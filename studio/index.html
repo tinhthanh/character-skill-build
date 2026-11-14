@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio nhân vật</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<style>
+  :root {
+    --nen:#0c1116; --be-mat:#141b22; --be-mat-2:#1a232c; --noi:#212c37;
+    --vien:#26323d; --vien-2:#34434f;
+    --chu:#e8edf1; --chu-2:#a3b0bb; --chu-3:#6d7b87;
+    --nhan:#5cc2cc; --nhan-dam:#12707a; --nhan-mo:rgba(92,194,204,.14);
+    --canh-bao:#f0b36b; --loi:#ef7f8b; --tot:#6fd3a0;
+    --bo:10px; --bo-nho:7px;
+    --san-1:#102a3a; --san-2:#060d16;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  [hidden] { display:none !important; }
+  html, body { height:100%; }
+  body { font-family:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:13px;
+         background:var(--nen); color:var(--chu); line-height:1.45; overflow:hidden; }
+  button, input, select { font:inherit; color:inherit; }
+  button { cursor:pointer; border:0; background:none; }
+  :focus-visible { outline:2px solid var(--nhan); outline-offset:2px; }
+
+  /* ───────────── khung ───────────── */
+  .app { display:grid; height:100vh; grid-template-rows:52px minmax(0,1fr) 62px;
+         grid-template-columns:84px minmax(0,1fr) 348px;
+         grid-template-areas:"tren tren tren" "ray san bang" "duoi duoi duoi"; }
+
+  /* ───────────── thanh trên ───────────── */
+  .tren { grid-area:tren; display:flex; align-items:center; gap:10px; padding:0 14px;
+          background:var(--be-mat); border-bottom:1px solid var(--vien); }
+  .ten-app { display:flex; align-items:center; gap:9px; font-weight:700; font-size:14px; white-space:nowrap; }
+  .ten-app i { width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+               background:linear-gradient(140deg,var(--nhan),#3a8bd0); }
+  .ten-app i svg { width:16px; height:16px; stroke:#06222a; }
+  .chon { height:32px; padding:0 30px 0 11px; border-radius:var(--bo-nho); border:1px solid var(--vien-2);
+          background:var(--be-mat-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a3b0bb' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 11px center;
+          appearance:none; -webkit-appearance:none; font-weight:600; cursor:pointer; }
+  .gian { flex:1; }
+  .nut-bt { width:32px; height:32px; border-radius:var(--bo-nho); display:grid; place-items:center; color:var(--chu-2); }
+  .nut-bt:hover:not(:disabled) { background:var(--noi); color:var(--chu); }
+  .nut-bt:disabled { opacity:.3; cursor:default; }
+  .nut-bt svg { width:18px; height:18px; }
+  .ray svg { width:21px; height:21px; }
+  svg.net { fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .vach { width:1px; height:22px; background:var(--vien); margin:0 2px; }
+  .trang-thai { font-size:12px; color:var(--chu-3); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .trang-thai::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--tot); }
+  .trang-thai.ban::before { background:var(--canh-bao); }
+  .nut { height:32px; padding:0 13px; border-radius:var(--bo-nho); font-weight:600; border:1px solid var(--vien-2);
+         background:var(--be-mat-2); white-space:nowrap; }
+  .nut:hover { background:var(--noi); }
+  .nut.dat-lai { display:flex; align-items:center; gap:6px; padding:0 11px; }
+  .nut.dat-lai svg { width:15px; height:15px; }
+  .nut:disabled { opacity:.35; cursor:default; }
+  .nut:disabled:hover { background:var(--be-mat-2); }
+  .dat-nhom { margin-left:auto; height:24px; padding:0 9px; border-radius:6px; border:1px solid var(--vien-2); color:var(--chu-2);
+              font-size:11.5px; font-weight:500; }
+  .dat-nhom:hover { color:var(--canh-bao); border-color:var(--canh-bao); }
+  .nut.chinh { background:var(--nhan); border-color:var(--nhan); color:#04262b; }
+  .nut.chinh:hover { filter:brightness(1.08); }
+  .nut.chinh:disabled { opacity:.5; cursor:default; }
+  .menu { position:relative; }
+  .menu-o { position:absolute; right:0; top:38px; min-width:230px; padding:5px; z-index:30; display:none;
+            background:var(--be-mat-2); border:1px solid var(--vien-2); border-radius:var(--bo);
+            box-shadow:0 14px 40px rgba(0,0,0,.5); }
+  .menu.mo .menu-o { display:block; }
+  .menu-o button, .menu-o a { display:block; width:100%; text-align:left; padding:8px 10px; border-radius:6px;
+            color:var(--chu); text-decoration:none; }
+  .menu-o button:hover, .menu-o a:hover { background:var(--noi); }
+  .menu-o hr { border:0; border-top:1px solid var(--vien); margin:5px 0; }
+
+  /* ───────────── ray trái ───────────── */
+  .ray { grid-area:ray; background:var(--be-mat); border-right:1px solid var(--vien);
+         display:flex; flex-direction:column; gap:2px; padding:8px 6px; overflow-y:auto; }
+  .ray button { display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 2px; border-radius:var(--bo-nho);
+                color:var(--chu-3); font-size:10.5px; font-weight:500; line-height:1.2; text-align:center; position:relative; }
+  .ray button:hover { background:var(--be-mat-2); color:var(--chu-2); }
+  .ray button.chon-r { background:var(--nhan-mo); color:var(--nhan); }
+  .ray button .cham { position:absolute; top:6px; right:14px; width:6px; height:6px; border-radius:50%; background:var(--canh-bao); display:none; }
+  .ray button.da-doi .cham { display:block; }
+
+  /* ───────────── sân khấu ───────────── */
+  .san { grid-area:san; position:relative; overflow:hidden; display:grid; place-items:center;
+         background:radial-gradient(120% 90% at 50% 20%,var(--san-1) 0%,var(--san-2) 75%); }
+  .san.sang { --san-1:#f3f6f8; --san-2:#cdd6dd; }
+  .san.caro { background:conic-gradient(#1b242d 25%,#141b22 0 50%,#1b242d 0 75%,#141b22 0) 0 0/28px 28px; }
+  .san .nv { height:92%; max-width:94%; }
+  .san-cc { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:8px; }
+  .khuc { display:flex; padding:3px; gap:2px; border-radius:9px; background:rgba(12,17,22,.72);
+          border:1px solid var(--vien); backdrop-filter:blur(8px); }
+  .khuc button { height:26px; padding:0 11px; white-space:nowrap; border-radius:6px; color:var(--chu-2); font-weight:500; font-size:12px; }
+  .khuc button:hover { color:var(--chu); }
+  .khuc button.bat { background:var(--noi); color:var(--chu); }
+  .khuc button.o-mau { width:26px; padding:0; display:grid; place-items:center; }
+  .khuc button.o-mau span { width:14px; height:14px; border-radius:4px; border:1px solid rgba(255,255,255,.25); }
+
+  /* ───────────── bảng phải ───────────── */
+  .bang { grid-area:bang; background:var(--be-mat); border-left:1px solid var(--vien); overflow-y:auto; padding:16px 16px 28px; }
+  .bang h2 { font-size:15px; font-weight:700; display:flex; align-items:center; gap:7px; }
+  .bang .mo-ta { color:var(--chu-3); font-size:12px; margin:3px 0 14px; }
+  .goi-y { width:17px; height:17px; border-radius:50%; border:1px solid var(--vien-2); color:var(--chu-3);
+           font-size:10.5px; font-weight:700; display:inline-grid; place-items:center; cursor:help; position:relative; }
+  .goi-y:hover::after, .goi-y:focus::after { content:attr(data-g); position:absolute; top:22px; left:-8px; width:268px; z-index:20;
+           padding:9px 11px; border-radius:8px; background:#0a0f14; border:1px solid var(--vien-2); color:var(--chu-2);
+           font-size:11.5px; font-weight:400; line-height:1.5; text-align:left; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .nhan-muc { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--chu-3); margin:18px 0 8px; }
+  .nhan-muc:first-of-type { margin-top:0; }
+
+  .mau-san { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .mau-san button { border-radius:var(--bo); border:1.5px solid var(--vien); background:var(--be-mat-2); overflow:hidden;
+                    display:flex; flex-direction:column; text-align:center; transition:border-color .12s, transform .12s; }
+  .mau-san button:hover { border-color:var(--vien-2); transform:translateY(-1px); }
+  .mau-san button.dang { border-color:var(--nhan); box-shadow:0 0 0 3px var(--nhan-mo); }
+  .mau-san .hinh { aspect-ratio:1; background:radial-gradient(100% 100% at 50% 20%,#163041,#0b141d); overflow:hidden; pointer-events:none; }
+  .mau-san .hinh.than { aspect-ratio:400/470; }
+  .mau-san .hinh > div { width:100%; height:100%; }
+  .mau-san span { padding:5px 4px 6px; background:var(--be-mat-2); position:relative; font-size:10.5px; color:var(--chu-2); line-height:1.25;
+                  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .truot { display:grid; grid-template-columns:96px 1fr 54px; align-items:center; gap:10px; height:32px; }
+  .truot label { color:var(--chu-2); display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .truot label i { width:5px; height:5px; border-radius:50%; background:var(--canh-bao); visibility:hidden; flex:none; }
+  .truot.da-doi label i { visibility:visible; }
+  .truot input[type=range] { width:100%; height:18px; appearance:none; -webkit-appearance:none; background:none; cursor:pointer; }
+  .truot input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px; background:var(--vien-2); }
+  .truot input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; margin-top:-5px; border-radius:50%;
+           background:var(--chu); border:2px solid var(--nhan); }
+  .truot input[type=range]::-moz-range-track { height:4px; border-radius:2px; background:var(--vien-2); }
+  .truot input[type=range]::-moz-range-thumb { width:11px; height:11px; border-radius:50%; background:var(--chu); border:2px solid var(--nhan); }
+  .truot .so { width:100%; height:26px; text-align:right; padding:0 7px; border-radius:6px; border:1px solid transparent;
+               background:var(--be-mat-2); font:12px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--chu); }
+  .truot .so:hover { border-color:var(--vien-2); }
+  .truot .so:focus { outline:none; border-color:var(--nhan); }
+  details.nang-cao { margin-top:10px; border-top:1px solid var(--vien); padding-top:10px; }
+  details.nang-cao summary { cursor:pointer; color:var(--chu-2); font-weight:600; list-style:none; display:flex; align-items:center; gap:6px; height:28px; }
+  details.nang-cao summary::-webkit-details-marker { display:none; }
+  details.nang-cao summary::before { content:''; width:6px; height:6px; border-right:1.6px solid currentColor; border-bottom:1.6px solid currentColor;
+           transform:rotate(-45deg); transition:transform .15s; }
+  details.nang-cao[open] summary::before { transform:rotate(45deg); }
+  .meo { margin-top:14px; font-size:11.5px; color:var(--chu-3); }
+
+  .bang-mau { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .bang-mau button { width:30px; height:30px; border-radius:50%; border:2px solid var(--be-mat); box-shadow:0 0 0 1px var(--vien-2); }
+  .bang-mau button:hover { transform:scale(1.08); }
+  .bang-mau button.dang { box-shadow:0 0 0 2px var(--nhan); }
+  .bang-mau label.tuy { width:30px; height:30px; border-radius:50%; position:relative; overflow:hidden; cursor:pointer;
+           background:conic-gradient(#ef7f8b,#f0b36b,#f2e279,#6fd3a0,#5cc2cc,#7c8cf0,#c77de0,#ef7f8b); box-shadow:0 0 0 1px var(--vien-2); }
+  .bang-mau label.tuy input { position:absolute; inset:-6px; width:150%; height:150%; opacity:0; cursor:pointer; }
+
+  /* ───────────── thanh dưới ───────────── */
+  .duoi { grid-area:duoi; display:flex; align-items:center; gap:10px; padding:0 14px; background:var(--be-mat); border-top:1px solid var(--vien); }
+  .phat { width:36px; height:36px; border-radius:50%; background:var(--nhan); color:#04262b; display:grid; place-items:center; flex:none; }
+  .phat svg { width:15px; height:15px; fill:currentColor; }
+  .dung { width:36px; height:36px; border-radius:50%; border:1px solid var(--vien-2); color:var(--chu); display:grid; place-items:center; flex:none; }
+  .dung svg { width:13px; height:13px; fill:currentColor; }
+  .dung:hover:not(:disabled) { background:var(--noi); border-color:var(--loi); color:var(--loi); }
+  .dung:disabled { opacity:.3; cursor:default; }
+  .dong-tac { flex:1; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding:2px 0;
+              mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent); }
+  .dong-tac::-webkit-scrollbar { display:none; }
+  .dong-tac button { height:30px; padding:0 12px; border-radius:15px; border:1px solid var(--vien-2); color:var(--chu-2);
+                     font-weight:500; white-space:nowrap; flex:none; }
+  .dong-tac button:hover { color:var(--chu); background:var(--be-mat-2); }
+  .dong-tac button.dang { background:var(--nhan-mo); border-color:var(--nhan); color:var(--nhan); }
+  .loi-noi { width:230px; height:32px; padding:0 11px; border-radius:var(--bo-nho); border:1px solid var(--vien-2); background:var(--be-mat-2); }
+  .loi-noi:focus { outline:none; border-color:var(--nhan); }
+  .loi-noi::placeholder { color:var(--chu-3); }
+
+  .toast { position:fixed; left:50%; bottom:78px; transform:translate(-50%,12px); padding:10px 16px; border-radius:var(--bo);
+           background:#0a0f14; border:1px solid var(--vien-2); box-shadow:0 14px 40px rgba(0,0,0,.55); max-width:min(560px,92vw);
+           opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; }
+  .toast.hien { opacity:1; transform:translate(-50%,0); }
+  .toast.loi { border-color:var(--loi); }
+
+  @media (max-width:900px) {
+    body { overflow:auto; overflow-x:hidden; }
+    .tren, .duoi, .bang, .ray { min-width:0; }
+    .tren { gap:6px; padding:0 10px; }
+    .tren .chon { min-width:0; flex:1 1 0; }
+    .tren .gian, .tren .vach { display:none; }
+    #tocDo { display:none; }
+    .app { height:auto; min-height:100vh; grid-template-rows:52px 46vh auto auto 62px; grid-template-columns:minmax(0,1fr);
+           grid-template-areas:"tren" "san" "ray" "bang" "duoi"; }
+    .ray { flex-direction:row; border-right:0; border-bottom:1px solid var(--vien); overflow-x:auto; padding:6px 10px; }
+    .ray button { min-width:66px; }
+    .bang { border-left:0; overflow:visible; }
+    .duoi { position:sticky; bottom:0; }
+    .trang-thai, .loi-noi, .ten-app span, .dat-lai span { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="tren">
+    <div class="ten-app"><i><svg class="net" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M6 21v-5a6 6 0 0 1 12 0v5"/></svg></i><span>Studio nhân vật</span></div>
+    <select class="chon" id="chonNV" aria-label="Nhân vật"></select>
+    <div class="gian"></div>
+    <button class="nut-bt" id="hoanTac" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác"><svg class="net" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button class="nut-bt" id="lamLai" title="Làm lại (Ctrl+Shift+Z)" aria-label="Làm lại"><svg class="net" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    <button class="nut dat-lai" id="datLai" title="Đưa nhân vật này về bộ số gốc đẹp nhất (hoàn tác được)" disabled>
+      <svg class="net" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.600-5.900"/><path d="M4 4v5h5"/></svg><span>Đặt lại</span></button>
+    <div class="vach"></div>
+    <span class="trang-thai" id="trangThai">Đã lưu</span>
+    <button class="nut chinh" id="luu">Lưu</button>
+    <div class="menu" id="menu">
+      <button class="nut-bt" id="menuNut" title="Thêm" aria-label="Thêm"><svg class="net" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+      <div class="menu-o">
+        <button id="veDaLuu">Về bản đã lưu</button>
+        <button id="veGoc">Về mặc định gốc</button>
+        <hr>
+        <button id="taiJson">Tải file config (.json)</button>
+        <button id="chepMa">Chép định nghĩa (JS)</button>
+        <hr>
+        <button id="chepNhung">Chép mã nhúng HyperFrames</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="ray" id="ray" aria-label="Nhóm chỉnh"></nav>
+
+  <main class="san" id="san">
+    <div class="nv" id="nv"></div>
+    <div class="san-cc">
+      <div class="khuc" id="khucNhin">
+        <button data-n="than">Toàn thân</button>
+        <button data-n="mat">Cận mặt</button>
+      </div>
+      <div class="khuc" id="khucNen">
+        <button class="o-mau bat" data-nen="" title="Nền tối"><span style="background:#0d2230"></span></button>
+        <button class="o-mau" data-nen="sang" title="Nền sáng"><span style="background:#e9eef1"></span></button>
+        <button class="o-mau" data-nen="caro" title="Nền caro"><span style="background:conic-gradient(#3a4651 25%,#1b242d 0 50%,#3a4651 0 75%,#1b242d 0)"></span></button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="bang" id="bang"></aside>
+
+  <footer class="duoi">
+    <button class="phat" id="phat" title="Phát / tạm dừng (phím cách)" aria-label="Phát / tạm dừng"></button>
+    <button class="dung" id="dung" title="Dừng động tác, về đứng yên (Esc)" aria-label="Dừng động tác" disabled><svg viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg></button>
+    <div class="dong-tac" id="dongTac"></div>
+    <select class="chon" id="tocDo" aria-label="Tốc độ">
+      <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+    </select>
+    <input class="loi-noi" id="loi" type="text" value="Xin chào, mình là bác sĩ thú y!" placeholder="Lời cho Nói / Giải thích…" aria-label="Lời nói">
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="module">
+/* ============================ Studio nhân vật ============================
+ * MỘT màn hình thay cho hai trang cũ (trang chỉnh + sân thử động tác).
+ * Không có logic nhân vật nào ở đây: rig là `runtime/rig-svg.js`, bảng tham số
+ * và mẫu là `studio/params.js`. Trang này chỉ là giao diện —
+ * ray nhóm bên trái, nhân vật ở giữa, bảng của ĐÚNG MỘT nhóm bên phải,
+ * động tác ở thanh dưới.
+ */
+// `runtime/index.js` đăng ký sẵn mọi nhân vật: ba nhân vật có sẵn và các nhân vật
+// tuỳ chỉnh trong `characters/`.
+import { RigSVG, RigThu, IIFE_TEN } from '../runtime/index.js';
+import { NHOM, khungMat } from './params.js';
+
+const $ = (id) => document.getElementById(id);
+const sao = (o) => JSON.parse(JSON.stringify(o));
+const I = (d) => `<svg class="net" viewBox="0 0 24 24">${d}</svg>`;
+
+/* ───────────────────────────────────────────────────────── mô tả giao diện */
+// `nhin`: bấm vào nhóm thì sân khấu tự phóng tới chỗ nhóm ấy tác động.
+// `chinh`: các thanh hay dùng; phần còn lại của `NHOM[k].muc` gập vào "Nâng cao".
+const MUC = [
+  { k: 'mat', ten: 'Khuôn mặt', nhin: 'mat', moTa: 'Hình dáng hộp sọ và hàm.',
+    icon: I('<path d="M12 3c4.4 0 7 3 7 7.5S16 21 12 21s-7-6-7-10.5S7.6 3 12 3z"/><path d="M9 10.5h.01M15 10.5h.01M9.5 15c1.5 1.2 3.5 1.2 5 0"/>'),
+    chinh: ['rong', 'cao', 'cam'] },
+  { k: 'may', ten: 'Chân mày', nhin: 'mat', moTa: 'Kiểu mày và chỗ đặt mày.',
+    icon: I('<path d="M3.5 10c2-2.6 5-2.8 7-1.2M13.500 8.800c2-1.600 5-1.400 7 1.200M7.500 14.500h.01M16.500 14.500h.01"/>'),
+    chinh: ['dai', 'day', 'cong', 'xech'] },
+  { k: 'net', ten: 'Mắt mũi miệng', nhin: 'mat', moTa: 'Chỗ đặt và cỡ của từng nét.',
+    icon: I('<path d="M2.500 12s3.500-6 9.500-6 9.500 6 9.500 6-3.500 6-9.500 6-9.500-6-9.500-6z"/><circle cx="12" cy="12" r="2.6"/>'),
+    chinh: ['matX', 'matY', 'matCo', 'miengY'] },
+  { k: 'mieng', ten: 'Biểu cảm', nhin: 'mat', moTa: 'Nét miệng lúc đứng yên.',
+    icon: I('<path d="M4 10.500c3-1.800 5-1.800 8-.4 3-1.400 5-1.400 8 .4-2 5.500-5 7.500-8 7.500s-6-2-8-7.500z"/><path d="M4 10.500c3.500 1.600 12.500 1.600 16 0"/>'),
+    chinh: ['mieng', 'cuoi', 'chum'] },
+  { k: 'than', ten: 'Tỉ lệ', nhin: 'than', moTa: 'Đầu to hay nhỏ, cổ dài hay rụt, chân dài hay ngắn.',
+    icon: I('<circle cx="12" cy="6.500" r="3.500"/><path d="M7 21v-6a5 5 0 0 1 10 0v6"/>'),
+    chinh: ['coDau', 'dauLech', 'coThan', 'coChan'] },
+  { k: 'tay', ten: 'Tay', nhin: 'than', moTa: 'Độ dài, độ mập và tư thế nghỉ của tay.',
+    icon: I('<path d="M8 13V6.500a1.500 1.500 0 0 1 3 0V11V4.500a1.500 1.500 0 0 1 3 0V11V6.500a1.500 1.500 0 0 1 3 0V15c0 3.500-2.500 6-6 6-2.800 0-4.300-1.400-5.600-3.600L3.800 14a1.400 1.400 0 0 1 2.300-1.500L8 14.500"/>'),
+    chinh: ['daiCanhTay', 'daiCangTay', 'dayTay', 'coBanTay'] },
+  { k: 'tayAo', ten: 'Tay áo', nhin: 'than', moTa: 'Dài, rộng và đường gấu của tay áo.',
+    icon: I('<path d="M8.500 3 3 6l2 4 2-1v11h10V9l2 1 2-4-5.500-3a3.500 3.500 0 0 1-7 0z"/>'),
+    chinh: ['daiTayAo', 'rongTayAo', 'xeoTayAo'] },
+  { k: 'chan', ten: 'Chân', nhin: 'than', moTa: 'Từng đốt chân và bàn chân.',
+    icon: I('<path d="M9 3v9l-1 9M15 3v9l1 9M5.500 21H10M14 21h4.500"/>'),
+    chinh: ['daiDui', 'daiOng', 'dayChan', 'cachChan', 'coBanChan'] },
+  { k: 'mau', ten: 'Màu sắc', nhin: 'than', moTa: 'Màu tối đi kèm tự suy theo màu chính: tay áo và bóng sườn theo áo, chân mày theo tóc, chân xa và tai theo lông.',
+    icon: I('<path d="M12 3s6 6.500 6 11a6 6 0 0 1-12 0c0-4.500 6-11 6-11z"/>') },
+];
+// Nhãn đọc được thay cho ký hiệu của trang cũ ("trán ▢", "đầu ⌀").
+const TEN = {
+  rong: 'Bề rộng', cao: 'Vòm đầu', cam: 'Cằm dài', yRong: 'Gò má', tranVuong: 'Trán vuông', hamVuong: 'Hàm vuông', rongTran: 'Trán rộng', rongCam: 'Cằm rộng',
+  dai: 'Dài', day: 'Dày', cong: 'Độ cong', thon: 'Thon đuôi', xech: 'Xếch', mayY: 'Cao thấp', mayX: 'Khoảng cách',
+  matX: 'Mắt xa gần', matY: 'Mắt cao thấp', matCo: 'Cỡ mắt', muiY: 'Mũi cao thấp', muiCo: 'Cỡ mũi', miengY: 'Miệng cao thấp', miengRong: 'Miệng rộng',
+  mieng: 'Mở miệng', cuoi: 'Cười', chum: 'Chúm môi',
+  dauLech: 'Cổ ngắn', coDau: 'Cỡ đầu', coThan: 'Cỡ thân', coChan: 'Cỡ chân',
+  daiCanhTay: 'Cánh tay', daiCangTay: 'Cẳng tay', dayTay: 'Độ mập', coBanTay: 'Bàn tay', batNghi: 'Nghỉ: bắp tay', cangNghi: 'Nghỉ: cẳng tay',
+  daiTayAo: 'Dài', xeoTayAo: 'Gấu xéo', rongTayAo: 'Rộng', vienGau: 'Viền gấu', boGocTayAo: 'Bo góc',
+  daiDui: 'Đùi', daiOng: 'Ống chân', dayChan: 'Độ mập', cachChan: 'Khoảng cách', coBanChan: 'Bàn chân',
+};
+const BANG_MAU = [
+  ['da', 'Da', ['#fde0cf', '#f7d9c4', '#f1c3a0', '#e3ad86', '#c98f66', '#a66f4c', '#7c4f36']],
+  ['toc', 'Tóc', ['#151319', '#2c2a33', '#4d3122', '#6b4b2f', '#8d3f4a', '#b5652f', '#d9a54a', '#9aa3ad']],
+  ['ao', 'Áo', ['#3f4650', '#4a8ed6', '#2f9e8f', '#3aa87a', '#8a5ad6', '#d65a4a', '#e0a83a', '#f1f3f5']],
+  ['quan', 'Quần', ['#2f3a4d', '#4a515c', '#1f2933', '#5a6b7c', '#6b5544', '#274a6e']],
+  ['giay', 'Giày', ['#1b2029', '#d7b48f', '#f1f3f5', '#7a4b32', '#b84a4a']],
+  ['phuKien', 'Phụ kiện', ['#7d4fa0', '#5cc2cc', '#d65a4a', '#e0a83a', '#3aa87a']],
+  ['mu', 'Mũ', ['#237a6e', '#1f5f8f', '#5a4a8a', '#b84a5a', '#3f4650']],
+  ['aoTrong', 'Áo trong', ['#3f6ea8', '#2f9e8f', '#8d3f4a', '#4a515c', '#e0a83a']],
+  ['ongNghe', 'Ống nghe', ['#8d3f4a', '#8c4680', '#1f5f8f', '#22262e', '#2f9e8f']],
+  ['mat', 'Mắt', ['#3a2416', '#1c1a22', '#4a2e18', '#2f5d50', '#2f4f7a']],
+  ['mieng', 'Môi', ['#7d2f3d', '#5a2530', '#8d4a4e', '#b84a5a', '#a05a48']],
+  // — thú cưng —
+  ['long', 'Lông', ['#dc9a4c', '#9ba4af', '#f1ede6', '#3a3336', '#8a5a3a', '#e8c07a', '#c9744a', '#6f7d8c']],
+  ['longSang', 'Lông sáng', ['#fbead0', '#f5f2ed', '#ffffff', '#e9d3b4', '#d9dde2']],
+  ['dom', 'Vằn', ['#6b7480', '#3a3336', '#8a5a3a', '#b87a34', '#4d5661']],
+  ['vongCo', 'Vòng cổ', ['#d6453d', '#2f9e8f', '#2f6fd0', '#8a5ad6', '#e0a83a', '#22262e']],
+  ['mui', 'Mũi', ['#2a2024', '#e58b96', '#7a4b3a', '#b9606c']],
+];
+const DONG_TAC = [
+  ['idle', 'Đứng yên'], ['wave', 'Vẫy tay'], ['giaiThich', 'Giải thích'], ['speak', 'Nói'], ['point', 'Chỉ'],
+  ['present', 'Giới thiệu'], ['thumbsUp', 'Tán thành'], ['nod', 'Gật đầu'], ['shake', 'Lắc đầu'], ['shrug', 'Nhún vai'],
+  ['loLang', 'Lo lắng'], ['march', 'Dậm chân'], ['stroll', 'Bước nhẹ'], ['stepInPlace', 'Bước tại chỗ'],
+  ['walk', 'Đi ngang'], ['enter', 'Bước vào'], ['exit', 'Bước ra'], ['walkForward', 'Tiến lại gần'], ['walkAway', 'Đi ra xa'],
+].filter(([m]) => typeof RigSVG.prototype[m] === 'function');
+const DT_CAN_MAT = new Set(['idle', 'speak', 'giaiThich', 'nod', 'shake', 'loLang']);   // xem được khi đang cận mặt
+
+/* ─────────────────────────────────────────────────────────── trạng thái */
+// `tt` = con số ĐANG dùng, lấy từ chính giá trị rig trả về (không đọc ngược từ
+// thanh trượt: thanh trượt làm tròn theo bước).
+// Thứ tự đặt có ý: thân/tay/chân trước, rồi khuôn mặt, rồi mày và nét — vì đổi
+// khuôn mặt thì rig tính lại `matX`/`mayX` theo viền, hai nhóm kia phải đè lên sau.
+const THU_TU = ['than', 'tay', 'tayAo', 'chan', 'mat', 'may', 'net', 'mieng'];
+let khoa, rig, tt, goc, daLuu;
+// THÚ CƯNG dùng bộ rig riêng (`rig-thu.js`): chỉ có bảng màu và bộ động tác của
+// chính loài ấy — các nhóm chỉnh khuôn mặt/tay/chân bên trái là của khung xương người.
+const laThu = () => khoa in RigThu.LOAI;
+const tenNV = () => (laThu() ? RigThu.LOAI[khoa] : RigSVG.NHAN_VAT[khoa]).ten || khoa;
+const DT_CAN_MAT_THU = new Set(['idle', 'bark', 'meow', 'purr', 'tiltHead']);
+const canMat = (m) => (laThu() ? DT_CAN_MAT_THU : DT_CAN_MAT).has(m);
+let lichSu = [], viTri = 0;
+let mucChon = 'mat', nhin = 'mat';
+let tl = null, dangChay = 'idle', henRanh = 0;
+let hinhNho = [];                       // [{ rig, kieu }] của bảng mẫu đang mở
+let mucNguoi = null;                    // nhóm đang mở ở nhân vật người, nhớ lại khi ghé qua thú
+
+function datNhom(r, k, kieu) {
+  const v = NHOM[k].dat(r, kieu);
+  // Biểu cảm ở đây là nét mặt LÚC NGHỈ, nên ghi luôn vào tư thế nghỉ — nếu chỉ
+  // đặt vào `rig.s` như trang cũ thì động tác kế tiếp khép về là mất.
+  if (k === 'mieng') {
+    const n = { mieng: v.mieng, cuoi: v.cuoi, chum: v.chum };
+    r.nv.nghi = { ...(r.nv.nghi || {}), ...n };
+    r.NGHI = Object.freeze({ ...r.NGHI, ...n });
+  }
+  return v;
+}
+
+function taoRig(host) {
+  const r = laThu() ? new RigThu(host, khoa) : new RigSVG(host, khoa);
+  r._mauGoc = { ...r.mauKhai };
+  r._mauDoi = {};
+  return r;
+}
+
+// Đọc bộ số của một rig VỪA DỰNG (trước khi có động tác nào chạy).
+function docTrangThai(r) {
+  const o = { mau: {} };
+  if (laThu()) return o;
+  for (const k of THU_TU) o[k] = k === 'mieng' ? { mieng: r.NGHI.mieng, cuoi: r.NGHI.cuoi, chum: r.NGHI.chum } : NHOM[k].dat(r, {});
+  return o;
+}
+
+// Đặt nguyên một trạng thái lên rig; trả về trạng thái THỰC rig đang dùng.
+function apTrangThai(r, st) {
+  const m = st.mau || {};
+  if (JSON.stringify(m) !== JSON.stringify(r._mauDoi)) {
+    r.mauKhai = { ...r._mauGoc };
+    r.doiMau(m);
+    r._mauDoi = { ...m };
+  }
+  const ra = { mau: { ...m } };
+  if (!laThu()) for (const k of THU_TU) ra[k] = datNhom(r, k, st[k] || {});
+  r.datNghi();
+  return ra;
+}
+
+// Định dạng tệp config — đúng thứ `napBoSo()` trong runtime/index.js nạp và tools/serve.py ghi ra.
+function raConfig(st) {
+  if (laThu()) return Object.keys(st.mau || {}).length ? { mau: st.mau } : {};
+  const { batNghi, cangNghi, ...tay } = st.tay;
+  const may = {}, viTriMay = {};
+  for (const [k, v] of Object.entries(st.may)) (NHOM.may.khoaKieu.includes(k) ? may : viTriMay)[k] = v;
+  const c = {
+    than: st.than, tay, tayAo: st.tayAo, chan: st.chan,
+    nghi: { ...(RigSVG.NHAN_VAT[khoa].nghi || {}), batL: batNghi, batR: batNghi, cangL: cangNghi, cangR: cangNghi, ...st.mieng },
+    khuon: st.mat, may, viTriMay, net: st.net,
+  };
+  if (Object.keys(st.mau || {}).length) c.mau = st.mau;
+  return c;
+}
+function tuConfig(c, nen) {
+  const st = sao(nen);
+  if (laThu()) { if (c.mau) st.mau = { ...c.mau }; return st; }
+  const gop = (k, o) => { if (o) Object.assign(st[k], o); };
+  gop('than', c.than); gop('tay', c.tay); gop('tayAo', c.tayAo); gop('chan', c.chan);
+  gop('mat', c.khuon); gop('may', c.may); gop('may', c.viTriMay); gop('net', c.net);
+  if (c.nghi) {
+    if (c.nghi.batR !== undefined) st.tay.batNghi = c.nghi.batR;
+    if (c.nghi.cangR !== undefined) st.tay.cangNghi = c.nghi.cangR;
+    for (const k of ['mieng', 'cuoi', 'chum']) if (c.nghi[k] !== undefined) st.mieng[k] = c.nghi[k];
+  }
+  if (c.mau) st.mau = { ...c.mau };
+  return st;
+}
+const khac = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
+// `v2`: bản nháp đời đầu được ghi ngay khi MỞ trang, kể cả lúc chưa chỉnh gì — nên
+// nó đóng băng dáng đứng và tỉ lệ cũ, và nhân vật không nhận bộ số mới trong mã.
+// Đổi khoá để bỏ hết các bản nháp ấy.
+const KHOA_NHAP = () => 'studio-nhan-vat/v2/' + khoa;
+
+/* ───────────────────────────────────────────────────────── lịch sử · lưu */
+function ghiNhan() {
+  if (!khac(tt, lichSu[viTri])) return;
+  lichSu = lichSu.slice(0, viTri + 1);
+  lichSu.push(sao(tt));
+  if (lichSu.length > 120) lichSu.shift();
+  viTri = lichSu.length - 1;
+  sauKhiDoi();
+}
+function sauKhiDoi() {
+  $('hoanTac').disabled = viTri === 0;
+  $('lamLai').disabled = viTri >= lichSu.length - 1;
+  const ban = khac(raConfig(tt), raConfig(daLuu));
+  // Chỉ giữ bản nháp khi THẬT SỰ có thay đổi chưa lưu. Không khác gì bản đã lưu
+  // thì xoá đi, để lần sau mở trang nhân vật nhận đúng bộ số mới nhất trong mã.
+  try { if (ban) localStorage.setItem(KHOA_NHAP(), JSON.stringify(tt)); else localStorage.removeItem(KHOA_NHAP()); }
+  catch (e) { /* chế độ riêng tư: bỏ qua bản nháp */ }
+  $('trangThai').textContent = ban ? 'Chưa lưu' : 'Đã lưu';
+  $('trangThai').classList.toggle('ban', ban);
+  for (const b of $('ray').children) b.classList.toggle('da-doi', khac(tt[b.dataset.k], goc[b.dataset.k]));
+  $('datLai').disabled = !khac(tt, goc);
+  const dn = $('bang').querySelector('.dat-nhom');
+  if (dn) dn.hidden = !khac(tt[mucChon], goc[mucChon]);
+  capNhatHinhNho();
+}
+function veLichSu(i) {
+  if (i < 0 || i >= lichSu.length) return;
+  viTri = i;
+  datTatCa(lichSu[i]);
+}
+// Đặt cả một trạng thái lên nhân vật chính (hoàn tác, đặt lại, nạp bản nháp).
+function datTatCa(st) {
+  veRanh(true);
+  tt = apTrangThai(rig, st);
+  ranh();
+  capNhatKhung(false);
+  veBang();
+  sauKhiDoi();
+}
+
+let henToast = 0;
+function toast(chu, loi = false) {
+  const t = $('toast');
+  t.textContent = chu; t.classList.toggle('loi', loi); t.classList.add('hien');
+  clearTimeout(henToast); henToast = setTimeout(() => t.classList.remove('hien'), loi ? 6000 : 2600);
+}
+
+async function luu() {
+  const nut = $('luu'), c = raConfig(tt);
+  nut.disabled = true; nut.textContent = 'Đang lưu…';
+  try {
+    const res = await fetch('/api/character/config/' + khoa, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
+    if (!res.ok) throw new Error('máy chủ trả ' + res.status);
+    daLuu = sao(tt);
+    sauKhiDoi();
+    toast(`Đã lưu config của “${tenNV()}”.`);
+  } catch (e) {
+    toast(`Không lưu được lên máy chủ (${e.message}). Bản nháp vẫn giữ trên máy này — có thể tải file .json từ menu ⋯.`, true);
+  } finally { nut.disabled = false; nut.textContent = 'Lưu'; }
+}
+
+/* ───────────────────────────────────────────────────────────── sân khấu */
+const khungDay = (r = rig) => `0 0 ${r.constructor.KHUNG.w} ${r.constructor.KHUNG.h}`;
+function capNhatKhung(muot = true) {
+  const dich = nhin !== 'mat' ? khungDay() : laThu() ? rig.khungMat(84) : khungMat(rig, 108);
+  gsap.killTweensOf(rig.svg);
+  if (muot && !matchMedia('(prefers-reduced-motion:reduce)').matches) gsap.to(rig.svg, { attr: { viewBox: dich }, duration: 0.45, ease: 'power2.inOut' });
+  else rig.svg.setAttribute('viewBox', dich);
+  for (const b of $('khucNhin').children) b.classList.toggle('bat', b.dataset.n === nhin);
+}
+function datNhin(n, muot = true) { nhin = n; capNhatKhung(muot); }
+
+const BIEU_PHAT = '<svg viewBox="0 0 16 16"><path d="M4 2.500v11l9-5.500z"/></svg>';
+const BIEU_DUNG = '<svg viewBox="0 0 16 16"><path d="M3.500 2.500h3v11h-3zM9.500 2.500h3v11h-3z"/></svg>';
+function veNutPhat() {
+  $('phat').innerHTML = tl && !tl.paused() ? BIEU_DUNG : BIEU_PHAT;
+  for (const b of $('dongTac').children) b.classList.toggle('dang', b.dataset.m === dangChay);
+  $('dung').disabled = dangChay === 'idle';      // đứng yên thì không có gì để dừng
+}
+function dungTl() { clearTimeout(henRanh); if (tl) tl.kill(); tl = null; }
+
+// Rảnh thì thở/chớp mắt liên tục — nhân vật không bao giờ đứng hình.
+function ranh() {
+  dungTl();
+  dangChay = 'idle';
+  tl = rig.idle(6);
+  tl.eventCallback('onComplete', ranh);
+  tl.play(0);
+  veNutPhat();
+}
+// Đang diễn một động tác thì dừng lại về dáng nghỉ (để chỉnh tay/miệng không bị
+// động tác ghi đè từng khung). `im` = chưa khởi động lại vòng nghỉ.
+function veRanh(im = false) {
+  if (dangChay === 'idle' && tl && !im) return;
+  dungTl();
+  rig.datNghi();
+  if (!im) ranh();
+}
+// Nút DỪNG: bỏ động tác đang diễn và đưa nhân vật về tư thế nghỉ. Về MƯỢT trong
+// 0.3 giây nếu nhân vật còn đứng tại chỗ; còn nếu đang ở chỗ khác hoặc đang ẩn
+// (bước ra, đi xa, đi ngang) thì đặt thẳng về giữa — trượt cả người qua màn hình
+// trông như lỗi hơn là dừng.
+function dungDongTac() {
+  if (dangChay === 'idle') return;
+  dungTl();
+  dangChay = 'idle';
+  const s = rig.s, N = rig.NGHI;
+  if (Math.abs(s.x - N.x) > 1 || Math.abs(s.co - N.co) > 0.01 || s.mo < 0.99 || Math.abs(s.huong - N.huong) > 0.01) { rig.datNghi(); return ranh(); }
+  const so = {};
+  for (const k in N) if (typeof N[k] === 'number') so[k] = N[k];
+  tl = gsap.timeline({ onUpdate: () => rig.apDung(), onComplete: ranh });
+  tl.to(s, { ...so, duration: 0.3, ease: 'power2.out' });
+  if (N.tayL !== undefined) tl.set(s, { tayL: N.tayL, tayR: N.tayR }, 0.15);
+  veNutPhat();
+}
+function chay(m) {
+  dungTl();
+  rig.datNghi();
+  if (m === 'idle') return ranh();
+  if (nhin === 'mat' && !canMat(m)) datNhin('than');
+  const loi = $('loi').value;
+  const t = laThu() ? rig[m]() : m === 'point' ? rig.point({ x: 70, y: 110 }) : (m === 'speak' || m === 'giaiThich') ? rig[m](loi, 2.6) : rig[m]();
+  dangChay = m; tl = t;
+  t.timeScale(Number($('tocDo').value));
+  t.eventCallback('onComplete', () => { henRanh = setTimeout(ranh, 450); });
+  t.play(0);
+  veNutPhat();
+}
+
+/* ───────────────────────────────────────────────────────── bảng bên phải */
+const lamTron = (v, buoc) => +Number(v).toFixed(buoc < 0.1 ? 2 : buoc < 1 ? 1 : 0);
+const trung = (a, b) => Math.abs(a - b) < 1e-6;
+
+// Đặt MỘT nhóm lên nhân vật chính khi người dùng kéo / bấm mẫu (chưa ghi lịch sử).
+function apNhom(k, kieu) {
+  if (NHOM[k].dungDongTac) veRanh();
+  tt[k] = datNhom(rig, k, kieu);
+  for (const kk of NHOM[k].keoTheo || []) tt[kk] = datNhom(rig, kk, {});
+  if (nhin === 'mat') capNhatKhung(false);
+  capNhatTruot();
+}
+
+// Nút "Đặt lại nhóm" ở tiêu đề bảng — chỉ hiện khi nhóm đang mở khác bộ số gốc.
+const NUT_DAT_NHOM = () => `<button class="dat-nhom" title="Chỉ đưa nhóm này về gốc"${khac(tt[mucChon], goc[mucChon]) ? '' : ' hidden'}>Đặt lại nhóm</button>`;
+function datLaiNhom() {
+  if (mucChon === 'mau') {
+    tt.mau = {};
+    rig.mauKhai = { ...rig._mauGoc }; rig.doiMau({}); rig._mauDoi = {};
+    if (nhin === 'mat') capNhatKhung(false);
+  } else apNhom(mucChon, { ...goc[mucChon] });
+  ghiNhan();
+  veBang();
+}
+function htmlTruot(k, khoaSo) {
+  const c = NHOM[k].muc[khoaSo];
+  return `<div class="truot" data-key="${khoaSo}" title="Bấm đúp để về giá trị gốc">
+      <label><i></i>${TEN[khoaSo] || c.ten}</label>
+      <input type="range" min="${c.min}" max="${c.max}" step="${c.buoc}"${c.nghich ? ' style="direction:rtl"' : ''} aria-label="${TEN[khoaSo] || c.ten}">
+      <input type="text" class="so" inputmode="decimal" spellcheck="false" aria-label="${TEN[khoaSo] || c.ten} (số)">
+    </div>`;
+}
+function capNhatTruot() {
+  if (mucChon === 'mau') return;
+  for (const o of $('bang').querySelectorAll('.truot')) {
+    const key = o.dataset.key, v = tt[mucChon][key], c = NHOM[mucChon].muc[key];
+    const [truot, so] = o.querySelectorAll('input');
+    truot.value = v;
+    if (document.activeElement !== so) so.value = lamTron(v, c.buoc);   // không ghi đè ô đang gõ dở
+    o.classList.toggle('da-doi', !trung(v, goc[mucChon][key]));
+  }
+  for (const b of $('bang').querySelectorAll('.mau-san button')) {
+    const kieu = NHOM[mucChon].kieu[b.dataset.i][1];
+    b.classList.toggle('dang', Object.entries(kieu).every(([q, v]) => trung(tt[mucChon][q], v)));
+  }
+}
+
+function veBang() {
+  const muc = MUC.find((x) => x.k === mucChon), o = $('bang');
+  hinhNho = [];
+  if (mucChon === 'mau') return veBangMau(muc, o);
+  const n = NHOM[mucChon], cacKhoa = Object.keys(n.muc);
+  const chinh = cacKhoa.filter((q) => muc.chinh.includes(q)), them = cacKhoa.filter((q) => !muc.chinh.includes(q));
+  o.innerHTML = `<h2>${muc.ten}${n.ghiChu ? `<span class="goi-y" tabindex="0" data-g="${n.ghiChu.replace(/"/g, '&quot;')}">i</span>` : ''}${NUT_DAT_NHOM()}</h2>
+    <p class="mo-ta">${muc.moTa}</p>
+    <div class="nhan-muc">Mẫu có sẵn</div>
+    <div class="mau-san">${n.kieu.map(([ten], i) =>
+      `<button data-i="${i}" title="${ten}"><div class="hinh${muc.nhin === 'than' ? ' than' : ''}"><div></div></div><span>${ten.split(' — ')[0]}</span></button>`).join('')}</div>
+    <div class="nhan-muc">Tinh chỉnh</div>
+    ${chinh.map((q) => htmlTruot(mucChon, q)).join('')}
+    ${them.length ? `<details class="nang-cao"><summary>Nâng cao (${them.length})</summary>${them.map((q) => htmlTruot(mucChon, q)).join('')}</details>` : ''}
+    <p class="meo">Bấm đúp vào một thanh để đưa nó về giá trị gốc.</p>`;
+  capNhatTruot();
+  dungHinhNho(muc);
+}
+
+// Hình thu nhỏ của từng mẫu: một rig thật, mang ĐÚNG trạng thái hiện tại rồi áp
+// mẫu lên — nên thấy được mẫu ấy trên chính nhân vật đang chỉnh, không phải một
+// hình minh hoạ chung chung. Dựng lần lượt để bảng hiện ra ngay.
+let luotHinh = 0;
+function dungHinhNho(muc) {
+  const luot = ++luotHinh, o = [...$('bang').querySelectorAll('.mau-san button')];
+  let i = 0;
+  const buoc = () => {
+    if (luot !== luotHinh || i >= o.length) return;
+    const kieu = NHOM[muc.k].kieu[i][1], r = taoRig(o[i].querySelector('.hinh > div'));
+    hinhNho.push({ rig: r, kieu, nhin: muc.nhin, k: muc.k });
+    veHinhNho(hinhNho[hinhNho.length - 1]);
+    i++;
+    setTimeout(buoc, 0);
+  };
+  buoc();
+}
+function veHinhNho(h) {
+  apTrangThai(h.rig, { ...tt, [h.k]: { ...tt[h.k], ...h.kieu } });
+  h.rig.svg.setAttribute('viewBox', h.nhin === 'mat' ? khungMat(h.rig, 74) : khungDay(h.rig));
+}
+let henHinh = 0;
+function capNhatHinhNho() {
+  clearTimeout(henHinh);
+  henHinh = setTimeout(() => hinhNho.forEach(veHinhNho), 120);
+}
+
+function veBangMau(muc, o) {
+  const co = BANG_MAU.filter(([k]) => /^#[0-9a-f]{6}$/i.test(rig.mau[k] || ''));
+  o.innerHTML = `<h2>${muc.ten}${NUT_DAT_NHOM()}</h2><p class="mo-ta">${muc.moTa}</p>` + co.map(([k, ten, ds]) => {
+    const ht = rig.mau[k].toLowerCase(), day = ds.includes(ht) ? ds : [ht, ...ds];
+    return `<div class="nhan-muc">${ten}</div><div class="bang-mau" data-k="${k}">`
+      + day.map((m) => `<button data-m="${m}" style="background:${m}" title="${m}" aria-label="${ten} ${m}" class="${m === ht ? 'dang' : ''}"></button>`).join('')
+      + `<label class="tuy" title="Màu tuỳ chọn"><input type="color" value="${ht}" aria-label="${ten}: màu tuỳ chọn"></label></div>`;
+  }).join('');
+}
+function datMau(k, m, ghi = true) {
+  tt.mau = { ...tt.mau, [k]: m };
+  rig.doiMau({ [k]: m });
+  rig._mauDoi = { ...tt.mau };
+  if (nhin === 'mat') capNhatKhung(false);
+  if (ghi) { ghiNhan(); veBang(); }
+}
+
+/* ─────────────────────────────────────────────────────────────── sự kiện */
+$('bang').addEventListener('input', (e) => {
+  const o = e.target.closest('.truot');
+  if (o) {
+    const key = o.dataset.key, c = NHOM[mucChon].muc[key];
+    let v = parseFloat(String(e.target.value).replace(',', '.'));
+    if (!Number.isFinite(v)) return;                       // đang gõ dở dấu trừ / dấu chấm
+    v = Math.min(c.max, Math.max(c.min, v));
+    apNhom(mucChon, { ...tt[mucChon], [key]: v });
+    return;
+  }
+  const bm = e.target.closest('.bang-mau');
+  if (bm && e.target.type === 'color') datMau(bm.dataset.k, e.target.value, false);
+});
+$('bang').addEventListener('change', (e) => {
+  if (e.target.closest('.truot')) { capNhatTruot(); ghiNhan(); }
+  else if (e.target.type === 'color') { ghiNhan(); veBang(); }
+});
+$('bang').addEventListener('dblclick', (e) => {
+  const o = e.target.closest('.truot');
+  if (!o || e.target.classList.contains('so')) return;
+  apNhom(mucChon, { ...tt[mucChon], [o.dataset.key]: goc[mucChon][o.dataset.key] });
+  ghiNhan();
+});
+$('bang').addEventListener('click', (e) => {
+  if (e.target.closest('.dat-nhom')) return datLaiNhom();
+  const mau = e.target.closest('.mau-san button');
+  if (mau) { apNhom(mucChon, { ...tt[mucChon], ...NHOM[mucChon].kieu[mau.dataset.i][1] }); ghiNhan(); return; }
+  const m = e.target.closest('.bang-mau button');
+  if (m) datMau(m.parentNode.dataset.k, m.dataset.m);
+});
+
+function chonMuc(k, doiNhin = true) {
+  mucChon = k;
+  for (const b of $('ray').children) b.classList.toggle('chon-r', b.dataset.k === k);
+  const muc = MUC.find((x) => x.k === k);
+  if (doiNhin && muc.nhin !== nhin) { if (muc.nhin === 'mat' && !canMat(dangChay)) ranh(); datNhin(muc.nhin); }
+  veBang();
+  $('bang').scrollTop = 0;
+}
+$('ray').innerHTML = MUC.map((m) => `<button data-k="${m.k}">${m.icon}<span>${m.ten}</span><b class="cham"></b></button>`).join('');
+$('ray').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chonMuc(b.dataset.k); });
+
+$('khucNhin').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) datNhin(b.dataset.n); });
+$('khucNen').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  $('san').classList.remove('sang', 'caro');
+  if (b.dataset.nen) $('san').classList.add(b.dataset.nen);
+  for (const x of $('khucNen').children) x.classList.toggle('bat', x === b);
+});
+
+// Thanh động tác dựng lại theo từng nhân vật: người một bộ, chó một bộ, mèo một bộ.
+function veDongTac() {
+  const ds = laThu() ? rig.DONG_TAC.map((m) => [m, RigThu.TEN_DONG_TAC[m] || m]) : DONG_TAC;
+  $('dongTac').innerHTML = ds.map(([m, ten]) => `<button data-m="${m}">${ten}</button>`).join('');
+  $('dongTac').scrollLeft = 0;
+  $('loi').style.display = laThu() ? 'none' : '';            // thú không nói
+  for (const b of $('ray').children) b.hidden = laThu() && b.dataset.k !== 'mau';
+}
+$('dongTac').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chay(b.dataset.m); });
+$('phat').addEventListener('click', () => { if (!tl) return ranh(); clearTimeout(henRanh); tl.paused(!tl.paused()); veNutPhat(); });
+// Dừng hẳn động tác đang diễn (kể cả đang tạm dừng giữa chừng) và về đứng yên.
+$('dung').addEventListener('click', dungDongTac);
+$('tocDo').addEventListener('change', (e) => { if (tl && dangChay !== 'idle') tl.timeScale(Number(e.target.value)); });
+$('loi').addEventListener('keydown', (e) => { if (e.key === 'Enter') chay('giaiThich'); });
+
+$('hoanTac').addEventListener('click', () => veLichSu(viTri - 1));
+$('lamLai').addEventListener('click', () => veLichSu(viTri + 1));
+$('luu').addEventListener('click', luu);
+$('menuNut').addEventListener('click', (e) => { e.stopPropagation(); $('menu').classList.toggle('mo'); });
+document.addEventListener('click', () => $('menu').classList.remove('mo'));
+const datLai = (st, chu) => { tt = sao(st); datTatCa(tt); lichSu = lichSu.slice(0, viTri + 1); lichSu.push(sao(tt)); viTri = lichSu.length - 1; sauKhiDoi(); toast(chu + ' Ctrl+Z để quay lại.'); };
+$('veDaLuu').addEventListener('click', () => datLai(daLuu, 'Đã về bản đã lưu.'));
+$('veGoc').addEventListener('click', () => datLai(goc, 'Đã về mặc định gốc.'));
+$('datLai').addEventListener('click', () => datLai(goc, `Đã đặt lại “${tenNV()}” về bộ số gốc.`));
+$('taiJson').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(raConfig(tt), null, 2)], { type: 'application/json' }));
+  a.download = khoa + '.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+$('chepMa').addEventListener('click', async () => {
+  if (laThu()) {
+    const ma = `mau: ${JSON.stringify(tt.mau)},`;
+    try { await navigator.clipboard.writeText(ma); toast('Đã chép bảng màu vào clipboard.'); } catch (e) { console.log(ma); }
+    return;
+  }
+  const c = raConfig(tt), so = (v) => (typeof v === 'number' ? +v.toFixed(3) : `'${v}'`);
+  const goi = (o) => '{ ' + Object.entries(o).map(([k, v]) => `${k}: ${so(v)}`).join(', ') + ' }';
+  const phang = (o) => Object.entries(o).map(([k, v]) => `${k}: ${so(v)}`).join(', ') + ',';
+  const ma = [phang(c.than), phang(c.tay), phang(c.tayAo), phang(c.chan), `nghi: ${goi(c.nghi)},`, `khuon: ${goi(c.khuon)},`,
+              `may: ${goi(c.may)},`, phang(c.viTriMay), phang(c.net), ...(c.mau ? [`mau: { ...m0, ${goi(c.mau).slice(2)},`] : [])].join('\n');
+  try { await navigator.clipboard.writeText(ma); toast('Đã chép định nghĩa vào clipboard.'); }
+  catch (e) { console.log(ma); toast('Trình duyệt chặn clipboard — định nghĩa đã in ra console.', true); }
+});
+
+// Mã nhúng cho HyperFrames: bản dựng `dist/character.iife.js` nạp bằng thẻ script thường
+// và CONFIG NẰM NGAY TRONG MÃ — composition không được fetch gì lúc render.
+$('chepNhung').addEventListener('click', async () => {
+  const c = raConfig(tt), cs = Object.keys(c).length ? `, config: ${JSON.stringify(c)}` : '';
+  const goi = laThu() ? `${IIFE_TEN}.taoThuCung(host, { loai: '${khoa}'${cs} })` : `${IIFE_TEN}.taoNhanVat(host, { khoa: '${khoa}'${cs} })`;
+  const dt = laThu() ? rig.DONG_TAC[1] : 'wave';
+  const ma = `<div id="nv-${khoa}" class="clip" data-start="0" data-duration="6" data-track-index="1" style="position:absolute;left:60%;bottom:6%;height:70%"></div>
+<script src="character.iife.js"><\/script>
+<script>
+  ${IIFE_TEN}.gieo(1);                                  // cố định chớp mắt / khẩu hình
+  const host = document.getElementById('nv-${khoa}');
+  const { rig } = ${goi};
+  // tl là timeline paused của composition:
+  // tl.add(rig.idle(6), 0); tl.add(rig.${dt}(), 1);
+<\/script>`;
+  try { await navigator.clipboard.writeText(ma); toast('Đã chép mã nhúng HyperFrames vào clipboard.'); }
+  catch (e) { console.log(ma); toast('Trình duyệt chặn clipboard — mã nhúng đã in ra console.', true); }
+});
+
+document.addEventListener('keydown', (e) => {
+  const go = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range';
+  const lenh = e.metaKey || e.ctrlKey;
+  if (lenh && e.key.toLowerCase() === 's') { e.preventDefault(); luu(); }
+  else if (lenh && e.key.toLowerCase() === 'z' && !go) { e.preventDefault(); veLichSu(viTri + (e.shiftKey ? 1 : -1)); }
+  else if (e.key === ' ' && !go && e.target.tagName !== 'BUTTON') { e.preventDefault(); $('phat').click(); }
+  else if (e.key === 'Escape') {
+    if ($('menu').classList.contains('mo')) $('menu').classList.remove('mo');
+    else dungDongTac();
+  }
+});
+
+/* ───────────────────────────────────────────────────────────── khởi động */
+async function khoiDong(k) {
+  khoa = k;
+  dungTl();
+  luotHinh++; hinhNho = [];
+  rig = taoRig($('nv'));
+  window.rig = rig;                                    // kiem-khung.mjs / kiem-muot.mjs đòi đúng tên này
+  $('nv').style.aspectRatio = `${rig.constructor.KHUNG.w}/${rig.constructor.KHUNG.h}`;
+  veDongTac();
+  // Thú chỉ có nhóm Màu sắc; quay lại nhân vật người thì trả về nhóm đang xem trước đó.
+  if (laThu()) { if (mucChon !== 'mau') mucNguoi = mucChon; mucChon = 'mau'; nhin = 'than'; }
+  else if (mucNguoi) { mucChon = mucNguoi; mucNguoi = null; nhin = MUC.find((x) => x.k === mucChon).nhin; }
+  goc = docTrangThai(rig);
+  tt = sao(goc);
+  // Bản đã lưu trên máy chủ (nếu có) là mốc "Đã lưu"; bản nháp trên máy này đè lên trên.
+  daLuu = sao(goc);
+  try {
+    const res = await fetch(`../configs/${khoa}.json`, { cache: 'no-store' });
+    if (res.ok) daLuu = tuConfig(await res.json(), goc);
+  } catch (e) { /* chưa lưu lần nào: dùng số gốc */ }
+  let nhap = null;
+  try { nhap = JSON.parse(localStorage.getItem(KHOA_NHAP()) || 'null'); } catch (e) {}
+  const batDau = nhap && (nhap.mat || (laThu() && nhap.mau)) ? { ...sao(daLuu), ...nhap } : daLuu;
+  tt = apTrangThai(rig, batDau);
+  // Mốc "đã lưu" cũng phải đi qua rig một lượt, để so với `tt` bằng cùng một kiểu số.
+  if (khac(batDau, daLuu)) { const tam = taoRig(document.createElement('div')); daLuu = apTrangThai(tam, daLuu); } else daLuu = sao(tt);
+  lichSu = [sao(tt)]; viTri = 0;
+  ranh();
+  capNhatKhung(false);
+  chonMuc(mucChon, false);
+  sauKhiDoi();
+  history.replaceState(null, '', '?nv=' + khoa);
+  document.title = `${tenNV()} — Studio nhân vật`;
+}
+
+const DS_NV = [...Object.keys(RigSVG.NHAN_VAT), ...Object.keys(RigThu.LOAI)];
+for (const [nhan, ds, bang] of [['Người', Object.keys(RigSVG.NHAN_VAT), RigSVG.NHAN_VAT], ['Thú cưng', Object.keys(RigThu.LOAI), RigThu.LOAI]]) {
+  const g = document.createElement('optgroup'); g.label = nhan;
+  for (const k of ds) g.appendChild(new Option(bang[k].ten || k, k));
+  $('chonNV').appendChild(g);
+}
+let dau = new URLSearchParams(location.search).get('nv');
+if (!DS_NV.includes(dau)) dau = 'bac_si_thu_y';
+$('chonNV').value = dau;
+$('chonNV').addEventListener('change', (e) => khoiDong(e.target.value));
+veNutPhat();
+khoiDong(dau);
+</script>
+</body>
+</html>

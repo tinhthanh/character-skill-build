@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Ví dụ HyperFrames — bác sĩ và cún</title>
+<style>
+  html, body { margin: 0; background: #0b1218; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: system-ui, sans-serif; }
+  #nen { position: absolute; inset: 0; background: linear-gradient(165deg, #123448 0%, #071019 70%); }
+  #san { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; background: #0d2433; }
+  #tieu-de { position: absolute; left: 120px; top: 150px; margin: 0; font-size: 96px; font-weight: 800; color: #eaf2f6; letter-spacing: -1px; }
+  #phu-de { position: absolute; left: 124px; top: 280px; margin: 0; font-size: 40px; color: #7fb9c4; }
+  /* Chỗ đặt nhân vật: cho CHIỀU CAO, bề ngang tự theo tỉ lệ khung của rig (thư viện đặt aspect-ratio). */
+  #bac-si { position: absolute; right: 330px; bottom: 96px; height: 760px; }
+  #cun { position: absolute; right: 760px; bottom: 96px; height: 330px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="bac-si-va-cun" data-start="0" data-duration="15" data-width="1920" data-height="1080">
+  <div id="nen" class="clip" data-start="0" data-duration="15" data-track-index="0"></div>
+  <div id="san" class="clip" data-start="0" data-duration="15" data-track-index="1"></div>
+  <h1 id="tieu-de" class="clip" data-start="0" data-duration="15" data-track-index="2">Khám định kỳ</h1>
+  <p id="phu-de" class="clip" data-start="0" data-duration="15" data-track-index="3">Sáu tháng một lần cho bé nhà mình</p>
+  <div id="cun" class="clip" data-start="0" data-duration="15" data-track-index="4"></div>
+  <div id="bac-si" class="clip" data-start="0" data-duration="15" data-track-index="5"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <!-- Bản dựng một tệp của thư viện nhân vật. Khi làm project thật: chép dist/character.iife.js vào project. -->
+  <script src="../../dist/character.iife.js"></script>
+  <script>
+    // 1. Gieo hạt TRƯỚC khi dựng bất cứ timeline nào — chớp mắt và khẩu hình dùng số ngẫu nhiên.
+    VGCharacter.gieo(7);
+
+    // 2. Dựng nhân vật, đồng bộ. `config` (nếu có) là object chép từ configs/<id>.json.
+    const bacSi = VGCharacter.taoNhanVat(document.getElementById('bac-si'), { khoa: 'bac_si_thu_y' }).rig;
+    const cun = VGCharacter.taoThuCung(document.getElementById('cun'), { loai: 'cho' }).rig;
+
+    // 3. Mỗi nhân vật MỘT chuỗi động tác. kichBan() lo vị trí giữa các bước và khung 0.
+    const dienBacSi = VGCharacter.kichBan(bacSi, [
+      'enter', 'wave',
+      ['giaiThich', 'Chào bạn, hôm nay mình khám định kỳ cho bé nhé.', 3.2],
+      ['point', { x: 40, y: 330 }],
+      'thumbsUp', ['idle', 1.6],
+    ]);
+    const dienCun = VGCharacter.kichBan(cun, [['idle', 1.2], 'wagTail', 'sit', 'bark', 'givePaw', 'jump', ['idle', 1.5]]);
+
+    // 4. Timeline của composition: một timeline paused, đăng ký đúng khoá data-composition-id.
+    const tl = gsap.timeline({ paused: true });
+    tl.from('#tieu-de', { opacity: 0, y: 40, duration: 0.7, ease: 'power2.out' }, 0.2);
+    tl.from('#phu-de', { opacity: 0, y: 24, duration: 0.6, ease: 'power2.out' }, 0.6);
+    tl.add(dienBacSi.paused(false), 0);
+    tl.add(dienCun.paused(false), 0.4);
+    window.__timelines = window.__timelines || {};
+    window.__timelines['bac-si-va-cun'] = tl;
+  </script>
+</div>
+</body>
+</html>

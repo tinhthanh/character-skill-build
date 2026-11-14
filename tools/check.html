@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>đang kiểm…</title>
+<!-- Kiểm tra tự động MỌI nhân vật × MỌI động tác. Mở qua tools/serve.py, hoặc chạy tools/check.sh.
+     Kết quả là JSON trong thẻ pre#kq; document.title thành PASS hoặc FAIL. -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="../dist/character.iife.js"></script>
+<div id="san" style="width:400px;height:470px"></div><div id="san2" style="width:400px;height:330px"></div>
+<pre id="kq"></pre>
+<script type="module">
+const ra = { ok: true, loi: [], nhanVat: {}, banDung: {} };
+const hong = (cho, chu) => { ra.ok = false; ra.loi.push(`${cho}: ${chu}`); };
+window.addEventListener('error', (e) => hong('trang', e.message));
+try {
+  const L = await import('../runtime/index.js');
+  const { RigSVG, RigThu } = L;
+  const xau = (svg) => { let n = 0; svg.querySelectorAll('*').forEach((el) => { for (const a of el.attributes) if (/NaN|undefined|null|Infinity/.test(a.value)) n++; }); return n; };
+  const trungId = (svg) => { const m = {}; svg.querySelectorAll('[id]').forEach((e) => { m[e.id] = (m[e.id] || 0) + 1; }); return Object.keys(m).filter((k) => m[k] > 1); };
+  const quet = (rig, ten, dsDongTac, duocLech) => {
+    const o = ra.nhanVat[ten] = { dongTac: dsDongTac.length };
+    const t0 = trungId(rig.svg); if (t0.length) hong(ten, 'id trùng: ' + t0.join(','));
+    if (xau(rig.svg)) hong(ten, 'thuộc tính hỏng ở tư thế nghỉ');
+    for (const m of dsDongTac) {
+      rig.datNghi();
+      let t;
+      try { t = m === 'point' ? rig.point({ x: 60, y: 80 }) : (m === 'speak' || m === 'giaiThich') ? rig[m]('Xin chào, rất vui được gặp bạn!', 2.4) : rig[m](); }
+      catch (e) { hong(`${ten}.${m}`, 'ném lỗi lúc dựng: ' + e.message); continue; }
+      let n = 0;
+      for (let i = 0; i <= 60; i++) { t.progress(i / 60); rig.apDung(); n += xau(rig.svg); }
+      if (n) hong(`${ten}.${m}`, `${n} thuộc tính NaN/undefined`);
+      const lech = Object.keys(rig.NGHI).filter((q) => (typeof rig.NGHI[q] === 'number' ? Math.abs(rig.s[q] - rig.NGHI[q]) > 1e-3 : rig.s[q] !== rig.NGHI[q]));
+      if (lech.length && !duocLech.includes(m)) hong(`${ten}.${m}`, 'không khép về tư thế nghỉ: ' + lech.join(','));
+      t.kill();
+    }
+    // Slot bắt buộc
+    for (const id of o.canCo || []) if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(ten, `thiếu phần tử #…-${id}`);
+  };
+  for (const k of Object.keys(RigSVG.NHAN_VAT)) {
+    const rig = new RigSVG(document.getElementById('san'), k);
+    for (const id of ['tocTruoc', 'matL', 'matR', 'nguoiL', 'nguoiR', 'banL', 'banR'])
+      if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(k, `thiếu phần tử bắt buộc #<p>-${id} (xem references/slots.md)`);
+    quet(rig, k, [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG], ['walkAway', 'exit']);
+    // đổi màu + bộ số không được làm hỏng
+    try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.napBoSo(rig, { than: { coDau: 1.2 }, khuon: { rong: 44 } }); if (xau(rig.svg)) hong(k, 'hỏng sau doiMau/napBoSo'); }
+    catch (e) { hong(k, 'doiMau/napBoSo ném lỗi: ' + e.message); }
+  }
+  for (const k of Object.keys(RigThu.LOAI)) quet(new RigThu(document.getElementById('san2'), k), k, RigThu.DONG_TAC[k], ['exit']);
+
+  // Tính tất định: gieo cùng hạt phải ra cùng timeline.
+  { const rig = new RigSVG(document.getElementById('san'), 'bac_si_thu_y');
+    const dau = (t) => JSON.stringify(t.getChildren(true, true, false).map((c) => [c.startTime().toFixed(3), c.duration().toFixed(3)]));
+    L.gieo(3); const a = dau(rig.giaiThich('một hai ba bốn', 2)); L.gieo(3); const b = dau(rig.giaiThich('một hai ba bốn', 2)); L.gieo(null);
+    if (a !== b) hong('gieo', 'cùng hạt mà hai timeline khác nhau'); }
+
+  // kichBan: khung 0 phải đúng trạng thái đầu của bước đầu; tua tới đâu cũng ra đúng một trạng thái.
+  { const rig = new RigSVG(document.getElementById('san'), 'bs_nam');
+    const t = L.kichBan(rig, ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']);
+    t.seek(0); rig.apDung(); const x0 = rig.s.x;
+    if (Math.abs(x0 + 270) > 2) hong('kichBan', `khung 0: x = ${x0.toFixed(1)}, đáng ra −270 (enter)`);
+    const chup = (tg) => { t.seek(tg); rig.apDung(); return JSON.stringify(Object.keys(rig.NGHI).map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k]))); };
+    const tg = t.duration() * 0.63, a = chup(tg); chup(0.2); chup(t.duration()); const b = chup(tg);
+    if (a !== b) hong('kichBan', 'tua tới cùng một thời điểm theo hai đường ra hai trạng thái');
+    t.seek(t.duration()); rig.apDung();
+    if (Math.abs(rig.s.x - 100) > 1) hong('kichBan', `cuối chuỗi x = ${rig.s.x.toFixed(1)}, đáng ra 100`);
+    // Tua bằng seek() — GSAP tắt mọi callback — hình vẫn phải đổi theo (rig tự vẽ lại ở microtask).
+    const hinh = () => rig.el.goc.getAttribute('transform') + rig.el.batR.getAttribute('transform');
+    t.totalTime(1.0, false); const dung = hinh();
+    t.totalTime(3.0, false); t.seek(1.0); await Promise.resolve();
+    if (hinh() !== dung) hong('kichBan', 'seek() (tắt callback) không vẽ lại hình');
+    ra.kichBan = { dai: +t.duration().toFixed(2) }; }
+
+  // Bản dựng IIFE phải tươi: cùng danh sách nhân vật với mã nguồn.
+  const G = window[L.IIFE_TEN];
+  if (!G) hong('dist', 'không nạp được dist/character.iife.js — chạy: python3 tools/build.py');
+  else {
+    const a = JSON.stringify(G.danhSach()), b = JSON.stringify(L.danhSach());
+    ra.banDung.khop = a === b;
+    if (a !== b) hong('dist', 'dist/character.iife.js đã cũ so với mã nguồn — chạy: python3 tools/build.py');
+    const h = document.createElement('div'); document.body.appendChild(h);
+    try { const { rig } = G.taoNhanVat(h, { khoa: 'bac_si_thu_y', config: { mau: { ao: '#2f9e8f' } } }); if (rig.mau.ao !== '#2f9e8f') hong('dist', 'taoNhanVat không nhận config'); }
+    catch (e) { hong('dist', 'taoNhanVat ném lỗi: ' + e.message); }
+    h.remove();
+  }
+} catch (e) { hong('kiểm', e.stack || String(e)); }
+document.getElementById('kq').textContent = JSON.stringify(ra);
+document.title = ra.ok ? 'PASS' : 'FAIL';
+</script>

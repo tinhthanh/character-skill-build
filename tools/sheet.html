@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Bảng tư thế</title>
+<!-- Bảng tư thế của MỘT nhân vật, để soát bằng mắt:  tools/sheet.html?nv=<id>
+     Hàng 1: đứng yên (toàn thân, cận ngực, cận mặt). Hàng 2–3: giữa các động tác. -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<body style="margin:0;background:#1d3a4b;display:flex;flex-wrap:wrap;font:12px system-ui;color:#cfe">
+<script type="module">
+import { RigSVG, RigThu, gieo } from '../runtime/index.js';
+gieo(1);
+const nv = new URLSearchParams(location.search).get('nv') || 'bac_si_thu_y', thu = nv in RigThu.LOAI;
+const o = (nhan, fn, khung) => {
+  const hop = document.createElement('div'); hop.style.cssText = 'width:256px;height:300px;outline:1px solid #345;overflow:hidden;position:relative';
+  const d = document.createElement('div'); d.style.cssText = 'width:100%;height:100%'; hop.appendChild(d); document.body.appendChild(hop);
+  const r = thu ? new RigThu(d, nv) : new RigSVG(d, nv);
+  if (fn) fn(r); r.apDung(); if (khung) r.svg.setAttribute('viewBox', khung(r));
+  const l = document.createElement('span'); l.textContent = nhan; l.style.cssText = 'position:absolute;left:5px;top:3px'; hop.appendChild(l);
+};
+const giua = (m, p = 0.45, ...ts) => (r) => { r[m](...ts).progress(p); };
+if (thu) {
+  o('nghỉ'); o('cận mặt', null, (r) => r.khungMat(70));
+  for (const m of RigThu.DONG_TAC[nv].slice(1)) o(m, giua(m, 0.5));
+} else {
+  o('nghỉ'); o('cận ngực', null, () => '120 200 160 188'); o('cận mặt', null, () => '120 60 160 188');
+  o('nghiêng 50%', (r) => { r.s.huong = 0.5; }); o('nghiêng 100%', (r) => { r.s.huong = 1; });
+  for (const [m, p, ...ts] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['giaiThich', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
+                               ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['loLang', 0.5], ['nod', 0.25]]) o(m, giua(m, p, ...ts));
+}
+document.title = 'XONG';
+</script>
