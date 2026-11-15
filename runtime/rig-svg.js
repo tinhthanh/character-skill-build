@@ -30,6 +30,7 @@ const NGHI = Object.freeze({
   seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
+  itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
   tayL: 'mo', tayR: 'mo',
 });
 
@@ -431,6 +432,19 @@ const NV_MAC_DINH = {
   //   'none'  không có — đầu trọc
   // Không có núm này thì đầu hói vẽ đẹp lúc nhìn thẳng, quay nghiêng là mọc lại tóc kín đầu.
   backHair: 'full',
+  // DÁNG CÒNG 0…1: thân ngắn lại một chút, đầu chúi xuống giữa hai vai; quay nghiêng thì cả
+  // thân ngả về trước. (`than` trong trạng thái chỉ nghiêng SANG BÊN, không ra được dáng này.)
+  stoop: 0,
+  // VÁY / TẠP DỀ — lớp trang phục DƯỚI HÔNG, rig tự vẽ theo hai đùi nên nó xoè ra khi bước,
+  // ngắn lại khi ngồi và hẹp đi khi quay nghiêng. `null` = không có.
+  //   { kind: 'skirt' | 'apron', length: 1, flare: 4 }
+  //   length  tính bằng chiều dài đùi: 0.6 giữa đùi · 1 ngang gối · 1.5 giữa ống chân
+  //   flare   gấu rộng hơn hông bao nhiêu đơn vị mỗi bên
+  // Màu lấy từ `mau.skirt`, không khai thì theo màu áo.
+  skirt: null,
+  // ĐỒ VẬT CẦM TAY: hàm vẽ trong hệ toạ độ CỔ TAY (lòng bàn tay quanh (0, 12), ngón chỉ xuống
+  // +y). Vẽ đè lên bàn tay, đi theo cổ tay. Hiện/ẩn bằng trạng thái `itemL` / `itemR`.
+  heldItemL: () => '', heldItemR: () => '',
   damSuon: 0.45,     // độ đậm mảng tối hai bên sườn áo
   // Khuôn mặt: bảy tham số của `veKhuonMat`, không phải đường vẽ tay. Bộ số
   // dưới đây DÒ RA từ chính đường cũ (`M -44 0 A 44 44 …`) bằng tìm kiếm lưới:
@@ -660,6 +674,8 @@ export class RigSVG {
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
   static DI_NGANG = ['walk', 'enter', 'exit'];
+  // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem'];
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
@@ -843,7 +859,7 @@ export class RigSVG {
             ${dai ? `<path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5} L 6.2 ${g - 1} Q 0 ${g + 1.5} -6.2 ${g - 1} Z" fill="${da}"/>
             <path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5}" stroke="${this.mau.vienNet}" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".7"/>` : ''}
           </g>
-          <g id="${p}-coTay${ben}" transform="translate(0 ${g})">${this.#tay(ben)}</g>
+          <g id="${p}-coTay${ben}" transform="translate(0 ${g})">${this.#tay(ben)}<g id="${p}-item${ben}">${this.nv['heldItem' + ben](p, this.mau, this.nv)}</g></g>
         </g>
       </g>`;
   }
@@ -924,6 +940,7 @@ export class RigSVG {
     <g id="${p}-chanG" transform="translate(${HONG.x} ${HONG.y})">
       <g id="${p}-hongL" transform="translate(-14 0)">${this.#chan('L')}</g>
       <g id="${p}-hongR" transform="translate(14 0)">${this.#chan('R')}</g>
+      ${this.nv.skirt ? `<path id="${p}-skirt" fill="${this.mau.skirt || this.mau.ao}" stroke-linejoin="round"${V}/>` : ''}
     </g>
     <g id="${p}-than">
       <g id="${p}-sau"><g id="${p}-batL"${this.#Vtay()}>${this.#canhTay('L')}</g></g>
@@ -996,7 +1013,7 @@ export class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1096,7 +1113,8 @@ export class RigSVG {
     if (e.tren.lastElementChild !== e.phuKienTren) e.tren.appendChild(e.phuKienTren);
     e.phuKienTren.style.display = ah > 0.12 ? 'none' : '';
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
-    if (e.chanG.lastElementChild !== gan) e.chanG.appendChild(gan);
+    if (e.chanG.lastElementChild !== gan && e.chanG.lastElementChild !== e.skirt) e.chanG.appendChild(gan);
+    else if (e.skirt && e.skirt.previousElementSibling !== gan) e.chanG.insertBefore(gan, e.skirt);      // váy luôn nằm trên cả hai chân
     // ---- ĐẦU XOAY NGHIÊNG (3/4). Coi đầu là khối cầu bán kính `khuon.rong`:
     // xoay góc θ thì một điểm ở x0 trên mặt đi tới x0·cosθ + sâu·sinθ. Cả cụm nét mặt
     // vì thế chỉ cần MỘT phép dịch (netLech ≈ R·sinθ) và MỘT phép co ngang (cosθ).
@@ -1164,7 +1182,42 @@ export class RigSVG {
     e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})${shinFix}`);
     e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})${shinFix}`);
 
-    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than}) scale(${this.nv.coThan})`);
+    // ── VÁY / TẠP DỀ: một tứ giác từ eo xuống gấu, hai góc gấu BÁM theo hai đùi.
+    if (e.skirt) {
+      const K = this.nv.skirt, thigh = DAI.dui * daiDui, halfLeg = 13 * dayChan, flare = K.flare ?? 4;
+      const reach = (K.length ?? 1) * thigh;                     // gấu cách hông bao xa, đo dọc theo chân
+      // Điểm trên chân `side` ở cách hông `reach`, lệch ngang `offset` so với trục chân — trong
+      // hệ toạ độ nhóm chân. Quá gối thì đi tiếp theo hướng ống chân.
+      const along = (side, offset) => {
+        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * s['nhac' + side] * 6) * RAD;
+        const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
+        const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
+        const b = a + s['ong' + side] * RAD;
+        return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
+      };
+      const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
+      let L, R, top;
+      if (K.kind === 'apron') {
+        // Tạp dề chỉ che MẶT TRƯỚC: tấm hẹp hơn hông, quay nghiêng thì dạt về phía bụng và hẹp lại.
+        const cL = along('L', 0), cR = along('R', 0), mid = [(cL[0] + cR[0]) / 2 + h * waist * 0.55, Math.max(cL[1], cR[1])];
+        const half = waist * 0.66 * (1 - ah * 0.5);
+        L = [mid[0] - half - flare * 0.4, mid[1]]; R = [mid[0] + half + flare * 0.4, mid[1]];
+        top = [h * waist * 0.5 - half * 0.92, h * waist * 0.5 + half * 0.92];
+      } else {
+        L = along('L', -(halfLeg + flare)); R = along('R', halfLeg + flare);
+        // Hai chân bắt chéo (đang bước nghiêng): gấu vẫn phải đi từ mép trái sang mép phải.
+        if (L[0] > R[0]) [L, R] = [R, L];
+        const waistTop = waist * (1 - ah * 0.3);                 // thân nhìn nghiêng hẹp hơn hai chân chụm lại
+        top = [-waistTop, waistTop];
+      }
+      const sag = Math.max(L[1], R[1]) + 3.5;
+      e.skirt.setAttribute('d', `M ${top[0].toFixed(2)} -4 L ${top[1].toFixed(2)} -4 L ${R[0].toFixed(2)} ${R[1].toFixed(2)} Q ${((L[0] + R[0]) / 2).toFixed(2)} ${sag.toFixed(2)} ${L[0].toFixed(2)} ${L[1].toFixed(2)} Z`);
+    }
+
+    // ── DÁNG CÒNG: thân ngắn lại, và khi quay nghiêng thì ngả hẳn về trước (xoay theo hướng nhìn).
+    const stoop = clamp(this.nv.stoop || 0, 0, 1);
+    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than + h * stoop * 10}) scale(${this.nv.coThan} ${this.nv.coThan * (1 - stoop * 0.05)})`);
     e.chanG.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) scale(1 ${this.nv.coChan})`);
     // NHẤC VAI — cổ, đầu, hai cánh tay, đệm vai VÀ THÂN ÁO đều dời theo cùng
     // một lượng. Thiếu thân áo ở đây là `shrug()` (vai −9) nhấc đệm vai lên
@@ -1195,7 +1248,10 @@ export class RigSVG {
     const coHep = 1 - ah * 0.2, chanCo = 20 * (1 - ah * 0.5) / coHep, eoCo = 15 - ah * 4;
     e.co.setAttribute('transform', `translate(${h * 3} 0) scale(${coHep} 1)`);
     e.coDa.setAttribute('d', `M -13 -130 L 13 -130 L 13.5 -106 Q ${eoCo} -100 ${chanCo} -96 L ${-chanCo} -96 Q ${-eoCo} -100 -13.5 -106 Z`);
-    e.dau.setAttribute('transform', `translate(${s.dauX + h * 2.5} ${-103 + this.nv.dauLech + s.dauY}) rotate(${s.dau}) scale(${this.nv.coDau})`);
+    // Còng lưng: đầu chúi xuống giữa hai vai (cổ ngắn lại) và nhô ra trước khi quay nghiêng.
+    e.dau.setAttribute('transform', `translate(${s.dauX + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau}) scale(${this.nv.coDau})`);
+    e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
+    e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
 
     // Đánh tay theo chiều sâu (nhìn từ trước): tay ra trước thì rút ngắn (phối cảnh),
     // khuỷu gập nhiều và hơi khép vào thân; tay ra sau thì gần thẳng, hơi mở ra ngoài.
@@ -1576,8 +1632,16 @@ export class RigSVG {
     // VỊ TRÍ `x` KHÔNG thuộc tư thế nghỉ: nhân vật đã đi tới đâu thì đứng lại ở đó.
     // Khép cả `x` thì động tác nào chạy sau một lần đi cũng kéo nhân vật trượt về giữa.
     // (`datNghi()` mới là thứ đưa nhân vật về giữa.)
+    //
+    // `seat` (đang ngồi) và `huong` (đang quay mặt về đâu) cũng là THẾ ĐỨNG chứ không phải tư
+    // thế nghỉ: động tác nào xong cũng trả hai thứ này về đúng giá trị LÚC NÓ BẮT ĐẦU, không về
+    // 0. Nhờ vậy nhân vật đã `sitDown()` thì nói, gật, vẫy tay xong vẫn còn ngồi; đã `face()` về
+    // phía ai thì vẫn nhìn về phía đó; còn `walk()` quay ngang để bước rồi tự quay lại hướng cũ.
+    // (Giá trị đọc lúc DỰNG timeline — `sequence()` lo cho trạng thái lúc ấy đúng.)
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
+    so.seat = this.s.seat; so.huong = this.s.huong;
+    so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     // Bàn tay về hình dạng NGHỈ của nhân vật (mặc định thả lỏng, nhưng có thể là nắm tay).
     t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
@@ -1953,6 +2017,53 @@ export class RigSVG {
   }
 
   /**
+   * QUAY MẶT về một phía và GIỮ hướng đó cho các động tác sau.
+   *   face('left') · face('right') · face('front')        theo tên
+   *   face(element) · face(otherRig)                      quay về phía phần tử / nhân vật ấy
+   * `amount` 0…1 — 0.55 là nghiêng 3/4 (mặc định), 1 là nghiêng hẳn.
+   */
+  face(target = 'right', amount = 0.55) {
+    let side = target === 'left' ? -1 : target === 'front' ? 0 : 1;
+    if (target && typeof target === 'object') {
+      // Phần tử DOM hoặc một rig khác: so tâm của nó với tâm của mình trên màn hình.
+      const box = (el) => el.getBoundingClientRect(), other = box(target.svg || target), mine = box(this.svg);
+      const dx = (other.left + other.width / 2) - (mine.left + mine.width / 2);
+      side = Math.abs(dx) < 1 ? 0 : dx < 0 ? -1 : 1;
+    }
+    const t = this.tl(), s = this.s, to = side * clamp(amount, 0, 1);
+    t.to(s, { nhinX: side * 1.6, duration: 0.2, ease: 'power2.out' }, 0);          // mắt đi trước
+    this.#khep(t, 0.4, 0.05, { huong: to });
+    return t;
+  }
+
+  /** CẤT đồ vật đang cầm ở tay `side` ('L' | 'R' | 'both'); nó vẫn ẩn qua các động tác sau. */
+  hideItem(side = 'R') { return this.#toggleItem(side, 0); }
+  /** LẤY RA lại đồ vật đã cất. */
+  showItem(side = 'R') { return this.#toggleItem(side, 1); }
+  #toggleItem(side, value) {
+    const keep = {};
+    if (side !== 'R') keep.itemL = value;
+    if (side !== 'L') keep.itemR = value;
+    return this.#khep(this.tl(), 0.25, 0, keep);
+  }
+
+  /** NGỒI XUỐNG và ở yên trong dáng ngồi; các động tác sau (nói, gật, vẫy…) diễn khi đang ngồi. */
+  sitDown() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 2.5, than: 0, duration: 0.25, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.5, 0.05, { seat: 1 });
+    return t;
+  }
+
+  /** ĐỨNG DẬY từ dáng ngồi. */
+  standUp() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 2.5, duration: 0.2, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.5, 0.05, { seat: 0 });
+    return t;
+  }
+
+  /**
    * NGỒI xuống (như ngồi lên một chiếc ghế vô hình, nhìn thẳng), giữ, rồi đứng dậy.
    * Đùi rút ngắn theo phối cảnh — đầu gối đưa về phía người xem — và cả người hạ xuống đúng
    * bằng phần đùi vừa rút, nên bàn chân vẫn nằm trên mặt đất. Composition tự vẽ ghế nếu cần.
@@ -1998,7 +2109,7 @@ export class RigSVG {
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
-    this.#khep(t, 0.45, at, { x: 0 });
+    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
   }
 

@@ -15,7 +15,8 @@ export const DEFINITION_KEYS = {
   top: 'ao', sideShading: 'suon', sideShadingOpacity: 'damSuon', collar: 'coAo',
   accessories: 'phuKien', shoulderAccessories: 'phuKienTren', shoes: 'giay',
   // công tắc
-  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
+  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', stoop: 'stoop', skirt: 'skirt',
+  heldItemL: 'heldItemL', heldItemR: 'heldItemR', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
   outlineWidth: 'vienRong',
   // tỉ lệ
   headSize: 'coDau', neckDrop: 'dauLech', torsoScale: 'coThan', legScale: 'coChan',
@@ -47,6 +48,7 @@ export const COLOR_KEYS = {
   iris: 'mat', lips: 'mieng', cheeks: 'ma', accent: 'phuKien',
   outline: 'vien', lineStroke: 'vienNet', brows: 'may', mouthInside: 'miengToi', tongue: 'luoi', teeth: 'rang',
   hat: 'mu', hatHighlight: 'muSang', innerShirt: 'aoTrong', stethoscope: 'ongNghe',
+  buttons: 'cuc',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   // thú
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
   collar: 'vongCo', tag: 'the', earInner: 'taiTrong',
@@ -60,7 +62,7 @@ export const PERSON_STATE_KEYS = {
   upperArmL: 'batL', upperArmR: 'batR', forearmL: 'cangL', forearmR: 'cangR', armSwingL: 'vungL', armSwingR: 'vungR',
   thighL: 'duiL', thighR: 'duiR', shinL: 'ongL', shinR: 'ongR', kneeLiftL: 'nhacL', kneeLiftR: 'nhacR', seat: 'seat',
   eyesClosed: 'matY', lookX: 'nhinX', lookY: 'nhinY', browL: 'mayL', browR: 'mayR',
-  mouthOpen: 'mieng', pucker: 'chum', smile: 'cuoi', handL: 'tayL', handR: 'tayR',
+  mouthOpen: 'mieng', pucker: 'chum', smile: 'cuoi', handL: 'tayL', handR: 'tayR', itemL: 'itemL', itemR: 'itemR',
 };
 
 /** Trạng thái của rig THÚ (bốn chân dùng tên nội bộ tn/tx/sn/sx — hiếm khi cần chạm tới). */
@@ -148,7 +150,7 @@ function wrapDrawing(fn) {
 }
 // Mắt và giày vẽ theo từng bên: người viết ghi `id="${p}-eye-${side}"`, nên id chỉ lộ ra sau
 // khi hàm chạy — vì thế phải đổi id trên KẾT QUẢ của hàm chứ không đổi trên mã nguồn.
-const DRAWING_SLOTS = ['toc', 'mu', 'mat', 'mui', 'net', 'beard', 'coAo', 'phuKien', 'phuKienTren', 'giay'];
+const DRAWING_SLOTS = ['toc', 'mu', 'mat', 'mui', 'net', 'beard', 'coAo', 'phuKien', 'phuKienTren', 'giay', 'heldItemL', 'heldItemR'];
 
 /** Định nghĩa nhân vật: công khai → nội bộ. Khoá lạ (kể cả khoá nội bộ) đi qua nguyên vẹn. */
 export function definitionToInternal(definition) {

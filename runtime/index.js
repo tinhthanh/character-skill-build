@@ -13,12 +13,12 @@
 import { RigSVG } from './rig-svg.js';
 import { RigThu } from './rig-thu.js';
 import { dangKyDau, KIT } from './characters.js';
-import { roundGlasses, shortBeard, moustache } from './parts.js';
+import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.4.1';
+export const VERSION = '0.5.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -52,7 +52,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC]; } });
 
 /* ─────────────────────────────────────────────────────────────── bộ đồ nghề */
@@ -62,16 +62,16 @@ const publicOutfit = (outfit) => definitionToPublic(outfit);
  * BỘ ĐỒ NGHỀ đưa cho hàm `define` của nhân vật tuỳ chỉnh (tham số thứ hai).
  *   outfits   các bộ trang phục dựng sẵn — trải vào định nghĩa rồi ghi đè chi tiết
  *   outlines  đường bao thân áo của ba bộ ấy, nếu chỉ cần hình dáng
- *   parts     kính, râu, ria vẽ sẵn
+ *   parts     kính, râu, ria, nếp nhăn, yếm tạp dề và đồ vật cầm tay vẽ sẵn
  *   partsOf   lấy định nghĩa của một nhân vật KHÁC để mượn bộ phận: partsOf('doctor').faceExtras
  */
 export const kit = {
   outfits: { scrubs: publicOutfit(KIT.boDo.doMo), pawTunic: publicOutfit(KIT.boDo.aoDauChan), coat: publicOutfit(KIT.boDo.aoBlouse),
-             plainCoat: publicOutfit(KIT.boDo.plainCoat) },
+             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt) },
   outlines: { scrubs: KIT.AO.doMo, pawTunic: KIT.AO.aoDauChan, coat: KIT.AO.aoBlouse },
   sideShading: KIT.suonTu, shoulderPatches: KIT.vaiCo, closedShoes: KIT.giayKin,
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
-  parts: { roundGlasses, shortBeard, moustache },
+  parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone },
   partsOf(id) {
     if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
@@ -148,7 +148,8 @@ export function registerCharacter({ id, base = 'vet', define }) {
     throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
+    // Base `default` có bảng màu rỗng (dùng bảng mặc định của rig) — khi ấy không có gì để đối chiếu.
+    if (definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }
@@ -244,7 +245,7 @@ export function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
     petActions: { ...RigThu.DONG_TAC },
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     bakedConfigs: Object.keys(bakedConfigs),

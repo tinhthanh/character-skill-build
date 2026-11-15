@@ -184,8 +184,39 @@ const DO_BL_PLAIN = {
   phuKienTren: () => '',
 };
 
+// ── ĐỒ THƯỜNG NGÀY (không phải đồ y tế): dùng lại dáng thân của đồ mổ, bỏ hết túi và thẻ tên.
+// Không mang theo `mauSoSau` của đồ mổ (màu mũ): đồ thường không quyết định màu sau đầu.
+const { mauSoSau: _capColor, ...PLAIN_BASE } = DO_MO;
+// Áo thun: cổ tròn có bo, tay ngắn, trơn.
+const OUTFIT_TEE = {
+  ...PLAIN_BASE,
+  coAo: (p, m) => `${vaiCo(m)}
+        <path d="M -12 -103 Q 0 -90 12 -103 Z" fill="${m.da}"/>
+        <path d="M -13.500 -104 Q 0 -89 13.500 -104" stroke="${m.aoToi}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M -29.500 13 Q 0 19 29.500 13" stroke="${m.aoToi}" stroke-width="1.3" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
+// Sơ mi: tay dài, cổ bẻ hai ve nhọn, nẹp giữa và hàng cúc.
+const OUTFIT_SHIRT = {
+  ...PLAIN_BASE,
+  tayDai: true,
+  coAo: (p, m) => `${vaiCo(m)}
+        <path d="M -9 -103 L 9 -103 L 0 -91 Z" fill="${m.da}"/>
+        <path d="M -14 -106 L 0 -91 L -9.500 -84 Z M 14 -106 L 0 -91 L 9.500 -84 Z" fill="${m.ao}" stroke="${m.vienNet}" stroke-width="1.1" stroke-linejoin="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M 0 -90 V 15" stroke="${m.aoToi}" stroke-width="1.3"/>
+        ${[-76, -58, -40, -22, -4].map((y) => `<circle cx="0" cy="${y}" r="1.700" fill="${m.cuc || '#f4f6f8'}" stroke="${m.vienNet}" stroke-width="0.700"/>`).join('')}
+        <path d="M 11 -66 h 13 v 12 q 0 2.500 -2.500 2.500 h -8 q -2.500 0 -2.500 -2.500 z" fill="none" stroke="${m.aoToi}" stroke-width="1.200" stroke-linejoin="round"/>
+        <path d="M -29.500 13 Q 0 19 29.500 13" stroke="${m.aoToi}" stroke-width="1.3" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
 export const KIT = {
-  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN },
+  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT },
   AO: { doMo: AO_MO, aoDauChan: AO_DD, aoBlouse: AO_BL },
   suonTu, vaiCo, giayKin, theTen, dauChan, ongNgheVatCo,
 };

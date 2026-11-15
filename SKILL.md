@@ -143,6 +143,13 @@ and non-hex colours. These still fail without an error:
   not want. `references/slots.md` lists what each base sets and how to remove it.
 - **Things draped over the shoulders go in `shoulderAccessories` as well as `accessories`.**
   Sleeves are drawn after the torso and would cover a stethoscope or lanyard.
+- **Everyday characters:** spread `kit.outfits.tee` or `kit.outfits.shirt` instead of a medical
+  outfit; add `skirt: { kind: 'skirt' | 'apron', length }` for a skirt or apron that moves with
+  the legs (do not draw one as a decal in `accessories` — it will not follow the legs or the
+  turn), `stoop` for an elderly posture, `heldItemL` / `heldItemR` for a cup, clipboard or phone.
+- **Conversations:** `sitDown`, `standUp` and `face(target)` change the stance and *keep* it, so
+  a character can speak while seated or while turned to another character. See
+  `references/actions.md` → Stance.
 - **A bald head needs `backHair`.** The rig generates hair behind the skull when the head
   turns; `backHair: 'low'` or `'none'` turns it down or off.
 - **Always spread the base palette:** `colors: { ...base.colors, top: '#…' }`. A bare

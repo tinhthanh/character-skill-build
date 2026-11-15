@@ -27,6 +27,10 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
 | `sit` | `(hold = 2)` | sit down as on an unseen chair, hands on the lap, stand up again | `hold` + 0.95 |
+| `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |
+| `standUp` | — | stand up from `sitDown` | 0.55 |
+| `face` | `(target = 'right', amount = 0.55)` | turn toward `'left'` / `'right'` and **stay turned**; `'front'` turns back. `target` may also be a DOM element or another rig — the character turns to whichever side it is on | 0.45 |
+| `hideItem` `showItem` | `(side = 'R')` | put away / take out the held item of hand `'L'`, `'R'` or `'both'`; it stays that way | 0.25 |
 | `march` | `(steps = 6)` | march on the spot, arms swinging | 2.7 |
 | `stroll` | `(steps = 6)` | relaxed steps on the spot | 3.2 |
 | `stepInPlace` | `(steps = 6)` | steps on the spot, arms still | 2.9 |
@@ -42,6 +46,24 @@ counted per vowel group, so Vietnamese and English text both pace correctly.
 After `exit` or `walkAway` the character is invisible; use `enter` to bring it back.
 A character keeps its horizontal position after `walk` with a distance. `sit` draws no
 chair; put one in the composition behind the character if the scene needs it.
+
+**Stance.** Sitting (`sitDown` / `standUp`) and facing (`face`) are *held*: every other action
+ends in the stance it started from, not standing-facing-front. So a conversation is
+
+```js
+VGCharacter.sequence(a, [['enter', 'left'], ['face', b], ['explain', 'Hello!', 2], ['nod']]);
+VGCharacter.sequence(b, [['sitDown'], ['face', a], ['speak', 'Hi.', 1.2], ['standUp'], ['face', 'front']]);
+```
+
+`sit(hold)` and `turn(direction, hold)` remain round trips. `walk` turns side-on to step and
+then returns to the held facing; `enter` always ends standing, facing front. `face(element)`
+compares positions **when the timeline is built**, so place both characters first. Build
+stance-dependent timelines with `sequence()` — it gives each action the state the previous one
+left behind.
+
+**Held items** are part of the stance too: `hideItem(side)` puts one away and it stays away
+until `showItem(side)`. Do not tween `rig.state.itemR` beside a `sequence()` — the sequence
+owns the whole state and overwrites it.
 
 ## Pets — `VGCharacter.createPet(host, { species, config }).rig`
 

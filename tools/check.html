@@ -167,6 +167,46 @@ try {
     if (Math.abs(box(rig.el.banL).bottom - foot) > 1.5) hong('sit', 'feet leave the ground while sitting');
     if (Math.abs(box(rig.el.bong).top - shadow) > 1.5) hong('sit', 'the ground shadow moves away from the feet while sitting');
     t.kill();
+    // Thế đứng GIỮ NGUYÊN: ngồi rồi nói vẫn còn ngồi; quay mặt rồi gật vẫn còn quay; đứng dậy / nhìn thẳng thì về 0.
+    {
+      const stance = L.sequence(rig, [['sitDown'], ['explain', 'xin chao', 1], ['face', 'left'], ['nod'], ['walk', 2], ['standUp'], ['face', 'front'], ['wave']]);
+      const at = (index, frac) => { const step = stance.data.steps[index]; stance.time(step.start + step.duration * frac); return rig.state; };
+      if (Math.abs(at(1, 0.5).seat - 1) > 1e-3 || Math.abs(at(1, 1).seat - 1) > 1e-3) hong('sitDown', 'the character stands up during / after the next action');
+      if (Math.abs(at(3, 1).facing + 0.55) > 1e-3 || Math.abs(at(3, 1).seat - 1) > 1e-3) hong('face', `facing is ${rig.state.facing} after the next action instead of -0.55`);
+      if (Math.abs(at(4, 1).facing + 0.55) > 1e-3) hong('face', `walk does not return to the held facing (${rig.state.facing})`);
+      if (Math.abs(at(7, 1).seat) > 1e-3 || Math.abs(rig.state.facing) > 1e-3) hong('standUp', 'standUp / face("front") do not return to standing, facing front');
+      stance.kill(); rig.reset();
+      const stowed = L.sequence(rig, [['hideItem', 'R'], ['wave'], ['showItem', 'R'], ['nod']]);
+      stowed.time(stowed.data.steps[1].start + stowed.data.steps[1].duration); if (rig.state.itemR > 1e-3) hong('hideItem', 'the item comes back after the next action');
+      stowed.time(stowed.duration()); if (rig.state.itemR < 0.999) hong('showItem', 'the item is not back');
+      stowed.kill(); rig.reset();
+      // face(target): quay về phía một phần tử trên màn hình.
+      const mark = document.createElement('div'); mark.style.cssText = 'position:fixed;left:-500px;top:0;width:10px;height:10px'; document.body.appendChild(mark);
+      const toward = rig.face(mark); toward.progress(1); if (!(rig.state.facing < 0)) hong('face', 'face(element) does not turn toward an element on the left');
+      toward.kill(); mark.remove(); rig.reset();
+    }
+    // Váy, tạp dề, đồ cầm tay, dáng còng: vẽ không lỗi ở mọi tư thế; váy ngắn lại khi ngồi; đồ vật ẩn được.
+    {
+      L.registerCharacter({ id: 'check_tmp_5', base: 'nurse', define: (base, kit) => ({ ...base, ...kit.outfits.shirt, stoop: 1, skirt: { kind: 'skirt', length: 1.4 },
+        faceExtras: (p, c) => kit.parts.wrinkles(c), heldItemL: (p, c) => kit.parts.clipboard(c), heldItemR: (p, c) => kit.parts.cup(c) }) });
+      L.registerCharacter({ id: 'check_tmp_6', base: 'default', define: (base, kit) => ({ ...base, ...kit.outfits.tee, skirt: { kind: 'apron' },
+        accessories: (p, c) => `<g id="${p}-accessories">${kit.parts.apronBib(c)}</g>`, heldItemR: (p, c) => kit.parts.phone(c) }) });
+      for (const id of ['check_tmp_5', 'check_tmp_6']) {
+        const dressed = L.createCharacter(document.getElementById('san'), { id }).rig, hem = dressed.svg.querySelector('[id$="-skirt"]');
+        if (!hem) { hong(id, 'no skirt element'); continue; }
+        for (const [name, progress] of [['walk', 0.3], ['march', 0.3], ['sit', 0.5], ['turn', 0.5], ['wave', 0.4]]) {
+          const t = dressed[name](); t.progress(progress); dressed.apDung();
+          if (xau(dressed.svg)) hong(id, `${name}: bad attribute values with skirt / held items`);
+          t.kill(); dressed.reset();
+        }
+        const standing = hem.getBoundingClientRect().height; dressed.state.seat = 1; dressed.render();
+        if (!(hem.getBoundingClientRect().height < standing * 0.8)) hong(id, 'the skirt does not shorten when seated');
+        dressed.reset(); dressed.state.itemR = 0; dressed.render();
+        if (dressed.svg.querySelector('[id$="-itemR"]').getAttribute('opacity') !== '0') hong(id, 'state.itemR = 0 does not hide the held item');
+        if (trungId(dressed.svg).length) hong(id, 'duplicate ids: ' + trungId(dressed.svg).join(', '));
+        dressed.svg.remove();
+      }
+    }
     // Hói: không còn tóc phía sau khi quay.
     L.registerCharacter({ id: 'check_tmp_4', base: 'surgeon', define: (base) => ({ ...base, hat: () => '', backHair: 'none' }) });
     const bald = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_4' }).rig; bald.state.facing = 1; bald.render();

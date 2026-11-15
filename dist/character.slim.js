@@ -1,4 +1,4 @@
-/* VGCharacter v0.4.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.5.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -14,6 +14,7 @@ const NGHI = Object.freeze({
   seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
+  itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
   tayL: 'mo', tayR: 'mo',
 });
 const MAU_MAC_DINH = {
@@ -228,6 +229,9 @@ const NV_MAC_DINH = {
   tayDai: false,
   mauSoSau: 'toc',
   backHair: 'full',
+  stoop: 0,
+  skirt: null,
+  heldItemL: () => '', heldItemR: () => '',
   damSuon: 0.45,     // độ đậm mảng tối hai bên sườn áo
   khuon: { rong: 44, cao: 44, cam: 51, yRong: 0, tranVuong: -0.06, hamVuong: -0.08, rongTran: 1.06, rongCam: 1.1 },
   dau: (m, nv) => veKhuonMat(nv.khuon),
@@ -364,6 +368,7 @@ class RigSVG {
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit'];
   static DI_NGANG = ['walk', 'enter', 'exit'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem'];
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
   static COLOR_ALIASES = {};
@@ -489,7 +494,7 @@ class RigSVG {
             ${dai ? `<path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5} L 6.2 ${g - 1} Q 0 ${g + 1.5} -6.2 ${g - 1} Z" fill="${da}"/>
             <path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5}" stroke="${this.mau.vienNet}" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".7"/>` : ''}
           </g>
-          <g id="${p}-coTay${ben}" transform="translate(0 ${g})">${this.#tay(ben)}</g>
+          <g id="${p}-coTay${ben}" transform="translate(0 ${g})">${this.#tay(ben)}<g id="${p}-item${ben}">${this.nv['heldItem' + ben](p, this.mau, this.nv)}</g></g>
         </g>
       </g>`;
   }
@@ -544,6 +549,7 @@ class RigSVG {
     <g id="${p}-chanG" transform="translate(${HONG.x} ${HONG.y})">
       <g id="${p}-hongL" transform="translate(-14 0)">${this.#chan('L')}</g>
       <g id="${p}-hongR" transform="translate(14 0)">${this.#chan('R')}</g>
+      ${this.nv.skirt ? `<path id="${p}-skirt" fill="${this.mau.skirt || this.mau.ao}" stroke-linejoin="round"${V}/>` : ''}
     </g>
     <g id="${p}-than">
       <g id="${p}-sau"><g id="${p}-batL"${this.#Vtay()}>${this.#canhTay('L')}</g></g>
@@ -613,7 +619,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -678,7 +684,8 @@ class RigSVG {
     if (e.tren.lastElementChild !== e.phuKienTren) e.tren.appendChild(e.phuKienTren);
     e.phuKienTren.style.display = ah > 0.12 ? 'none' : '';
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
-    if (e.chanG.lastElementChild !== gan) e.chanG.appendChild(gan);
+    if (e.chanG.lastElementChild !== gan && e.chanG.lastElementChild !== e.skirt) e.chanG.appendChild(gan);
+    else if (e.skirt && e.skirt.previousElementSibling !== gan) e.chanG.insertBefore(gan, e.skirt);      // váy luôn nằm trên cả hai chân
     const nv = this.nv, K = nv.khuon, k = mem(ah), sg = h < 0 ? -1 : 1;
     const co = 1 - ah * 0.15, lech = h * nv.netLech;
     e.net.setAttribute('transform', `translate(${lech} 0) scale(${co} 1)`);
@@ -720,7 +727,35 @@ class RigSVG {
     e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
     e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})${shinFix}`);
     e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})${shinFix}`);
-    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than}) scale(${this.nv.coThan})`);
+    if (e.skirt) {
+      const K = this.nv.skirt, thigh = DAI.dui * daiDui, halfLeg = 13 * dayChan, flare = K.flare ?? 4;
+      const reach = (K.length ?? 1) * thigh;                     // gấu cách hông bao xa, đo dọc theo chân
+      const along = (side, offset) => {
+        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * s['nhac' + side] * 6) * RAD;
+        const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
+        const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
+        const b = a + s['ong' + side] * RAD;
+        return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
+      };
+      const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
+      let L, R, top;
+      if (K.kind === 'apron') {
+        const cL = along('L', 0), cR = along('R', 0), mid = [(cL[0] + cR[0]) / 2 + h * waist * 0.55, Math.max(cL[1], cR[1])];
+        const half = waist * 0.66 * (1 - ah * 0.5);
+        L = [mid[0] - half - flare * 0.4, mid[1]]; R = [mid[0] + half + flare * 0.4, mid[1]];
+        top = [h * waist * 0.5 - half * 0.92, h * waist * 0.5 + half * 0.92];
+      } else {
+        L = along('L', -(halfLeg + flare)); R = along('R', halfLeg + flare);
+        if (L[0] > R[0]) [L, R] = [R, L];
+        const waistTop = waist * (1 - ah * 0.3);                 // thân nhìn nghiêng hẹp hơn hai chân chụm lại
+        top = [-waistTop, waistTop];
+      }
+      const sag = Math.max(L[1], R[1]) + 3.5;
+      e.skirt.setAttribute('d', `M ${top[0].toFixed(2)} -4 L ${top[1].toFixed(2)} -4 L ${R[0].toFixed(2)} ${R[1].toFixed(2)} Q ${((L[0] + R[0]) / 2).toFixed(2)} ${sag.toFixed(2)} ${L[0].toFixed(2)} ${L[1].toFixed(2)} Z`);
+    }
+    const stoop = clamp(this.nv.stoop || 0, 0, 1);
+    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than + h * stoop * 10}) scale(${this.nv.coThan} ${this.nv.coThan * (1 - stoop * 0.05)})`);
     e.chanG.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) scale(1 ${this.nv.coChan})`);
     const nhacY = -s.tho * 2.5 + s.vai;
     const bienAo = `translate(${h * 2} ${nhacY}) scale(${(1 + s.tho * 0.03) * (1 - ah * 0.4)} 1)`;  // ngực nở khi hít, hẹp khi xoay
@@ -737,7 +772,9 @@ class RigSVG {
     const coHep = 1 - ah * 0.2, chanCo = 20 * (1 - ah * 0.5) / coHep, eoCo = 15 - ah * 4;
     e.co.setAttribute('transform', `translate(${h * 3} 0) scale(${coHep} 1)`);
     e.coDa.setAttribute('d', `M -13 -130 L 13 -130 L 13.5 -106 Q ${eoCo} -100 ${chanCo} -96 L ${-chanCo} -96 Q ${-eoCo} -100 -13.5 -106 Z`);
-    e.dau.setAttribute('transform', `translate(${s.dauX + h * 2.5} ${-103 + this.nv.dauLech + s.dauY}) rotate(${s.dau}) scale(${this.nv.coDau})`);
+    e.dau.setAttribute('transform', `translate(${s.dauX + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau}) scale(${this.nv.coDau})`);
+    e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
+    e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
     const tayTheoSau = (bat, cang, v) => {
       const truoc = Math.max(0, v), sau = Math.max(0, -v);
       return {
@@ -930,6 +967,8 @@ class RigSVG {
   #khep(t, d = 0.5, at = '>', giu = {}) {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
+    so.seat = this.s.seat; so.huong = this.s.huong;
+    so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
     return t;
@@ -1209,6 +1248,38 @@ class RigSVG {
     this.#khep(t, 0.4, 0.4 + hold);
     return t;
   }
+  face(target = 'right', amount = 0.55) {
+    let side = target === 'left' ? -1 : target === 'front' ? 0 : 1;
+    if (target && typeof target === 'object') {
+      const box = (el) => el.getBoundingClientRect(), other = box(target.svg || target), mine = box(this.svg);
+      const dx = (other.left + other.width / 2) - (mine.left + mine.width / 2);
+      side = Math.abs(dx) < 1 ? 0 : dx < 0 ? -1 : 1;
+    }
+    const t = this.tl(), s = this.s, to = side * clamp(amount, 0, 1);
+    t.to(s, { nhinX: side * 1.6, duration: 0.2, ease: 'power2.out' }, 0);          // mắt đi trước
+    this.#khep(t, 0.4, 0.05, { huong: to });
+    return t;
+  }
+  hideItem(side = 'R') { return this.#toggleItem(side, 0); }
+  showItem(side = 'R') { return this.#toggleItem(side, 1); }
+  #toggleItem(side, value) {
+    const keep = {};
+    if (side !== 'R') keep.itemL = value;
+    if (side !== 'L') keep.itemR = value;
+    return this.#khep(this.tl(), 0.25, 0, keep);
+  }
+  sitDown() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 2.5, than: 0, duration: 0.25, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.5, 0.05, { seat: 1 });
+    return t;
+  }
+  standUp() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 2.5, duration: 0.2, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.5, 0.05, { seat: 0 });
+    return t;
+  }
   sit(hold = 2) {
     const t = this.tl(), s = this.s;
     t.to(s, { seat: 1, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
@@ -1235,7 +1306,7 @@ class RigSVG {
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
-    this.#khep(t, 0.45, at, { x: 0 });
+    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
   }
   exit(to = 'right') {
@@ -2147,8 +2218,35 @@ const DO_BL_PLAIN = {
   phuKien: (p, m) => DO_BL.phuKien(p, m).split(STETHOSCOPE_MARK)[0] + '\n      </g>',
   phuKienTren: () => '',
 };
+const { mauSoSau: _capColor, ...PLAIN_BASE } = DO_MO;
+const OUTFIT_TEE = {
+  ...PLAIN_BASE,
+  coAo: (p, m) => `${vaiCo(m)}
+        <path d="M -12 -103 Q 0 -90 12 -103 Z" fill="${m.da}"/>
+        <path d="M -13.500 -104 Q 0 -89 13.500 -104" stroke="${m.aoToi}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M -29.500 13 Q 0 19 29.500 13" stroke="${m.aoToi}" stroke-width="1.3" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
+const OUTFIT_SHIRT = {
+  ...PLAIN_BASE,
+  tayDai: true,
+  coAo: (p, m) => `${vaiCo(m)}
+        <path d="M -9 -103 L 9 -103 L 0 -91 Z" fill="${m.da}"/>
+        <path d="M -14 -106 L 0 -91 L -9.500 -84 Z M 14 -106 L 0 -91 L 9.500 -84 Z" fill="${m.ao}" stroke="${m.vienNet}" stroke-width="1.1" stroke-linejoin="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M 0 -90 V 15" stroke="${m.aoToi}" stroke-width="1.3"/>
+        ${[-76, -58, -40, -22, -4].map((y) => `<circle cx="0" cy="${y}" r="1.700" fill="${m.cuc || '#f4f6f8'}" stroke="${m.vienNet}" stroke-width="0.700"/>`).join('')}
+        <path d="M 11 -66 h 13 v 12 q 0 2.500 -2.500 2.500 h -8 q -2.500 0 -2.500 -2.500 z" fill="none" stroke="${m.aoToi}" stroke-width="1.200" stroke-linejoin="round"/>
+        <path d="M -29.500 13 Q 0 19 29.500 13" stroke="${m.aoToi}" stroke-width="1.3" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
 const KIT = {
-  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN },
+  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT },
   AO: { doMo: AO_MO, aoDauChan: AO_DD, aoBlouse: AO_BL },
   suonTu, vaiCo, giayKin, theTen, dauChan, ongNgheVatCo,
 };
@@ -2295,7 +2393,51 @@ function moustache(c, { color = null, mouthY = 30, width = 17 } = {}) {
             <path fill="${fill}" d="M 0 ${mouthY - 9} Q ${-width * 0.5} ${mouthY - 13} ${-width} ${mouthY - 5} Q ${-width * 0.55} ${mouthY - 3.5} 0 ${mouthY - 5.5}
               Q ${width * 0.55} ${mouthY - 3.5} ${width} ${mouthY - 5} Q ${width * 0.5} ${mouthY - 13} 0 ${mouthY - 9} Z"/>`;
 }
-return { roundGlasses, shortBeard, moustache };
+const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
+function wrinkles(c, { color = null, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true } = {}) {
+  const stroke = color || c.skinShadow || '#c9987a';
+  return `
+            <g fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" opacity=".8">
+              ${[-1, 1].map((g) => `
+              <path d="M ${g * (eyeX + 15)} ${eyeY - 3} l ${g * 5} -3 M ${g * (eyeX + 16)} ${eyeY + 2} l ${g * 5.500} 1"/>
+              <path d="M ${g * 15} ${mouthY - 14} Q ${g * 21} ${mouthY - 5} ${g * 18} ${mouthY + 3}"/>`).join('')}
+              ${forehead ? `<path d="M -15 ${eyeY - 31} Q 0 ${eyeY - 34} 15 ${eyeY - 31} M -11 ${eyeY - 25} Q 0 ${eyeY - 27.500} 11 ${eyeY - 25}"/>` : ''}
+            </g>`;
+}
+function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
+  const fill = color || c.skirt || c.accent || c.topShadow, line = lineOf(c);
+  return `
+        <path d="M ${-width + 2} ${top} Q -13 -92 -9 -103 M ${width - 2} ${top} Q 13 -92 9 -103" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+        <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
+}
+function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3 } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(0 12) rotate(90) scale(${size})">
+          <path d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${color}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
+          <path d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}"/>
+          <path d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round"/>
+        </g>`;
+}
+function clipboard(c, { color = '#b9834f', paper = '#ffffff' } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(2 10) rotate(90)">
+          <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
+          <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
+          <path d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
+        </g>`;
+}
+function phone(c, { color = '#22262e', screen = '#8fd3ff' } = {}) {
+  return `
+        <g transform="translate(0 10) rotate(90)">
+          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}"/>
+          <rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>
+        </g>`;
+}
+return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone };
 })();
 __m['runtime/schema.js'] = (function () {
 const DEFINITION_KEYS = {
@@ -2303,7 +2445,8 @@ const DEFINITION_KEYS = {
   hair: 'toc', hat: 'mu', eye: 'mat', nose: 'mui', faceExtras: 'net', beard: 'beard',
   top: 'ao', sideShading: 'suon', sideShadingOpacity: 'damSuon', collar: 'coAo',
   accessories: 'phuKien', shoulderAccessories: 'phuKienTren', shoes: 'giay',
-  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
+  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', stoop: 'stoop', skirt: 'skirt',
+  heldItemL: 'heldItemL', heldItemR: 'heldItemR', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
   outlineWidth: 'vienRong',
   headSize: 'coDau', neckDrop: 'dauLech', torsoScale: 'coThan', legScale: 'coChan',
   upperArmLength: 'daiCanhTay', forearmLength: 'daiCangTay', armThickness: 'dayTay', handSize: 'coBanTay',
@@ -2327,6 +2470,7 @@ const COLOR_KEYS = {
   iris: 'mat', lips: 'mieng', cheeks: 'ma', accent: 'phuKien',
   outline: 'vien', lineStroke: 'vienNet', brows: 'may', mouthInside: 'miengToi', tongue: 'luoi', teeth: 'rang',
   hat: 'mu', hatHighlight: 'muSang', innerShirt: 'aoTrong', stethoscope: 'ongNghe',
+  buttons: 'cuc',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
   collar: 'vongCo', tag: 'the', earInner: 'taiTrong',
 };
@@ -2337,7 +2481,7 @@ const PERSON_STATE_KEYS = {
   upperArmL: 'batL', upperArmR: 'batR', forearmL: 'cangL', forearmR: 'cangR', armSwingL: 'vungL', armSwingR: 'vungR',
   thighL: 'duiL', thighR: 'duiR', shinL: 'ongL', shinR: 'ongR', kneeLiftL: 'nhacL', kneeLiftR: 'nhacR', seat: 'seat',
   eyesClosed: 'matY', lookX: 'nhinX', lookY: 'nhinY', browL: 'mayL', browR: 'mayR',
-  mouthOpen: 'mieng', pucker: 'chum', smile: 'cuoi', handL: 'tayL', handR: 'tayR',
+  mouthOpen: 'mieng', pucker: 'chum', smile: 'cuoi', handL: 'tayL', handR: 'tayR', itemL: 'itemL', itemR: 'itemR',
 };
 const PET_STATE_KEYS = {
   x: 'x', y: 'y', opacity: 'mo', scale: 'co', facing: 'huong',
@@ -2398,7 +2542,7 @@ function wrapDrawing(fn) {
   wrapped[WRAPPED] = true;
   return wrapped;
 }
-const DRAWING_SLOTS = ['toc', 'mu', 'mat', 'mui', 'net', 'beard', 'coAo', 'phuKien', 'phuKienTren', 'giay'];
+const DRAWING_SLOTS = ['toc', 'mu', 'mat', 'mui', 'net', 'beard', 'coAo', 'phuKien', 'phuKienTren', 'giay', 'heldItemL', 'heldItemR'];
 function definitionToInternal(definition) {
   const out = {};
   for (const [key, value] of Object.entries(definition)) {
@@ -2499,10 +2643,10 @@ __m['runtime/index.js'] = (function () {
 const { RigSVG } = __m['runtime/rig-svg.js'];
 const { RigThu } = __m['runtime/rig-thu.js'];
 const { dangKyDau, KIT } = __m['runtime/characters.js'];
-const { roundGlasses, shortBeard, moustache } = __m['runtime/parts.js'];
+const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -2525,16 +2669,16 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC]; } });
 const publicOutfit = (outfit) => definitionToPublic(outfit);
 const kit = {
   outfits: { scrubs: publicOutfit(KIT.boDo.doMo), pawTunic: publicOutfit(KIT.boDo.aoDauChan), coat: publicOutfit(KIT.boDo.aoBlouse),
-             plainCoat: publicOutfit(KIT.boDo.plainCoat) },
+             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt) },
   outlines: { scrubs: KIT.AO.doMo, pawTunic: KIT.AO.aoDauChan, coat: KIT.AO.aoBlouse },
   sideShading: KIT.suonTu, shoulderPatches: KIT.vaiCo, closedShoes: KIT.giayKin,
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
-  parts: { roundGlasses, shortBeard, moustache },
+  parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone },
   partsOf(id) {
     if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
@@ -2587,7 +2731,7 @@ function registerCharacter({ id, base = 'vet', define }) {
     throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
+    if (definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }
@@ -2651,7 +2795,7 @@ function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
     petActions: { ...RigThu.DONG_TAC },
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     bakedConfigs: Object.keys(bakedConfigs),

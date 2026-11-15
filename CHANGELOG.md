@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0
+
+Added
+- Held stance: `sitDown()`, `standUp()` and `face(target, amount)` change how the character
+  stands and keep it — actions that follow (speak, nod, wave…) play seated or turned. `face`
+  takes `'left'`, `'right'`, `'front'`, a DOM element or another rig.
+- `skirt: { kind: 'skirt' | 'apron', length, flare }`: a lower garment generated over the legs
+  that follows the walk, the seat and the turn. Colour `colors.skirt`.
+- `heldItemL` / `heldItemR` drawing keys (wrist space) with state keys `itemL` / `itemR` and the actions
+  `hideItem(side)` / `showItem(side)`;
+  ready-made `kit.parts.cup`, `clipboard`, `phone`.
+- `stoop` (0…1): bent-back posture.
+- Everyday outfits `kit.outfits.tee` and `kit.outfits.shirt` (`colors.buttons`); parts
+  `kit.parts.wrinkles` and `kit.parts.apronBib`.
+- The pose sheet shows "sitDown → explain" and "face left → wave".
+
+Fixed
+- `registerCharacter` with `base: 'default'` threw "backSkullColor names a colour that is not in
+  colors" (the default base has an empty palette).
+
+Changed
+- Every action now ends in the `seat`, `facing` and held-item visibility it started with rather
+  than resetting them. Nothing changes for compositions that never set them; `enter` still ends standing and
+  facing front.
+
 ## 0.4.1
 
 Fixed
