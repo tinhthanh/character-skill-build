@@ -13,12 +13,13 @@
 import { RigSVG } from './rig-svg.js';
 import { RigThu } from './rig-thu.js';
 import { dangKyDau, KIT } from './characters.js';
+import { createProp, PROP_KINDS } from './props.js';
 import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.6.0';
+export const VERSION = '0.7.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -53,7 +54,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
   });
 }
 Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
-Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC]; } });
+Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 
 /* ─────────────────────────────────────────────────────────────── bộ đồ nghề */
 
@@ -194,6 +195,7 @@ function applyInternalPersonConfig(rig, c) {
   if (c.khuon) rig.doiKhuonMat(c.khuon);
   if (c.may || c.viTriMay) rig.doiChanMay({ ...(c.may || {}), ...(c.viTriMay || {}) });
   if (c.net)   rig.doiNetMat(c.net);
+  if (c.dang)  rig.doiDang(c.dang);
   if (c.nghi) {
     rig.nv.nghi = { ...(rig.nv.nghi || {}), ...c.nghi };
     rig.NGHI = Object.freeze({ ...rig.NGHI, ...c.nghi });
@@ -268,8 +270,9 @@ export function list() {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
     personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
-    petActions: { ...RigThu.DONG_TAC },
+    petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
+    props: [...PROP_KINDS],
     bakedConfigs: Object.keys(bakedConfigs),
   };
 }
@@ -358,4 +361,4 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
 
-export { RigSVG, RigThu };
+export { RigSVG, RigThu, createProp };

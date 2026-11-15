@@ -136,6 +136,7 @@ the *left* of the person it should look toward, or expect to see its tail first.
 ```bash
 sh tools/peek.sh /path/to/project/index.html                 # frame 0 + 7 evenly spaced
 sh tools/peek.sh /path/to/project/index.html 0,1.5,3,6 /tmp/peek.png
+PEEK_WIDTH=960 PEEK_COLS=2 sh tools/peek.sh /path/to/project/index.html 4,9   # bigger frames, to judge details
 ```
 
 It prints the composition's declared and actual duration, the start and end of every step of
@@ -185,8 +186,9 @@ npx hyperframes render -o out.mp4 .
 The library draws characters only. A scene usually needs:
 
 - **A chair for `sit` / `sitDown`.** Sitting lowers the whole character by about 0.11 × host
-  height (the thighs foreshorten; feet stay on the floor). Draw the chair as its own element
-  behind the character's host.
+  height (the thighs foreshorten; feet stay on the floor). `VGCharacter.createProp(host,
+  'chair', { for: rig })` draws a chair whose seat is at that character's sitting height — see
+  `references/actions.md` → Scene props. Any element of your own behind the host works too.
 - **Seated behind a counter or desk.** Measured from the bottom of the host, a seated
   character's chin is at about 0.4–0.5 × host height and the top of the head at 0.7–0.85; the
   hem of the top is at about 0.1–0.15. So a counter in front that is taller than ~0.35 × host

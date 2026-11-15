@@ -270,6 +270,24 @@ export const NHOM = {
     ghiChu: '“chân ⌀” ở hàng Đầu ↔ thân co cả chân kể cả giày; hàng này chỉnh từng phần, giày giữ cỡ',
     tinhLaiKhung: true,       // chân ngắn đi thì cả người hạ xuống, khung mặt dời theo
   },
+  dang: {
+    ten: 'Dáng & váy',
+    kieu: [
+      ['thẳng lưng', { stoop: 0 }],
+      ['hơi còng',   { stoop: 0.5 }],
+      ['còng',       { stoop: 1 }],
+      ['váy ngắn',   { skirtLength: 0.6, skirtFlare: 5 }],
+      ['váy ngang gối', { skirtLength: 1, skirtFlare: 4 }],
+      ['váy dài',    { skirtLength: 1.5, skirtFlare: 6 }],
+    ],
+    muc: {
+      stoop:       { min: 0,   max: 1,  buoc: 0.01, ten: 'độ còng' },
+      skirtLength: { min: 0.2, max: 2,  buoc: 0.01, ten: 'váy ↕' },
+      skirtFlare:  { min: 0,   max: 30, buoc: 0.5,  ten: 'váy xoè' },
+    },
+    dat: (r, k) => r.doiDang(k),
+    ghiChu: 'độ còng thấy rõ nhất khi quay nghiêng (nút ← → ở thanh dưới). Hai số của váy chỉ có tác dụng với nhân vật có váy hoặc tạp dề',
+  },
   net: {
     ten: 'Mắt · mũi · miệng', kieu: KIEU_NET,
     muc: {

@@ -1514,6 +1514,24 @@ export class RigSVG {
   }
 
   /**
+   * Đổi DÁNG và TRANG PHỤC DƯỚI — `stoop` (độ còng 0…1), `skirtLength`, `skirtFlare`. Trả về bộ
+   * đang dùng. Hai số của váy chỉ có tác dụng khi nhân vật KHAI `skirt`; nhân vật không có váy
+   * thì chúng được nhớ nhưng không vẽ gì.
+   */
+  doiDang(posture) {
+    if (posture.stoop !== undefined) this.nv.stoop = clamp(posture.stoop, 0, 1);
+    const skirt = this.nv.skirt;
+    if (skirt) {
+      const next = { ...skirt };
+      if (posture.skirtLength !== undefined) next.length = clamp(posture.skirtLength, 0.2, 2);
+      if (posture.skirtFlare !== undefined) next.flare = clamp(posture.skirtFlare, 0, 30);
+      this.nv.skirt = next;
+    }
+    this.apDung();
+    return { stoop: this.nv.stoop || 0, skirtLength: (this.nv.skirt && this.nv.skirt.length) ?? 1, skirtFlare: (this.nv.skirt && this.nv.skirt.flare) ?? 4 };
+  }
+
+  /**
    * Đổi TAY ÁO — trả về bộ đang dùng. Tay áo là đường vẽ nướng trong SVG nên
    * phải ghi lại `d`; đệm vai và đường may thì `apDung` tự dựng lại từ `nv`.
    */
@@ -1544,6 +1562,15 @@ export class RigSVG {
    * Đế giày ở cổ chân + 10 (theo cỡ bàn chân); mọi thứ nhân `coChan` vì nhóm
    * chân co cả cụm. Chân mặc định: 78 + 78 + 10 = 166 = 428 − 262, hạ 0.
    */
+  /**
+   * Cao độ MẶT GHẾ (y trong khung 400 × 470, sàn ở 458) khớp với nhân vật này khi ngồi: mặt
+   * dưới của đùi lúc `seat = 1`. Đạo cụ ghế dùng số này (runtime/props.js).
+   */
+  seatY() {
+    const nv = this.nv;
+    return HONG.y + DOI_Y + this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 + 13 * nv.dayChan * nv.coChan;
+  }
+
   hangChan() {
     const nv = this.nv;
     return (428 - HONG.y) - (DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan) * nv.coChan;

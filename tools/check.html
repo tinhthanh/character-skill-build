@@ -303,6 +303,57 @@ try {
     moved.kill(); hostA.remove(); hostB.remove();
   }
 
+  // ── Thú: thế ngồi và hướng quay giữ nguyên qua các động tác ──
+  {
+    const host = document.getElementById('san');
+    const dog = L.createPet(host, { species: 'dog' }).rig;
+    const held = L.sequence(dog, ['sitDown', 'bark', ['face', 'left'], 'tiltHead', ['walk', 2], 'standUp', ['face', 'right'], 'wagTail']);
+    const end = (index) => { const step = held.data.steps[index]; held.time(step.start + step.duration); return dog.s; };
+    if (Math.abs(end(1).ngoi - 1) > 1e-3) hong('pet sitDown', 'the dog stands up after the next action');
+    if (end(3).huong !== -1 || Math.abs(dog.s.ngoi - 1) > 1e-3) hong('pet face', `after face('left') + tiltHead: facing ${dog.s.huong}, seated ${dog.s.ngoi}`);
+    if (end(4).huong !== -1 || Math.abs(dog.s.ngoi - 1) > 1e-3) hong('pet walk', 'walking on the spot does not return to the held stance');
+    if (end(7).huong !== 1 || Math.abs(dog.s.ngoi) > 1e-3) hong('pet standUp', 'standUp / face("right") do not return to standing, facing right');
+    held.kill(); dog.datNghi();
+    const back = L.sequence(dog, [['walk', 4, -80]]); back.time(back.duration());
+    if (dog.s.huong < 0.99 || Math.abs(dog.s.x + 80) > 1) hong('pet walk', `walk(4, -80) must end 80 units left, facing right again (x ${dog.s.x}, facing ${dog.s.huong})`);
+    back.kill(); dog.svg.remove();
+    const cat = L.createPet(host, { species: 'cat' }).rig;
+    const up = L.sequence(cat, ['standUp', 'meow']); up.time(up.duration());
+    if (Math.abs(cat.s.ngoi) > 1e-3) hong('pet standUp', 'the cat sits back down after the next action');
+    up.kill(); cat.svg.remove();
+    if (!L.list().petActions.dog.includes('sitDown') || !dog.actions.includes('face')) hong('list', 'pet stance actions are not listed');
+  }
+
+  // ── Đạo cụ cảnh và nhóm bộ số `posture` ──
+  {
+    const host = document.getElementById('san');
+    const sitter = L.createCharacter(host, { id: 'granny' }).rig;
+    for (const kind of L.list().props) {
+      const propHost = document.createElement('div'); propHost.style.cssText = 'position:fixed;left:0;top:0;height:470px'; document.body.appendChild(propHost);
+      const prop = L.createProp(propHost, kind, { for: sitter, color: '#8a6245' });
+      if (xau(prop.svg)) hong(`prop ${kind}`, 'bad attribute values');
+      if (!prop.svg.querySelector('rect, path')) hong(`prop ${kind}`, 'draws nothing');
+      const box = prop.svg.getBoundingClientRect(), drawn = [...prop.svg.children].map((el) => el.getBoundingClientRect());
+      const bottom = Math.max(...drawn.map((r) => r.bottom)) - box.top;
+      if (Math.abs(bottom - 458) > 6) hong(`prop ${kind}`, `does not stand on the floor line (bottom at ${bottom.toFixed(0)}, floor 458)`);
+      propHost.remove();
+    }
+    // Mặt ghế phải nằm ngay dưới đùi người ngồi: giữa gấu áo và bàn chân.
+    sitter.state.seat = 1; sitter.render();
+    const frame = sitter.svg.getBoundingClientRect(), unit = frame.height / 470;
+    const hip = (sitter.el.chanG.getBoundingClientRect().top - frame.top) / unit, foot = (sitter.el.banL.getBoundingClientRect().bottom - frame.top) / unit;
+    if (!(sitter.seatY() > hip && sitter.seatY() < foot - 30)) hong('seatY', `seat at ${sitter.seatY().toFixed(0)} is not between the seated hip (${hip.toFixed(0)}) and the feet (${foot.toFixed(0)})`);
+    const expectThrow = (label, fn) => { try { fn(); hong('guards', `${label}: should have thrown`); } catch (e) { /* đúng */ } };
+    expectThrow('createProp with an unknown kind', () => L.createProp(host, 'sofa'));
+    expectThrow('createProp with a colour name', () => L.createProp(host, 'chair', { color: 'brown' }));
+    sitter.svg.remove();
+    const tuned = L.createCharacter(host, { id: 'granny', config: { posture: { stoop: 0.2, skirtLength: 0.7, skirtFlare: 9 } } }).rig;
+    if (tuned.nv.stoop !== 0.2 || tuned.nv.skirt.length !== 0.7 || tuned.nv.skirt.flare !== 9) hong('config posture', 'stoop / skirtLength / skirtFlare are not applied');
+    if (L.RigSVG.NHAN_VAT.granny.skirt.length === 0.7) hong('config posture', 'a config changed the shared character definition');
+    if (L.validateConfig({ posture: { stoop: 'x' } }).length !== 1 || L.validateConfig({ posture: { bend: 1 } }).length !== 1) hong('config posture', 'bad posture values are not reported');
+    tuned.svg.remove();
+  }
+
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
   {
     const load = (url) => new Promise((resolve) => {

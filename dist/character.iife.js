@@ -1,4 +1,4 @@
-/* VGCharacter v0.6.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.7.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1521,6 +1521,24 @@ class RigSVG {
   }
 
   /**
+   * Đổi DÁNG và TRANG PHỤC DƯỚI — `stoop` (độ còng 0…1), `skirtLength`, `skirtFlare`. Trả về bộ
+   * đang dùng. Hai số của váy chỉ có tác dụng khi nhân vật KHAI `skirt`; nhân vật không có váy
+   * thì chúng được nhớ nhưng không vẽ gì.
+   */
+  doiDang(posture) {
+    if (posture.stoop !== undefined) this.nv.stoop = clamp(posture.stoop, 0, 1);
+    const skirt = this.nv.skirt;
+    if (skirt) {
+      const next = { ...skirt };
+      if (posture.skirtLength !== undefined) next.length = clamp(posture.skirtLength, 0.2, 2);
+      if (posture.skirtFlare !== undefined) next.flare = clamp(posture.skirtFlare, 0, 30);
+      this.nv.skirt = next;
+    }
+    this.apDung();
+    return { stoop: this.nv.stoop || 0, skirtLength: (this.nv.skirt && this.nv.skirt.length) ?? 1, skirtFlare: (this.nv.skirt && this.nv.skirt.flare) ?? 4 };
+  }
+
+  /**
    * Đổi TAY ÁO — trả về bộ đang dùng. Tay áo là đường vẽ nướng trong SVG nên
    * phải ghi lại `d`; đệm vai và đường may thì `apDung` tự dựng lại từ `nv`.
    */
@@ -1551,6 +1569,15 @@ class RigSVG {
    * Đế giày ở cổ chân + 10 (theo cỡ bàn chân); mọi thứ nhân `coChan` vì nhóm
    * chân co cả cụm. Chân mặc định: 78 + 78 + 10 = 166 = 428 − 262, hạ 0.
    */
+  /**
+   * Cao độ MẶT GHẾ (y trong khung 400 × 470, sàn ở 458) khớp với nhân vật này khi ngồi: mặt
+   * dưới của đùi lúc `seat = 1`. Đạo cụ ghế dùng số này (runtime/props.js).
+   */
+  seatY() {
+    const nv = this.nv;
+    return HONG.y + DOI_Y + this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 + 13 * nv.dayChan * nv.coChan;
+  }
+
   hangChan() {
     const nv = this.nv;
     return (428 - HONG.y) - (DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan) * nv.coChan;
@@ -3029,16 +3056,20 @@ class RigThu {
 
   #khep(t, d = 0.4, at = '>', giu = {}) {
     // `x` không thuộc tư thế nghỉ: con vật đi tới đâu thì đứng lại ở đó (xem rig-svg.js).
+    // `ngoi` (đang ngồi) và `huong` (đang quay về bên nào) là THẾ ĐỨNG: động tác xong thì trả về
+    // đúng giá trị lúc nó bắt đầu chứ không về tư thế nghỉ — chó đã `sitDown()` thì sủa, nghiêng
+    // đầu xong vẫn ngồi; con vật đã `face('left')` thì vẫn quay trái. (Như rig người.)
     const { x, ...so } = this.NGHI;
+    so.ngoi = this.s.ngoi; so.huong = this.s.huong;
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     return t;
   }
   #chop(t, at) {
     t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
   }
-  // Đứng dậy nếu đang nghỉ ở dáng ngồi (mèo); trả về thời điểm đứng xong.
+  // Đứng dậy nếu đang ngồi (mèo nghỉ ở dáng ngồi; chó sau `sitDown`); trả về thời điểm đứng xong.
   #dung(t, at = 0) {
-    if (!this.NGHI.ngoi) return at;
+    if (!this.s.ngoi) return at;
     t.to(this.s, { ngoi: 0, duration: 0.32, ease: 'power2.inOut' }, at);
     return at + 0.32;
   }
@@ -3086,22 +3117,56 @@ class RigThu {
   walk(buoc = 4, quang = 0) {
     const t = this.tl(), s = this.s, x0 = s.x;
     let at = this.#dung(t, 0);
-    if (quang < 0) { t.to(s, { huong: -1, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
+    // Đi về phía nào thì quay đầu về phía ấy; đi xong quay lại hướng ĐANG GIỮ (xem `face`).
+    const held = s.huong < 0 ? -1 : 1, dir = quang < 0 ? -1 : quang > 0 ? 1 : held;
+    if (dir !== held) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
     t.to(s, { taiL: 0.5, taiR: 0.5, cuoi: 0.7, duration: 0.2 }, 0);
     const chuKy = quang ? Math.max(2, Math.round(Math.abs(quang) / 40)) : buoc / 2;
     at = this.#di(t, at, chuKy, 0.5, { quang, x0 });
-    this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: quang < 0 ? -1 : 1 } : {});
-    if (quang < 0) t.to(s, { huong: 1, duration: 0.22, ease: 'power1.inOut' }, '>');
+    this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: dir } : {});
+    if (dir !== held) t.to(s, { huong: held, duration: 0.22, ease: 'power1.inOut' }, '>');
     return t;
   }
 
   /** Chạy VÀO khung từ bên trái rồi dừng ở giữa. */
   enter() {
     const t = this.tl(), s = this.s;
-    t.set(s, { x: -300, mo: 1, ngoi: 0, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
+    t.set(s, { x: -300, mo: 1, ngoi: 0, huong: 1, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
     const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300, x0: -300, A: 16, cao: 11 });
-    this.#khep(t, 0.4, at, { x: 0 });
+    this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: 1 });      // vào xong: về dáng nghỉ của giống, đầu quay phải
     return t;
+  }
+
+  /* ----------------------------------------------------------- thế đứng */
+
+  // Động tác đổi THẾ ĐỨNG và giữ nguyên cho các động tác sau.
+  static STANCE = ['sitDown', 'standUp', 'face'];
+
+  /** Hoành độ TÂM con vật trên màn hình (px), tính cả quãng đã đi. */
+  centerX() {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+    return frame.left + frame.width / 2 + this.s.x * scale;
+  }
+
+  /** NGỒI XUỐNG và ở yên trong dáng ngồi. */
+  sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
+
+  /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). */
+  standUp() { return this.#khep(this.tl(), 0.35, 0, { ngoi: 0 }); }
+
+  /**
+   * QUAY ĐẦU về một phía và giữ: face('left') · face('right') · face(element) · face(otherRig).
+   * Con vật đứng nghiêng nên chỉ có hai hướng.
+   */
+  face(target = 'right') {
+    let side = target === 'left' ? -1 : 1;
+    if (target && typeof target === 'object') {
+      const box = target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+      const dx = (typeof target.centerX === 'function' ? target.centerX() : box.left + box.width / 2) - this.centerX();
+      side = dx < 0 ? -1 : 1;
+    }
+    return this.#khep(this.tl(), 0.3, 0, { huong: side });
   }
 
   /** Chạy RA khỏi khung về bên phải và ẩn đi. */
@@ -3698,6 +3763,93 @@ function dangKyDau(RigSVG, gocTen = 'vet') {
 return { KIT, dungDau, dangKyDau };
 })();
 
+/* ───── runtime/props.js ───── */
+__m['runtime/props.js'] = (function () {
+// props.js — ĐẠO CỤ CẢNH vẽ sẵn: ghế, ghế đẩu, bàn, quầy.
+//
+// Đạo cụ vẽ trong CÙNG KHUNG với nhân vật người (400 × 470, sàn ở y = 458, giữa khung x = 200).
+// Nhờ vậy muốn ghế nằm đúng dưới người ngồi thì chỉ cần cho host của ghế CÙNG `left`, `bottom`
+// và `height` với host của nhân vật, đặt nó TRƯỚC nhân vật trong HTML (để nằm phía sau). Bàn và
+// quầy cũng dùng cùng `bottom` + `height`, rồi dời `left` sang chỗ cần.
+
+const PROP_FRAME = { w: 400, h: 470, floor: 458, centre: 200 };
+const SEAT_DEFAULT = 372;                      // cao độ mặt ghế khớp nhân vật có sẵn khi không đưa `for`
+
+const shade = (hex, amount) => {               // tối đi (amount < 0) hoặc sáng lên một màu #rrggbb
+  const n = parseInt(hex.slice(1), 16), mix = (v) => Math.max(0, Math.min(255, Math.round(v + (amount < 0 ? v : 255 - v) * amount)));
+  return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => mix(v).toString(16).padStart(2, '0')).join('');
+};
+
+// Mỗi đạo cụ: (o) => chuỗi SVG. `o.seat` là cao độ mặt ghế (y trong khung), `o.w` bề rộng.
+const DRAW = {
+  // Ghế đẩu: mặt tròn dẹt, bốn chân hơi choãi, một thanh giằng.
+  stool: ({ seat, w = 84, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <path d="M ${x0 + 12} ${seat + 8} L ${x0 + 2} ${F} M ${x1 - 12} ${seat + 8} L ${x1 - 2} ${F}" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
+    <path d="M ${x0 + 9} ${seat + (F - seat) * 0.6} H ${x1 - 9}" stroke="${dark}" stroke-width="4.500" stroke-linecap="round"/>
+    <rect x="${x0}" y="${seat}" width="${w}" height="13" rx="6.500" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  // Ghế tựa nhìn từ trước: lưng ghế nhô lên sau lưng người ngồi.
+  chair: ({ seat, w = 108, back = 92, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <rect x="${x0 + 4}" y="${seat - back}" width="${w - 8}" height="${back + 6}" rx="12" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
+    <path d="M ${x0 + 9} ${seat + 10} V ${F} M ${x1 - 9} ${seat + 10} V ${F}" stroke="${dark}" stroke-width="8" stroke-linecap="round"/>
+    <rect x="${x0}" y="${seat}" width="${w}" height="15" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  // Bàn: mặt bàn mỏng, hai chân.
+  table: ({ w = 230, height = 150, color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <path d="M ${x0 + 18} ${top + 10} V ${F} M ${x1 - 18} ${top + 10} V ${F}" stroke="${dark}" stroke-width="10" stroke-linecap="round"/>
+    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  // Quầy: khối đặc tới sàn, mặt quầy nhô ra một chút, hai đường chỉ ván.
+  counter: ({ w = 300, height = 150, color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2;
+    return `
+    <rect x="${x0 + 6}" y="${top + 8}" width="${w - 12}" height="${height - 8}" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
+    <path d="M ${x0 + 6 + (w - 12) / 3} ${top + 16} V ${F - 6} M ${x0 + 6 + (w - 12) * 2 / 3} ${top + 16} V ${F - 6}" stroke="${line}" stroke-width="1.200" opacity=".45"/>
+    <rect x="${x0}" y="${top}" width="${w}" height="13" rx="4" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+};
+
+const PROP_KINDS = Object.keys(DRAW);
+
+/**
+ * Dựng một đạo cụ vào `host`.
+ *   kind     'chair' | 'stool' | 'table' | 'counter'
+ *   options  { for, color, width, height, back }
+ *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
+ *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
+ *     width    bề rộng, đơn vị khung (ghế 108, ghế đẩu 84, bàn 230, quầy 300)
+ *     height   chiều cao bàn / quầy tính từ sàn, đơn vị khung (150)
+ *     back     chiều cao lưng ghế tính từ mặt ghế (92)
+ * Trả về { svg, kind, seatY }. Host nên có cùng `bottom` và `height` với host của nhân vật.
+ */
+function createProp(host, kind, options = {}) {
+  if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
+  const { color = '#8a6245', width, height, back } = options;
+  if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
+  for (const [name, value] of Object.entries({ width, height, back }))
+    if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
+  const sitter = options.for;
+  if (sitter !== undefined && typeof (sitter && sitter.seatY) !== 'function') throw new Error(`[character] prop "${kind}": \`for\` must be a person rig (createCharacter(...).rig)`);
+  const seat = sitter ? sitter.seatY() : SEAT_DEFAULT;
+  const o = { seat, color, dark: shade(color, -0.28), line: shade(color, -0.55) };
+  if (width !== undefined) o.w = width;
+  if (height !== undefined) o.height = height;
+  if (back !== undefined) o.back = back;
+  host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
+  host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
+  </svg>`;
+  return { svg: host.firstElementChild, kind, seatY: seat };
+}
+
+return { PROP_FRAME, PROP_KINDS, createProp };
+})();
+
 /* ───── runtime/parts.js ───── */
 __m['runtime/parts.js'] = (function () {
 // parts.js — vài BỘ PHẬN vẽ sẵn cho nhân vật tuỳ chỉnh: kính, râu, ria, nếp nhăn, yếm tạp dề,
@@ -3900,6 +4052,7 @@ const CONFIG_GROUPS = {
   faceShape: ['khuon', FACE_SHAPE_KEYS],
   brows: ['may', BROW_KEYS],
   browPosition: ['viTriMay', pick(DEFINITION_KEYS, ['browSpacing', 'browY'])],
+  posture: ['dang', { stoop: 'stoop', skirtLength: 'skirtLength', skirtFlare: 'skirtFlare' }],
   features: ['net', pick(DEFINITION_KEYS, ['eyeSpacing', 'eyeY', 'eyeSize', 'noseOffsetY', 'noseSize', 'mouthY', 'mouthWidth'])],
 };
 
@@ -4256,11 +4409,12 @@ __m['runtime/index.js'] = (function () {
 const { RigSVG } = __m['runtime/rig-svg.js'];
 const { RigThu } = __m['runtime/rig-thu.js'];
 const { dangKyDau, KIT } = __m['runtime/characters.js'];
+const { createProp, PROP_KINDS } = __m['runtime/props.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -4295,7 +4449,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
   });
 }
 Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
-Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC]; } });
+Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 
 /* ─────────────────────────────────────────────────────────────── bộ đồ nghề */
 
@@ -4436,6 +4590,7 @@ function applyInternalPersonConfig(rig, c) {
   if (c.khuon) rig.doiKhuonMat(c.khuon);
   if (c.may || c.viTriMay) rig.doiChanMay({ ...(c.may || {}), ...(c.viTriMay || {}) });
   if (c.net)   rig.doiNetMat(c.net);
+  if (c.dang)  rig.doiDang(c.dang);
   if (c.nghi) {
     rig.nv.nghi = { ...(rig.nv.nghi || {}), ...c.nghi };
     rig.NGHI = Object.freeze({ ...rig.NGHI, ...c.nghi });
@@ -4510,8 +4665,9 @@ function list() {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
     personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
-    petActions: { ...RigThu.DONG_TAC },
+    petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
+    props: [...PROP_KINDS],
     bakedConfigs: Object.keys(bakedConfigs),
   };
 }
@@ -4601,7 +4757,7 @@ dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
 
 
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, RigSVG, RigThu };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, RigSVG, RigThu, createProp };
 })();
 
 __m['runtime/index.js'].__setBakedConfigs({});

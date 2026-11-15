@@ -90,6 +90,7 @@ export const CONFIG_GROUPS = {
   faceShape: ['khuon', FACE_SHAPE_KEYS],
   brows: ['may', BROW_KEYS],
   browPosition: ['viTriMay', pick(DEFINITION_KEYS, ['browSpacing', 'browY'])],
+  posture: ['dang', { stoop: 'stoop', skirtLength: 'skirtLength', skirtFlare: 'skirtFlare' }],
   features: ['net', pick(DEFINITION_KEYS, ['eyeSpacing', 'eyeY', 'eyeSize', 'noseOffsetY', 'noseSize', 'mouthY', 'mouthWidth'])],
 };
 

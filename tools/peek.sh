@@ -3,6 +3,7 @@
 #   tools/peek.sh <index.html> [t1,t2,...] [image.png]
 #   tools/peek.sh examples/hyperframes/index.html                 → 8 evenly spaced frames
 #   tools/peek.sh ~/video/index.html 0,1.5,3,6 peek.png           → exactly those seconds
+#   PEEK_WIDTH=960 PEEK_COLS=2 tools/peek.sh index.html 4,9       → bigger frames (default 480 px wide, 4 per row)
 # Prints the timing of every step of every character sequence, warns about overruns and
 # overlapping speech, then saves one contact sheet. The composition can live anywhere.
 set -e
@@ -23,7 +24,7 @@ SRV=$!
 cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || true; rm -rf "$WORK"; exit $status; }
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/peek.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
-URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES"
+URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES&w=${PEEK_WIDTH:-480}&cols=${PEEK_COLS:-4}"
 "$CHROME_BIN" --headless=new --disable-gpu --window-size=1200,800 --virtual-time-budget=20000 --enable-logging=stderr --v=0 --dump-dom "$URL" 2>"$WORK/log" > "$WORK/dom"
 python3 tools/peek_report.py < "$WORK/dom" || {
   # Composition không dựng được timeline thường là do script của nó ném lỗi — in lỗi ấy ra,

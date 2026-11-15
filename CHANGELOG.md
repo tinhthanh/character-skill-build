@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.0
+
+Added
+- Scene props: `VGCharacter.createProp(host, 'chair' | 'stool' | 'table' | 'counter', options)`,
+  drawn in the person frame so they line up with a character that shares `bottom` and
+  `height`; `for: rig` puts the seat at that character's sitting height (`rig.seatY()`).
+- Pets hold a stance: `sitDown()`, `standUp()`, `face(direction | element | rig)`; `walk`
+  returns to the held facing. People and pets can `face` each other.
+- Config group `posture`: `stoop`, `skirtLength`, `skirtFlare`.
+- Studio: a **Dáng & váy** group (stoop, skirt length and flare) and stance buttons in the
+  bottom bar (sit, face left / right, put the held item away) that stay in force while
+  actions play.
+- `tools/peek.sh`: `PEEK_WIDTH` and `PEEK_COLS` for bigger frames.
+- `examples/conversation` uses the chair and table props.
+
+Changed
+- Pet actions now end in the `seated` / `facing` they started with (as people do since 0.5.0).
+  Nothing changes for compositions that never sit a dog down or turn a pet.
+
 ## 0.6.0
 
 An independent agent trial of 0.5.2 produced most of the fixes and documentation changes below.

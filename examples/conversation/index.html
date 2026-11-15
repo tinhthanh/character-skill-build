@@ -8,8 +8,10 @@
   #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: system-ui, sans-serif; }
   #wall { position: absolute; inset: 0; background: linear-gradient(165deg, #46362e 0%, #1b1512 72%); }
   #floor { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; background: #2a201b; }
-  /* The chair is ordinary HTML BEHIND the seated character: `sitDown` draws no furniture. */
-  #chair { position: absolute; left: 1215px; bottom: 96px; width: 250px; height: 330px; background: #7a553c; border-radius: 22px 22px 6px 6px; box-shadow: inset 0 -150px 0 #5f412d; }
+  /* The chair is a ready-made prop. Same left / bottom / height as the character who sits on it,
+     and BEFORE her in the HTML so it is drawn behind her. */
+  #chair { position: absolute; left: 1150px; bottom: 96px; height: 700px; }
+  #table { position: absolute; left: 1420px; bottom: 96px; height: 700px; }
   /* Give each character a HEIGHT; the width follows the rig's own aspect ratio. */
   #barista { position: absolute; left: -60px; bottom: 96px; height: 760px; }   /* near the edge: her entrance starts off-frame */
   #granny { position: absolute; left: 1150px; bottom: 96px; height: 700px; }
@@ -21,7 +23,8 @@
   <div id="floor" class="clip" data-start="0" data-duration="19" data-track-index="1"></div>
   <div id="chair" class="clip" data-start="0" data-duration="19" data-track-index="2"></div>
   <div id="granny" class="clip" data-start="0" data-duration="19" data-track-index="3"></div>
-  <div id="barista" class="clip" data-start="0" data-duration="19" data-track-index="4"></div>
+  <div id="table" class="clip" data-start="0" data-duration="19" data-track-index="4"></div>
+  <div id="barista" class="clip" data-start="0" data-duration="19" data-track-index="5"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
   <!-- In a real project: copy dist/character.slim.js next to index.html and load that. -->
@@ -30,6 +33,10 @@
     VGCharacter.seed(11);
     const barista = VGCharacter.createCharacter(document.getElementById('barista'), { id: 'barista' }).rig;
     const granny = VGCharacter.createCharacter(document.getElementById('granny'), { id: 'granny' }).rig;
+
+    // Furniture: `for: granny` sets the seat to the height at which she sits.
+    VGCharacter.createProp(document.getElementById('chair'), 'chair', { for: granny, color: '#8a5a3c' });
+    VGCharacter.createProp(document.getElementById('table'), 'table', { color: '#a9764f', width: 170, height: 135 });
 
     // A conversation = two sequences whose speaking steps TAKE TURNS. Numbers are pauses (seconds)
     // that wait for the other character's line; `sh tools/peek.sh` prints every step's start and

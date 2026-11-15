@@ -121,12 +121,48 @@ stand them up first:
 Exact durations for a given composition: `tools/peek.sh <index.html>` prints the start and
 end of every step.
 
+**Pet stance.** Like people, pets hold a stance: `sitDown()`, `standUp()` and
+`face('left' | 'right' | element | rig)` stay in force through the actions that follow (a dog
+that sat down barks and tilts its head seated; a cat that stood up stays standing). `walk`
+turns toward the direction it walks and then returns to the held facing; `enter` ends in the
+species' rest pose, head toward the right. A person can `face(petRig)` and a pet can
+`face(personRig)`.
+
+## Scene props — `VGCharacter.createProp(host, kind, options)`
+
+Ready-made furniture, drawn in the **same 400 × 470 frame as a person** with the floor on the
+same line. Give the prop's host the same `bottom` and `height` as the character's host; for a
+chair or stool also the same `left`, and put it **before** the character in the HTML so it is
+drawn behind. Tables and counters use the same `bottom` + `height` and their own `left`.
+
+| `kind` | Options (frame units) | Notes |
+|---|---|---|
+| `chair` | `for`, `color`, `width = 108`, `back = 92` | seat with a backrest that shows behind the sitter |
+| `stool` | `for`, `color`, `width = 84` | |
+| `table` | `color`, `width = 230`, `height = 150` | thin top on two legs |
+| `counter` | `color`, `width = 300`, `height = 150` | solid to the floor |
+
+`for: rig` sets the seat to the height at which that person sits (`rig.seatY()`); without it a
+default that fits the built-in characters is used. `color` is `#rrggbb`; the darker tone and
+the line colour are derived. Returns `{ svg, kind, seatY }`. A unit is `host height / 470` px.
+
+```html
+<div id="chair"  class="clip" style="position:absolute; left:1150px; bottom:96px; height:700px" …></div>
+<div id="granny" class="clip" style="position:absolute; left:1150px; bottom:96px; height:700px" …></div>
+```
+```js
+const granny = VGCharacter.createCharacter(document.getElementById('granny'), { id: 'granny' }).rig;
+VGCharacter.createProp(document.getElementById('chair'), 'chair', { for: granny, color: '#8a5a3c' });
+granny.state.seat = 1;                       // already seated in the first frame
+```
+
 ## Library and rig API
 
 | Call | Use |
 |---|---|
 | `VGCharacter.createCharacter(host, { id, config })` | build a person; returns `{ rig, id }`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
+| `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps`. The result is pre-sampled, so seeking to any time, in any order, gives the same frame |
 | `VGCharacter.seed(n)` | fix all randomness; `null` restores `Math.random` |
 | `VGCharacter.list()` | ids, action names, expression names, baked config ids |

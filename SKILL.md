@@ -62,6 +62,9 @@ still break mid-action, and some failures are silent (see [Pitfalls](#pitfalls))
    land where the rest pose intends. Fix and repeat from step 4.
 6. **Fine-tune numbers in the studio (optional).** Open
    `http://127.0.0.1:8300/studio/?nv=<id>`, adjust sliders and colours, press **Lưu** (Save).
+   The **Dáng & váy** group tunes `stoop` and the skirt; the **Ngồi · ← · → · Đồ vật** buttons
+   in the bottom bar hold a stance so every action can be reviewed seated, turned, or with
+   the held item put away.
    That writes `configs/<id>.json`, and the next build bakes it into the bundle, so
    `createCharacter(host, { id })` returns the tuned character. The studio's ⋯ menu can also
    copy the values as definition lines if they should become the character's defaults.
@@ -150,6 +153,9 @@ and non-hex colours. These still fail without an error:
   outfit; add `skirt: { kind: 'skirt' | 'apron', length }` for a skirt or apron that moves with
   the legs (do not draw one as a decal in `accessories` — it will not follow the legs or the
   turn), `stoop` for an elderly posture, `heldItemL` / `heldItemR` for a cup, clipboard or phone.
+- **Furniture:** `VGCharacter.createProp(host, 'chair' | 'stool' | 'table' | 'counter', { for: rig })`
+  draws props in the character's own frame, so a chair with the same `left` / `bottom` /
+  `height` as its sitter lines up by itself. See `references/actions.md` → Scene props.
 - **Conversations:** `sitDown`, `standUp` and `face(target)` change the stance and *keep* it, so
   a character can speak while seated or while turned to another character. See
   `references/actions.md` → Stance.

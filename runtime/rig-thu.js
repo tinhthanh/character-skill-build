@@ -499,16 +499,20 @@ export class RigThu {
 
   #khep(t, d = 0.4, at = '>', giu = {}) {
     // `x` không thuộc tư thế nghỉ: con vật đi tới đâu thì đứng lại ở đó (xem rig-svg.js).
+    // `ngoi` (đang ngồi) và `huong` (đang quay về bên nào) là THẾ ĐỨNG: động tác xong thì trả về
+    // đúng giá trị lúc nó bắt đầu chứ không về tư thế nghỉ — chó đã `sitDown()` thì sủa, nghiêng
+    // đầu xong vẫn ngồi; con vật đã `face('left')` thì vẫn quay trái. (Như rig người.)
     const { x, ...so } = this.NGHI;
+    so.ngoi = this.s.ngoi; so.huong = this.s.huong;
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     return t;
   }
   #chop(t, at) {
     t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
   }
-  // Đứng dậy nếu đang nghỉ ở dáng ngồi (mèo); trả về thời điểm đứng xong.
+  // Đứng dậy nếu đang ngồi (mèo nghỉ ở dáng ngồi; chó sau `sitDown`); trả về thời điểm đứng xong.
   #dung(t, at = 0) {
-    if (!this.NGHI.ngoi) return at;
+    if (!this.s.ngoi) return at;
     t.to(this.s, { ngoi: 0, duration: 0.32, ease: 'power2.inOut' }, at);
     return at + 0.32;
   }
@@ -556,22 +560,56 @@ export class RigThu {
   walk(buoc = 4, quang = 0) {
     const t = this.tl(), s = this.s, x0 = s.x;
     let at = this.#dung(t, 0);
-    if (quang < 0) { t.to(s, { huong: -1, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
+    // Đi về phía nào thì quay đầu về phía ấy; đi xong quay lại hướng ĐANG GIỮ (xem `face`).
+    const held = s.huong < 0 ? -1 : 1, dir = quang < 0 ? -1 : quang > 0 ? 1 : held;
+    if (dir !== held) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
     t.to(s, { taiL: 0.5, taiR: 0.5, cuoi: 0.7, duration: 0.2 }, 0);
     const chuKy = quang ? Math.max(2, Math.round(Math.abs(quang) / 40)) : buoc / 2;
     at = this.#di(t, at, chuKy, 0.5, { quang, x0 });
-    this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: quang < 0 ? -1 : 1 } : {});
-    if (quang < 0) t.to(s, { huong: 1, duration: 0.22, ease: 'power1.inOut' }, '>');
+    this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: dir } : {});
+    if (dir !== held) t.to(s, { huong: held, duration: 0.22, ease: 'power1.inOut' }, '>');
     return t;
   }
 
   /** Chạy VÀO khung từ bên trái rồi dừng ở giữa. */
   enter() {
     const t = this.tl(), s = this.s;
-    t.set(s, { x: -300, mo: 1, ngoi: 0, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
+    t.set(s, { x: -300, mo: 1, ngoi: 0, huong: 1, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
     const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300, x0: -300, A: 16, cao: 11 });
-    this.#khep(t, 0.4, at, { x: 0 });
+    this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: 1 });      // vào xong: về dáng nghỉ của giống, đầu quay phải
     return t;
+  }
+
+  /* ----------------------------------------------------------- thế đứng */
+
+  // Động tác đổi THẾ ĐỨNG và giữ nguyên cho các động tác sau.
+  static STANCE = ['sitDown', 'standUp', 'face'];
+
+  /** Hoành độ TÂM con vật trên màn hình (px), tính cả quãng đã đi. */
+  centerX() {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+    return frame.left + frame.width / 2 + this.s.x * scale;
+  }
+
+  /** NGỒI XUỐNG và ở yên trong dáng ngồi. */
+  sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
+
+  /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). */
+  standUp() { return this.#khep(this.tl(), 0.35, 0, { ngoi: 0 }); }
+
+  /**
+   * QUAY ĐẦU về một phía và giữ: face('left') · face('right') · face(element) · face(otherRig).
+   * Con vật đứng nghiêng nên chỉ có hai hướng.
+   */
+  face(target = 'right') {
+    let side = target === 'left' ? -1 : 1;
+    if (target && typeof target === 'object') {
+      const box = target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+      const dx = (typeof target.centerX === 'function' ? target.centerX() : box.left + box.width / 2) - this.centerX();
+      side = dx < 0 ? -1 : 1;
+    }
+    return this.#khep(this.tl(), 0.3, 0, { huong: side });
   }
 
   /** Chạy RA khỏi khung về bên phải và ẩn đi. */
