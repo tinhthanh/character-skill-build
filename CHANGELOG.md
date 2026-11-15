@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.31.1
+
+Fixed
+- **A caption covered the speaker's face while the camera was still moving in.** Captions
+  now also check where the heads are at the moment the caption appears, before the camera
+  has reached the speaker. If no place is free for the whole line but the overlap is only at
+  the start, the caption appears a little later (up to one second), once the camera has
+  arrived. In a vertical frame a caption is only moved within 12–78% of the height, clear of
+  the area that video apps cover with their own controls.
+
 ## 0.31.0
 
 Added

@@ -682,6 +682,36 @@ try {
       if (!moved.inside) hong('captions avoid', 'the caption was moved out of the frame');
       talk.sequences.forEach((item) => item.kill()); stage4.remove();
     }
+    // PHỤ ĐỀ lúc máy quay ĐANG PHÓNG VÀO (khung dọc, hộp chữ giữa khung): suốt thời gian hộp chữ hiện rõ, nó không được
+    // đè lên đầu người nói — dời đi, hoặc hiện muộn hơn một chút khi không còn chỗ.
+    {
+      const stage5 = document.createElement('div'); stage5.setAttribute('data-composition-id', 'check-captions-move');
+      stage5.style.cssText = 'position:absolute;left:0;top:0;width:540px;height:960px;overflow:hidden';
+      const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage5.appendChild(d); return d; };
+      const h1 = mk('move-a', 'left:20px;bottom:150px;width:330px;height:390px'), h2 = mk('move-c', 'left:330px;bottom:150px;width:200px;height:165px');
+      const text = mk('move-text', 'left:62px;top:499px;width:324px;padding:9px 17px;font:600 22px/1.25 sans-serif;text-align:center;background:#000;color:#fff');
+      document.body.appendChild(stage5);
+      const p1 = L.createCharacter(h1, { id: 'girl' }).rig, pet = L.createPet(h2, { species: 'cat' }).rig, scene5 = ['#move-a', '#move-c'];
+      const worst = (options) => {
+        const talk = L.conversation([[p1, ['idle', 1]], [p1, ['explain', 'Chao be meo! Hom nay be khoe khong?', 3]]], { camera: { scene: scene5, fill: 0.46, centerY: 0.34 } });
+        const words = L.captions(talk, text, options), reel = gsap.timeline({ paused: true }); talk.addTo(reel, 0); reel.add(words.paused(false), 0);
+        let covered = 0;
+        for (let time = 0.5; time <= reel.duration(); time += 0.04) {
+          reel.time(time); if (+text.style.opacity < 0.3) continue;
+          const box = text.getBoundingClientRect(), head = p1.el.dau.getBoundingClientRect();
+          const x = Math.min(box.right, head.right) - Math.max(box.left, head.left), y = Math.min(box.bottom, head.bottom) - Math.max(box.top, head.top);
+          if (x > 0 && y > 0) covered = Math.max(covered, (x * y) / (head.width * head.height));
+        }
+        const said = words.data.lines.length;
+        words.kill(); reel.kill(); talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill(); L.shot(scene5, null, 'wide').progress(1); text.style.transform = '';
+        return { covered, said };
+      };
+      const plain = worst({ avoid: false }), careful = worst({});
+      if (plain.covered < 0.1) hong('captions avoid', `test setup: left alone, the caption should cover the speaker's head while the camera moves in (${Math.round(plain.covered * 100)}%)`);
+      if (careful.covered > 0.03) hong('captions avoid', `the caption covers ${Math.round(careful.covered * 100)}% of the speaker's head while the camera moves in`);
+      if (careful.said !== 1) hong('captions avoid', 'the line is no longer captioned');
+      stage5.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

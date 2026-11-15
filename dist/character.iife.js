@@ -1,4 +1,4 @@
-/* VGCharacter v0.31.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.31.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5108,7 +5108,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.31.0';
+const VERSION = '0.31.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5705,17 +5705,34 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
     for (const line of lines) {
       slot.textContent = label(line);
       const frame = root.getBoundingClientRect(), box = element.getBoundingClientRect(), ratio = frame.height / (root.offsetHeight || frame.height) || 1;
-      const heads = [];
-      for (const time of [line.start + 0.15, (line.start + line.end) / 2, line.end - 0.1]) {
+      // Các cái đầu đang hiện trong khung ở một thời điểm (đã tính cả máy quay).
+      const headsAt = (time) => {
         reels.forEach((reel) => reel.time(Math.max(0, Math.min(time, reel.duration()))));
-        for (const rig of actors) { if (rig.s.mo < 0.5) continue; const head = rig.el.dau.getBoundingClientRect(); if (head.width > 0 && head.right > frame.left && head.left < frame.right) heads.push(head); }
-      }
-      const pad = 6 * ratio, hits = (shift) => heads.some((head) => head.right > box.left - pad && head.left < box.right + pad && head.bottom > box.top + shift - pad && head.top < box.bottom + shift + pad);
+        const found = [];
+        for (const rig of actors) { if (rig.s.mo < 0.5) continue; const head = rig.el.dau.getBoundingClientRect(); if (head.width > 0 && head.right > frame.left && head.left < frame.right) found.push(head); }
+        return found;
+      };
+      const pad = 6 * ratio, over = (list, shift) => list.some((head) => head.right > box.left - pad && head.left < box.right + pad && head.bottom > box.top + shift - pad && head.top < box.bottom + shift + pad);
+      // Đo cả lúc hộp chữ BẮT ĐẦU HIỆN (trước khi câu nói bắt đầu một nhịp `fade`): khi ấy máy quay còn đang ở cảnh
+      // trước, chưa phóng vào người nói — cái đầu nằm ở chỗ khác hẳn so với giữa câu.
+      const lead = headsAt(line.start - fade), during = [line.start + 0.15, (line.start + line.end) / 2, line.end - 0.1].flatMap(headsAt);
+      const hits = (shift) => over(lead, shift) || over(during, shift);
       if (!hits(0)) continue;
-      const step = frame.height * 0.02, low = frame.top + frame.height * 0.06, high = frame.bottom - frame.height * 0.06;
+      // Vùng được dời tới: 6–94% chiều cao; khung DỌC thì 12–78% — phần dưới cùng của video dọc thường bị giao diện
+      // của nền tảng che (tên kênh, nút bấm).
+      const portrait = frame.height > frame.width, step = frame.height * 0.02;
+      const low = frame.top + frame.height * (portrait ? 0.12 : 0.06), high = frame.bottom - frame.height * (portrait ? 0.22 : 0.06);
       for (let n = 1; n <= 22 && line.shift === undefined; n++) for (const shift of [n * step, -n * step]) {
         if (box.top + shift < low || box.bottom + shift > high || hits(shift)) continue;
         line.shift = shift / ratio; break;
+      }
+      // Không có chỗ nào trống suốt cả câu, nhưng chỉ vướng ở LÚC ĐẦU (máy quay còn đang phóng vào): cho hộp chữ hiện
+      // MUỘN hơn một chút, khi máy quay đã tới nơi — tối đa một giây, và không quá nửa câu.
+      if (line.shift === undefined && !over(during, 0)) {
+        for (let wait = 0.1; wait <= Math.min(1, (line.end - line.start) / 2); wait += 0.1) {
+          if (over(headsAt(line.start - fade + wait), 0)) continue;
+          line.start += wait; break;
+        }
       }
     }
     reels.forEach((reel, index) => reel.time(before[index]));
@@ -5740,7 +5757,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
   const playhead = { _time: 0, get time() { return this._time; }, set time(value) { this._time = value; show(value); } };
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   timeline.to(playhead, { time: total, duration: total, ease: 'none' }, 0);
-  timeline.data = { type: 'character-captions', lines: lines.map(({ start, end, text, rig }) => ({ start, end, text, character: rig ? rig.publicId || '' : '' })) };
+  timeline.data = { type: 'character-captions', lines: lines.map(({ start, end, text, rig, shift }) => ({ start, end, text, character: rig ? rig.publicId || '' : '', shift: shift || 0 })) };
   show(0);
   return timeline;
 }
