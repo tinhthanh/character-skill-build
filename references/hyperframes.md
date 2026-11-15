@@ -182,7 +182,7 @@ const talk = VGCharacter.conversation([
   { together: [[vet, ['face', boy]], [boy, ['face', vet]]] },      // several characters at once
   [vet, ['speakCues', window.VOICE_CUES.line1]],
   [boy, ['speakCues', window.VOICE_CUES.line2], 'nod'],
-], { gap: 0.25 });                                                 // seconds between turns
+], { gap: 0.25 });                                                 // seconds between turns; an opening LINE waits `leadIn` (0.6 s)
 talk.addTo(tl, 0);
 ```
 
@@ -296,6 +296,11 @@ Two ways to move the mouth:
    `data-duration` to the file's length — `tools/peek.sh` prints both next to the step, ready
    to paste (`act.data.steps` holds the same). The step lasts the audio's
    length plus about 0.55 s of settling; the mouth is closed again when the audio ends.
+
+**Check the lip-sync by eye.** Still frames a second apart cannot show whether a mouth follows
+the words. `sh tools/peek.sh index.html "" mouth.png --mouth=2` saves a dense strip of mouth
+close-ups (10 a second) for the 2nd spoken line, each labelled with its time and cue shape,
+and prints the shapes in order. Pauses should show a closed mouth, stressed vowels an open one.
 
 Several lines: one audio clip and one cue script per line (`--name line2` sets the key in
 `window.VOICE_CUES`). Complete example: `examples/voiceover/index.html` (its `voice.wav` is a

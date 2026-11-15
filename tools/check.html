@@ -539,6 +539,7 @@ try {
     // Lời của speakCues lấy từ { text } hoặc từ metadata của bộ cue.
     const cued = L.sequence(a, [['speakCues', { metadata: { duration: 1, text: 'tu metadata' }, mouthCues: [{ start: 0, end: 1, value: 'C' }] }], ['speakCues', { mouthCues: [{ start: 0, end: 1, value: 'C' }] }, null, { text: 'tu tuy chon' }]]);
     if (cued.data.steps[0].text !== 'tu metadata' || cued.data.steps[1].text !== 'tu tuy chon') hong('captions', `speakCues text is not picked up (${cued.data.steps.map((step) => step.text)})`);
+    if (!Array.isArray(cued.data.steps[0].cues) || cued.data.steps[0].cues.length !== 1) hong('sequence', 'speakCues steps do not carry their cues (tools/peek.sh --mouth needs them)');
     cued.kill();
     try { L.captions(L.sequence(a, ['wave', 'nod']), caption); hong('captions', 'a source without spoken text should throw'); } catch (error) { /* đúng */ }
     // Bong bóng: nằm phía trên đầu người nói, và đổi chỗ khi đổi người nói.
@@ -581,6 +582,13 @@ try {
     if (dog.s.huong !== 1) hong('conversation', `a pet's face(rig) inside a conversation turns the wrong way (${dog.s.huong})`);
     const faced = crossing.of(a).data.steps.find((step) => step.name === 'face');
     if (!faced || faced.target !== dog) hong('conversation', 'the face step no longer records the real target (tools/peek.sh needs it)');
+    // Cảnh mở đầu bằng lời nói thì chừa một nhịp; mở đầu bằng động tác thì không.
+    a.reset();
+    const spokenFirst = L.conversation([[a, ['speak', 'xin chao', 1]]]), actedFirst = L.conversation([[a, 'nod'], [a, ['speak', 'xin chao', 1]]]);
+    if (Math.abs(spokenFirst.turns[0].start - 0.6) > 0.01) hong('conversation', `an opening line starts at ${spokenFirst.turns[0].start}s instead of after the 0.6 s lead-in`);
+    if (Math.abs(actedFirst.turns[0].start) > 0.01) hong('conversation', 'a conversation that opens with an action must start at 0');
+    if (Math.abs(L.conversation([[a, ['speak', 'xin chao', 1]]], { leadIn: 0 }).turns[0].start) > 0.01) hong('conversation', 'leadIn: 0 is ignored');
+    a.reset();
     // Thú đi quãng dài thì chạy lúp xúp: 600 đơn vị trong dưới 5 giây, vẫn dừng đúng chỗ.
     dog.datNghi(); const trot = L.sequence(dog, [['walk', 4, 600]]); trot.time(trot.duration());
     if (trot.duration() > 5 || Math.abs(dog.s.x - 600) > 1e-3) hong('pet walk', `walk(4, 600) takes ${trot.duration().toFixed(1)}s and ends at x ${dog.s.x}`);

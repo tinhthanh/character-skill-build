@@ -4,10 +4,18 @@
 #   tools/peek.sh examples/hyperframes/index.html                 → 8 evenly spaced frames
 #   tools/peek.sh ~/video/index.html 0,1.5,3,6 peek.png           → exactly those seconds
 #   PEEK_WIDTH=960 PEEK_COLS=2 tools/peek.sh index.html 4,9       → bigger frames (default 480 px wide, 4 per row)
+#   tools/peek.sh index.html "" mouth.png --mouth=2              → LIP-SYNC check: a dense strip of mouth close-ups
+#                                                                   for the 2nd spoken line, with the cue shape per frame
 # Prints the timing of every step of every character sequence, warns about overruns and
 # overlapping speech, then saves one contact sheet. The composition can live anywhere.
 set -e
-FILE="${1:?usage: tools/peek.sh <index.html> [t1,t2,...] [image.png]}"; TIMES="${2:-}"; OUT="${3:-peek.png}"
+# --mouth[=N]: tách khỏi các tham số vị trí.
+MOUTH=""; count=$#
+while [ "$count" -gt 0 ]; do
+  arg="$1"; shift; count=$((count - 1))
+  case "$arg" in --mouth) MOUTH=1 ;; --mouth=*) MOUTH="${arg#--mouth=}" ;; *) set -- "$@" "$arg" ;; esac
+done
+FILE="${1:?usage: tools/peek.sh <index.html> [t1,t2,...] [image.png] [--mouth[=N]]}"; TIMES="${2:-}"; OUT="${3:-peek.png}"
 [ -f "$FILE" ] || { echo "peek: no such file: $FILE" >&2; exit 1; }
 DIR="$(cd "$(dirname "$FILE")" && pwd)"; NAME="$(basename "$FILE")"
 case "$OUT" in /*) ;; *) OUT="$(pwd)/$OUT" ;; esac
@@ -25,7 +33,7 @@ SRV=$!
 cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || true; rm -rf "$WORK"; exit $status; }
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/peek.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
-URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES&w=${PEEK_WIDTH:-480}&cols=${PEEK_COLS:-4}"
+URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES&w=${PEEK_WIDTH:-480}&cols=${PEEK_COLS:-4}&mouth=$MOUTH"
 # MỘT lượt Chrome: đợi trang báo xong (title DONE / ERROR) rồi mới lấy DOM và chụp ảnh. Bản cũ
 # chụp theo ngân sách thời gian ảo nên composition nặng cho ra các ô CHƯA tua, không cảnh báo.
 rm -f "$OUT"                                   # hỏng thì không để lại ảnh cũ cho người ta xem nhầm

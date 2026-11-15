@@ -144,14 +144,16 @@ def spectral_shape(frame, emphasised, rate, level):
     total = sum(power) or 1.0
     low, open_, mid, front = (p / total for p in power)
     if front >= 0.35:                                        # e, i: miệng bè ngang
-        return 'C' if level >= 0.6 else 'B'
+        return 'C' if level >= 0.38 else 'B'
     if open_ >= 0.45 or (open_ + mid >= 0.6 and mid >= 0.25):  # a, o: miệng mở
-        return 'D' if level >= 0.75 else 'C' if level >= 0.35 else 'B'
+        return 'D' if level >= 0.6 else 'C' if level >= 0.22 else 'B'
     if low >= 0.6:                                           # chỉ có đáy: u / oo (to) hoặc m, n (nhỏ)
-        if level < 0.25:
+        if level < 0.14:                                     # gần như im: môi khép (m, b, p)
             return 'A'
+        if level < 0.34:                                     # nhỏ: n, l, nguyên âm lướt — miệng hé chứ không mím
+            return 'B'
         return 'F' if level >= 0.55 and open_ + mid < 0.12 else 'E'
-    return 'D' if level >= 0.75 else 'C' if level >= 0.4 else 'B'
+    return 'D' if level >= 0.65 else 'C' if level >= 0.28 else 'B'
 
 
 def spectral_cues(path):
@@ -166,12 +168,32 @@ def spectral_cues(path):
     loud = ranked[min(count - 1, int(count * 0.95))] or max(levels) or 1.0
     floor = ranked[int(count * 0.1)]
     gate = floor + (loud - floor) * 0.12
+    # Độ to được so với CỤM LỜI của chính nó, không chỉ với chỗ to nhất của cả tệp: người nói nhỏ dần về
+    # cuối câu, so với đỉnh toàn tệp thì nửa sau của câu chỉ còn là miệng hé — nhân vật thành ra nói lí nhí.
+    # Một cụm = các khung có tiếng liền nhau, cách nhau bởi quãng im dài hơn PAUSE.
+    phrase_peak = [loud] * count
+    start, quiet, pause_frames = None, 0, int(PAUSE / FRAME)
+    def close(first, last):
+        voiced = sorted(levels[i] for i in range(first, last + 1) if levels[i] >= gate)
+        if voiced:
+            peak = max(voiced[min(len(voiced) - 1, int(len(voiced) * 0.9))], gate + (loud - gate) * 0.35)   # cụm rất nhỏ thì không thổi phồng quá
+            for i in range(first, last + 1): phrase_peak[i] = peak
+    for n in range(count + 1):
+        voiced = n < count and levels[n] >= gate
+        if voiced:
+            if start is None: start = n
+            quiet = 0
+        elif start is not None:
+            quiet += 1
+            if quiet > pause_frames or n == count:
+                close(start, n - quiet); start, quiet = None, 0
     shapes = []
     for n in range(count):
         if levels[n] < gate:
             shapes.append('X')
         else:
-            shapes.append(spectral_shape(data[n * size:(n + 1) * size], emphasised[n * size:(n + 1) * size], rate, (levels[n] - gate) / max(1e-9, loud - gate)))
+            level = max((levels[n] - gate) / max(1e-9, loud - gate), (levels[n] - gate) / max(1e-9, phrase_peak[n] - gate))
+            shapes.append(spectral_shape(data[n * size:(n + 1) * size], emphasised[n * size:(n + 1) * size], rate, level))
     # Một khung lạc giữa hai khung giống nhau là nhiễu: theo hàng xóm.
     for n in range(1, count - 1):
         if shapes[n - 1] == shapes[n + 1] != shapes[n]:

@@ -23,4 +23,9 @@ if not info.get('sequences'):
     print('\n  (no character sequences in the timeline)')
 for warning in info.get('warnings', []):
     print(f"\n  ⚠ {warning}")
+if info.get('mouth'):
+    m = info['mouth']
+    print(f"\nmouth strip: line {m['line']} — \"{m['who']}\", {m['start']:.2f} → {m['end']:.2f} s, {m['frames']} frames (10 per second)")
+    if m.get('shapes'): print(f"  cue shapes per frame: {m['shapes']}   (X pause · A closed · B teeth · C open · D wide · E round · F pucker)")
+    else: print('  (this line uses speak / explain: the mouth is estimated from the text, there are no cues)')
 print('\nframes captured: ' + ', '.join(f"{t:g}s" for t in info['times']))

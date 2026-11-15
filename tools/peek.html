@@ -16,7 +16,10 @@
 <pre id="info"></pre>
 <script type="module">
 const query = new URLSearchParams(location.search);
-const src = query.get('src'), columns = +(query.get('cols') || 4), tileWidth = +(query.get('w') || 480);
+const src = query.get('src');
+let columns = +(query.get('cols') || 4), tileWidth = +(query.get('w') || 480);
+// ?mouth=N: thay vì ảnh toàn cảnh rải rác, chụp một DẢI CẬN MIỆNG dày khung của câu nói thứ N — để soát nhép miệng.
+const mouthLine = +(query.get('mouth') || 0);
 const info = { ok: true, warnings: [] };
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -58,7 +61,7 @@ try {
     const start = +child.startTime().toFixed(3), end = +(child.startTime() + child.duration()).toFixed(3);
     if (end > probe.declared + 0.01) info.warnings.push(`the sequence of "${child.data.character}" ends at ${end}s, after data-duration ${probe.declared}s`);
     return { character: child.data.character, start, end,
-             steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2), ...(step.sound ? { sound: step.sound } : {}) })) };
+             steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2), ...(step.sound ? { sound: step.sound } : {}), ...(step.cues ? { cues: step.cues } : {}) })) };
   });
   // Hai nhân vật NÓI chồng lên nhau: gần như luôn là lỗi dàn cảnh, mà nhìn ảnh tĩnh không thấy.
   // Bước nói kéo dài hơn TIẾNG NÓI 0,55 giây (miệng đã khép, tay đang về chỗ) — phần đuôi ấy không
@@ -134,18 +137,43 @@ try {
   const times = (query.get('t') || '').split(',').map(Number).filter((n) => Number.isFinite(n) && query.get('t'));
   // Mặc định: khung 0 (để thấy cảnh mở đầu) rồi 7 điểm rải đều.
   if (!times.length) { times.push(0); for (let i = 0; i < 7; i++) times.push(+(total * (i + 1) / 7.5).toFixed(2)); }
+  // Dải cận miệng: 10 khung mỗi giây suốt câu nói (tối đa 40 khung), ô nhỏ, 10 ô một hàng.
+  let mouth = null;
+  if (mouthLine) {
+    const spoken = info.sequences.flatMap((seq, index) => seq.steps.filter((step) => ['speak', 'explain', 'speakCues'].includes(step.name)).map((step) => ({ ...step, who: seq.character, index }))).sort((a, b) => a.start - b.start);
+    mouth = spoken[mouthLine - 1];
+    if (!mouth) throw new Error(`--mouth=${mouthLine}: the composition has ${spoken.length} spoken line(s)`);
+    const until = mouth.end - 0.45, count = Math.min(40, Math.max(2, Math.round((until - mouth.start) * 10)));
+    times.length = 0;
+    for (let i = 0; i < count; i++) times.push(+(mouth.start + (until - mouth.start) * i / (count - 1)).toFixed(2));
+    columns = 10; tileWidth = 150;
+    const shapeAt = (time) => { const cue = (mouth.cues || []).find((item) => time - mouth.start >= item.start && time - mouth.start < item.end); return cue ? cue.value : ''; };
+    info.mouth = { who: mouth.who, line: mouthLine, start: mouth.start, end: +until.toFixed(2), frames: count, shapes: mouth.cues ? times.map(shapeAt).join('') : null };
+    mouth.shapeAt = shapeAt;
+  }
   info.times = times;
 
-  const scale = tileWidth / probe.width, tileHeight = Math.round(probe.height * scale);
+  const scale = tileWidth / probe.width, tileHeight = mouth ? 105 : Math.round(probe.height * scale);
   const grid = document.getElementById('grid');
   grid.style.gridTemplateColumns = `repeat(${Math.min(columns, times.length)}, ${tileWidth}px)`;
   info.sheet = { width: Math.min(columns, times.length) * (tileWidth + 6) + 6, height: Math.ceil(times.length / columns) * (tileHeight + 6) + 6 };
   await Promise.all(times.map(async (time) => {
     const tile = document.createElement('div'); tile.className = 'tile'; tile.style.cssText = `width:${tileWidth}px;height:${tileHeight}px`;
     const frame = document.createElement('iframe'); frame.style.cssText = `width:${probe.width}px;height:${probe.height}px;transform:scale(${scale})`;
-    const label = document.createElement('span'); label.textContent = time.toFixed(2) + ' s';
+    const label = document.createElement('span'); label.textContent = time.toFixed(2) + ' s' + (mouth && mouth.shapeAt(time) ? ' · ' + mouth.shapeAt(time) : '');
     tile.append(frame, label); grid.appendChild(tile);
-    seek(await loadComposition(frame), time);
+    const comp = await loadComposition(frame);
+    seek(comp, time);
+    if (mouth) {
+      // Cắt quanh miệng: lấy hai mắt làm mốc (miệng nằm dưới mắt khoảng 0,7 lần khoảng cách hai mắt), tính trên
+      // hình ĐÃ qua máy quay, rồi phóng iframe sao cho vùng ấy lấp đầy ô.
+      const rig = comp.timeline.getChildren(true, false, true).filter((item) => item.data && item.data.type === 'character-sequence')[mouth.index].data.rig;
+      const left = rig.el.matL.getBoundingClientRect(), right = rig.el.matR.getBoundingClientRect();
+      const eyeX = (left.left + left.right + right.left + right.right) / 4, eyeY = (left.top + left.bottom + right.top + right.bottom) / 4;
+      const gap = Math.abs((right.left + right.right) / 2 - (left.left + left.right) / 2) || 40;
+      const width = gap * 2.3, zoom = tileWidth / width;
+      frame.style.transform = `translate(${-(eyeX - width / 2) * zoom}px, ${-(eyeY - gap * 0.1) * zoom}px) scale(${zoom})`;
+    }
   }));
   await wait(120);
 } catch (error) { info.ok = false; info.error = String(error && error.message || error); }

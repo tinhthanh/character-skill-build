@@ -174,7 +174,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
 | `rig.shotBox(kind)` | the box such a shot aims at, in frame units, for the rig's current state |
 | `VGCharacter.captions(source, element, options)` | show the words of each spoken line while it is spoken — a fixed caption, or a bubble above the speaker with `follow: true` |
-| `VGCharacter.conversation(turns, { gap, waiting, camera })` | several characters taking turns, timed automatically; `camera` cuts to whoever speaks; returns `{ sequences, turns, duration, camera, of(rig), addTo(timeline, at) }` — see `references/hyperframes.md` → Staging recipes |
+| `VGCharacter.conversation(turns, { gap, waiting, camera, leadIn })` | several characters taking turns, timed automatically; `camera` cuts to whoever speaks; returns `{ sequences, turns, duration, camera, of(rig), addTo(timeline, at) }` — see `references/hyperframes.md` → Staging recipes |
 | `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps`. The result is pre-sampled, so seeking to any time, in any order, gives the same frame |
 | `VGCharacter.seed(n)` | fix all randomness; `null` restores `Math.random` |
 | `VGCharacter.list()` | ids, action names, expression names, baked config ids |

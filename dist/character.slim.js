@@ -1,4 +1,4 @@
-/* VGCharacter v0.12.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.12.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3166,7 +3166,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.12.2';
+const VERSION = '0.12.3';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3380,6 +3380,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
       if (typeof text === 'string' && text.trim()) entry.text = text.trim();
       entry.speech = Math.max(0, entry.duration - SPEECH_SETTLE);          // tiếng nói ngắn hơn bước đúng quãng "về chỗ"
       if (name === 'speakCues' && args[0] && args[0].metadata && args[0].metadata.soundFile) entry.sound = args[0].metadata.soundFile;
+      if (name === 'speakCues') entry.cues = Array.isArray(args[0]) ? args[0] : (args[0] && args[0].mouthCues) || [];      // cho tools/peek.sh --mouth
     }
     steps.push(entry);
     at += child.duration() + gap;
@@ -3500,7 +3501,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
   show(0);
   return timeline;
 }
-function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null } = {}) {
+function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null, leadIn = 0.6 } = {}) {
   if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
   const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
   const part = (rig) => {
@@ -3521,7 +3522,9 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
     return data;
   };
   const turns = [];
-  let clock = 0;
+  const opening = (entry) => { const turn = entry && entry.turn ? entry.turn : entry; return turn && Array.isArray(turn.together) ? turn.together.map(opening).flat() : [Array.isArray(turn) ? turn[1] : null]; };
+  const speaksFirst = opening(turnList[0]).some((step) => SPEECH_STEPS.includes(Array.isArray(step) ? step[0] : step));
+  let clock = speaksFirst ? leadIn : 0;
   turnList.forEach((entry, index) => {
     const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;
     if (entry && !Array.isArray(entry) && Array.isArray(entry.turn)) entry = entry.turn;

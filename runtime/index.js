@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.12.2';
+export const VERSION = '0.12.3';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -349,6 +349,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
       entry.speech = Math.max(0, entry.duration - SPEECH_SETTLE);          // tiếng nói ngắn hơn bước đúng quãng "về chỗ"
       // Tệp tiếng mà bộ cue này được tạo ra từ đó — tools/peek.sh ghép <audio> với bước theo tên tệp.
       if (name === 'speakCues' && args[0] && args[0].metadata && args[0].metadata.soundFile) entry.sound = args[0].metadata.soundFile;
+      if (name === 'speakCues') entry.cues = Array.isArray(args[0]) ? args[0] : (args[0] && args[0].mouthCues) || [];      // cho tools/peek.sh --mouth
     }
     steps.push(entry);
     at += child.duration() + gap;
@@ -562,7 +563,8 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
  *   ], { gap: 0.25 });
  *   talk.addTo(tl, 0);
  *
- * Lượt sau bắt đầu khi lượt trước xong (cộng `gap` giây). Trong lúc chờ tới lượt, nhân vật
+ * Lượt sau bắt đầu khi lượt trước xong (cộng `gap` giây). Nếu lượt ĐẦU TIÊN mở bằng một câu nói thì nó bắt
+ * đầu sau `leadIn` giây (0.6) chứ không phải ở khung hình đầu. Trong lúc chờ tới lượt, nhân vật
  * THỞ và chớp mắt (`idle`) thay vì đứng hình — `waiting: false` để tắt.
  *
  * Trả về { sequences, turns, duration, addTo, of }:
@@ -571,7 +573,7 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
  *   addTo(timeline, at = 0)   thêm mọi chuỗi vào timeline của composition
  *   of(rig)     chuỗi của một nhân vật
  */
-export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null } = {}) {
+export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null, leadIn = 0.6 } = {}) {
   if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
   const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
   // Mỗi nhân vật nhớ TRẠNG THÁI BAN ĐẦU (để lần dựng nào cũng xuất phát từ đúng chỗ ấy) và `centre`:
@@ -598,7 +600,11 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
     return data;
   };
   const turns = [];
-  let clock = 0;
+  // Cảnh mở đầu bằng LỜI NÓI thì chừa một nhịp: không thì nhân vật nói ngay từ khung hình đầu tiên, và
+  // máy quay vẫn đang đẩy vào khi câu đã bắt đầu.
+  const opening = (entry) => { const turn = entry && entry.turn ? entry.turn : entry; return turn && Array.isArray(turn.together) ? turn.together.map(opening).flat() : [Array.isArray(turn) ? turn[1] : null]; };
+  const speaksFirst = opening(turnList[0]).some((step) => SPEECH_STEPS.includes(Array.isArray(step) ? step[0] : step));
+  let clock = speaksFirst ? leadIn : 0;
   turnList.forEach((entry, index) => {
     // Một mục: [rig, ...bước] · { together: [[rig, …], …] } · { turn: [rig, …], shot } (ghi đè máy quay cho lượt ấy)
     const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;

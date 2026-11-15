@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.12.3
+
+Added
+- `tools/peek.sh … --mouth[=N]`: a dense strip of mouth close-ups (10 a second) for the Nth
+  spoken line, labelled with time and cue shape — a way to judge lip-sync without rendering.
+- `conversation(…, { leadIn })`: when the first turn opens with a line, it starts after 0.6 s
+  instead of on the first frame (the camera has time to arrive). `leadIn: 0` restores the old
+  timing. Scenes made by `tools/scene.py` get it too.
+
+Changed
+- `tools/cues.py --method spectral` opens the mouth more: loudness is judged against the
+  phrase it belongs to, not only the loudest moment of the file, and the closed-lips shape is
+  kept for near-silence. On three test lines the share of open shapes rose modestly; the
+  timing of pauses is unchanged.
+
 ## 0.12.2
 
 Fixed
