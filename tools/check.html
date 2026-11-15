@@ -712,6 +712,21 @@ try {
       if (careful.said !== 1) hong('captions avoid', 'the line is no longer captioned');
       stage5.remove();
     }
+    // Lượt KHÔNG LỜI mở đầu bằng `enter`, ngay sau câu nói của người khác: bắt đầu sớm (tối đa 1,2 s) khi người kia còn
+    // đang nói nốt; lượt không lời KHÁC (chó sủa) thì vẫn chờ dứt lời; lượt sau đó không bị kéo sớm theo.
+    {
+      const person = L.createCharacter(host, { id: 'vet' }).rig, pet = L.createPet(san2, { species: 'dog' }).rig;
+      const spoken = (talk, n) => { const step = talk.turns[n].steps.find((item) => item.speech !== undefined); return [step.start, step.start + step.speech]; };
+      const arriving = L.conversation([[person, ['explain', 'mot hai ba bon nam sau', 3]], [pet, 'enter', 'wagTail'], [person, ['explain', 'bay tam', 1.5]]]);
+      const [lineStart, lineEnd] = spoken(arriving, 0), entered = arriving.turns[1].start, early = lineEnd - entered;
+      if (!(early > 0.9 && early < 1.3)) hong('conversation', `a wordless entrance should start about 1.2s before the previous line ends (starts ${early.toFixed(2)}s before)`);
+      if (entered < lineStart + 0.5) hong('conversation', 'the entrance starts before the previous line has got going');
+      if (spoken(arriving, 2)[0] < arriving.turns[1].end - 1e-6) hong('conversation', 'the line after the entrance starts before the entrance turn is over');
+      arriving.sequences.forEach((item) => item.kill()); person.reset(); pet.datNghi();
+      const barking = L.conversation([[person, ['explain', 'mot hai ba bon nam sau', 3]], [pet, 'bark']]);
+      if (barking.turns[1].start < spoken(barking, 0)[1] - 1e-6) hong('conversation', 'a wordless turn that is not an entrance starts before the previous line ends');
+      barking.sequences.forEach((item) => item.kill()); person.svg.remove(); pet.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

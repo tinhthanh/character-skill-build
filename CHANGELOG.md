@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.32.0
+
+Changed
+- **A wordless entrance no longer waits for silence.** In `conversation()` (and scene files)
+  a turn with no speech that begins with `enter` — a pet running in, someone walking in
+  before doing something — starts up to 1.2 s before the previous speaker's line ends,
+  instead of after it. Other wordless turns (a bark, a nod) still wait for the line to end.
+  Scenes with such a turn get slightly shorter.
+
+Added
+- `tools/scene.py` notes when a pet stands inside the width of a table or counter, which
+  will overlap it, and says where to move it.
+
 ## 0.31.2
 
 From a first-time-user trial (a fresh agent building a new scene from the docs alone).

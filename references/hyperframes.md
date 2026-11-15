@@ -224,7 +224,8 @@ takes longer in a wide frame — about 1.6 s near the edge, up to about 5 s for 
 wherever the character stands (also after a `walk`) and ends hidden; `enter` brings it back.
 
 **Two characters talking.** Use `VGCharacter.conversation(turns)`: each turn is
-`[rig, ...steps]`, the next turn starts when the previous one is done, and a character
+`[rig, ...steps]`, the next turn starts when the previous one is done (a wordless turn that
+begins with `enter` starts up to 1.2 s early, while the previous speaker finishes the line), and a character
 waiting for its turn keeps breathing — no pauses to add up by hand:
 
 ```js

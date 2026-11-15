@@ -477,6 +477,20 @@ def main():
                 fits = max(40, round(0.28 * who['_host_height'] / unit - 12))
                 notes.append(f'"{who["name"]}" sits behind the {prop["kind"]} at x {centre:.0f}, which is taller than their chest — only the head will show. Lower it with "tabletop": {fits} (now {prop["options"].get("tabletop", 150)}), or let them stand.')
 
+    # Con vật đứng TRONG bề ngang của bàn / quầy: nó nằm dưới gầm bàn, chân bàn (hoặc cả cái quầy) che mất một phần.
+    for prop in props:
+        if prop['kind'] not in ('counter', 'table'): continue
+        unit = prop['host_height'] / PERSON[1]
+        centre = prop['left'] + prop['host_height'] * PERSON[0] / PERSON[1] / 2
+        half = float(prop['options'].get('width', 300 if prop['kind'] == 'counter' else 230)) * unit / 2
+        for who in names.values():
+            if not who['_pet']: continue
+            body = 0.3 * who['_host_height']                                                               # nửa bề ngang thân con vật
+            if abs(float(who['x']) - centre) >= half + body: continue
+            side = 'left' if float(who['x']) < centre else 'right'
+            clear = round(centre - half - body - 20) if side == 'left' else round(centre + half + body + 20)
+            notes.append(f'"{who["name"]}" stands at x {float(who["x"]):.0f}, inside the {prop["kind"]} (x {centre - half:.0f}–{centre + half:.0f}) — the {prop["kind"]} will overlap it. Move it to x {clear} or further {side}.')
+
     # ── không ghi đè bản đã SỬA TAY ──
     target = os.path.join(out, 'index.html')
     if os.path.exists(target) and not args.force:

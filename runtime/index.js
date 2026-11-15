@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.31.2';
+export const VERSION = '0.32.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -736,13 +736,23 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
   const opening = (entry) => { const turn = entry && entry.turn ? entry.turn : entry; return turn && Array.isArray(turn.together) ? turn.together.map(opening).flat() : [Array.isArray(turn) ? turn[1] : null]; };
   const speaksFirst = opening(turnList[0]).some((step) => SPEECH_STEPS.includes(Array.isArray(step) ? step[0] : step));
   let clock = speaksFirst ? leadIn : 0;
+  let lastLine = null;                                     // câu nói kết thúc lượt trước: { rig, start }
   turnList.forEach((entry, index) => {
     // Một mục: [rig, ...bước] · { together: [[rig, …], …] } · { turn: [rig, …], shot } (ghi đè máy quay cho lượt ấy)
     const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;
     if (entry && !Array.isArray(entry) && Array.isArray(entry.turn)) entry = entry.turn;
     const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
-    const begin = clock, moved = [];
-    let finish = begin;
+    // Lượt KHÔNG LỜI mở đầu bằng `enter` (con vật chạy vào, ai đó bước vào rồi mới làm gì đó), ngay sau câu nói của
+    // người khác: cho bắt đầu sớm tới 1,2 s — nhân vật xuất hiện khi người kia đang nói nốt câu. Chờ dứt lời rồi mới
+    // cho vào thì cả quãng đi vào là một khoảng lặng (đo được: hơn sáu giây khi con mèo chạy vào rồi kêu).
+    let begin = clock;
+    if (overlap && lastLine && parallel.length === 1) {
+      const only = parallel[0] && !Array.isArray(parallel[0]) && Array.isArray(parallel[0].turn) ? parallel[0].turn : parallel[0];
+      const names = Array.isArray(only) ? only.slice(1).map((step) => (Array.isArray(step) ? step[0] : step)) : [];
+      if (names[0] === 'enter' && !names.some((name) => SPEECH_STEPS.includes(name)) && only[0] !== lastLine.rig) begin = Math.max(lastLine.start + 0.5, clock - 1.2);
+    }
+    const moved = [];
+    let finish = begin, spokeLast = null;
     for (let turn of parallel) {
       // Lượt bên trong `together` cũng có thể mang `shot` riêng: { turn: [rig, …], shot }.
       let own = override;
@@ -772,11 +782,13 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       // nói thu tay về — hai người đối đáp thì gối nhau như thế; chờ đủ thì mỗi câu thêm một quãng im.
       const last = real[real.length - 1];
       finish = Math.max(finish, mine.end - (overlap && last && SPEECH_STEPS.includes(last.name) ? SPEECH_SETTLE : 0));
+      spokeLast = last && SPEECH_STEPS.includes(last.name) ? { rig, start: last.start } : null;
       turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     // Vị trí mới chỉ có hiệu lực SAU lượt này: các lượt diễn cùng lúc đều thấy nhau ở chỗ cũ.
     for (const [mine, centre] of moved) mine.centre = centre;
-    clock = finish + gap;
+    clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại
+    lastLine = parallel.length === 1 ? spokeLast : null;
   });
   const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
   const rigs = [...cast.keys()];

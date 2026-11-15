@@ -1,4 +1,4 @@
-/* VGCharacter v0.31.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.32.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3329,7 +3329,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.31.2';
+const VERSION = '0.32.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3781,12 +3781,19 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
   const opening = (entry) => { const turn = entry && entry.turn ? entry.turn : entry; return turn && Array.isArray(turn.together) ? turn.together.map(opening).flat() : [Array.isArray(turn) ? turn[1] : null]; };
   const speaksFirst = opening(turnList[0]).some((step) => SPEECH_STEPS.includes(Array.isArray(step) ? step[0] : step));
   let clock = speaksFirst ? leadIn : 0;
+  let lastLine = null;                                     // câu nói kết thúc lượt trước: { rig, start }
   turnList.forEach((entry, index) => {
     const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;
     if (entry && !Array.isArray(entry) && Array.isArray(entry.turn)) entry = entry.turn;
     const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
-    const begin = clock, moved = [];
-    let finish = begin;
+    let begin = clock;
+    if (overlap && lastLine && parallel.length === 1) {
+      const only = parallel[0] && !Array.isArray(parallel[0]) && Array.isArray(parallel[0].turn) ? parallel[0].turn : parallel[0];
+      const names = Array.isArray(only) ? only.slice(1).map((step) => (Array.isArray(step) ? step[0] : step)) : [];
+      if (names[0] === 'enter' && !names.some((name) => SPEECH_STEPS.includes(name)) && only[0] !== lastLine.rig) begin = Math.max(lastLine.start + 0.5, clock - 1.2);
+    }
+    const moved = [];
+    let finish = begin, spokeLast = null;
     for (let turn of parallel) {
       let own = override;
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
@@ -3810,10 +3817,12 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       moved.push([mine, measured.centre]);
       const last = real[real.length - 1];
       finish = Math.max(finish, mine.end - (overlap && last && SPEECH_STEPS.includes(last.name) ? SPEECH_SETTLE : 0));
+      spokeLast = last && SPEECH_STEPS.includes(last.name) ? { rig, start: last.start } : null;
       turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     for (const [mine, centre] of moved) mine.centre = centre;
-    clock = finish + gap;
+    clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại
+    lastLine = parallel.length === 1 ? spokeLast : null;
   });
   const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
   const rigs = [...cast.keys()];
