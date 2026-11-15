@@ -1,4 +1,4 @@
-/* VGCharacter v0.14.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.15.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3184,7 +3184,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.14.1';
+const VERSION = '0.15.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3467,7 +3467,7 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
   timeline.data = { type: 'character-shot', kind, target };
   return timeline;
 }
-function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true } = {}) {
+function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0 } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -3476,6 +3476,26 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
   else if (source && source.data && source.data.type === 'character-sequence') lines = fromSteps(source.data.steps, source.data.rig);
   else throw new Error('[character] captions(source, …): source must be a conversation(), a sequence(), or an array of { start, end, text }');
   lines = lines.filter((line) => line && typeof line.text === 'string' && line.end > line.start).sort((a, b) => a.start - b.start);
+  if (maxChars > 0) lines = lines.flatMap((line) => {
+    const parts = [];
+    let rest = line.text.trim();
+    while (rest.length > maxChars) {
+      const head = rest.slice(0, maxChars + 1);
+      let cut = -1;
+      for (const marks of [/[.!?…]\s/g, /[;,]\s/g]) {
+        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.35) cut = mark.index + 1;
+        if (cut > 0) break;
+      }
+      if (cut < 0) cut = head.lastIndexOf(' ');
+      if (cut <= 0) cut = maxChars;
+      parts.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    if (parts.length < 2) return [line];
+    const total = parts.reduce((sum, part) => sum + part.length, 0), span = line.end - line.start;
+    let at = line.start;
+    return parts.map((text) => { const piece = { ...line, text, start: at, end: at + span * text.length / total }; at = piece.end; return piece; });
+  });
   if (readable) lines.forEach((line, index) => {
     const words = line.text.trim().split(/\s+/).length, next = lines[index + 1];
     const wanted = line.start + Math.max(0.5 + 0.3 * words, next ? 0 : 3);

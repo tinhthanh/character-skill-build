@@ -555,6 +555,17 @@ try {
     words.time(lineA.start - 1); if (+caption.style.opacity > 0.01) hong('captions', 'the caption is visible before anyone speaks');
     words.time(words.duration()); if (+caption.style.opacity > 0.01) hong('captions', 'the caption is still visible at the end');
     if (words.data.lines.length !== 2) hong('captions', `expected 2 lines, got ${words.data.lines.length}`);
+    // Chia cụm: câu dài tách ở cuối câu, các cụm nối tiếp nhau và phủ đúng quãng của câu gốc.
+    const long = [{ start: 1, end: 9, text: 'Mot: mang theo so tiem chung. Hai: cho be nhin an bon tieng truoc khi kham. Ba: ghi lai nhung thay doi ban thay o be.' }];
+    const chunked = L.captions(long, caption, { maxChars: 60, readable: false }).data.lines;
+    if (chunked.length < 2) hong('captions', 'maxChars does not split a long line');
+    else {
+      if (chunked.some((line) => line.text.length > 61)) hong('captions', 'a chunk is longer than maxChars');
+      if (chunked.some((line) => /:$/.test(line.text))) hong('captions', `a chunk ends on a colon: ${JSON.stringify(chunked.map((line) => line.text))}`);
+      if (Math.abs(chunked[0].start - 1) > 1e-6 || Math.abs(chunked[chunked.length - 1].end - 9) > 1e-6 || chunked.some((line, i) => i && Math.abs(line.start - chunked[i - 1].end) > 1e-6)) hong('captions', 'chunks do not tile the original line');
+      if (chunked.map((line) => line.text).join(' ') !== long[0].text) hong('captions', 'chunks lose or reorder words');
+    }
+    if (L.captions(long, caption, { readable: false }).data.lines.length !== 1) hong('captions', 'without maxChars a line must stay whole');
     // Lời của speakCues lấy từ { text } hoặc từ metadata của bộ cue.
     const cued = L.sequence(a, [['speakCues', { metadata: { duration: 1, text: 'tu metadata' }, mouthCues: [{ start: 0, end: 1, value: 'C' }] }], ['speakCues', { mouthCues: [{ start: 0, end: 1, value: 'C' }] }, null, { text: 'tu tuy chon' }]]);
     if (cued.data.steps[0].text !== 'tu metadata' || cued.data.steps[1].text !== 'tu tuy chon') hong('captions', `speakCues text is not picked up (${cued.data.steps.map((step) => step.text)})`);

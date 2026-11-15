@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.0
+
+Added
+- **Explainer layout.** `tools/scene.py`: `"layout": "presenter"` keeps the characters to one
+  side and gives the other side to a content panel; `"show": { "title", "bullets", "image" }`
+  on a turn puts a title, bullet points (one by one while the line is spoken) and a picture
+  there. Works in horizontal and vertical frames. `examples/scene-presenter/scene.json`.
+- `captions(…, { maxChars })` splits a long line into chunks shown one after another, broken
+  at sentence ends; scenes made by `tools/scene.py` use it.
+- `tools/scene.py --retime` also re-times the content clips.
+
 ## 0.14.1
 
 Changed

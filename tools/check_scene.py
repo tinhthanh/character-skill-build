@@ -90,6 +90,22 @@ with tempfile.TemporaryDirectory() as work:
         foreign = os.path.join(work, 'foreign'); os.makedirs(foreign); open(os.path.join(foreign, 'index.html'), 'w').write('<html>mine</html>')
         refused = build(example, foreign)
         if refused.returncode == 0 or 'not written by this tool' not in refused.stderr: problems.append('an index.html the tool did not write was overwritten')
+    # Bố cục "presenter": vùng nội dung có tiêu đề, các ý hiện lần lượt và ảnh, đều được căn giờ; phụ đề chia cụm.
+    presenter = os.path.join(ROOT, 'examples', 'scene-presenter', 'scene.json')
+    shown = build(presenter, os.path.join(work, 'presenter'))
+    if shown.returncode != 0:
+        problems.append('the presenter example does not build: ' + (shown.stderr.strip() or shown.stdout.strip())[:200])
+    else:
+        page = open(os.path.join(work, 'presenter', 'index.html'), encoding='utf-8').read()
+        starts = {name: float(start) for name, start in re.findall(r'id="(show-[\w-]+)"[^>]*data-start="([\d.]+)"', page)}
+        if len(starts) != 7: problems.append(f'expected 7 content clips in the presenter example, found {len(starts)}')
+        elif not (starts['show-1-title'] == 0 and starts['show-2-title'] < starts['show-2-bullet1'] < starts['show-2-bullet2'] < starts['show-2-bullet3'] < starts['show-3-title']):
+            problems.append(f'content clips are not timed in order: {starts}')
+        if 'data-show-turn' in page and 'data-duration="1" data-track-index' in page.split('id="show-1-title"')[1][:200]: problems.append('content clips still carry the placeholder duration')
+        if not os.path.isfile(os.path.join(work, 'presenter', 'characters.png')): problems.append('show.image was not copied next to index.html')
+        if 'camera:' in page: problems.append('the presenter layout must not add the close-up camera by default')
+        if 'maxChars' not in page: problems.append('captions are not chunked')
+        if '<h2' in page or '<ul' in page: problems.append('content must be flat clips, not nested elements')
     # Kịch bản sai phải bị từ chối, và thông báo phải gọi đúng tên chỗ sai.
     base = json.load(open(example, encoding='utf-8'))
     def variant(change):
@@ -106,6 +122,7 @@ with tempfile.TemporaryDirectory() as work:
         ('a misspelt top-level key', lambda s: s.update({'captons': False}), 'captions'),
         ('an unknown prop key', lambda s: s['props'][0].update({'colour': '#fff'}), 'color'),
         ('an unknown background key', lambda s: s['background'].update({'sky': '#fff'}), 'sky'),
+        ('show without the presenter layout', lambda s: s['script'][1].update({'show': {'title': 'x'}}), 'presenter'),
         ('an unknown mood', lambda s: s['script'][1].update({'mood': 'joyful'}), 'mood'),
         ('a mood on a pet', lambda s: s['script'][0].update({'mood': 'happy'}), 'pet'),
         ('a missing background image', lambda s: s['background'].update({'image': 'nope.jpg'}), 'nope.jpg'),

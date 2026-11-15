@@ -45,6 +45,14 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 - Characters with `enter` walk in **together**, before the script. A prop with `"front": true`
   is drawn in front of the characters — a counter someone stands behind. `shot` goes on a turn
   (also on a turn inside `together`), not on the `together` entry itself.
+- **Explainer videos — `"layout": "presenter"`.** The characters stand to one side and the
+  other side is a content panel. A turn can carry
+  `"show": { "title": "…", "bullets": ["…", "…"], "image": "file.png" }`: it appears as the
+  turn starts — bullets one by one while the line is spoken — and stays until the next
+  `show` (`"show": false` clears the panel). The first title is on screen from frame 0, the
+  camera does not cut to close-ups (add `"camera": true` if you want them), and in a vertical
+  frame the panel sits above the captions and the presenter below. The tool notes content that
+  is taller than the panel. Sample: `examples/scene-presenter/scene.json`.
 - **Vertical video:** set `"width": 1080, "height": 1920`. Default character heights and the
   caption size follow the frame; captions sit mid-frame, inside the area that TikTok, Reels and
   Shorts leave clear, the camera puts the speaker above them, and the floor line sits higher
@@ -229,7 +237,9 @@ tl.add(VGCharacter.captions(talk, document.getElementById('caption')).paused(fal
   `python3 tools/cues.py voice.wav --js --text "words"` and they carry the text.
 - Style the element yourself (it starts at opacity 0). If it contains a child with
   `data-caption-text`, the words go there and the rest is yours (a frame, a bubble tail).
-- `options`: `fade` (0.15 s), `hold` (0.3 s after the line), `speaker: true` (prefix the
+- `options`: `maxChars` (off by default; e.g. 110 splits a long line into chunks of about two
+  lines, shown one after another and broken at sentence ends — scenes made by `tools/scene.py`
+  set it), `fade` (0.15 s), `hold` (0.3 s after the line), `speaker: true` (prefix the
   character's name), and `follow: true` for a **speech bubble** — the element is placed above
   the speaker's head with `left` / `top` (give it `position: absolute`; `offsetY` is the gap).
 - Keep the caption or bubble **out of** the camera's `scene` list. A bubble follows where the

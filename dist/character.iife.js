@@ -1,4 +1,4 @@
-/* VGCharacter v0.14.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.15.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -4868,7 +4868,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.14.1';
+const VERSION = '0.15.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5331,7 +5331,8 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
  *             (hoặc `metadata.text` do `tools/cues.py --text` ghi vào bộ cue).
  *   element   phần tử hiện chữ — kiểu dáng do composition lo. Nếu có một phần tử con mang
  *             thuộc tính `data-caption-text` thì chữ ghi vào đó (phần còn lại là khung, đuôi bong bóng…).
- *   options   fade (0.15 s hiện / ẩn) · hold (0.3 s giữ chữ sau khi dứt lời) · readable (true: mỗi câu ở lại
+ *   options   maxChars (0 = không chia; ví dụ 110 = câu dài tự tách thành các cụm khoảng hai dòng) ·
+ *             fade (0.15 s hiện / ẩn) · hold (0.3 s giữ chữ sau khi dứt lời) · readable (true: mỗi câu ở lại
  *             đủ lâu để đọc — 0,5 s + 0,3 s mỗi từ, câu cuối ít nhất 3 s) · speaker (false; true
  *             để thêm "Tên: " phía trước) · follow (false; true = BONG BÓNG: đặt phần tử phía trên
  *             đầu người nói bằng left / top — phần tử phải `position: absolute` trong khung hình
@@ -5340,7 +5341,7 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
  * Trả về một timeline (paused). Chữ và độ mờ là HÀM CỦA THỜI GIAN (một tween, tra bảng) nên tua
  * tới đâu cũng ra đúng một khung hình. `timeline.data.lines` giữ danh sách câu.
  */
-function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true } = {}) {
+function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0 } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -5349,6 +5350,30 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
   else if (source && source.data && source.data.type === 'character-sequence') lines = fromSteps(source.data.steps, source.data.rig);
   else throw new Error('[character] captions(source, …): source must be a conversation(), a sequence(), or an array of { start, end, text }');
   lines = lines.filter((line) => line && typeof line.text === 'string' && line.end > line.start).sort((a, b) => a.start - b.start);
+  // CHIA CỤM: một câu dài hơn `maxChars` được tách thành nhiều cụm hiện lần lượt (ngắt ở dấu câu nếu được),
+  // mỗi cụm chiếm phần thời gian tỉ lệ với độ dài của nó. Không thì cả câu là một khối chữ đứng yên chục giây.
+  if (maxChars > 0) lines = lines.flatMap((line) => {
+    const parts = [];
+    let rest = line.text.trim();
+    while (rest.length > maxChars) {
+      const head = rest.slice(0, maxChars + 1);
+      // Ưu tiên ngắt ở cuối CÂU (. ! ? …), rồi tới dấu phẩy / chấm phẩy, cuối cùng mới là khoảng trắng.
+      // Không ngắt sau dấu hai chấm: "Ba:" mà đứng cuối cụm thì người đọc bị treo.
+      let cut = -1;
+      for (const marks of [/[.!?…]\s/g, /[;,]\s/g]) {
+        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.35) cut = mark.index + 1;
+        if (cut > 0) break;
+      }
+      if (cut < 0) cut = head.lastIndexOf(' ');
+      if (cut <= 0) cut = maxChars;
+      parts.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    if (parts.length < 2) return [line];
+    const total = parts.reduce((sum, part) => sum + part.length, 0), span = line.end - line.start;
+    let at = line.start;
+    return parts.map((text) => { const piece = { ...line, text, start: at, end: at + span * text.length / total }; at = piece.end; return piece; });
+  });
   // ĐỦ GIỜ ĐỂ ĐỌC: một câu ở lại ít nhất 0,5 s + 0,3 s mỗi từ (câu cuối của phim: ít nhất 3 s), kể cả
   // khi tiếng nói ngắn hơn thế — nhưng không lấn sang câu kế tiếp.
   if (readable) lines.forEach((line, index) => {

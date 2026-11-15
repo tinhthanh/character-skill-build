@@ -47,6 +47,10 @@ Scene file (every key except `characters` and `script` is optional):
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
+  layout       `"layout": "presenter"` is for explainer videos: the characters stand to one side and the other
+               side is a CONTENT PANEL. A turn can then carry `"show": { "title": "…", "bullets": ["…"], "image":
+               "file.png" }` — it appears as the turn starts (bullets one by one while the line is spoken) and
+               stays until the next `show` (`"show": false` clears the panel). No close-up camera in this layout.
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
                `"tabletop"` is the height of a table or counter top in frame units (150; lower it for
                someone seated behind it — the tool tells you when a seated character would be hidden).
@@ -85,10 +89,11 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show')
+SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image')
 
@@ -145,9 +150,32 @@ def retime(target):
     if new_total != old_total:
         html = html.replace(f'data-start="0" data-duration="{old_total}"', f'data-start="0" data-duration="{new_total}"')
         changed.append(f'total {old_total} → {new_total} s')
+    html = place_shows(html, timings, float(new_total))
     open(target, 'w', encoding='utf-8').write(html)
     print(target)
     print('  ' + ('; '.join(changed) if changed else 'already in time — nothing changed'))
+
+
+def html_text(text):
+    return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def place_shows(html, timings, total):
+    """Fill in data-start / data-duration of every content clip (title, bullet, image) from the turn timings."""
+    turns = timings.get('turns')
+    if not turns: return html
+    def fix(match):
+        tag = match.group(0)
+        turn = int(re.search(r'data-show-turn="(\d+)"', tag).group(1))
+        part = float(re.search(r'data-show-part="([\d.]+)"', tag).group(1))
+        until = re.search(r'data-show-until="(\w+)"', tag).group(1)
+        begin, finish = turns[turn]
+        start = begin + part * max(0.0, finish - begin - 0.6) * 0.85               # các ý hiện dần trong lúc câu ấy được nói
+        if turn == 0 and part == 0: start = 0.0                                    # nội dung đầu tiên có mặt từ khung 0 — khung ấy là ảnh bìa của video
+        end = total if until == 'end' else turns[int(until)][0]
+        tag = re.sub(r'data-start="[^"]*"', f'data-start="{start:.2f}"', tag, count=1)
+        return re.sub(r'data-duration="[^"]*"', f'data-duration="{max(0.2, end - start):.2f}"', tag, count=1)
+    return re.sub(r'<(?:div|img)\b[^>]*\bdata-show-turn="\d+"[^>]*>', fix, html)
 
 
 def js(value):
@@ -288,8 +316,24 @@ def main():
                                '{ together: [' + ', '.join(arrivals) + '] }' if len(arrivals) > 1 else arrivals[0]))
     facing = [f"[{who['name']}, ['face', {who['faces']}]]" for who in names.values() if who.get('faces')]
     if facing: turns.append(('  // everyone turns toward the one they look at', '{ together: [' + ', '.join(facing) + '] }' if len(facing) > 1 else facing[0]))
+    layout = scene.get('layout', 'stage')
+    if layout not in ('stage', 'presenter'): fail(f'"layout" must be "stage" or "presenter", got {js(layout)}')
+    # Chỉ số "phẳng" của từng lượt trong talk.turns: các lượt mở đầu (thú ngồi sẵn, bước vào, quay mặt) đứng trước kịch bản.
+    flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals) + len(facing)
+    shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     for index, entry in enumerate(script):
         where = f'script[{index}]'
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or 'show' not in turn: continue
+            show = turn['show']
+            if layout != 'presenter': fail(f'{where}: "show" needs "layout": "presenter" at the top of the scene file')
+            if show is False or show is None: shows.append({'turn': flat, 'clear': True}); continue
+            if not isinstance(show, dict) or not show: fail(f'{where}: "show" must be an object with "title", "bullets" and / or "image", or false to clear the panel')
+            known(f'{where}.show', show, SHOW_KEYS)
+            if 'bullets' in show and (not isinstance(show['bullets'], list) or not all(isinstance(item, str) for item in show['bullets'])): fail(f'{where}: "show.bullets" must be a list of strings')
+            if 'image' in show and not os.path.isfile(os.path.join(base, show['image'])): fail(f'{where}: show.image not found: {show["image"]} (looked in {base})')
+            shows.append(dict(show, turn=flat))
+        flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
             known(where, entry, ('together',))
@@ -347,7 +391,7 @@ def main():
         if done.returncode != 0: fail(f'could not make mouth cues for {voice["file"]}: {done.stderr.strip()}')
         voice['length'] = float(re.search(r'([\d.]+) s,', done.stdout).group(1))
 
-    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * (0.176 if width >= height else 0.34))}, **scene.get('background', {}))        # khung dọc: nền đứng cao hơn, vì phần đáy bị giao diện ứng dụng che
+    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * (0.176 if width >= height else 0.26 if scene.get('layout') == 'presenter' else 0.34))}, **scene.get('background', {}))        # khung dọc: nền đứng cao hơn, vì phần đáy bị giao diện ứng dụng che
     ground = round(background['floorHeight'] * 0.5)         # bàn chân đứng ở giữa dải sàn
     layers, style, body, setup = [], [], [], []
     track = [0]
@@ -377,18 +421,62 @@ def main():
         clip(who['_element'], f'position: absolute; left: {who["_left"]:.0f}px; bottom: {ground}px; height: {who["_host_height"]:.0f}px;'); layers.append('#' + who['_element'])
     for prop in [item for item in props if item['front']]:           # "front": true — vẽ SAU nhân vật, tức che phía trước họ (đứng sau quầy)
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
+    # ── VÙNG NỘI DUNG của bố cục "presenter": tiêu đề, các ý, ảnh — mỗi thứ là MỘT clip phẳng (HyperFrames
+    # không nhận clip lồng phần tử con), vị trí tính sẵn. Vùng nằm ở phía đối diện với nhân vật.
+    landscape = width >= height
+    if shows:
+        people_x = sum(float(who['x']) for who in names.values()) / len(names)
+        if landscape:
+            panel_w, panel_x, panel_y, panel_bottom = round(width * 0.5), (round(width * 0.06) if people_x > width / 2 else round(width * 0.44)), round(height * 0.11), round(height * 0.76)
+        else:
+            # Khung dọc: nội dung ở trên (16%–38%), phụ đề ngay dưới nó (40%), người dẫn đứng thấp hơn — ba thứ không đè nhau.
+            panel_w, panel_x, panel_y, panel_bottom = round(width * 0.8), round(width * 0.1), round(height * 0.16), round(height * 0.385)
+        title_px, bullet_px = round(min(width, height) * 0.066), round(min(width, height) * 0.05)
+        # Ước lượng số dòng khi chữ tự xuống hàng: một ký tự rộng chừng 0,5 cỡ chữ ở tiêu đề (đậm), 0,46 ở các ý.
+        lines_of = lambda text, px: max(1, -(-len(text) * px * (0.5 if px == title_px else 0.43) // panel_w))
+        style.append(f'  .show {{ position: absolute; left: {panel_x}px; width: {panel_w}px; margin: 0; color: #f5f8fa; font-family: system-ui, sans-serif; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); }}')
+        style.append(f'  .show-title {{ font-weight: 800; font-size: {title_px}px; line-height: 1.15; }}')
+        style.append(f'  .show-bullet {{ font-weight: 600; font-size: {bullet_px}px; line-height: 1.3; padding-left: 1.1em; text-indent: -1.1em; box-sizing: border-box; }}')
+        style.append('  .show-image { object-fit: contain; object-position: left top; border-radius: 14px; }')
+        visible = [show for show in shows if not show.get('clear')]
+        for number, show in enumerate(shows):
+            if show.get('clear'): continue
+            later = [other['turn'] for other in shows if other['turn'] > show['turn']]
+            until = str(later[0]) if later else 'end'
+            y = panel_y
+            def piece(tag, kind, part, content, top, extra=''):
+                element = f'show-{number + 1}-{kind}'
+                body.append(f'  <{tag} id="{element}" class="clip show show-{kind.rstrip("0123456789")}" style="top: {round(top)}px;{extra}" data-start="0" data-duration="1" data-track-index="{track[0]}" '
+                            f'data-show-turn="{show["turn"]}" data-show-part="{part:.3f}" data-show-until="{until}"' + (f' src="{content}" alt="">' if tag == 'img' else f'>{html_text(content)}</{tag}>'))
+                track[0] += 1
+            if show.get('title'):
+                piece('div', 'title', 0, show['title'], y)
+                y += lines_of(show['title'], title_px) * title_px * 1.15 + title_px * 0.55
+            bullets = show.get('bullets', [])
+            for i, text in enumerate(bullets):
+                piece('div', f'bullet{i + 1}', (i + (1 if show.get('title') else 0)) / (len(bullets) + (1 if show.get('title') else 0)), '• ' + text, y)
+                y += lines_of('• ' + text, bullet_px) * bullet_px * 1.3 + bullet_px * 0.5
+            if show.get('image'):
+                name = os.path.basename(show['image'])
+                if os.path.abspath(os.path.join(base, show['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, show['image']), os.path.join(out, name))
+                room = max(round(height * 0.14), panel_bottom - y)
+                piece('img', 'image', 0, name, y, f' height: {round(room)}px;')
+                y += room
+            if y > panel_bottom + 4: notes.append(f'the content shown at script turn {show["turn"]} is about {round(y - panel_bottom)}px taller than the panel — shorten it or split it over two turns')
+
     # Phụ đề: khung ngang thì sát đáy; khung DỌC thì nhấc lên 20% — một phần năm dưới cùng của video dọc
     # bị giao diện của TikTok / Reels / Shorts che (HyperFrames `check` gọi đó là vùng an toàn).
     captions = scene.get('captions', True) and '"say"' in json.dumps(script)        # không ai nói thì không cần phụ đề
     if captions:
         look = f'padding: 18px 34px; border-radius: 18px; box-sizing: border-box; background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(min(width, height) * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;'
+        caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.52))
         if width >= height:
             clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; ' + look)
         else:
             # Khung DỌC: chữ phải nằm trong vùng mà giao diện TikTok / Reels / Shorts không che — theo bảng của
             # HyperFrames là từ 15% tới 65% chiều cao, và ở nửa dưới của vùng ấy thì lùi khỏi cột nút bên phải
             # (11%–72% bề ngang). Neo bằng `top` để ba dòng chữ vẫn nằm trọn trong vùng.
-            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {round(height * 0.52)}px; ' + look)
+            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {caption_top}px; ' + look)
     for voice in voices:
         body.append(f'  <audio id="voice-{voice["key"].replace("_", "-")}" class="clip" src="{voice["file"]}" data-start="__START_{voice["key"]}__" data-duration="{voice["length"]:.2f}" data-track-index="{track[0]}" data-volume="1"></audio>')
         track[0] += 1
@@ -403,7 +491,7 @@ def main():
         if who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
         if who.get('seated') and not who['_pet']:
             setup.append(f"    {who['name']}.state.seat = 1;                 // already seated in the first frame")
-    camera = scene.get('camera', True)
+    camera = scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
@@ -416,7 +504,9 @@ def main():
     for comment, code in ([('  // pets that start seated', '{ together: [' + ', '.join(seated_pets) + '] }' if len(seated_pets) > 1 else seated_pets[0])] if seated_pets else []) + turns:
         if comment: lines.append('    ' + comment)
         lines.append(f'      {code},')
-    caption_code = "    tl.add(VGCharacter.captions(talk, $('caption')).paused(false), 0);     // the words of each line, while it is spoken" if captions else ''
+    caption_chars = round((width * 0.7 if landscape else width * 0.6) / (min(width, height) * 0.041 * 0.5) * 1.9)     # khoảng hai dòng chữ
+    caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars} }}).paused(false), 0);     // the words of each line, in chunks of about two lines" if captions else ''
+    if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
 <html lang="en">
@@ -452,7 +542,7 @@ def main():
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
-    window.__sceneTimings = {{ duration: tl.duration(), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: step.start, sound: step.sound, length: step.speech }}))) }};
+    window.__sceneTimings = {{ duration: tl.duration(), turns: talk.turns.map((turn) => [turn.start, turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: step.start, sound: step.sound, length: step.speech }}))) }};
   </script>
 </div>
 </body>
@@ -466,6 +556,7 @@ def main():
     if len(timings['speech']) != len(voices): fail(f'expected {len(voices)} lip-synced lines but the composition has {len(timings["speech"])}')
     for voice, line in zip(voices, timings['speech']):
         final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
+    final = place_shows(final, timings, total)
     # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
     final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')
     open(target, 'w', encoding='utf-8').write(final)

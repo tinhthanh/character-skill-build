@@ -122,7 +122,9 @@ clips for every voice file.
    `say` + `audio` lip-syncs to the file; `say` + `dur` estimates the mouth. `mood` is the
    tone of the line (`happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
    `confused`, `tired`). `do` takes any action step. Vertical video: `"width": 1080,
-   "height": 1920`.
+   "height": 1920`. **Explainer with one presenter:** `"layout": "presenter"` and
+   `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
+   beside the character as they speak (`examples/scene-presenter/scene.json`).
 2. **Build it.** `python3 tools/scene.py scene.json` → `<id>/index.html` next to the scene
    file, with the bundle, cues and audio beside it. Read its notes (lines starting `!`).
 3. **Preview and look.** `sh tools/peek.sh <id>/index.html` prints every step's timing and
@@ -194,7 +196,7 @@ configs/        tuned numbers written by the studio, baked into dist/
 dist/           character.slim.js (use this) · character.iife.js (same, commented) — generated
 runtime/        the library sources (ES modules)
 studio/         visual editor (Vietnamese UI)
-examples/       hyperframes/ · conversation/ · voiceover/ · scene/ · scene-vertical/
+examples/       hyperframes/ · conversation/ · voiceover/ · scene/ · scene-vertical/ · scene-presenter/
 tools/          check.sh (everything, must PASS) · shot.sh (pose sheet) · describe.sh · gallery.sh ·
                 scene.py (scene file → composition; --retime) · cues.py (mouth cues from audio) ·
                 peek.sh (preview; --mouth) · lint-examples.sh (hyperframes lint / check; needs Node) ·
