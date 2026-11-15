@@ -77,7 +77,7 @@ try {
   // (bước dài hơn tiếng 0,55 s). Xem ảnh tĩnh thì không thể thấy tiếng lệch — nên soát bằng số.
   {
     const fileOf = (path) => (path || '').split(/[\\/]/).pop().split('?')[0];
-    const clips = [...probe.doc.querySelectorAll('audio[data-start]')].map((clip) => ({ id: clip.id || clip.getAttribute('src') || 'audio', file: fileOf(clip.getAttribute('src')), start: +clip.dataset.start, duration: +clip.dataset.duration, used: false }));
+    const clips = [...probe.doc.querySelectorAll('audio[data-start]:not([data-role="music"])')].map((clip) => ({ id: clip.id || clip.getAttribute('src') || 'audio', file: fileOf(clip.getAttribute('src')), start: +clip.dataset.start, duration: +clip.dataset.duration, used: false }));
     const lines = info.sequences.flatMap((seq) => seq.steps.filter((step) => step.name === 'speakCues').map((step) => ({ who: seq.character, start: step.start, length: Math.max(0, step.end - step.start - 0.55), sound: step.sound })));
     for (const line of lines) {
       // Ghép theo TÊN TỆP TIẾNG mà bộ cue được tạo ra từ đó; chỉ khi không biết tên mới ghép theo giờ gần nhất

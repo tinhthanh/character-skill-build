@@ -47,6 +47,10 @@ with tempfile.TemporaryDirectory() as work:
         picture = os.path.join(os.path.dirname(example), '_check_room.png')
         open(picture, 'wb').write(png)
         staged['background'] = {'image': '_check_room.png'}
+        # Người bước vào GIỮA cảnh rồi nói, và bước ra; một câu nhắc tên con vật.
+        staged['characters'].append({'name': 'late', 'id': 'nurse', 'x': 1700, 'faces': 'vet'})
+        staged['script'].insert(3, {'who': 'late', 'enter': 'right', 'say': 'Xin lỗi, tôi đến muộn.', 'dur': 1.6, 'exit': 'right'})
+        staged['music'] = '../voiceover/voice.wav'
         staged_path = os.path.join(os.path.dirname(example), '_check_staged.json')
         try:
             json.dump(staged, open(staged_path, 'w', encoding='utf-8'))
@@ -60,6 +64,11 @@ with tempfile.TemporaryDirectory() as work:
             if not re.search(r"together: \[\[vet, \['enter', \"left\"\][^\n]*\[boy, \['enter', \"right\"\]", page): problems.append('two entering characters do not enter together')
             if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
             if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
+            if 'late.state.opacity = 0' not in page: problems.append('a character that enters mid-scene is not hidden at the start')
+            if not re.search(r"\[late, \['enter', \"right\"\], \['walk', 4, -?\d+\], \['face', vet\], \['explain'[^\n]*\['exit', \"right\"\]\]", page): problems.append('a turn with enter / say / exit is not written in that order')
+            if 'bella.state.facing = -1' not in page or "[bella, ['face'" in page: problems.append('a character present from the start is not turned toward its target up front')
+            if 'data-role="music"' not in page or 'data-volume="0.15"' not in page: problems.append('"music" does not add a quiet music clip')
+            if not re.search(r'\{ turn: \[vet, \[.speakCues.[^\n]*shot: \[vet, bella\] \}', page): problems.append('a line that names a pet does not frame the pet with the speaker')
             if '{ mood: "surprised" }]' not in page or "['express', \"surprised\"" in page: problems.append('"mood" on a spoken turn is not passed to the line itself')
             if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
             if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
@@ -129,6 +138,9 @@ with tempfile.TemporaryDirectory() as work:
         ('an unknown prop key', lambda s: s['props'][0].update({'colour': '#fff'}), 'color'),
         ('an unknown background key', lambda s: s['background'].update({'sky': '#fff'}), 'sky'),
         ('show without the presenter layout', lambda s: s['script'][1].update({'show': {'title': 'x'}}), 'presenter'),
+        ('an unknown background preset', lambda s: s['background'].update({'preset': 'castle'}), 'preset'),
+        ('enter on the character and on a turn', lambda s: s['script'][1].update({'enter': 'left'}), 'enter'),
+        ('a missing music file', lambda s: s.update({'music': 'nope.mp3'}), 'nope.mp3'),
         ('an unknown mood', lambda s: s['script'][1].update({'mood': 'joyful'}), 'mood'),
         ('a mood on a pet', lambda s: s['script'][0].update({'mood': 'happy'}), 'pet'),
         ('a missing background image', lambda s: s['background'].update({'image': 'nope.jpg'}), 'nope.jpg'),

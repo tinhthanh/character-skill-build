@@ -1,4 +1,4 @@
-/* VGCharacter v0.16.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.17.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1435,7 +1435,8 @@ class RigSVG {
     const face = RigSVG.EXPRESSIONS[mood];
     if (!face) throw new Error(`[character] no mood "${mood}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const corner = (value) => face.cuoi * 0.7 + value * 0.3;
-    return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: face.matY || 0 }, corner, eyes: face.matY || 0 };
+    const eyes = (face.matY || 0) * 0.35;
+    return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: eyes }, corner, eyes };
   }
   #khauHinh(t, soAm, nhip, corner = (value) => value) {
     const s = this.s;
@@ -3184,7 +3185,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.16.0';
+const VERSION = '0.17.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3425,7 +3426,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
-function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, centerY = 0.5, sequence: given, time, frame } = {}) {
+function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, centerY = 0.5, sequence: given, time, frame, avoid = null } = {}) {
   const elements = [].concat(scene || []).flatMap((item) => (typeof item === 'string' ? [...document.querySelectorAll(item)] : [item])).filter((item) => item && item.nodeType === 1);
   if (!elements.length) throw new Error('[character] shot(scene, …): scene must be a selector, an element, or an array of them — and match at least one element');
   const root = frame || elements[0].closest('[data-composition-id]') || elements[0].parentElement;
@@ -3435,27 +3436,44 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
     for (let node = element; node && node !== root; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
     return { x, y };
   };
-  let target = { x: 0, y: 0, scale: 1 };
+  let target = { x: 0, y: 0, scale: 1 }, subjects = [];
   if (kind !== 'wide') {
     const rigs = [].concat(subject || []);
     if (!rigs.length || rigs.some((rig) => !rig || typeof rig.shotBox !== 'function')) throw new Error(`[character] shot(scene, subject, "${kind}"): subject must be a rig (createCharacter / createPet …).rig, or an array of rigs`);
     const sequences = [].concat(given || []);
     let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
-    rigs.forEach((rig, index) => {
+    const boxAt = (rig, index, boxKind) => {
       const actions = time === undefined ? null : sequences[index] || (sequences.length === 1 && rigs.length === 1 ? sequences[0] : null) || rig.lastSequence || null;
       const before = actions ? actions.time() : 0;
       if (actions) actions.time(Math.min(time, actions.duration()));
-      const box = rig.shotBox(kind);
+      const box = rig.shotBox(boxKind), shown = rig.s.mo > 0.5;
       if (actions) actions.time(before);
       const size = rig.constructor.KHUNG, host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
       const unit = Math.min(hostWidth / size.w, hostHeight / size.h);
       const originX = host.x + (hostWidth - size.w * unit) / 2, originY = host.y + (hostHeight - size.h * unit) / 2;
-      left = Math.min(left, originX + box.x * unit); right = Math.max(right, originX + (box.x + box.width) * unit);
-      top = Math.min(top, originY + box.y * unit); bottom = Math.max(bottom, originY + (box.y + box.height) * unit);
+      return { left: originX + box.x * unit, right: originX + (box.x + box.width) * unit, top: originY + box.y * unit, bottom: originY + (box.y + box.height) * unit, shown };
+    };
+    rigs.forEach((rig, index) => {
+      const box = boxAt(rig, index, kind);
+      left = Math.min(left, box.left); right = Math.max(right, box.right); top = Math.min(top, box.top); bottom = Math.max(bottom, box.bottom);
     });
     const scale = Math.max(1, Math.min(8, fill * frameHeight / (bottom - top), (rigs.length > 1 ? 0.9 : 1.6) * frameWidth / (right - left)));
     const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
     target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight * centerY - (top + bottom) / 2 * scale, frameHeight), scale };
+    const crowded = [];
+    for (const other of [].concat(avoid || [])) {
+      if (rigs.includes(other) || typeof other.shotBox !== 'function') continue;
+      const box = boxAt(other, -1, 'face');
+      if (!box.shown) continue;
+      const partly = (x) => { const a = box.left * scale + x, b = box.right * scale + x, seen = Math.min(frameWidth, b) - Math.max(0, a); return seen > 0.06 * (b - a) && seen < 0.94 * (b - a); };
+      const overlapsY = box.bottom * scale + target.y > 0 && box.top * scale + target.y < frameHeight;
+      if (!overlapsY || !partly(target.x)) continue;
+      const shifted = within(target.x + ((box.left + box.right) / 2 > (left + right) / 2 ? frameWidth - (box.left * scale + target.x) + 6 : -(box.right * scale + target.x) - 6), frameWidth);
+      const keepsSubject = left * scale + shifted >= 0 && right * scale + shifted <= frameWidth;
+      if (keepsSubject && !partly(shifted)) target.x = shifted; else crowded.push(other);
+    }
+    if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame });
+    subjects = rigs;
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   for (const element of elements) {
@@ -3464,7 +3482,7 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
     if (target.scale > 1) element.setAttribute('data-layout-allow-overflow', '');
     timeline.to(element, { ...target, duration: Math.max(duration, 0.001), ease: duration > 0 ? ease : 'none' }, 0);
   }
-  timeline.data = { type: 'character-shot', kind, target };
+  timeline.data = { type: 'character-shot', kind, target, subjects };
   return timeline;
 }
 function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0 } = {}) {
@@ -3539,7 +3557,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
   show(0);
   return timeline;
 }
-function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null, leadIn = 0.6 } = {}) {
+function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null, leadIn = 0.6, overlap = true } = {}) {
   if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
   const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
   const part = (rig) => {
@@ -3578,7 +3596,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
         ? ['face', anchor(step[1]), ...step.slice(2)] : step));
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
-      if (wait < -1e-6) throw new Error(`[character] conversation: turn ${index + 1} would start before "${rig.publicId || 'character'}" finished its previous turn`);
+      if (wait < 0) wait = 0;
       if (waiting && wait > 0.8 && typeof rig.idle === 'function') {
         mine.steps.push(['idle', +(wait - 0.3).toFixed(3)]);
         mine.end = measure(rig, mine.steps).duration; mine.used = true;
@@ -3590,7 +3608,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
       mine.end = measured.duration; mine.used = true;
       moved.push([mine, measured.centre]);
-      finish = Math.max(finish, mine.end);
+      const last = real[real.length - 1];
+      finish = Math.max(finish, mine.end - (overlap && last && SPEECH_STEPS.includes(last.name) ? SPEECH_SETTLE : 0));
       turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     for (const [mine, centre] of moved) mine.centre = centre;
@@ -3611,6 +3630,11 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const spoken = turn.steps.filter((step) => SPEECH_STEPS.includes(step.name));
       const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
       if (spoken.length) lastWords = Math.max(lastWords, until);
+      const crossing = turn.steps.find((step) => ['enter', 'exit', 'walkForward', 'walkAway'].includes(step.name));
+      if (crossing && turn.shot === undefined && aimed && aimed !== 'wide') {
+        cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, crossing.start - lead));
+        aimed = 'wide'; inFrame = [];
+      }
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
@@ -3624,8 +3648,9 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const key = shotKind === 'wide' ? 'wide' : [].concat(subject).map((rig) => rigs.indexOf(rig)).join('+') + ':' + shotKind;
       if (key !== aimed) {
         const at = Math.max(0, from - lead);
-        cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move, ...framing }).paused(false), at);
-        aimed = key; inFrame = shotKind === 'wide' ? [] : [].concat(subject);
+        cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move, ...framing, avoid: rigs }).paused(false), at);
+        const made = cameraTimeline.getChildren(false, false, true).pop();
+        aimed = key; inFrame = shotKind === 'wide' ? [] : (made && made.data && made.data.subjects) || [].concat(subject);
       }
       lastWords = Math.max(lastWords, until);
     }

@@ -55,6 +55,11 @@ Scene file (every key except `characters` and `script` is optional):
                (Vietnamese; `voice-tts voices` lists them). Each line is synthesised ONCE into voice/ next to the
                scene file and reused — delete a file to have it spoken again. `"voice": false` on a turn keeps
                that line silent. Without voice-tts installed, use "audio" or "dur".
+  enter/exit   `"enter": "left" | "right"` on a TURN brings that character in mid-scene: it is off stage until then,
+               walks in to its `x`, then says / does the rest of the turn. `"exit": "left" | "right"` walks it out
+               after the turn. Order inside one turn: enter → say → do → exit (a `mood` without `say` comes first).
+  background   `"preset": "clinic" | "lobby" | "home"` draws a simple room (and sets the floor colour).
+  music        `"music": "file.mp3"` plays under the whole scene at `"musicVolume"` (0.15).
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
                `"tabletop"` is the height of a table or counter top in frame units (150; lower it for
                someone seated behind it — the tool tells you when a seated character would be hidden).
@@ -67,7 +72,7 @@ clips and the total duration are out of date. Fix them in place with:
 
     python3 tools/scene.py --retime path/to/index.html
 """
-import argparse, difflib, hashlib, json, os, re, shutil, socket, subprocess, sys, tempfile, time
+import argparse, difflib, hashlib, json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -93,13 +98,13 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
-BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image')
+BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 
 
 def fingerprint(html):
@@ -204,6 +209,44 @@ def speak_line(base, who, voice, words, where):
     return relative
 
 
+# ── PHÔNG NỀN dựng sẵn: mỗi phông là một ảnh SVG 1920 × 1080 đặt làm nền của MỘT phần tử (#wall) — HyperFrames
+# không nhận clip lồng phần tử con — cùng màu sàn đi kèm. Vẽ phẳng, ít chi tiết, để nhân vật vẫn là thứ nổi nhất.
+def _svg(body):
+    return "data:image/svg+xml," + urllib.parse.quote(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">{body}</svg>', safe="/:=' ")
+
+
+PRESETS = {
+    # Phòng khám: tường xanh ngọc nhạt, cửa sổ, tủ thuốc có chữ thập, bảng đo thị lực.
+    'clinic': {'floor': '#b9cfd2', 'wallDark': '#9fbfc4', 'svg': '''
+        <rect width="1920" height="1080" fill="#d6ebec"/><rect y="760" width="1920" height="320" fill="#c4dfe1"/>
+        <rect x="1180" y="150" width="420" height="330" rx="10" fill="#f4fbfc"/><rect x="1196" y="166" width="388" height="298" fill="#bfe3f2"/>
+        <path d="M 1390 166 V 464 M 1196 315 H 1584" stroke="#f4fbfc" stroke-width="14"/><path d="M 1196 380 Q 1300 330 1400 372 T 1584 350 V 464 H 1196 Z" fill="#9ed0a8" opacity=".7"/>
+        <rect x="250" y="180" width="300" height="360" rx="12" fill="#f6fbfb" stroke="#a9c9cc" stroke-width="6"/><path d="M 400 180 V 540" stroke="#a9c9cc" stroke-width="5"/>
+        <path d="M 318 300 h 34 v -34 h 28 v 34 h 34 v 28 h -34 v 34 h -28 v -34 h -34 z" fill="#e2574c"/>
+        <rect x="760" y="210" width="210" height="270" rx="8" fill="#ffffff" stroke="#b7cfd2" stroke-width="5"/>
+        <path d="M 800 262 h 130 M 815 312 h 100 M 828 356 h 74 M 840 394 h 50 M 850 428 h 30" stroke="#7d989c" stroke-width="12" stroke-linecap="round"/>
+        <rect y="742" width="1920" height="20" fill="#a9c9cc"/>'''},
+    # Sảnh lễ tân: tường ấm, dải gỗ, biển chữ thập xanh, chậu cây, hai khung ảnh.
+    'lobby': {'floor': '#c9b79f', 'wallDark': '#d9c7ae', 'svg': '''
+        <rect width="1920" height="1080" fill="#f1e6d3"/><rect y="560" width="1920" height="210" fill="#e3d2b6"/><rect y="548" width="1920" height="14" fill="#c9b08a"/>
+        <rect x="150" y="150" width="240" height="180" rx="8" fill="#ffffff" stroke="#b9a078" stroke-width="8"/><circle cx="270" cy="232" r="46" fill="#f2b56b"/><path d="M 170 312 L 240 250 L 300 300 L 340 270 L 372 312 Z" fill="#8fbf8a"/>
+        <rect x="460" y="170" width="170" height="150" rx="8" fill="#ffffff" stroke="#b9a078" stroke-width="8"/><path d="M 508 262 q -16 -34 14 -40 q 8 -30 34 -8 q 30 -2 20 28 q 14 30 -22 30 z" fill="#e58b8b"/>
+        <circle cx="1560" cy="250" r="96" fill="#3f9a8c"/><path d="M 1532 222 h 0 M 1538 180 h 44 v 48 h 48 v 44 h -48 v 48 h -44 v -48 h -48 v -44 h 48 z" fill="#ffffff"/>
+        <path d="M 1120 760 h 110 l -14 -120 h -82 z" fill="#b97a4e"/><path d="M 1175 640 q -70 -90 -30 -210 q 30 80 30 210 M 1175 640 q 80 -70 70 -190 q -60 70 -70 190 M 1175 640 q -110 -40 -130 -130 q 90 20 130 130" fill="#5fa46a"/>
+        <rect y="752" width="1920" height="18" fill="#b9a078"/>'''},
+    # Phòng ở nhà: tường vàng kem, cửa sổ rèm, kệ sách, đèn cây.
+    'home': {'floor': '#b98f6a', 'wallDark': '#e2cfa6', 'svg': '''
+        <rect width="1920" height="1080" fill="#f3e7c6"/>
+        <rect x="220" y="140" width="460" height="360" rx="10" fill="#fffaf0"/><rect x="238" y="158" width="424" height="324" fill="#bfe0f0"/><path d="M 450 158 V 482" stroke="#fffaf0" stroke-width="14"/>
+        <path d="M 200 130 h 150 q -20 190 -90 380 h -60 z M 700 130 h -150 q 20 190 90 380 h 60 z" fill="#e59f8a"/><rect x="180" y="116" width="540" height="22" rx="8" fill="#9a6a4a"/>
+        <rect x="1250" y="200" width="430" height="380" fill="#c99a6c"/><path d="M 1250 326 H 1680 M 1250 452 H 1680" stroke="#9a6a4a" stroke-width="12"/>
+        <path d="M 1280 220 h 34 v 96 h -34 z M 1322 240 h 30 v 76 h -30 z M 1362 226 h 40 v 90 h -40 z M 1430 250 h 28 v 66 h -28 z M 1290 350 h 44 v 92 h -44 z M 1350 366 h 30 v 76 h -30 z M 1540 346 h 36 v 96 h -36 z M 1300 476 h 60 v 94 h -60 z M 1480 490 h 34 v 80 h -34 z" fill="#7fa7c9"/>
+        <path d="M 1326 240 h 22 M 1434 250 h 20 M 1354 366 h 22" stroke="#e8c15a" stroke-width="8"/>
+        <path d="M 960 770 V 420" stroke="#6e5a48" stroke-width="12"/><path d="M 900 420 h 120 l -24 -110 h -72 z" fill="#f2c86b"/><ellipse cx="960" cy="772" rx="60" ry="12" fill="#6e5a48"/>
+        <rect y="752" width="1920" height="18" fill="#d9c08e"/>'''},
+}
+
+
 def js(value):
     return json.dumps(value, ensure_ascii=False)
 
@@ -239,6 +282,12 @@ def main():
     # ── nhân vật ──
     cast = scene.get('characters')
     if not isinstance(cast, list) or not cast: fail('"characters" must be a non-empty list')
+    # Ai bước vào GIỮA cảnh (một lượt có "enter")? Phải biết trước khi đặt host: người ấy xuất phát ngoài mép khung
+    # như người bước vào từ đầu, và ẩn cho tới lượt của mình.
+    late = {}
+    for entry in (scene.get('script') if isinstance(scene.get('script'), list) else []):
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if isinstance(turn, dict) and turn.get('enter') and turn.get('who') not in late: late[turn.get('who')] = turn['enter']
     names = {}
     for who in cast:
         if not isinstance(who, dict) or not who.get('name'): fail('every character needs a "name"')
@@ -262,11 +311,15 @@ def main():
         centre = stand
         # Điểm xuất phát của `enter` cách tâm host 0,57 × chiều cao; đầu + tóc rộng tới 0,3 × chiều cao về mỗi
         # phía. Đặt tâm host cách mép 0,18 × chiều cao thì cả cái đầu nằm ngoài khung lúc bắt đầu.
-        if who.get('enter') == 'left': centre = min(stand, (0.18 if not pet else 0.3) * host_height)
-        if who.get('enter') == 'right': centre = max(stand, width - 0.18 * host_height)
+        if who.get('enter') and name in late: fail(f'character "{name}" has "enter" both on the character (enters at the start) and on a turn (enters later) — keep one')
+        if late.get(name) not in (None, 'left', 'right'): fail(f'a turn of "{name}" has "enter": {js(late.get(name))} — it must be "left" or "right"')
+        if pet and late.get(name) == 'right': fail(f'character "{name}": pets can only enter from the left')
+        coming = who.get('enter') or late.get(name)
+        if coming == 'left': centre = min(stand, (0.18 if not pet else 0.3) * host_height)
+        if coming == 'right': centre = max(stand, width - 0.18 * host_height)
         # Số tính ra cất dưới khoá có gạch dưới ở đầu — khoá của người viết kịch bản không bao giờ trùng được.
         names[name] = dict(who, _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
-                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}')
+                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}', _late=late.get(name))
     for who in names.values():
         if who.get('faces') and who['faces'] not in names: fail(f'character "{who["name"]}" faces "{who["faces"]}", who is not in the scene')
 
@@ -295,6 +348,15 @@ def main():
         steps = []
         # `mood`: lượt CÓ lời thì cả câu được nói bằng nét mặt ấy; lượt không lời thì là một nhịp nét mặt
         # trước các động tác của lượt.
+        # Thứ tự trong MỘT lượt: enter → (mood, nếu không có lời) → say → do → exit.
+        if 'enter' in turn:
+            if who['_late'] != turn['enter'] or getattr(turn_code, 'entered', set()) & {who['name']}: fail(f'{where}: "{who["name"]}" can enter only once per scene')
+            turn_code.entered = getattr(turn_code, 'entered', set()) | {who['name']}
+            steps.append(f"['enter', {js(turn['enter'])}]" if not who['_pet'] else "'enter'")
+            if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
+            if who.get('faces'): steps.append(f"['face', {who['faces']}]")
+        if turn.get('exit') not in (None, 'left', 'right'): fail(f'{where}: "exit" must be "left" or "right"')
+        if who['_pet'] and turn.get('exit') == 'left': fail(f'{where}: pets can only exit to the right')
         mood = turn.get('mood')
         if 'mood' in turn:
             if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
@@ -321,8 +383,13 @@ def main():
                 steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
         for step in turn.get('do', []):
             steps.append(step_code(step, where))
-        if not steps: fail(f'{where}: a turn needs "say", "do" or "mood"')
+        if turn.get('exit'): steps.append(f"['exit', {js(turn['exit'])}]" if not who['_pet'] else "'exit'")
+        if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
+        # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
+        if 'shot' not in turn and 'say' in turn:
+            mentioned = [other['name'] for other in names.values() if other['_pet'] and re.search(r'(?<!\w)' + re.escape(other['name']) + r'(?!\w)', str(turn['say']), re.IGNORECASE)]
+            if mentioned: turn = dict(turn, shot=[who['name']] + mentioned)
         if 'shot' in turn:
             shot = turn['shot']
             if isinstance(shot, list):
@@ -341,17 +408,16 @@ def main():
     for who in entering:
         steps = [f"['enter', {js(who['enter'])}]"] if not who['_pet'] else ["'enter'"]
         if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
+        if who.get('faces'): steps.append(f"['face', {who['faces']}]")
         arrivals.append(f"[{who['name']}, " + ', '.join(steps) + ']')
     # Mọi người bước vào CÙNG LÚC: vào lần lượt thì người vào sau đứng sẵn trong khung chờ tới lượt
     # rồi mới "bước vào" — và cảnh mất thêm vài giây trước câu nói đầu tiên.
     if arrivals: turns.append(('  // ' + ', '.join(who['name'] for who in entering) + (' walk' if len(entering) > 1 else ' walks') + ' in from outside the frame to the mark',
                                '{ together: [' + ', '.join(arrivals) + '] }' if len(arrivals) > 1 else arrivals[0]))
-    facing = [f"[{who['name']}, ['face', {who['faces']}]]" for who in names.values() if who.get('faces')]
-    if facing: turns.append(('  // everyone turns toward the one they look at', '{ together: [' + ', '.join(facing) + '] }' if len(facing) > 1 else facing[0]))
     layout = scene.get('layout', 'stage')
     if layout not in ('stage', 'presenter'): fail(f'"layout" must be "stage" or "presenter", got {js(layout)}')
     # Chỉ số "phẳng" của từng lượt trong talk.turns: các lượt mở đầu (thú ngồi sẵn, bước vào, quay mặt) đứng trước kịch bản.
-    flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals) + len(facing)
+    flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals)
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     for index, entry in enumerate(script):
         where = f'script[{index}]'
@@ -423,6 +489,9 @@ def main():
         if done.returncode != 0: fail(f'could not make mouth cues for {voice["file"]}: {done.stderr.strip()}')
         voice['length'] = float(re.search(r'([\d.]+) s,', done.stdout).group(1))
 
+    preset = scene.get('background', {}).get('preset')
+    if preset is not None and preset not in PRESETS: fail(f'background.preset must be one of {", ".join(PRESETS)} — got {js(preset)}')
+    if preset and scene.get('background', {}).get('image'): fail('background: give "preset" or "image", not both')
     background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * (0.176 if width >= height else 0.26 if scene.get('layout') == 'presenter' else 0.34))}, **scene.get('background', {}))        # khung dọc: nền đứng cao hơn, vì phần đáy bị giao diện ứng dụng che
     ground = round(background['floorHeight'] * 0.5)         # bàn chân đứng ở giữa dải sàn
     layers, style, body, setup = [], [], [], []
@@ -440,8 +509,12 @@ def main():
         if not os.path.isfile(source): fail(f'background.image not found: {picture} (looked in {base})')
         if os.path.abspath(source) != os.path.abspath(os.path.join(out, os.path.basename(picture))): shutil.copy(source, os.path.join(out, os.path.basename(picture)))
         clip('wall', f'position: absolute; inset: 0; background: {background["wallDark"]} url("{os.path.basename(picture)}") center / cover no-repeat;'); layers.append('#wall')
+    elif preset:
+        clip('wall', f'position: absolute; inset: 0; background: {PRESETS[preset]["wallDark"]} url("{_svg(" ".join(PRESETS[preset]["svg"].split()))}") center bottom / cover no-repeat;'); layers.append('#wall')
     else:
         clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
+    if preset:
+        background['floor'] = scene.get('background', {}).get('floor', PRESETS[preset]['floor'])
     if not picture or 'floor' in scene.get('background', {}):
         clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
     for prop in [item for item in props if not item['front']]:
@@ -466,11 +539,19 @@ def main():
         title_px, bullet_px = round(min(width, height) * 0.066), round(min(width, height) * 0.05)
         # Ước lượng số dòng khi chữ tự xuống hàng: một ký tự rộng chừng 0,5 cỡ chữ ở tiêu đề (đậm), 0,46 ở các ý.
         lines_of = lambda text, px: max(1, -(-len(text) * px * (0.5 if px == title_px else 0.43) // panel_w))
-        style.append(f'  .show {{ position: absolute; left: {panel_x}px; width: {panel_w}px; margin: 0; color: #f5f8fa; font-family: system-ui, sans-serif; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); }}')
+        # Chữ của vùng nội dung: sáng trên nền tối (tường màu trơn mặc định, ảnh nền), TỐI trên các phông dựng sẵn
+        # (đều là tường sáng) — `hyperframes check` đo độ tương phản và đòi ít nhất 3:1.
+        ink = 'color: #16303a;' if preset or picture else 'color: #f5f8fa; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);'
+        style.append(f'  .show {{ position: absolute; left: {panel_x}px; width: {panel_w}px; margin: 0; {ink} font-family: system-ui, sans-serif; }}')
         style.append(f'  .show-title {{ font-weight: 800; font-size: {title_px}px; line-height: 1.15; }}')
         style.append(f'  .show-bullet {{ font-weight: 600; font-size: {bullet_px}px; line-height: 1.3; padding-left: 1.1em; text-indent: -1.1em; box-sizing: border-box; }}')
         style.append('  .show-image { object-fit: contain; object-position: left top; border-radius: 14px; }')
-        visible = [show for show in shows if not show.get('clear')]
+        # Trên phông dựng sẵn hoặc ảnh nền, chữ nằm trên một TẤM THẺ sáng mờ — không thì chữ đè lên tranh treo tường,
+        # cửa sổ… của phông. Thẻ là một clip phẳng riêng, có mặt suốt cảnh.
+        if preset or picture:
+            pad = round(min(width, height) * 0.035)
+            clip('panel', f'position: absolute; left: {panel_x - pad}px; top: {panel_y - pad}px; width: {panel_w + 2 * pad}px; height: {panel_bottom - panel_y + 2 * pad}px; '
+                          'border-radius: 22px; background: rgba(255, 255, 255, 0.9); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);')
         for number, show in enumerate(shows):
             if show.get('clear'): continue
             later = [other['turn'] for other in shows if other['turn'] > show['turn']]
@@ -515,6 +596,13 @@ def main():
         body.append(f'  <audio id="voice-{voice["key"].replace("_", "-")}" class="clip" src="{voice["file"]}" data-start="__START_{voice["key"]}__" data-duration="{voice["length"]:.2f}" data-track-index="{track[0]}" data-volume="1"></audio>')
         track[0] += 1
 
+    music = scene.get('music')
+    if music:
+        if not os.path.isfile(os.path.join(base, music)): fail(f'music file not found: {music} (looked in {base})')
+        if os.path.abspath(os.path.join(base, music)) != os.path.abspath(os.path.join(out, os.path.basename(music))): shutil.copy(os.path.join(base, music), os.path.join(out, os.path.basename(music)))
+        # Nhạc nền: một clip tiếng chạy suốt cảnh, nhỏ hơn giọng nói. data-role để tools/peek.sh không coi nó là giọng thiếu người nhép.
+        body.append(f'  <audio id="music" class="clip" src="{os.path.basename(music)}" data-role="music" data-start="0" data-duration="__TOTAL__" data-track-index="{track[0]}" data-volume="{float(scene.get("musicVolume", 0.15)):g}"></audio>')
+        track[0] += 1
     for who in names.values():
         make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])} }})"
         setup.append(f"    const {who['name']} = {make}.rig;")
@@ -525,13 +613,20 @@ def main():
         if who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
         if who.get('seated') and not who['_pet']:
             setup.append(f"    {who['name']}.state.seat = 1;                 // already seated in the first frame")
+        # Người có mặt từ đầu thì ĐÃ quay về phía người mình nhìn ngay ở khung 0 — không tốn một nhịp quay mặt đầu cảnh.
+        if who.get('faces') and not who.get('enter') and not who['_late']:
+            toward = -1 if float(names[who['faces']]['x']) < float(who['x']) else 1
+            setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
+        if who['_late']:
+            setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")
     camera = scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
         # Khung dọc: phụ đề nằm giữa khung (vùng an toàn), nên người nói được đặt ở PHẦN TRÊN và nhỏ lại
         # một chút — không thì chữ đè lên miệng.
-        portrait = '' if width >= height else ', fill: 0.46, centerY: 0.34'
+        # Khung ngang: cảnh cận lấp 66% chiều cao (mặc định 82% của thư viện làm cái đầu chiếm nửa khung hình).
+        portrait = ', fill: 0.66' if width >= height else ', fill: 0.46, centerY: 0.34'
         camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)}{portrait} }}, "
     seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['_pet'] and who.get('seated')]
     lines = []

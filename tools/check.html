@@ -520,7 +520,10 @@ try {
     const turns = talk.turns;
     if (turns.length !== 7 || talk.sequences.length !== 3) hong('conversation', `expected 7 turns and 3 sequences, got ${turns.length} and ${talk.sequences.length}`);
     // Lượt sau bắt đầu đúng `gap` sau khi lượt trước xong; ba lượt "together" bắt đầu cùng lúc.
-    for (const [index, previous] of [[1, 0], [2, 1], [3, 2], [4, 3]]) if (Math.abs(turns[index].start - turns[previous].end - 0.25) > 0.01) hong('conversation', `turn ${index + 1} starts at ${turns[index].start.toFixed(3)}s, expected ${(turns[previous].end + 0.25).toFixed(3)}s (0.25 s after turn ${previous + 1})`);
+    // …trừ sau một CÂU NÓI: lượt kế gối lên 0,55 s người nói thu tay về (lượt 3 kết thúc bằng `explain`).
+    for (const [index, previous, settle] of [[1, 0, 0], [2, 1, 0], [3, 2, 0.55], [4, 3, 0]]) if (Math.abs(turns[index].start - (turns[previous].end - settle) - 0.25) > 0.01) hong('conversation', `turn ${index + 1} starts at ${turns[index].start.toFixed(3)}s, expected ${(turns[previous].end - settle + 0.25).toFixed(3)}s`);
+    { const waits = L.conversation([[a, ['speak', 'mot', 1]], [b, ['speak', 'hai', 1]]], { overlap: false }).turns; if (Math.abs(waits[1].start - waits[0].end - 0.25) > 0.01) hong('conversation', 'overlap: false must wait for the whole previous turn'); a.reset(); b.reset(); b.state.seat = 1;
+      const twice = L.conversation([[a, ['speak', 'mot', 1]], [a, ['speak', 'hai', 1]]]).turns; if (twice[1].start < twice[0].end) hong('conversation', 'one character speaking two turns in a row overlaps itself'); a.reset(); }
     if (Math.abs(turns[5].start - turns[4].start) > 0.01 || Math.abs(turns[6].start - turns[4].start) > 0.01) hong('conversation', 'turns inside { together } do not start at the same time');
     // Giờ trong `turns` phải khớp giờ thật của chuỗi đã dựng.
     const real = talk.of(b).data.steps.find((step) => step.name === 'speak');
@@ -603,6 +606,33 @@ try {
     for (const rig of [a, b]) { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); if (head.left < frame.left - 2 || head.right > frame.right + 2) hong('camera', `shot: [a, b] does not keep "${rig.publicId}" in frame`); }
     film.time(film.duration()); if (zoom() > 1.01) hong('camera', 'the camera does not return to the wide shot after the last line');
     if (!directed.camera) hong('camera', 'conversation(…, { camera }) does not expose the camera timeline');
+    // Lượt có `enter`: máy quay về toàn cảnh khi người ấy bắt đầu bước vào, rồi mới cắt vào khi họ nói.
+    {
+      a.reset(); b.reset(); b.state.seat = 1;
+      const arriving = L.conversation([[b, ['speak', 'mot', 1.2]], [a, 'enter', ['speak', 'hai', 1.2]]], { camera: scene });
+      const film2 = gsap.timeline({ paused: true }); arriving.addTo(film2, 0);
+      const entry = arriving.turns[1].steps[0], said = arriving.turns[1].steps[1];
+      film2.time(entry.start + 0.8); if (zoom() > 1.01) hong('camera', `the camera stays in a close-up (zoom ${zoom().toFixed(2)}) while another character walks in`);
+      film2.time(said.start + 0.9); if (zoom() < 1.2) hong('camera', 'the camera does not cut to the newcomer once they speak');
+      film2.time(0); a.reset(); b.reset(); b.state.seat = 1;
+    }
+    // Né người đứng cạnh: cận một người mà đầu người kia bị mép khung cắt ngang thì khung phải dời đi, hoặc ôm cả hai.
+    {
+      const near = document.createElement('div'); near.style.cssText = 'position:absolute;left:560px;bottom:96px;height:760px'; near.id = 'tk-near'; stage.appendChild(near);
+      const c = L.createCharacter(near, { id: 'clerk' }).rig;
+      const all = [...scene, '#tk-near'];
+      const cut = (rig) => { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(), seen = Math.min(frame.right, head.right) - Math.max(frame.left, head.left); return seen > 0.08 * head.width && seen < 0.92 * head.width; };
+      a.reset();
+      // Đặt người đứng cạnh sao cho tâm đầu của họ nằm đúng trên mép phải của cảnh cận thường.
+      const probe = L.shot(all, a, 'chest'), edge = (1920 - probe.data.target.x) / probe.data.target.scale; probe.kill();
+      near.style.left = `${edge - 760 * 400 / 470 / 2}px`;
+      const plain = L.shot(all, a, 'chest'); plain.progress(1); const wasCut = cut(c); plain.kill();
+      const careful = L.shot(all, a, 'chest', { avoid: [a, b, c, dog] }); careful.progress(1);
+      if (!wasCut) hong('shot avoid', 'test setup: the neighbour is not cut by the plain close-up');
+      if (cut(c)) hong('shot avoid', 'a neighbour is still cut by the frame edge');
+      if (cut(a)) hong('shot avoid', 'avoiding the neighbour cut the subject instead');
+      careful.kill(); L.shot(all, null, 'wide').progress(1); c.svg.remove(); near.remove();
+    }
     // Lượt không lời: người diễn nằm NGOÀI cảnh cận thì máy quay lùi về toàn cảnh; đang ở trong khung thì đứng yên.
     a.reset(); b.reset(); b.state.seat = 1; dog.datNghi();
     const acted = L.conversation([[a, ['speak', 'mot', 1.2]], [a, 'nod'], [dog, 'bark'], [b, ['speak', 'hai', 1]]], { camera: scene });

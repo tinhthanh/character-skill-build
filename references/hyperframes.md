@@ -70,6 +70,18 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   about 0.45 × the character's host height wide, so in a 1080 px frame two default-size people
   fit at `x` ≈ 300 and 780; for three, give them smaller `height`s (about 600) or put a pet
   between two people. `examples/scene-vertical/scene.json` is a 9:16 sample.
+- **Coming and going mid-scene.** `"enter": "left" | "right"` on a **turn** brings that
+  character in then: it is off stage (invisible) until that turn, walks in to its `x`, then
+  says or does the rest of the turn. `"exit"` on a turn walks it out afterwards. Order inside
+  one turn: `enter` → `say` → `do` → `exit` (a `mood` without `say` comes first). The camera
+  goes wide while someone walks in or out.
+- **Who looks at whom.** `faces` turns a character toward another: characters present from
+  the first frame are already turned; characters that walk in turn when they arrive.
+- **Rooms and music.** `"background": { "preset": "clinic" | "lobby" | "home" }` draws a simple
+  room. `"music": "file.mp3"` plays under the whole scene at `"musicVolume"` (0.15).
+- **Camera defaults.** A line that names a pet in the scene ("Bella is very healthy") frames the
+  speaker and the pet together; a close-up never leaves a neighbour half-cut at the frame edge —
+  it shifts, or takes the neighbour in. `shot` on the turn overrides both.
 - `"mood"` on a turn — `happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
   `confused`, `tired`. With `say`, the whole line is spoken with that face; without it, it is
   an expression beat before the turn's actions.
@@ -256,6 +268,9 @@ tl.add(VGCharacter.captions(talk, document.getElementById('caption')).paused(fal
   speaker stands in the un-zoomed frame, so do not combine `follow` with camera shots — use a
   fixed caption when the camera moves.
 
+After a spoken line the next turn starts as soon as the words end (it overlaps the speaker's
+0.55 s of settling); `overlap: false` waits. One character may speak several turns in a row.
+
 `talk.turns` lists every turn with absolute `start` / `end` and its steps (to time your own
 shots, effects and audio), `talk.of(rig)` is that character's sequence. (Under the hood it is still
 one `sequence()` per character.) Give each character a stance (`sitDown`,
@@ -372,7 +387,8 @@ tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), speech.start + speec
   each subject is **by then** (after a walk, seated…). It is a time in the subject's own
   sequence — the same as the composition time when sequences are added at 0. Without `time`
   the camera aims at the subject's first frame. `sequence` overrides which sequence is used
-  (default: the last one built for that rig).
+  (default: the last one built for that rig). `avoid: [otherRigs]` keeps the frame from cutting
+  a neighbour in half: it shifts, or includes the neighbour (`timeline.data.subjects` tells).
 - The aim is computed once, when the timeline is built: the camera does not follow a
   character that walks during the shot.
 
@@ -424,6 +440,15 @@ The library draws characters only. A scene usually needs:
   hem of the top is at about 0.1–0.15. So a counter in front that is taller than ~0.35 × host
   height leaves only the head showing. Either keep the counter low, or raise the character's
   host (a taller stool) until the chest clears it, and check with `tools/peek.sh`.
+- **Several scenes in one film.** Render each scene at the same size and frame rate
+  (`hyperframes render --fps 24 --output partN.mp4`; the default is 30 fps), then join them,
+  re-encoding so sound and picture stay together:
+
+  ```bash
+  ffmpeg -i part1.mp4 -i part2.mp4 -i part3.mp4 -filter_complex \
+    "[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[v][a]" -map "[v]" -map "[a]" \
+    -c:v libx264 -crf 18 -r 24 -c:a aac -b:a 192k final.mp4
+  ```
 - **Flat siblings, not nested wrappers.** Keep the chair, counter, speech bubbles and the
   character hosts as direct children of the composition root. `hyperframes check` reports
   `nested_structure_needs_subcomposition` when timed clips are wrapped in an extra container.

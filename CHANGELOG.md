@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.17.0
+
+From a 2 min 41 s film made by an agent from a 25-beat script (three scenes, four voices).
+
+Added
+- `tools/scene.py`: `"enter"` / `"exit"` on a turn — a character comes in or leaves mid-scene
+  (off stage until then); room presets `"background": { "preset": "clinic" | "lobby" | "home" }`;
+  `"music"` / `"musicVolume"`; a line that names a pet frames the speaker with the pet;
+  on presets and images the content panel gets a light card and dark text.
+- `shot(…, { avoid })`: a close-up no longer leaves a neighbour half-cut at the frame edge.
+- Automatic camera: goes wide while a character walks in or out.
+- Docs: order inside a turn, joining scenes with ffmpeg, the render frame rate.
+
+Changed
+- `conversation()`: after a spoken line the next turn starts when the words end, overlapping
+  the speaker's 0.55 s of settling (`overlap: false` for the old timing); a character may
+  speak several turns in a row.
+- `tools/scene.py`: characters present from the first frame are already turned toward the
+  one they `faces` (no opening "everyone turns" beat); landscape close-ups are looser.
+- Speaking with a mood keeps the eyes mostly open (a "happy" line looked like a smirk).
+
 ## 0.16.0
 
 Added

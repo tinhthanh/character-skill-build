@@ -2331,7 +2331,9 @@ export class RigSVG {
     const face = RigSVG.EXPRESSIONS[mood];
     if (!face) throw new Error(`[character] no mood "${mood}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const corner = (value) => face.cuoi * 0.7 + value * 0.3;
-    return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: face.matY || 0 }, corner, eyes: face.matY || 0 };
+    // Mắt chỉ khép MỘT PHẦN so với nét mặt đứng yên: nói mà mắt lim dim (vui, cười) thì thành ra nhếch mép, buồn ngủ.
+    const eyes = (face.matY || 0) * 0.35;
+    return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: eyes }, corner, eyes };
   }
 
   #khauHinh(t, soAm, nhip, corner = (value) => value) {

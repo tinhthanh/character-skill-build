@@ -123,7 +123,9 @@ clips for every voice file.
    `voice-tts` command installed, `"voice": "maichi"` on a character speaks its lines for you
    (Vietnamese; made once into `voice/` and reused). `mood` is the
    tone of the line (`happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
-   `confused`, `tired`). `do` takes any action step. Vertical video: `"width": 1080,
+   `confused`, `tired`). `do` takes any action step; `"enter"` / `"exit"` on a turn bring a
+   character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
+   draws a room. Vertical video: `"width": 1080,
    "height": 1920`. **Explainer with one presenter:** `"layout": "presenter"` and
    `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
    beside the character as they speak (`examples/scene-presenter/scene.json`).
