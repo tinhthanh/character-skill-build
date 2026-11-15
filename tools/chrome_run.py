@@ -12,7 +12,7 @@ page is ready, and gave half-rendered screenshots on larger compositions.
 Standard library only (a small WebSocket client is included). Exit codes: 0 finished,
 3 the page never reached a --wait title, 4 Chrome could not be started.
 """
-import argparse, base64, json, os, re, socket, struct, subprocess, sys, tempfile, time
+import argparse, base64, json, os, re, shutil, socket, struct, subprocess, sys, tempfile, time
 
 
 class DevTools:
@@ -96,7 +96,11 @@ def main():
     width, height = (int(n) for n in args.size.lower().split('x'))
     finished = set(args.wait.split(','))
 
-    with tempfile.TemporaryDirectory() as profile:
+    # Thư mục hồ sơ tạm: tự tạo, tự xoá SAU KHI Chrome thoát hẳn và bỏ qua lỗi xoá. Chrome trên Linux
+    # còn ghi vào hồ sơ một lúc sau khi được bảo đóng; để `TemporaryDirectory` dọn thì nó ném
+    # "Directory not empty" và biến một lượt chạy thành công thành thất bại.
+    profile = tempfile.mkdtemp(prefix='chrome-run-')
+    try:
         chrome = subprocess.Popen([args.chrome, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
                                    '--remote-debugging-port=0', f'--user-data-dir={profile}', 'about:blank'],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
@@ -165,6 +169,8 @@ def main():
                 try: chrome.wait(timeout=5)
                 except subprocess.TimeoutExpired: chrome.kill()
 
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
 
 if __name__ == '__main__':
     main()
