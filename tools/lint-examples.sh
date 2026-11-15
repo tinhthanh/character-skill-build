@@ -3,6 +3,7 @@
 #   tools/lint-examples.sh             lint only (fast, static)
 #   tools/lint-examples.sh --check     also `hyperframes check`: loads each example in a browser and
 #                                      samples it for runtime, layout and motion problems (slower)
+# --check needs FFmpeg (ffprobe) on PATH for examples that have audio.
 # With --check, errors fail; so do warnings, except the few known false positives listed in
 # references/hyperframes.md (a limb rotating about its joint, "the film is silent").
 # Needs Node (npx). Each example is copied to a temporary project together with the built

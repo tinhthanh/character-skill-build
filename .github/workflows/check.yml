@@ -21,6 +21,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # `hyperframes check` đọc tệp tiếng của ví dụ voiceover bằng ffprobe — runner không có sẵn.
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       # lint (tĩnh) + check (nạp từng ví dụ vào trình duyệt, soát runtime / bố cục / chuyển động).
       - name: Examples pass hyperframes lint and check
         run: sh tools/lint-examples.sh --check
