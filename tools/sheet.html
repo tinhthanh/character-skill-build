@@ -7,6 +7,7 @@
 <body style="margin:0;background:#1d3a4b;display:flex;flex-wrap:wrap;font:12px system-ui;color:#cfe">
 <script type="module">
 import { RigSVG, RigThu, gieo } from '../runtime/index.js';
+import { khungMat } from '../studio/params.js';
 gieo(1);
 const nv = new URLSearchParams(location.search).get('nv') || 'bac_si_thu_y', thu = nv in RigThu.LOAI;
 const o = (nhan, fn, khung) => {
@@ -21,7 +22,11 @@ if (thu) {
   o('nghỉ'); o('cận mặt', null, (r) => r.khungMat(70));
   for (const m of RigThu.DONG_TAC[nv].slice(1)) o(m, giua(m, 0.5));
 } else {
-  o('nghỉ'); o('cận ngực', null, () => '120 200 160 188'); o('cận mặt', null, () => '120 60 160 188');
+  // Khung cận TÍNH từ tỉ lệ của chính nhân vật (cỡ đầu, cỡ thân, độ dài chân), không đặt cứng:
+  // khung cứng hợp với nhân vật chibi thì cắt mất cằm hoặc tay của nhân vật ít chibi hơn.
+  const faceBox = (r) => khungMat(r, 80);
+  const chestBox = (r) => { const cy = 262 - 52 * r.nv.coThan + 30 + r.hangChan(), half = 82 * r.nv.coThan; return `${200 - half} ${cy - half * 1.05} ${half * 2} ${half * 2.35}`; };
+  o('nghỉ'); o('cận ngực', null, chestBox); o('cận mặt', null, faceBox);
   o('nghiêng 50%', (r) => { r.s.huong = 0.5; }); o('nghiêng 100%', (r) => { r.s.huong = 1; });
   for (const [m, p, ...ts] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['giaiThich', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
                                ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['loLang', 0.5], ['nod', 0.25]]) o(m, giua(m, p, ...ts));

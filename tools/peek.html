@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>đang xem…</title>
+<!-- XEM TRƯỚC một composition HyperFrames mà không cần render:  tools/peek.sh <index.html> [t1,t2,…]
+     Mỗi ô là composition được tua tới một thời điểm. Thông tin (thời lượng, từng bước của mỗi
+     chuỗi nhân vật, cảnh báo) nằm ở thẻ pre#info dạng JSON. -->
+<style>
+  body { margin: 0; background: #0c1116; font: 13px system-ui, sans-serif; color: #dfe7ec; }
+  #grid { display: grid; gap: 6px; padding: 6px; }
+  .tile { position: relative; overflow: hidden; background: #000; }
+  .tile iframe { border: 0; transform-origin: 0 0; display: block; }
+  .tile span { position: absolute; left: 6px; top: 5px; padding: 1px 7px; border-radius: 4px; background: rgba(0,0,0,.72); font-weight: 600; }
+  #info { display: none; }
+</style>
+<div id="grid"></div>
+<pre id="info"></pre>
+<script type="module">
+const query = new URLSearchParams(location.search);
+const src = query.get('src'), columns = +(query.get('cols') || 4), tileWidth = +(query.get('w') || 480);
+const info = { ok: true, warnings: [] };
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Nạp composition vào một iframe và trả về mọi thứ cần để tua nó.
+async function loadComposition(frame) {
+  await new Promise((resolve, reject) => { frame.addEventListener('load', resolve, { once: true }); frame.addEventListener('error', reject, { once: true }); frame.src = src; });
+  await wait(150);
+  const win = frame.contentWindow, doc = win.document;
+  const root = doc.querySelector('[data-composition-id]');
+  if (!root) throw new Error('không thấy phần tử gốc có data-composition-id');
+  const id = root.dataset.compositionId, timeline = (win.__timelines || {})[id];
+  if (!timeline) throw new Error(`không có window.__timelines["${id}"] — khoá phải trùng data-composition-id, và timeline phải dựng đồng bộ`);
+  return { win, doc, root, id, timeline, width: +root.dataset.width || 1920, height: +root.dataset.height || 1080, declared: +root.dataset.duration || 0 };
+}
+
+// Tua tới `time`. Bộ dựng thật ẩn/hiện các .clip theo data-start/data-duration; ở đây làm lại đúng việc đó.
+function seek(comp, time) {
+  comp.timeline.pause();
+  comp.timeline.totalTime(time, false);
+  for (const clip of comp.doc.querySelectorAll('.clip[data-start]')) {
+    const start = +clip.dataset.start, duration = +clip.dataset.duration;
+    clip.style.visibility = time >= start && (!Number.isFinite(duration) || time < start + duration) ? '' : 'hidden';
+  }
+}
+
+try {
+  if (!src) throw new Error('thiếu tham số ?src=');
+  const probeFrame = document.createElement('iframe');
+  probeFrame.style.cssText = 'position:absolute;left:-99999px;width:10px;height:10px';
+  document.body.appendChild(probeFrame);
+  const probe = await loadComposition(probeFrame);
+  const timelineDuration = +probe.timeline.duration().toFixed(3);
+  Object.assign(info, { composition: probe.id, width: probe.width, height: probe.height, declaredDuration: probe.declared, timelineDuration });
+  if (timelineDuration > probe.declared + 0.01)
+    info.warnings.push(`timeline dài ${timelineDuration}s nhưng data-duration là ${probe.declared}s — phần sau ${probe.declared}s sẽ bị cắt`);
+
+  // Các chuỗi nhân vật (kichBan gắn sẵn nhãn vào timeline con).
+  info.sequences = probe.timeline.getChildren(true, false, true).filter((child) => child.data && child.data.type === 'character-sequence').map((child) => {
+    const start = +child.startTime().toFixed(3), end = +(child.startTime() + child.duration()).toFixed(3);
+    if (end > probe.declared + 0.01) info.warnings.push(`chuỗi của "${child.data.character}" kết thúc ở ${end}s, sau data-duration ${probe.declared}s`);
+    return { character: child.data.character, start, end,
+             steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2) })) };
+  });
+  for (const clip of probe.doc.querySelectorAll('.clip[data-start]')) {
+    const end = +clip.dataset.start + +clip.dataset.duration;
+    if (end > probe.declared + 0.01) info.warnings.push(`clip #${clip.id || clip.tagName.toLowerCase()} kết thúc ở ${end}s, sau data-duration`);
+  }
+  probeFrame.remove();
+
+  // Thời điểm cần xem: do người gọi đưa, hoặc 8 điểm rải đều.
+  const total = probe.declared || timelineDuration;
+  const times = (query.get('t') || '').split(',').map(Number).filter((n) => Number.isFinite(n) && query.get('t'));
+  if (!times.length) for (let i = 0; i < 8; i++) times.push(+(total * (i + 0.5) / 8).toFixed(2));
+  info.times = times;
+
+  const scale = tileWidth / probe.width, tileHeight = Math.round(probe.height * scale);
+  const grid = document.getElementById('grid');
+  grid.style.gridTemplateColumns = `repeat(${Math.min(columns, times.length)}, ${tileWidth}px)`;
+  info.sheet = { width: Math.min(columns, times.length) * (tileWidth + 6) + 6, height: Math.ceil(times.length / columns) * (tileHeight + 6) + 6 };
+  await Promise.all(times.map(async (time) => {
+    const tile = document.createElement('div'); tile.className = 'tile'; tile.style.cssText = `width:${tileWidth}px;height:${tileHeight}px`;
+    const frame = document.createElement('iframe'); frame.style.cssText = `width:${probe.width}px;height:${probe.height}px;transform:scale(${scale})`;
+    const label = document.createElement('span'); label.textContent = time.toFixed(2) + ' s';
+    tile.append(frame, label); grid.appendChild(tile);
+    seek(await loadComposition(frame), time);
+  }));
+  await wait(120);
+} catch (error) { info.ok = false; info.error = String(error && error.message || error); }
+document.getElementById('info').textContent = JSON.stringify(info);
+document.title = info.ok ? 'DONE' : 'ERROR';
+</script>

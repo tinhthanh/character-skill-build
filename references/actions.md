@@ -38,19 +38,50 @@ read its doc comment in `runtime/rig-svg.js` before using it.
 After `exit` or `walkAway` the character is invisible; use `enter` to bring it back.
 A character keeps its horizontal position after `walk` with a distance.
 
-## Dog — `VGCharacter.taoThuCung(host, { loai: 'cho' }).rig`
+## Pets — `VGCharacter.taoThuCung(host, { loai }).rig`
 
-`idle(dur)` · `wagTail` · `bark(times = 2)` · `sit(hold = 1.6)` (sits, pants, stands) ·
-`tiltHead` · `jump(times = 2)` · `beg` (up on hind legs, paws waving) · `givePaw` ·
-`sniff` · `walk(steps, distance)` · `enter` · `exit`
+Both animals stand side-on with the **head toward screen right** and the face turned to the
+viewer. `walk` with a negative distance turns the animal round first.
 
-## Cat — `VGCharacter.taoThuCung(host, { loai: 'meo' }).rig`
+**Dog** (`loai: 'cho'`), rests standing:
 
-`idle(dur)` · `meow` · `purr` · `lickPaw` · `stretch` · `hiss` (arched back, puffed tail) ·
-`tailSwish` · `tiltHead` · `pounce` · `walk(steps, distance)` · `enter` · `exit`
+| Action | Arguments | What it does | ≈ seconds |
+|---|---|---|---|
+| `idle` | `(dur = 4)` | breathe, blink, gentle tail wag, ear flick | `dur` |
+| `wagTail` | — | fast wag, wiggling hips, tongue out | 1.9 |
+| `bark` | `(times = 2)` | head jerks up, mouth snaps open | 1.4 |
+| `sit` | `(hold = 1.6)` | sit, pant, stand up again | `hold` + 0.9 |
+| `tiltHead` | — | tilt one way, then the other | 2.3 |
+| `jump` | `(times = 2)` | happy hops | 2.0 |
+| `beg` | — | up on the hind legs, front paws waving | 2.3 |
+| `givePaw` | — | sit and offer a front paw | 1.9 |
+| `sniff` | — | nose to the ground | 1.8 |
+| `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
+| `enter` | — | run in from the left, stop at centre | 2.6 |
+| `exit` | — | run out to the right — **ends hidden** | 2.4 |
 
-The cat rests **sitting**; actions that need it standing stand it up first.
-`rig.DONG_TAC` lists the actions valid for that animal.
+**Cat** (`loai: 'meo'`), rests **sitting**; actions that need it standing stand it up first:
+
+| Action | Arguments | What it does | ≈ seconds |
+|---|---|---|---|
+| `idle` | `(dur = 4)` | breathe, slow blink, tail tip sways | `dur` |
+| `meow` | — | head up, mouth open, eyes squint | 1.3 |
+| `purr` | — | eyes closed, smiling, body trembles, head rubs | 2.0 |
+| `lickPaw` | — | raise a front paw and lick it | 2.2 |
+| `stretch` | — | chest to the floor, rump up, yawn | 2.4 |
+| `hiss` | — | arched back, puffed tail, flat ears, slit pupils | 2.0 |
+| `tailSwish` | — | slow wide tail swish | 2.4 |
+| `tiltHead` | — | tilt one way, then the other | 2.3 |
+| `pounce` | — | crouch, wiggle, leap | 2.4 |
+| `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
+| `enter` | — | run in from the left, stop at centre | 2.6 |
+| `exit` | — | run out to the right — **ends hidden** | 2.7 |
+
+`rig.DONG_TAC` lists the actions valid for that animal. Distances for pets are in the pet
+frame, 400 × 330 units.
+
+Exact durations for a given composition: `tools/peek.sh <index.html>` prints the start and
+end of every step.
 
 ## Other rig methods
 
@@ -58,6 +89,7 @@ The cat rests **sitting**; actions that need it standing stand it up first.
 |---|---|
 | `rig.datNghi()` | snap to the rest pose, centre of frame |
 | `rig.doiMau({ ao: '#…' })` | recolour; dependent shades follow |
-| `VGCharacter.napBoSo(rig, config)` | apply a studio config object |
+| `VGCharacter.napBoSo(rig, config)` | apply a studio config object; throws on an invalid one |
+| `VGCharacter.validateConfig(config, kind)` | list a config's problems without applying it (`kind`: `'person'` or `'pet'`) |
 | `VGCharacter.danhSach()` | list character ids and action names |
 | `rig.s` | the live state object (joint angles etc.) for custom tweens; call `rig.apDung()` after writing to it outside a rig timeline |

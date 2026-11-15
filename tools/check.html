@@ -85,6 +85,36 @@ try {
     if (hinh() !== dung) hong('kichBan', 'seek() (tắt callback) không vẽ lại hình');
     ra.kichBan = { dai: +t.duration().toFixed(2) }; }
 
+  // ── Các lớp CHẶN LỖI IM LẶNG phải còn hoạt động ──
+  { const expectThrow = (label, fn) => { try { fn(); hong('chặn lỗi', `${label}: đáng ra phải ném lỗi`); } catch (e) { /* đúng */ } };
+    const host = document.getElementById('san');
+    const problems = L.validateConfig({ thann: { coDau: 2 }, khuon: { rong: 'to', cao: 50 }, mau: { ao: 'xanh' }, nghi: { batL: 'x' } });
+    if (problems.length !== 4) hong('chặn lỗi', `validateConfig phải bắt 4 lỗi, bắt được ${problems.length}: ${problems.join(' | ')}`);
+    if (L.validateConfig({ than: { coDau: 1.2 }, mau: { ao: '#2f9e8f' }, nghi: { cuoi: 1 } }).length) hong('chặn lỗi', 'validateConfig báo lỗi trên một config hợp lệ');
+    expectThrow('taoNhanVat với config sai kiểu', () => L.taoNhanVat(host, { khoa: 'bs_nam', config: { khuon: { rong: 'to' } } }));
+    expectThrow('taoThuCung với loài lạ', () => L.taoThuCung(host, { loai: 'tho' }));
+    expectThrow('doiMau với tên màu', () => new RigSVG(host, 'mac_dinh').doiMau({ ao: 'red' }));
+    expectThrow('đăng ký trùng id', () => L.dangKyTuyChinh({ id: 'bs_nam', dinhNghia: (g) => ({ ...g }) }));
+    expectThrow('mauSoSau trỏ khoá không có', () => L.dangKyTuyChinh({ id: 'kiem_tam_1', dinhNghia: (g) => ({ ...g, mauSoSau: 'khong_co' }) }));
+    // Bỏ mũ mà quên đặt lại mauSoSau: sọ sau vẫn phải ra màu tóc.
+    const noHat = new RigSVG(host, { ...RigSVG.NHAN_VAT.bs_nam, mu: () => '' });
+    const fill = noHat.svg.querySelector('#' + noHat.id + '-tocLung').getAttribute('fill');
+    if (fill !== noHat.mau.toc) hong('chặn lỗi', `bỏ mũ nhưng sọ sau vẫn mang màu ${fill}, đáng ra là màu tóc ${noHat.mau.toc}`);
+  }
+
+  // ── Mọi tệp trong configs/ phải hợp lệ (studio ghi ra, nhưng người cũng sửa tay) ──
+  try {
+    const listing = await (await fetch('../configs/', { cache: 'no-store' })).text();
+    const files = [...listing.matchAll(/href="([^"?]+\.json)"/g)].map((m) => decodeURIComponent(m[1]));
+    ra.configs = files.length;
+    for (const file of files) {
+      const id = file.replace(/\.json$/, ''), kind = id in RigThu.LOAI ? 'pet' : 'person';
+      if (kind === 'person' && !(id in RigSVG.NHAN_VAT)) { hong(`configs/${file}`, 'không có nhân vật nào mang id này'); continue; }
+      let config; try { config = await (await fetch('../configs/' + file, { cache: 'no-store' })).json(); } catch (e) { hong(`configs/${file}`, 'không phải JSON hợp lệ'); continue; }
+      for (const problem of L.validateConfig(config, kind)) hong(`configs/${file}`, problem);
+    }
+  } catch (e) { hong('configs', 'không đọc được danh sách: ' + e.message); }
+
   // Bản dựng IIFE phải tươi: cùng danh sách nhân vật với mã nguồn.
   const G = window[L.IIFE_TEN];
   if (!G) hong('dist', 'không nạp được dist/character.iife.js — chạy: python3 tools/build.py');

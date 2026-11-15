@@ -33,6 +33,7 @@ folder.
 python3 tools/serve.py                 # http://127.0.0.1:8300/studio/
 sh tools/check.sh                      # every character × every action, headless → PASS / FAIL
 sh tools/shot.sh le_tan /tmp/le_tan.png   # pose sheet for one character
+sh tools/peek.sh examples/hyperframes/index.html   # timings + contact sheet of a composition
 ```
 
 Open `examples/hyperframes/index.html` through the dev server

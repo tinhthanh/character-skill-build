@@ -26,11 +26,71 @@ export function dangKyTuyChinh({ id, dua = 'bac_si_thu_y', dinhNghia }) {
   if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] id không hợp lệ: "${id}"`);
   const goc = RigSVG.NHAN_VAT[dua];
   if (!goc) throw new Error(`[character] "${id}" dựa trên "${dua}" nhưng chưa có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
-  return RigSVG.dangKy(id, dinhNghia(goc, KIT));
+  // Trùng id thì DỪNG, không ghi đè: hai tệp nhân vật cùng một id là nhân vật đăng ký trước
+  // biến mất không dấu vết, và composition nào đang dùng nó bỗng ra một người khác.
+  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" đã có nhân vật "${RigSVG.NHAN_VAT[id].ten || id}" — đặt id khác`);
+  const definition = dinhNghia(goc, KIT);
+  if (!definition || typeof definition !== 'object') throw new Error(`[character] "${id}": dinhNghia() phải trả về một object`);
+  if (definition.mau) assertColors(definition.mau, `nhân vật "${id}"`);
+  if (definition.mauSoSau && !(definition.mauSoSau in (definition.mau || {})))
+    throw new Error(`[character] "${id}": mauSoSau = "${definition.mauSoSau}" nhưng bảng màu không có khoá ấy`);
+  return RigSVG.dangKy(id, definition);
 }
 
-dangKyDau(RigSVG, 'bac_si_thu_y');
-for (const nv of TUY_CHINH) dangKyTuyChinh(nv);
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+function assertColors(palette, where) {
+  const bad = Object.entries(palette).filter(([, v]) => v !== null && v !== undefined && !(typeof v === 'string' && HEX_COLOR.test(v)));
+  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+}
+
+// Các nhóm và khoá HỢP LỆ của một bộ số nhân vật người. `nghi` và `mau` nhận khoá tuỳ ý
+// (kiểm theo KIỂU giá trị), các nhóm còn lại chỉ nhận đúng những khoá dưới đây, đều là số.
+const CONFIG_GROUPS = {
+  than: ['dauLech', 'coDau', 'coThan', 'coChan'],
+  tay: ['daiCanhTay', 'daiCangTay', 'dayTay', 'coBanTay', 'batNghi', 'cangNghi'],
+  tayAo: ['daiTayAo', 'xeoTayAo', 'rongTayAo', 'vienGau', 'boGocTayAo'],
+  chan: ['daiDui', 'daiOng', 'dayChan', 'cachChan', 'coBanChan'],
+  khuon: ['rong', 'cao', 'cam', 'yRong', 'tranVuong', 'hamVuong', 'rongTran', 'rongCam'],
+  may: ['dai', 'day', 'cong', 'thon', 'xech'],
+  viTriMay: ['mayX', 'mayY'],
+  net: ['matX', 'matY', 'matCo', 'muiY', 'muiCo', 'miengY', 'miengRong'],
+};
+
+/**
+ * Kiểm một bộ số TRƯỚC khi đổ vào rig; trả về danh sách lỗi (rỗng = hợp lệ).
+ *
+ * Phải kiểm vì rig không tự kiểm: một giá trị sai kiểu (`rong: "to"`) đi thẳng vào phép
+ * tính và ra NaN trong SVG — hình hỏng mà không có lỗi nào; còn tên nhóm hay tên khoá viết
+ * sai (`thann`) thì bị bỏ qua im lặng, người chỉnh tưởng đã áp mà nhân vật không đổi.
+ *
+ * `kind`: 'person' (mặc định) hoặc 'pet' (bộ số của thú chỉ có `mau`).
+ */
+export function validateConfig(config, kind = 'person') {
+  const problems = [];
+  if (config === null || config === undefined) return problems;
+  if (typeof config !== 'object' || Array.isArray(config)) return ['config phải là một object'];
+  const allowedGroups = kind === 'pet' ? ['mau'] : [...Object.keys(CONFIG_GROUPS), 'nghi', 'mau'];
+  for (const [group, value] of Object.entries(config)) {
+    if (!allowedGroups.includes(group)) { problems.push(`nhóm lạ "${group}" (hợp lệ: ${allowedGroups.join(', ')})`); continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" phải là một object`); continue; }
+    for (const [key, v] of Object.entries(value)) {
+      if (group === 'mau') {
+        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`mau.${key}: ${JSON.stringify(v)} không phải mã hex (#rgb / #rrggbb)`);
+      } else if (group === 'nghi') {
+        if (!(key in RigSVG.NGHI)) problems.push(`nghi.${key}: không có khoá trạng thái này`);
+        else if (typeof RigSVG.NGHI[key] === 'number' ? !Number.isFinite(v) : typeof v !== 'string') problems.push(`nghi.${key}: ${JSON.stringify(v)} sai kiểu`);
+      } else {
+        if (!CONFIG_GROUPS[group].includes(key)) problems.push(`${group}.${key}: khoá lạ (hợp lệ: ${CONFIG_GROUPS[group].join(', ')})`);
+        else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} phải là số`);
+      }
+    }
+  }
+  return problems;
+}
+function assertConfig(config, kind, who) {
+  const problems = validateConfig(config, kind);
+  if (problems.length) throw new Error(`[character] config của "${who}" không hợp lệ:\n  - ${problems.join('\n  - ')}`);
+}
 
 /**
  * Đổ bộ số (tệp `configs/<khoa>.json` do studio lưu) vào một rig NGƯỜI. Thứ tự có ý:
@@ -38,6 +98,7 @@ for (const nv of TUY_CHINH) dangKyTuyChinh(nv);
  */
 export function napBoSo(rig, c) {
   if (!c) return rig;
+  assertConfig(c, 'person', rig.nv.ten || 'nhân vật');
   if (c.mau)   rig.doiMau(c.mau);
   if (c.than)  rig.doiThan(c.than);
   if (c.tay)   rig.doiTay(c.tay);
@@ -66,6 +127,8 @@ export function taoNhanVat(host, { khoa = 'bac_si_thu_y', config = null } = {}) 
 /** Dựng một THÚ CƯNG ('cho' | 'meo') vào `host`. `config` hiện chỉ mang `mau`. */
 export function taoThuCung(host, { loai = 'cho', config = null } = {}) {
   host.style.aspectRatio = `${RigThu.KHUNG.w}/${RigThu.KHUNG.h}`;
+  if (!RigThu.LOAI[loai]) throw new Error(`[character] không có loài "${loai}" (có: ${Object.keys(RigThu.LOAI).join(', ')})`);
+  assertConfig(config, 'pet', loai);
   const rig = new RigThu(host, loai);
   if (config && config.mau) rig.doiMau(config.mau);
   rig.datNghi();
@@ -103,6 +166,7 @@ export function kichBan(rig, cacBuoc, { cach = 0.1 } = {}) {
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
   const chup = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
   let at = 0, cuoi = chup(), khung0 = null;
+  const steps = [];        // tên, lúc bắt đầu và thời lượng từng bước — cho tools/peek.sh và để canh lời đọc
   for (const b of cacBuoc) {
     if (typeof b === 'number') { at += b; continue; }
     const [ten, ...thamSo] = Array.isArray(b) ? b : [b];
@@ -121,12 +185,19 @@ export function kichBan(rig, cacBuoc, { cach = 0.1 } = {}) {
     con.progress(1); cuoi = chup();
     con.progress(0).paused(false);
     t.add(con, at);
+    steps.push({ name: ten, start: +at.toFixed(3), duration: +con.duration().toFixed(3) });
     at += con.duration() + cach;
   }
+  t.data = { type: 'character-sequence', character: rig.nv.ten || rig.nv.loai || '', steps };
   Object.assign(rig.s, khung0 || cuoi);       // rig nằm sẵn ở đúng khung 0 của chuỗi
   t.progress(0);
   rig.apDung();
   return t;
 }
+
+// Đăng ký nhân vật có sẵn rồi tới nhân vật tuỳ chỉnh. Đặt ở CUỐI module: việc đăng ký dùng
+// các hằng kiểm tra khai báo phía trên, chạy sớm hơn là đụng vào chúng trước khi chúng có giá trị.
+dangKyDau(RigSVG, 'bac_si_thu_y');
+for (const nv of TUY_CHINH) dangKyTuyChinh(nv);
 
 export { RigSVG, RigThu, KIT };

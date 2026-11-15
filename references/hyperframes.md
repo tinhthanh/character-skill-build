@@ -62,6 +62,9 @@ library is built to that contract. A complete composition is in
 - **Budget the duration.** `kichBan(...).duration()` is the length of the sequence; the
   composition's `data-duration` and the host clip's `data-duration` must cover it. Pad the end
   with `['idle', n]` so the character is not frozen while other elements finish.
+- **A bad config throws.** `taoNhanVat` / `taoThuCung` reject unknown groups or keys, non-numeric
+  values and non-hex colours with a message listing every problem, instead of drawing a broken
+  character. `hyperframes check` surfaces it as a runtime error.
 - **A character's host is a normal `.clip`.** Do not tween `display` or `visibility` on it.
   To bring a character on or off, use the `enter` / `exit` actions, which animate the rig's
   own opacity.
@@ -82,6 +85,48 @@ aligning hosts by `bottom` lines up everyone's feet.
   make sure that is off-screen or behind something if the entrance should be hidden.
 - A dog or cat beside a person looks right at roughly 0.4–0.45 × the person's host height.
 
+## Staging recipes
+
+**Units.** Distances passed to `walk`, and the `{ x, y }` given to `point`, are in the rig's
+frame, not in pixels: `px = units × hostHeight / 470` for people, `/ 330` for pets. A 760 px
+tall host therefore moves 1.62 px per unit.
+
+**Walk in from off-screen to a mark.** `enter` always ends at the centre of its host and
+starts 270 units to the left of it. Two ways to use that:
+
+- *Host at the mark.* Put the host where the character should end up. The entrance is only
+  hidden if the mark is within 270 units (0.57 × host height) of the left edge, or something
+  covers the start.
+- *Host at the edge, then walk.* Put the host so its centre is near the left edge, and follow
+  `enter` with a walk to the mark:
+
+  ```js
+  // host: left:-60px; height:760px → centre ≈ 263 px. Mark at 670 px → 407 px → 251 units.
+  VGCharacter.kichBan(rig, ['enter', ['walk', 4, 250], 'wave']);
+  ```
+
+  A character keeps the position it walked to, so everything after the walk happens at the mark.
+
+**Enter from the right:** `['enter', 'phai']` (people). Mirror the layout above.
+
+**Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
+the *left* of the person it should look toward, or expect to see its tail first.
+
+**Pet size next to a person.** Start from 0.45–0.55 × the person's host height (a cat on a
+760 px person reads well at about 400 px) and judge it in the preview.
+
+**Preview before rendering.** From the skill folder:
+
+```bash
+sh tools/peek.sh /path/to/project/index.html                 # 8 frames, evenly spaced
+sh tools/peek.sh /path/to/project/index.html 0,1.5,3,6 /tmp/peek.png
+```
+
+It prints the composition's declared and actual duration, the start and end of every step of
+every character sequence, and warnings for anything that runs past `data-duration`; then it
+saves one contact-sheet image of the requested frames. Use it to fit the script to the planned
+length and to check staging, instead of rendering.
+
 ## Lip-sync to a voice-over
 
 Put the audio in its own `<audio>` clip and give `giaiThich(text, dur)` the same `text` and
@@ -91,8 +136,9 @@ the clip's duration. Start both at the same time:
 const act = VGCharacter.kichBan(rig, ['enter', 1.0, ['giaiThich', 'Chào bạn, mình là bác sĩ Lan.', 3.1]]);
 ```
 
-`kichBan` places the speech after `enter` and the 1 s pause; read the start time back with
-`act.getChildren(false, false, true)[1].startTime()` to set the audio clip's `data-start`.
+`kichBan` places the speech after `enter` and the 1 s pause. Read where it landed from
+`act.data.steps` — `[{ name, start, duration }, …]`, times relative to the start of `act` — or
+from the `tools/peek.sh` printout, and set the audio clip's `data-start` to match.
 
 ## Validate and render
 
@@ -105,8 +151,14 @@ npx hyperframes render -o out.mp4 .
 - `lint` reads the bundle's source too. It rejects `querySelector` calls with interpolated
   template literals, so keep custom drawing code free of them (the library builds selectors by
   string concatenation for this reason).
-- `check` may report `off_pivot_rotation` on an arm (`#rig1-cangL` or similar). It is a
-  dial-pointer heuristic misreading a forearm; ignore it.
+- `check` reports warnings that are not defects of the composition. Expect, per character:
+  - `off_pivot_rotation` on arm parts (`#rig1-batR`, `#rig1-cangL`) or a pet's head
+    (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
+    joint. Several can appear.
+  - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` inside `giaiThich`: two of the library's own
+    gesture tweens meet within a frame. Cosmetic.
+
+  Errors, and warnings on your own elements, are still yours to fix.
 - After rendering, scrub the first two seconds of any `enter`: the character must walk in and
   stop, not snap back. `tools/check.sh` guards this, but it is the failure worth a look.
 

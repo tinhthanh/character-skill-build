@@ -51,6 +51,15 @@ const chinhSang = (c, k) => {
   return '#' + v.map((u) => Math.round(clamp(u, 0, 255)).toString(16).padStart(2, '0')).join('');
 };
 
+// Màu trong bảng màu phải là mã hex (#rgb hoặc #rrggbb), hoặc null với khoá cho phép tắt
+// (vd. `vien`). Tên màu CSS như 'red' KHÔNG dùng được: các màu tối/sáng đi kèm được tính
+// bằng số học trên mã hex, tên màu sẽ ra NaN và hỏng hình mà không báo gì.
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+function assertColors(palette, where) {
+  const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
+  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+}
+
 const NGHI = Object.freeze({
   x: 0, y: 0, mo: 1, co: 1, huong: 1,
   ngoi: 0, tho: 0, truocX: 0, truocY: 0, sauX: 0, sauY: 0, cong: 0, xu: 0,
@@ -383,6 +392,7 @@ export class RigThu {
 
   /** Đổi MÀU — dựng lại SVG từ bảng màu mới. `long` đổi thì `longToi` (chân xa, tai) tự tối theo. */
   doiMau(kieu = {}) {
+    assertColors(kieu, 'doiMau');
     const k = { ...kieu };
     if (k.long && !k.longToi) k.longToi = chinhSang(k.long, -0.2);
     Object.assign(this.mauKhai, k);

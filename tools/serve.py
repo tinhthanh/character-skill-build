@@ -3,6 +3,7 @@
 
     python3 tools/serve.py            # http://127.0.0.1:8300/studio/
     python3 tools/serve.py 8400
+    python3 tools/serve.py 8400 --mount=/duong/dan/project     # phục vụ thư mục ấy ở /__project/
 
 Khác `python3 -m http.server` ở hai điểm, cả hai đều từng gây lỗi khó lần:
   • Luôn gửi `Cache-Control: no-store`. Trình duyệt tự giữ module ES theo suy đoán;
@@ -11,10 +12,14 @@ Khác `python3 -m http.server` ở hai điểm, cả hai đều từng gây lỗ
     `configs/<id>.json`.
 Chỉ nghe trên 127.0.0.1.
 """
-import functools, http.server, json, os, re, sys
+import functools, http.server, json, os, re, sys, urllib.parse
 
 GOC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONG = int(sys.argv[1]) if len(sys.argv) > 1 else 8300
+ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
+CONG = int(ARGS[0]) if ARGS else 8300
+# Thư mục NGOÀI repo gắn vào /__project/ — để tools/peek.sh xem được composition nằm ở project khác.
+MOUNT = next((os.path.abspath(a.split('=', 1)[1]) for a in sys.argv[1:] if a.startswith('--mount=')), None)
+MOUNT_PREFIX = '/__project/'
 
 class H(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -22,6 +27,14 @@ class H(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def log_message(self, *a): pass
+
+    def translate_path(self, path):
+        clean = path.split('?', 1)[0].split('#', 1)[0]
+        if MOUNT and clean.startswith(MOUNT_PREFIX):
+            target = os.path.normpath(os.path.join(MOUNT, urllib.parse.unquote(clean[len(MOUNT_PREFIX):])))
+            # Không cho thoát khỏi thư mục đã gắn bằng "..".
+            return target if target == MOUNT or target.startswith(MOUNT + os.sep) else os.path.join(MOUNT, '__outside__')
+        return super().translate_path(path)
 
     def _tra(self, ma, noi_dung):
         than = json.dumps(noi_dung, ensure_ascii=False).encode()

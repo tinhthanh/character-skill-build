@@ -331,6 +331,15 @@ const tron = (a, b, k) => {
   return '#' + x.map((u, i) => Math.round(u + (y[i] - u) * k).toString(16).padStart(2, '0')).join('');
 };
 
+// Màu trong bảng màu phải là mã hex (#rgb hoặc #rrggbb), hoặc null với khoá cho phép tắt
+// (vd. `vien`). Tên màu CSS như 'red' KHÔNG dùng được: các màu tối/sáng đi kèm được tính
+// bằng số học trên mã hex, tên màu sẽ ra NaN và hỏng hình mà không báo gì.
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+function assertColors(palette, where) {
+  const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
+  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+}
+
 /* ---------------------------------------------------------------- NHÂN VẬT
  * Mỗi nhân vật là một object định nghĩa màu sắc + các mảnh SVG "thay được":
  *   mau       : bảng màu (ghi đè lên MAU_MAC_DINH)
@@ -738,6 +747,7 @@ export class RigSVG {
    * lần gọi này không truyền nó — đổi áo sang đỏ mà bóng sườn vẫn xanh thì hỏng.
    */
   doiMau(kieu = {}) {
+    assertColors(kieu, 'doiMau');
     const k = { ...kieu };
     if (k.ao && !k.aoToi) k.aoToi = chinhSang(k.ao, -0.21);
     if (k.da && !k.daToi) k.daToi = chinhSang(k.da, -0.12);
@@ -855,6 +865,15 @@ export class RigSVG {
     return (1 - k) * (Math.max(0, dui) * 1.4 - Math.max(0, -dui) * 0.45) + k * (dui + ong + 12);
   }
 
+  // Màu khối sọ sau. Chỉ theo `mauSoSau` khi nhân vật THẬT SỰ đội mũ (slot `mu` vẽ ra thứ
+  // gì đó). Nhân vật dựa trên một nhân vật đội mũ rồi bỏ mũ đi (`mu: () => ''`) thường quên
+  // đặt lại `mauSoSau` — và quay nghiêng là sau đầu hiện một mảng màu mũ. Không có mũ thì
+  // luôn là màu tóc, khỏi phải nhớ.
+  #backSkullColor() {
+    const hasHat = String(this.nv.mu(this.id, this.mau, this.nv) || '').trim() !== '';
+    return (hasHat && this.mau[this.nv.mauSoSau]) || this.mau.toc;
+  }
+
   #V() { return this.mau.vien ? ` filter="url(#${this.id}-vien)"` : ''; }
   // MẢNG DA (cánh tay, cổ) KHÔNG lọc viền — chỉ quần áo mới có nét.
   //
@@ -909,7 +928,7 @@ export class RigSVG {
         <g id="${p}-dau"${V}>
           <g transform="translate(0 -62)">
             <g id="${p}-veTay">
-            <g id="${p}-tocLung" fill="${this.mau[this.nv.mauSoSau] || this.mau.toc}"><ellipse id="${p}-tocLungE"/></g>
+            <g id="${p}-tocLung" fill="${this.#backSkullColor()}"><ellipse id="${p}-tocLungE"/></g>
             <path id="${p}-khuon" d="${this.nv.dau(this.mau, this.nv)}" fill="${this.mau.da}"/>
             <g id="${p}-tocG">${this.nv.toc(p, this.mau)}
             </g>

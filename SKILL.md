@@ -49,7 +49,7 @@ still break mid-action, and several failure modes are **silent** (see [Pitfalls]
 4. **Run the automated check.** `sh tools/check.sh` rebuilds the bundle and runs every
    action of every character in headless Chrome. It must print `PASS`. It catches thrown
    errors, `NaN` attributes, duplicate ids, missing required elements, actions that do not
-   return to rest, and a stale bundle.
+   return to rest, invalid files in `configs/`, and a stale bundle.
 5. **Look at it.** `sh tools/shot.sh <id> /tmp/<id>.png`, then open the PNG. It is a pose
    sheet: rest, close-ups, half and full turn, and ten mid-action frames. Check that nothing
    is covered that should be visible (accessories under sleeves, hair over a hat), that the
@@ -98,11 +98,20 @@ Four rules that are easy to get wrong:
 - **Give the host a height, not a width.** The library sets `aspect-ratio`; the character
   fills the host's height. Leave room: arms reach about 0.45 × height to each side.
 
-Action names and signatures: [references/actions.md](references/actions.md).
+Action names, arguments and durations: [references/actions.md](references/actions.md).
+
+**Preview without rendering:** `sh tools/peek.sh path/to/index.html [t1,t2,…] [out.png]`
+prints the timing of every step of every character and saves a contact sheet of frames. Do
+this before `hyperframes render`: it is how you find out that the script overruns
+`data-duration` or that an entrance starts in view. In the snippet above the bundle sits next
+to `index.html`; the example in this repo loads `../../dist/character.iife.js` instead, which
+is why it never goes stale.
 
 ## Pitfalls
 
-Each of these has bitten this codebase; all but the last fail without an error.
+Each of these has bitten this codebase. The library now throws on a duplicate character id,
+on an invalid config (unknown key, wrong type) and on non-hex colours; the ones below still
+fail without an error.
 
 - **Missing required ids.** `toc()` must contain `<g id="${p}-tocTruoc">`; `mat()` must
   contain `<g id="${p}-mat${ben}">` and `<g id="${p}-nguoi${ben}">`; `phuKien()` must wrap
@@ -110,6 +119,9 @@ Each of these has bitten this codebase; all but the last fail without an error.
   them blinking, gaze, head turn or body scaling silently stop working for that part.
 - **Hats go in `mu()`, not `toc()`.** The rig draws a generated hair patch after `toc()`
   when the head turns; a hat inside `toc()` gets a dark wedge painted across it.
+- **You inherit more than you see.** A base may carry a hat, glasses or a stethoscope you do
+  not want. The table "What each base already sets" and the section "Removing or replacing an
+  inherited part" in `references/slots.md` say what and how.
 - **Things draped over the shoulders go in `phuKienTren()` as well as `phuKien()`.**
   Sleeves are drawn after the torso and would cover a stethoscope or lanyard.
 - **Always spread the base palette:** `mau: { ...goc.mau, ao: '#…' }`. A bare
@@ -130,7 +142,7 @@ characters/           custom characters: _mau.js (template), le_tan.js (example)
 configs/              per-character tuned numbers written by the studio (<id>.json)
 dist/character.iife.js  single-file build for <script src> — generated, do not edit
 studio/               visual editor (Vietnamese UI)
-tools/                serve.py · build.py · check.sh · shot.sh · check.html · sheet.html
+tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) · peek.sh (composition preview)
 examples/hyperframes/ a complete composition with a vet and a dog
 references/           slots.md · actions.md · hyperframes.md
 ```
