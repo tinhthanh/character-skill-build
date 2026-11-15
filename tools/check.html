@@ -354,6 +354,37 @@ try {
     tuned.svg.remove();
   }
 
+  // ── Bộ dựng sẵn: mọi kiểu tóc, mọi bộ trang phục, mọi dáng người đều dựng được trên mọi nhân vật gốc ──
+  {
+    const host = document.getElementById('san');
+    let serial = 0;
+    const tryOn = (label, base, extra) => {
+      const id = 'check_kit_' + (serial++);
+      try {
+        L.registerCharacter({ id, base, define: (b, kit) => ({ ...b, hat: () => '', ...extra(b, kit) }) });
+        const rig = L.createCharacter(host, { id }).rig;
+        for (const facing of [0, 0.55, -1]) {
+          rig.state.facing = facing; rig.render();
+          if (xau(rig.svg)) hong(label, `on base ${base}: bad attribute values at facing ${facing}`);
+        }
+        if (!rig.svg.querySelector('[id$="-tocTruoc"]')) hong(label, `on base ${base}: missing required element "hair-front"`);
+        if (trungId(rig.svg).length) hong(label, `on base ${base}: duplicate ids ${trungId(rig.svg).join(', ')}`);
+        const t = rig.walk(); t.progress(0.3); rig.render(); if (xau(rig.svg)) hong(label, `on base ${base}: bad attribute values while walking`);
+        t.kill(); rig.svg.remove();
+      } catch (error) { hong(label, `on base ${base}: ${error.message}`); }
+    };
+    for (const base of ['default', 'vet', 'surgeon', 'nurse', 'doctor']) {
+      for (const name of Object.keys(L.kit.hair)) tryOn(`kit.hair.${name}`, base, (b, kit) => ({ hair: kit.hair[name]() }));
+      for (const name of Object.keys(L.kit.outfits)) tryOn(`kit.outfits.${name}`, base, (b, kit) => ({ ...kit.outfits[name] }));
+      for (const name of Object.keys(L.kit.bodies)) tryOn(`kit.bodies.${name}`, base, (b, kit) => ({ ...kit.bodies[name] }));
+    }
+    // Tuỳ chọn của kiểu tóc.
+    tryOn('kit.hair options', 'nurse', (b, kit) => ({ hair: kit.hair.ponytail({ side: 'right', tie: '#112233' }) }));
+    tryOn('kit.hair options', 'nurse', (b, kit) => ({ hair: kit.hair.long({ length: 1 }) }));
+    tryOn('kit.hair options', 'nurse', (b, kit) => ({ hair: kit.hair.curly({ volume: 1.3 }) }));
+    if (Object.keys(L.kit.hair).length < 10 || !L.kit.outfits.dress || !L.kit.bodies.child) hong('kit', 'hair / outfits / bodies presets are missing');
+  }
+
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
   {
     const load = (url) => new Promise((resolve) => {

@@ -10,7 +10,8 @@ export default {
   base: 'vet',                   // vet | surgeon | nurse | doctor | default | <another custom id>
   define: (base, kit) => ({
     ...base,
-    // ...kit.outfits.scrubs,    // (optional) take a whole outfit: scrubs | pawTunic | coat | plainCoat | tee | shirt
+    // ...kit.outfits.scrubs,    // (optional) take a whole outfit: scrubs | pawTunic | coat | plainCoat | tee | shirt | dress | hoodie | suit
+    // ...kit.bodies.child,      // (optional) body proportions: child | teen | adult | tall | stocky
     name: 'Display name',
 
     // ── proportions (a line you delete falls back to the base) ──
@@ -42,6 +43,8 @@ export default {
     // heldItemR: (p, c) => kit.parts.cup(c),                        // cup | clipboard | phone, or your own SVG in wrist space
     // …and close that hand around it:  restPose: { ...base.restPose, handR: 'fist', upperArmR: 20, forearmR: -80 }
     //    (L / R are SCREEN sides: R is the hand on the viewer's right)
+
+    // hair: kit.hair.bob(),                                         // ready-made hair: crop | sidePart | bob | long | ponytail | bun | pigtails | curly | spiky | tufts | bald
 
     // ── your own drawings (SVG strings) — read references/slots.md before writing them ──
     // hair: (p, c) => `<g id="${p}-hair-front" fill="${c.hair}">…</g>`,

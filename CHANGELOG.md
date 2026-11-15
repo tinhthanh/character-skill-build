@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.0
+
+Added
+- `kit.hair`: eleven ready-made hairstyles — `crop`, `sidePart`, `bob`, `long`, `ponytail`,
+  `bun`, `pigtails`, `curly`, `spiky`, `tufts`, `bald` — used as `hair: kit.hair.bob()`.
+- `kit.outfits.dress`, `hoodie` and `suit` (`colors.tie`, `colors.drawstrings`).
+- `kit.bodies`: proportion presets `child`, `teen`, `adult`, `tall`, `stocky`, each with a
+  suggested `hostScale` for scenes shared with adults.
+- Sample characters `girl`, `boy` and `manager`, built from kit presets with no SVG.
+- `tools/check.sh` tries every hairstyle, outfit and body preset on every built-in base.
+
+Fixed
+- Spreading `kit.outfits.scrubs` on a character without a hat colour threw "backSkullColor
+  names a colour that is not in colors"; a valid colour name the character does not define now
+  falls back to the hair colour.
+- Outfits on `base: 'default'` produced `fill="undefined"`: the accent and hair-highlight
+  colours are now derived when a character does not define them.
+- The back hair of `backHair: 'low'` had a pointed, star-like front edge when turned.
+
 ## 0.7.1
 
 Fixed

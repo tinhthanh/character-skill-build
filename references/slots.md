@@ -33,6 +33,9 @@ shoulder accessories) the base actually draws.
 | `granny` | grey ponytail | — | wrinkles | shirt, long `skirt`, `stoop: 1` | `true` | — | arms down | `skirt` |
 | `grandpa` | side tufts, `backHair: 'low'` | — | wrinkles, glasses; moustache in `beard` | cardigan (plain coat), `stoop: 0.6` | `true` | — | arms down | `innerShirt` |
 | `clerk` | side parting | — | glasses | shirt, clipboard in the screen-left hand | `true` | — | screen-left forearm across | `buttons` |
+| `girl` | `kit.hair.pigtails` | — | — | `kit.outfits.dress`, `kit.bodies.child` | — | — | arms slightly out | — |
+| `boy` | `kit.hair.spiky` | — | — | `kit.outfits.hoodie`, `kit.bodies.child` | `true` | — | arms down | — |
+| `manager` | `kit.hair.sidePart` | — | — | `kit.outfits.suit`, `kit.bodies.tall` | `true` | — | arms down | `innerShirt`, `tie`, `buttons` |
 
 ## Removing, replacing or borrowing a part
 
@@ -193,6 +196,11 @@ drawing functions. Derived automatically when you do not set them: `brows` (from
 | `kit.outfits.plainCoat` | the same coat without the stethoscope |
 | `kit.outfits.tee` | plain round-neck T-shirt, short sleeves — everyday clothes |
 | `kit.outfits.shirt` | long-sleeved shirt with pointed collar, placket, buttons (`colors.buttons`) and a chest pocket |
+| `kit.outfits.dress` | one-piece dress: round-neck top with a waist seam plus a `skirt` in the top's colour (set `colors.skirt` for a two-tone dress, `colors.trousers` to the skin colour for bare legs) |
+| `kit.outfits.hoodie` | long-sleeved hoodie: hood behind the neck, drawstrings (`colors.drawstrings`), kangaroo pocket, hem band |
+| `kit.outfits.suit` | jacket with lapels over a shirt (`colors.innerShirt`) and tie (`colors.tie`, falls back to `accent`), two buttons (`colors.buttons`), pocket lines |
+| `kit.hair.<style>(options)` | **ready-made hair** — call it and put the result in `hair`: `hair: kit.hair.bob()`. Styles: `crop` · `sidePart({ side })` · `bob` · `long({ length: 0…1 })` · `ponytail({ side, tie })` · `bun({ size })` · `pigtails({ tie })` · `curly({ volume })` · `spiky` · `tufts` (use with `backHair: 'low'`) · `bald` (use with `backHair: 'none'`). `side` is `'left'` / `'right'` on screen; `tie` is a colour (default `colors.accent`). Colours come from `colors.hair` and `colors.hairHighlight` |
+| `kit.bodies.<preset>` | **body proportions** to spread: `child` · `teen` · `adult` · `tall` · `stocky`. Each also carries `hostScale` — the host height to use relative to an adult's when they share a scene (child 0.75, teen 0.84, tall 1.08); the rig ignores that key |
 | `kit.outlines.<same names>` | the bare torso outlines, if you only want the shape |
 | `kit.partsOf(id)` | another character's definition, to borrow parts from |
 | `kit.parts.roundGlasses(c, { x, y, r, color })` | round glasses for `faceExtras` |

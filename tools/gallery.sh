@@ -14,5 +14,5 @@ SRV=$!
 cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || true; exit $status; }
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/gallery.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
-"$CHROME_BIN" --headless=new --disable-gpu --window-size=1400,750 --virtual-time-budget=8000 --screenshot="$OUT" "http://127.0.0.1:$PORT/tools/gallery.html" >/dev/null 2>&1
+"$CHROME_BIN" --headless=new --disable-gpu --window-size=1400,1000 --virtual-time-budget=8000 --screenshot="$OUT" "http://127.0.0.1:$PORT/tools/gallery.html" >/dev/null 2>&1
 echo "$OUT"

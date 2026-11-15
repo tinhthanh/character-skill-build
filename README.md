@@ -3,7 +3,7 @@
 An agent skill for **building custom 2D characters** and **reusing them in
 [HyperFrames](https://github.com/heygen-com/hyperframes) videos**.
 
-![Ten people and five pets built with the rig](docs/characters.png)
+![Thirteen people and five pets built with the rig](docs/characters.png)
 
 Characters are 100% SVG, animated with GSAP. A character is a small JavaScript definition
 on top of a shared skeleton, so every new character can already wave, talk, point, sit,
@@ -12,8 +12,10 @@ actions (wag, bark, beg; meow, stretch, hiss…), five breeds and adjustable bod
 
 What a definition can say, beyond face, hair and colours:
 
-- **Clothes** — ready-made outfits (`scrubs`, `pawTunic`, `coat`, `plainCoat`, `tee`, `shirt`),
-  a `skirt` or apron that follows the legs, glasses, beards, wrinkles.
+- **Clothes** — ready-made outfits (`scrubs`, `pawTunic`, `coat`, `plainCoat`, `tee`, `shirt`,
+  `dress`, `hoodie`, `suit`), a `skirt` or apron that follows the legs, glasses, beards, wrinkles.
+- **Hair and build without drawing** — eleven ready-made hairstyles (`kit.hair.bob()`,
+  `ponytail`, `curly`, `spiky`…) and body presets (`kit.bodies.child`, `teen`, `tall`, `stocky`).
 - **Things in the hand** — `heldItemL` / `heldItemR` (cup, clipboard, phone, or your own SVG);
   the hand keeps its grip and one-handed gestures switch to the free hand.
 - **Posture** — `stoop` for a bent back, `backHair` for bald heads, one-armed rest poses.

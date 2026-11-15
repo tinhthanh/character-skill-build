@@ -1,4 +1,4 @@
-/* VGCharacter v0.7.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.8.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -411,6 +411,8 @@ class RigSVG {
     if (!m.luoi) m.luoi = tron(m.mieng, '#e8848f', 0.62);
     if (!m.rang) m.rang = '#fffaf4';
     if (!m.may) m.may = m.toc;
+    if (!m.phuKien) m.phuKien = '#d6453d';
+    if (!m.tocSang) m.tocSang = chinhSang(m.toc, 0.22);
     for (const [alias, key] of Object.entries(RigSVG.COLOR_ALIASES)) if (key in m && !(alias in m)) m[alias] = m[key];
     this.mau = this.nv.mau = m;
   }
@@ -711,7 +713,7 @@ class RigSVG {
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
     e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
     const napeTop = nv.backHair === 'low'
-      ? `M ${xN} ${hairline} L ${X(tai + 13)} ${hairline} Q ${X(tai + 10)} ${(hairline - 5) / 2} ${X(tai + 7)} -5`
+      ? `M ${xN} ${hairline} L ${X(tai + 6)} ${hairline} Q ${X(tai + 10)} ${(hairline + 2) / 2} ${X(tai + 1)} 3`
       : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
     e.tocGayP.setAttribute('d', k < 0.001 || nv.backHair === 'none' ? '' :
       `${napeTop} L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
@@ -2310,8 +2312,56 @@ const OUTFIT_SHIRT = {
       </g>`,
   phuKienTren: () => '',
 };
+const AO_DRESS = 'M -29 3 Q 0 8 29 3 L 29 -40 Q 29.5 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105'
+               + ' Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -29.5 -70 -29 -40 Z';
+const OUTFIT_DRESS = {
+  ...OUTFIT_TEE,
+  ao: () => AO_DRESS,
+  suon: suonTu([[35, -88], [29.5, -70], [29, -40], [29, 3]]),
+  skirt: { kind: 'skirt', length: 1.05, flare: 9 },
+  daiTayAo: 0.75, rongTayAo: 1.3,
+  phuKien: (p) => `
+      <g id="${p}-phuKien"></g>`,
+};
+const OUTFIT_HOODIE = {
+  ...PLAIN_BASE,
+  tayDai: true,
+  coAo: (p, m) => `
+        <path d="M -27 -93 Q -30 -112 0 -113 Q 30 -112 27 -93 Q 14 -84 0 -84 Q -14 -84 -27 -93 Z" fill="${m.aoToi}" stroke="${m.vienNet}" stroke-width="1.100" stroke-linejoin="round"/>
+        ${vaiCo(m)}
+        <path d="M -11 -103 Q 0 -86 11 -103 Z" fill="${m.da}"/>
+        <path d="M -13 -104 Q 0 -84 13 -104" stroke="${m.ao}" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M -5 -88 V -64 M 5 -88 V -66" stroke="${m.day || '#f4f6f8'}" stroke-width="1.800" stroke-linecap="round"/>
+        <path d="M -19 -22 H 19 L 24 6 H -24 Z" fill="none" stroke="${m.aoToi}" stroke-width="1.500" stroke-linejoin="round"/>
+        <path d="M -30 11 Q 0 17 30 11" stroke="${m.aoToi}" stroke-width="2.600" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
+const AO_SUIT = 'M -32 27 Q 0 32 32 27 Q 30 0 27 -42 Q 28 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105'
+              + ' Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -28 -70 -27 -42 Q -30 0 -32 27 Z';
+const OUTFIT_SUIT = {
+  ...DO_BL,
+  ao: () => AO_SUIT,
+  suon: suonTu([[35, -88], [28, -70], [27, -42], [30, 0], [32, 27]]),
+  damSuon: 0.45,
+  coAo: (p, m) => `${DO_BL.coAo(p, m)}
+        <path d="M -3 -99 H 3 L 4.500 -92 L 0 -72 L -4.500 -92 Z" fill="${m.caVat || m.phuKien || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800" stroke-linejoin="round"/>
+        <path d="M -3.500 -103 H 3.500 L 3 -98 H -3 Z" fill="${m.caVat || m.phuKien || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800" stroke-linejoin="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M 0 -67 V 29" stroke="${m.vienNet}" stroke-width="1.200"/>
+        ${[-44, -24].map((y) => `<circle cx="3.600" cy="${y}" r="2" fill="${m.cuc || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800"/>`).join('')}
+        <path d="M 10 -62 h 12" stroke="${m.vienNet}" stroke-width="1.300" stroke-linecap="round"/>
+        ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
+        <path d="M ${g * 10} 2 H ${g * 26}" stroke="${m.vienNet}" stroke-width="1.300" stroke-linecap="round"/>`; }).join('')}
+      </g>`,
+  phuKienTren: () => '',
+};
 const KIT = {
-  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT },
+  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT,
+          dress: OUTFIT_DRESS, hoodie: OUTFIT_HOODIE, suit: OUTFIT_SUIT },
   AO: { doMo: AO_MO, aoDauChan: AO_DD, aoBlouse: AO_BL },
   suonTu, vaiCo, giayKin, theTen, dauChan, ongNgheVatCo,
 };
@@ -2490,6 +2540,105 @@ function createProp(host, kind, options = {}) {
 }
 return { PROP_FRAME, PROP_KINDS, createProp };
 })();
+__m['runtime/bodies.js'] = (function () {
+const child = {
+  headSize: 1.62, neckDrop: 15, torsoScale: 0.8, legScale: 0.5,
+  upperArmLength: 0.8, forearmLength: 0.62, armThickness: 0.9, handSize: 0.92,
+  thighLength: 1.15, shinLength: 1.1, legThickness: 1.1, legGap: 12, footSize: 0.95,
+  hostScale: 0.75,
+};
+const teen = {
+  headSize: 1.46, neckDrop: 10, torsoScale: 0.88, legScale: 0.64,
+  upperArmLength: 0.98, forearmLength: 0.7, armThickness: 0.7, handSize: 0.95,
+  thighLength: 1.3, shinLength: 1.22, legThickness: 0.92, legGap: 13, footSize: 1,
+  hostScale: 0.84,
+};
+const adult = {
+  headSize: 1.37, neckDrop: 9, torsoScale: 0.94, legScale: 0.68,
+  upperArmLength: 1.09, forearmLength: 0.7, armThickness: 0.68, handSize: 0.95,
+  thighLength: 1.4, shinLength: 1.25, legThickness: 1, legGap: 14, footSize: 1,
+  hostScale: 1,
+};
+const tall = {
+  headSize: 1.2, neckDrop: 5, torsoScale: 0.96, legScale: 0.86,
+  upperArmLength: 1.08, forearmLength: 0.84, armThickness: 0.72, handSize: 0.95,
+  thighLength: 1.3, shinLength: 1.25, legThickness: 0.95, legGap: 14, footSize: 1,
+  hostScale: 1.08,
+};
+const stocky = {
+  headSize: 1.34, neckDrop: 15, torsoScale: 1.08, legScale: 0.64,
+  upperArmLength: 1.0, forearmLength: 0.7, armThickness: 1.05, handSize: 1.08,
+  thighLength: 1.3, shinLength: 1.2, legThickness: 1.4, legGap: 17, footSize: 1.1,
+  hostScale: 1,
+};
+return { child, teen, adult, tall, stocky };
+})();
+__m['runtime/hair.js'] = (function () {
+const shine = (c, d, width = 3, opacity = 0.7) =>
+  (c.hairHighlight ? `<path d="${d}" stroke="${c.hairHighlight}" stroke-width="${width}" fill="none" stroke-linecap="round" opacity="${opacity}"/>` : '');
+const group = (p, c, body, mirror = false) => `
+              <g id="${p}-hair-front" fill="${c.hair}"${mirror ? ' transform="scale(-1 1)"' : ''}>${body}
+              </g>`;
+const tieColor = (c, tie) => tie || c.accent || c.hairHighlight || c.hair;
+const crop = () => (p, c) => group(p, c, `
+                <path d="M -51 2 Q -55 -40 -20 -56 Q 16 -68 42 -46 Q 54 -34 51 2 Q 45 -24 22 -33 Q 2 -39 -16 -31 Q -36 -22 -51 2 Z"/>
+                <path d="M -50 0 Q -52 12 -47 22 Q -42 10 -43 -6 Z"/>
+                <path d="M 50 0 Q 52 12 47 22 Q 42 10 43 -6 Z"/>
+                ${shine(c, 'M -30 -46 Q -6 -56 16 -50')}${shine(c, 'M 24 -42 Q 38 -36 45 -26', 2.2, 0.6)}`);
+const sidePart = ({ side = 'left' } = {}) => (p, c) => group(p, c, `
+                <path d="M -50 18 Q -58 -32 -24 -58 Q 4 -72 30 -56 Q 58 -34 50 18 Q 48 -10 43 -22 Q 30 -40 4 -36 Q -22 -30 -40 -14 Q -47 -2 -50 18 Z"/>
+                ${shine(c, 'M -22 -52 Q 4 -60 24 -50')}${shine(c, 'M -44 -8 Q -40 -26 -26 -38', 2.4, 0.55)}`, side === 'right');
+const bob = () => (p, c) => group(p, c, `
+                <path d="M -53 31 Q -64 -34 -28 -61 Q 0 -75 28 -61 Q 64 -34 53 31 Q 45 36 40 27 Q 46 -8 31 -25 Q 12 -39 -4 -33 Q -29 -30 -40 -14 Q -45 6 -40 27 Q -45 36 -53 31 Z"/>
+                ${shine(c, 'M -28 -52 Q -4 -63 20 -54', 3.2, 0.8)}${shine(c, 'M -48 4 Q -50 -18 -38 -36', 2.4, 0.6)}`);
+const long = ({ length = 0.5 } = {}) => (p, c) => {
+  const end = 62 + Math.max(0, Math.min(1, length)) * 44;
+  return group(p, c, `
+                <path d="M -55 ${end} Q -72 -30 -30 -62 Q 0 -77 30 -62 Q 72 -30 55 ${end} Q 45 ${end + 5} 37 ${end - 6} Q 47 20 43 -6 Q 36 -26 14 -34 Q -6 -38 -20 -30 Q -40 -22 -43 -4 Q -47 22 -37 ${end - 6} Q -45 ${end + 5} -55 ${end} Z"/>
+                ${shine(c, 'M -28 -53 Q -2 -65 22 -55', 3.2, 0.8)}${shine(c, 'M -52 30 Q -58 -6 -44 -34', 2.4, 0.55)}${shine(c, 'M 52 34 Q 56 6 48 -18', 2.2, 0.45)}`);
+};
+const ponytail = ({ side = 'left', tie = null } = {}) => (p, c) => group(p, c, `
+                <g id="${p}-hair-bun">
+                  <path d="M -34 -40 Q -68 -26 -76 6 Q -82 40 -64 58 Q -52 42 -58 16 Q -60 -8 -30 -20 Z"/>
+                  ${shine(c, 'M -46 -26 Q -60 -18 -63 0', 2.6, 0.5)}
+                </g>
+                <path d="M -50 22 Q -60 -30 -26 -58 Q 0 -74 26 -58 Q 60 -30 50 22 Q 47 -6 41 -18 Q 22 -38 2 -32 Q -20 -38 -41 -18 Q -47 -6 -50 22 Z"/>
+                ${shine(c, 'M -30 -50 Q -6 -62 18 -52', 3.2, 0.8)}${shine(c, 'M -46 -14 Q -44 -32 -32 -44', 2.4, 0.6)}
+                <circle cx="-40" cy="-32" r="5" fill="${tieColor(c, tie)}"/>`, side === 'right');
+const bun = ({ size = 1 } = {}) => (p, c) => group(p, c, `
+                <g id="${p}-hair-bun">
+                  <ellipse cx="2" cy="${-58 - 18 * size}" rx="${26 * size}" ry="${19 * size}"/>
+                  ${shine(c, `M ${-14 * size} ${-58 - 30 * size} Q -2 ${-58 - 38 * size} ${14 * size} ${-58 - 32 * size}`, 3.4, 0.9)}
+                </g>
+                <path d="M -50 34 Q -66 -28 -32 -68 Q 0 -84 32 -68 Q 66 -28 50 34 Q 50 22 47 8 Q 48 -34 0 -42 Q -48 -34 -47 8 Q -50 22 -50 34 Z"/>
+                ${shine(c, 'M -42 -44 Q -28 -60 -8 -62', 3.6, 0.9)}${shine(c, 'M 16 -62 Q 34 -56 42 -44', 2.8, 0.7)}`);
+const pigtails = ({ tie = null } = {}) => (p, c) => group(p, c, `
+                <path d="M -50 -8 Q -74 -4 -72 26 Q -70 46 -58 52 Q -50 34 -52 14 Z"/>
+                <path d="M 50 -8 Q 74 -4 72 26 Q 70 46 58 52 Q 50 34 52 14 Z"/>
+                <path d="M -50 20 Q -60 -30 -26 -58 Q 0 -74 26 -58 Q 60 -30 50 20 Q 47 -8 40 -20 Q 22 -34 0 -44 Q -22 -34 -40 -20 Q -47 -8 -50 20 Z"/>
+                ${shine(c, 'M -30 -50 Q -14 -60 -2 -60', 3, 0.8)}${shine(c, 'M 8 -60 Q 24 -56 34 -46', 2.6, 0.6)}
+                <circle cx="-52" cy="-4" r="4.500" fill="${tieColor(c, tie)}"/><circle cx="52" cy="-4" r="4.500" fill="${tieColor(c, tie)}"/>`);
+const curly = ({ volume = 1 } = {}) => (p, c) => {
+  const r = 15 * volume, curls = [];
+  for (let i = 0; i <= 8; i++) {
+    const a = Math.PI * (1.08 - i * 0.145);
+    curls.push(`<circle cx="${(52 * Math.cos(a)).toFixed(1)}" cy="${(-12 - 46 * Math.sin(a)).toFixed(1)}" r="${(r + (i % 2) * 1.5).toFixed(1)}"/>`);
+  }
+  for (let i = 0; i < 5; i++) curls.push(`<circle cx="${-32 + i * 16}" cy="${-34 - (i % 2) * 3}" r="${(10 * volume).toFixed(1)}"/>`);
+  return group(p, c, `
+                <path d="M -50 -4 Q -56 -54 0 -62 Q 56 -54 50 -4 Q 32 -32 0 -32 Q -32 -32 -50 -4 Z"/>
+                ${curls.join('')}
+                ${shine(c, 'M -30 -62 Q -22 -70 -12 -66', 2.6, 0.6)}${shine(c, 'M 6 -68 Q 16 -74 26 -66', 2.6, 0.6)}${shine(c, 'M -52 -28 Q -50 -38 -42 -42', 2.4, 0.5)}`);
+};
+const spiky = () => (p, c) => group(p, c, `
+                <path d="M -50 0 Q -55 -28 -45 -44 L -43 -62 L -30 -54 L -22 -73 L -9 -59 L 2 -78 L 12 -59 L 25 -71 L 31 -54 L 44 -61 L 45 -43 Q 55 -28 50 0 Q 45 -22 28 -30 Q 8 -36 -12 -30 Q -34 -24 -50 0 Z"/>
+                ${shine(c, 'M -20 -62 L -14 -50', 2.6, 0.6)}${shine(c, 'M 4 -66 L 8 -52', 2.6, 0.6)}${shine(c, 'M 26 -60 L 28 -48', 2.4, 0.5)}`);
+const tufts = () => (p, c) => group(p, c, `
+                <path d="M -50 -22 Q -60 -12 -58 6 Q -57 18 -50 22 Q -46 6 -47 -8 Q -46 -18 -50 -22 Z"/>
+                <path d="M 50 -22 Q 60 -12 58 6 Q 57 18 50 22 Q 46 6 47 -8 Q 46 -18 50 -22 Z"/>`);
+const bald = () => (p, c) => group(p, c, '');
+return { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald };
+})();
 __m['runtime/parts.js'] = (function () {
 function roundGlasses(c, { x = 20, y = 2, r = 12, color = null, width = 2.4 } = {}) {
   const stroke = color || c.accent || c.lineStroke;
@@ -2592,7 +2741,7 @@ const COLOR_KEYS = {
   iris: 'mat', lips: 'mieng', cheeks: 'ma', accent: 'phuKien',
   outline: 'vien', lineStroke: 'vienNet', brows: 'may', mouthInside: 'miengToi', tongue: 'luoi', teeth: 'rang',
   hat: 'mu', hatHighlight: 'muSang', innerShirt: 'aoTrong', stethoscope: 'ongNghe',
-  buttons: 'cuc',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
+  buttons: 'cuc', tie: 'caVat', drawstrings: 'day',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
   collar: 'vongCo', tag: 'the', earInner: 'taiTrong',
 };
@@ -2861,13 +3010,82 @@ const __default = {
 };
 return { default: __default };
 })();
+__m['characters/girl.js'] = (function () {
+const __default = {
+  id: 'girl',
+  base: 'nurse',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.dress,
+    ...kit.bodies.child,
+    name: 'Girl',
+    hair: kit.hair.pigtails(),
+    colors: {
+      ...base.colors,
+      hair: '#4a2f22', hairHighlight: '#7a5038',
+      top: '#f2b53c', topShadow: '#d29722', lineStroke: '#8a6212',
+      trousers: base.colors.skin, shoes: '#f4f4f2', accent: '#d6457a',
+    },
+    restPose: { ...base.restPose, smile: 1, mouthOpen: 0.3 },
+  }),
+};
+return { default: __default };
+})();
+__m['characters/boy.js'] = (function () {
+const __default = {
+  id: 'boy',
+  base: 'surgeon',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.hoodie,
+    ...kit.bodies.child,
+    name: 'Boy',
+    hat: () => '',
+    hair: kit.hair.spiky(),
+    colors: {
+      ...base.colors,
+      hair: '#3a2a22', hairHighlight: '#6a5040',
+      top: '#58a66a', topShadow: '#3f8452', lineStroke: '#2a5a38',
+      trousers: '#39445a', shoes: '#f4f4f2',
+    },
+    restPose: { upperArmL: 9, upperArmR: 9, forearmL: -10, forearmR: -10, smile: 0.9, mouthOpen: 0.2 },
+  }),
+};
+return { default: __default };
+})();
+__m['characters/manager.js'] = (function () {
+const __default = {
+  id: 'manager',
+  base: 'doctor',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.suit,
+    ...kit.bodies.tall,
+    name: 'Manager',
+    faceExtras: () => '',
+    hair: kit.hair.sidePart(),
+    colors: {
+      ...base.colors,
+      hair: '#2c2a33', hairHighlight: '#55505e',
+      top: '#39445a', topShadow: '#2a3346', lineStroke: '#151b27',
+      innerShirt: '#f4f6f8', tie: '#b23a3a', buttons: '#1d2331',
+      trousers: '#39445a', shoes: '#1b2029',
+    },
+    restPose: { upperArmL: 10, upperArmR: 10, forearmL: -13, forearmR: -13, smile: 0.6 },
+  }),
+};
+return { default: __default };
+})();
 __m['characters/index.js'] = (function () {
 const receptionist = __m['characters/receptionist.js'].default;
 const barista = __m['characters/barista.js'].default;
 const granny = __m['characters/granny.js'].default;
 const grandpa = __m['characters/grandpa.js'].default;
 const clerk = __m['characters/clerk.js'].default;
-const __default = [receptionist, barista, granny, grandpa, clerk];
+const girl = __m['characters/girl.js'].default;
+const boy = __m['characters/boy.js'].default;
+const manager = __m['characters/manager.js'].default;
+const __default = [receptionist, barista, granny, grandpa, clerk, girl, boy, manager];
 return { default: __default };
 })();
 __m['runtime/index.js'] = (function () {
@@ -2875,10 +3093,12 @@ const { RigSVG } = __m['runtime/rig-svg.js'];
 const { RigThu } = __m['runtime/rig-thu.js'];
 const { dangKyDau, KIT } = __m['runtime/characters.js'];
 const { createProp, PROP_KINDS } = __m['runtime/props.js'];
+const { child, teen, adult, tall, stocky } = __m['runtime/bodies.js'];
+const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald } = __m['runtime/hair.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.7.1';
+const VERSION = '0.8.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -2906,10 +3126,13 @@ Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DON
 const publicOutfit = (outfit) => definitionToPublic(outfit);
 const kit = {
   outfits: { scrubs: publicOutfit(KIT.boDo.doMo), pawTunic: publicOutfit(KIT.boDo.aoDauChan), coat: publicOutfit(KIT.boDo.aoBlouse),
-             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt) },
+             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt),
+             dress: publicOutfit(KIT.boDo.dress), hoodie: publicOutfit(KIT.boDo.hoodie), suit: publicOutfit(KIT.boDo.suit) },
   outlines: { scrubs: KIT.AO.doMo, pawTunic: KIT.AO.aoDauChan, coat: KIT.AO.aoBlouse },
   sideShading: KIT.suonTu, shoulderPatches: KIT.vaiCo, closedShoes: KIT.giayKin,
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
+  bodies: { child, teen, adult, tall, stocky },
+  hair: { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald },
   parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone },
   partsOf(id) {
     if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
@@ -2982,7 +3205,8 @@ function registerCharacter({ id, base = 'vet', define }) {
   }
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
+    const known = Object.values(COLOR_KEYS).includes(definition.mauSoSau);
+    if (!known && definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }

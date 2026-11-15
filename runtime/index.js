@@ -14,12 +14,14 @@ import { RigSVG } from './rig-svg.js';
 import { RigThu } from './rig-thu.js';
 import { dangKyDau, KIT } from './characters.js';
 import { createProp, PROP_KINDS } from './props.js';
+import { child, teen, adult, tall, stocky } from './bodies.js';
+import { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald } from './hair.js';
 import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.7.1';
+export const VERSION = '0.8.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -63,15 +65,20 @@ const publicOutfit = (outfit) => definitionToPublic(outfit);
  * BỘ ĐỒ NGHỀ đưa cho hàm `define` của nhân vật tuỳ chỉnh (tham số thứ hai).
  *   outfits   các bộ trang phục dựng sẵn — trải vào định nghĩa rồi ghi đè chi tiết
  *   outlines  đường bao thân áo của ba bộ ấy, nếu chỉ cần hình dáng
+ *   hair      kiểu tóc dựng sẵn — `hair: kit.hair.bob()`
+ *   bodies    bộ số tỉ lệ dáng người — trải vào định nghĩa
  *   parts     kính, râu, ria, nếp nhăn, yếm tạp dề và đồ vật cầm tay vẽ sẵn
  *   partsOf   lấy định nghĩa của một nhân vật KHÁC để mượn bộ phận: partsOf('doctor').faceExtras
  */
 export const kit = {
   outfits: { scrubs: publicOutfit(KIT.boDo.doMo), pawTunic: publicOutfit(KIT.boDo.aoDauChan), coat: publicOutfit(KIT.boDo.aoBlouse),
-             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt) },
+             plainCoat: publicOutfit(KIT.boDo.plainCoat), tee: publicOutfit(KIT.boDo.tee), shirt: publicOutfit(KIT.boDo.shirt),
+             dress: publicOutfit(KIT.boDo.dress), hoodie: publicOutfit(KIT.boDo.hoodie), suit: publicOutfit(KIT.boDo.suit) },
   outlines: { scrubs: KIT.AO.doMo, pawTunic: KIT.AO.aoDauChan, coat: KIT.AO.aoBlouse },
   sideShading: KIT.suonTu, shoulderPatches: KIT.vaiCo, closedShoes: KIT.giayKin,
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
+  bodies: { child, teen, adult, tall, stocky },
+  hair: { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald },
   parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone },
   partsOf(id) {
     if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
@@ -172,7 +179,10 @@ export function registerCharacter({ id, base = 'vet', define }) {
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
     // Base `default` có bảng màu rỗng (dùng bảng mặc định của rig) — khi ấy không có gì để đối chiếu.
-    if (definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
+    // Tên màu LẠ thì báo lỗi. Tên màu hợp lệ nhưng nhân vật không khai (trải `kit.outfits.scrubs` —
+    // vốn trỏ tới màu mũ — lên một nhân vật không đội mũ) thì cho qua: rig tự lấy màu tóc.
+    const known = Object.values(COLOR_KEYS).includes(definition.mauSoSau);
+    if (!known && definition.mau && Object.keys(definition.mau).length && !(definition.mauSoSau in definition.mau)) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }

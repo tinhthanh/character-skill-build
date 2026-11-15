@@ -743,6 +743,10 @@ export class RigSVG {
     if (!m.luoi) m.luoi = tron(m.mieng, '#e8848f', 0.62);
     if (!m.rang) m.rang = '#fffaf4';
     if (!m.may) m.may = m.toc;
+    // Hai màu mà bộ trang phục và kiểu tóc dựng sẵn đọc nhưng nhân vật `default` không khai: màu
+    // nhấn (dây buộc tóc, thẻ tên, cà vạt) và vệt sáng trên tóc. Thiếu là ra `fill="undefined"`.
+    if (!m.phuKien) m.phuKien = '#d6453d';
+    if (!m.tocSang) m.tocSang = chinhSang(m.toc, 0.22);
     // Bí danh CÔNG KHAI (tiếng Anh) cho từng màu, để hàm vẽ của nhân vật tuỳ chỉnh đọc
     // được `c.hair`, `c.top`… Bảng bí danh do `index.js` nạp vào; rig không tự biết nó.
     for (const [alias, key] of Object.entries(RigSVG.COLOR_ALIASES)) if (key in m && !(alias in m)) m[alias] = m[key];
@@ -1160,7 +1164,9 @@ export class RigSVG {
     e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
     // Mép trên của mảng tóc gáy: đỉnh đầu (tóc đủ), hoặc đường chân tóc (hói đỉnh); trọc thì không vẽ.
     const napeTop = nv.backHair === 'low'
-      ? `M ${xN} ${hairline} L ${X(tai + 13)} ${hairline} Q ${X(tai + 10)} ${(hairline - 5) / 2} ${X(tai + 7)} -5`
+      // Hói đỉnh: mép trước là MỘT đường cong tròn từ chân tóc xuống sau tai — không có mũi tóc mai
+      // nhọn như tóc đủ (mũi nhọn cộng với mép trên phẳng trông thành hình ngôi sao sau đầu).
+      ? `M ${xN} ${hairline} L ${X(tai + 6)} ${hairline} Q ${X(tai + 10)} ${(hairline + 2) / 2} ${X(tai + 1)} 3`
       : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
     e.tocGayP.setAttribute('d', k < 0.001 || nv.backHair === 'none' ? '' :
       `${napeTop} L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);

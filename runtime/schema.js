@@ -48,7 +48,7 @@ export const COLOR_KEYS = {
   iris: 'mat', lips: 'mieng', cheeks: 'ma', accent: 'phuKien',
   outline: 'vien', lineStroke: 'vienNet', brows: 'may', mouthInside: 'miengToi', tongue: 'luoi', teeth: 'rang',
   hat: 'mu', hatHighlight: 'muSang', innerShirt: 'aoTrong', stethoscope: 'ongNghe',
-  buttons: 'cuc',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
+  buttons: 'cuc', tie: 'caVat', drawstrings: 'day',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   // thú
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
   collar: 'vongCo', tag: 'the', earInner: 'taiTrong',

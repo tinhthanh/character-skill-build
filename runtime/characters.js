@@ -215,8 +215,62 @@ const OUTFIT_SHIRT = {
       </g>`,
   phuKienTren: () => '',
 };
+// Váy liền: thân áo thun cổ tròn, có đường eo, liền với chân váy (lớp `skirt` của rig — màu
+// `skirt` không khai thì theo màu áo nên ra một chiếc váy liền một màu).
+// Thân áo dừng ở EO (gấu y +3) chứ không xuống hông: chân váy vẽ dưới thân áo, nên gấu áo dài
+// sẽ in một khung chữ nhật lên chân váy như cái túi. Dừng ở eo thì mép ấy thành đường eo.
+const AO_DRESS = 'M -29 3 Q 0 8 29 3 L 29 -40 Q 29.5 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105'
+               + ' Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -29.5 -70 -29 -40 Z';
+const OUTFIT_DRESS = {
+  ...OUTFIT_TEE,
+  ao: () => AO_DRESS,
+  suon: suonTu([[35, -88], [29.5, -70], [29, -40], [29, 3]]),
+  skirt: { kind: 'skirt', length: 1.05, flare: 9 },
+  daiTayAo: 0.75, rongTayAo: 1.3,
+  phuKien: (p) => `
+      <g id="${p}-phuKien"></g>`,
+};
+// Hoodie: tay dài, mũ trùm nằm sau cổ, hai dây rút, túi kangaroo, bo gấu.
+const OUTFIT_HOODIE = {
+  ...PLAIN_BASE,
+  tayDai: true,
+  coAo: (p, m) => `
+        <path d="M -27 -93 Q -30 -112 0 -113 Q 30 -112 27 -93 Q 14 -84 0 -84 Q -14 -84 -27 -93 Z" fill="${m.aoToi}" stroke="${m.vienNet}" stroke-width="1.100" stroke-linejoin="round"/>
+        ${vaiCo(m)}
+        <path d="M -11 -103 Q 0 -86 11 -103 Z" fill="${m.da}"/>
+        <path d="M -13 -104 Q 0 -84 13 -104" stroke="${m.ao}" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M -5 -88 V -64 M 5 -88 V -66" stroke="${m.day || '#f4f6f8'}" stroke-width="1.800" stroke-linecap="round"/>
+        <path d="M -19 -22 H 19 L 24 6 H -24 Z" fill="none" stroke="${m.aoToi}" stroke-width="1.500" stroke-linejoin="round"/>
+        <path d="M -30 11 Q 0 17 30 11" stroke="${m.aoToi}" stroke-width="2.600" fill="none"/>
+      </g>`,
+  phuKienTren: () => '',
+};
+// Vest (áo khoác âu): dài quá hông một chút, ve áo, sơ mi và cà vạt, hai cúc, túi ngực.
+const AO_SUIT = 'M -32 27 Q 0 32 32 27 Q 30 0 27 -42 Q 28 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105'
+              + ' Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -28 -70 -27 -42 Q -30 0 -32 27 Z';
+const OUTFIT_SUIT = {
+  ...DO_BL,
+  ao: () => AO_SUIT,
+  suon: suonTu([[35, -88], [28, -70], [27, -42], [30, 0], [32, 27]]),
+  damSuon: 0.45,
+  coAo: (p, m) => `${DO_BL.coAo(p, m)}
+        <path d="M -3 -99 H 3 L 4.500 -92 L 0 -72 L -4.500 -92 Z" fill="${m.caVat || m.phuKien || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800" stroke-linejoin="round"/>
+        <path d="M -3.500 -103 H 3.500 L 3 -98 H -3 Z" fill="${m.caVat || m.phuKien || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800" stroke-linejoin="round"/>`,
+  phuKien: (p, m) => `
+      <g id="${p}-phuKien">
+        <path d="M 0 -67 V 29" stroke="${m.vienNet}" stroke-width="1.200"/>
+        ${[-44, -24].map((y) => `<circle cx="3.600" cy="${y}" r="2" fill="${m.cuc || m.aoToi}" stroke="${m.vienNet}" stroke-width="0.800"/>`).join('')}
+        <path d="M 10 -62 h 12" stroke="${m.vienNet}" stroke-width="1.300" stroke-linecap="round"/>
+        ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
+        <path d="M ${g * 10} 2 H ${g * 26}" stroke="${m.vienNet}" stroke-width="1.300" stroke-linecap="round"/>`; }).join('')}
+      </g>`,
+  phuKienTren: () => '',
+};
 export const KIT = {
-  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT },
+  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN, tee: OUTFIT_TEE, shirt: OUTFIT_SHIRT,
+          dress: OUTFIT_DRESS, hoodie: OUTFIT_HOODIE, suit: OUTFIT_SUIT },
   AO: { doMo: AO_MO, aoDauChan: AO_DD, aoBlouse: AO_BL },
   suonTu, vaiCo, giayKin, theTen, dauChan, ongNgheVatCo,
 };

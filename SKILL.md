@@ -19,7 +19,7 @@ Vietnamese.
 
 | Kind | Built in | Customisable |
 |---|---|---|
-| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`; samples `receptionist`, `barista`, `granny`, `grandpa`, `clerk` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
+| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`; samples `receptionist`, `barista`, `granny`, `grandpa`, `clerk`, `girl`, `boy`, `manager` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
 | Pets | `dog`, `shiba`, `cat`, `orange_cat`, `black_cat` | body shape (seven dials) and colours |
 
 To see them: `python3 tools/serve.py` then open `http://127.0.0.1:8300/studio/`.
@@ -41,15 +41,20 @@ still break mid-action, and some failures are silent (see [Pitfalls](#pitfalls))
    | `doctor` | woman with glasses, long-sleeved white coat with lapels |
    | `default` | plain adult proportions, T-shirt, no outline |
 
-   No base has to match exactly: take the head you want as `base`, spread an outfit from
-   `kit.outfits`, and borrow single parts from other characters with `kit.partsOf(id)`.
+   No base has to match exactly: take the head you want as `base`, then assemble from the
+   kit before drawing anything yourself — an outfit from `kit.outfits` (`scrubs`, `pawTunic`,
+   `coat`, `plainCoat`, `tee`, `shirt`, `dress`, `hoodie`, `suit`), hair from `kit.hair`
+   (`hair: kit.hair.bob()`; eleven styles), proportions from `kit.bodies` (`child`, `teen`,
+   `adult`, `tall`, `stocky`), single parts from other characters with `kit.partsOf(id)`.
+   Draw your own SVG only for what the kit does not have.
 3. **Write the definition.** `cp characters/_template.js characters/<id>.js`, edit, then add
    it to the array in `characters/index.js`. Override only what changes. Read
    [references/slots.md](references/slots.md) **before** drawing any SVG: it has the
    coordinate systems, the element ids the rig requires, what each base already carries and
    how to remove it. `sh tools/describe.sh <base>` prints a base's current numbers and
    colours. `characters/receptionist.js` is a complete worked example; `barista.js`, `granny.js`,
-   `grandpa.js` and `clerk.js` show aprons, skirts, age cues and held items.
+   `grandpa.js` and `clerk.js` show aprons, skirts, age cues and held items; `girl.js`, `boy.js`
+   and `manager.js` are built from kit presets alone (hair, outfit, body) with no SVG at all.
 4. **Run the automated check.** `sh tools/check.sh` rebuilds the bundle and runs every
    action of every character in headless Chrome. It must print `PASS`. It catches thrown
    errors, `NaN` attributes, duplicate ids, missing required elements, actions that do not
@@ -176,7 +181,7 @@ and non-hex colours. These still fail without an error:
 SKILL.md              this file
 runtime/              the library (ES modules): index.js (public API), schema.js (public ↔ internal
                       names), parts.js, characters.js, rig-svg.js (people), rig-thu.js (pets)
-characters/           custom characters: _template.js, samples (receptionist, barista, granny, grandpa, clerk), index.js (registry)
+characters/           custom characters: _template.js, samples (receptionist, barista, granny, grandpa, clerk, girl, boy, manager), index.js (registry)
 configs/              per-character tuned numbers written by the studio (<id>.json), baked into dist
 dist/                 character.iife.js (commented) · character.slim.js (use this one) — generated
 studio/               visual editor (Vietnamese UI)
