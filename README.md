@@ -143,7 +143,7 @@ itself) uses Node.
 
 Skill hướng dẫn AI agent **tạo nhân vật 2D tuỳ chỉnh** (SVG thuần, GSAP điều khiển) và
 **dùng lại nhân vật trong video HyperFrames**. Mỗi nhân vật là một tệp định nghĩa nhỏ trong
-`characters/`, thừa hưởng bộ xương, 23 động tác và 5 động tác thế đứng có sẵn. Kèm chó, mèo (năm giống) với bộ
+`characters/`, thừa hưởng bộ xương, 27 động tác và 5 động tác thế đứng có sẵn. Kèm chó, mèo (năm giống) với bộ
 động tác riêng và hình dáng chỉnh được.
 
 Nhân vật mặc được váy / tạp dề, cầm đồ vật (cốc, bìa hồ sơ, điện thoại), có dáng còng; trong

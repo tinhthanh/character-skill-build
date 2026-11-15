@@ -41,6 +41,8 @@ Scene file (every key except `characters` and `script` is optional):
                `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
                true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
+               `holds`: "cup" | "clipboard" | "phone" (right hand), or { "L": "cup" } — gives a person that item
+               to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). `shot`: "face" | "wide" | false | ["vet", "bella"]
@@ -100,7 +102,7 @@ def known(where, given, allowed):
 
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit')
 SHOW_KEYS = ('title', 'bullets', 'image')
@@ -306,6 +308,15 @@ def main():
         if not who.get('enter'): who.pop('enter', None)
         if late.get(name) is True: late[name] = nearer
         if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
+        # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
+        if 'holds' in who or 'holdsHidden' in who:
+            if pet: fail(f'character "{name}": a pet cannot hold an item')
+            held = who.get('holds')
+            if isinstance(held, str): held = {'R': held}
+            if not isinstance(held, dict) or not held or any(side not in ('L', 'R') or item not in ('cup', 'clipboard', 'phone') for side, item in held.items()):
+                fail(f'character "{name}": "holds" must be "cup", "clipboard" or "phone", or an object such as {{"L": "cup"}} — got {js(who.get("holds"))}')
+            if who.get('holdsHidden') not in (None, False, True): fail(f'character "{name}": "holdsHidden" must be true or false')
+            who['holds'] = held
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
         frame = PET if pet else PERSON
@@ -629,7 +640,7 @@ def main():
         body.append(f'  <audio id="music" class="clip" src="{os.path.basename(music)}" data-role="music" data-start="0" data-duration="__TOTAL__" data-track-index="{track[0]}" data-volume="{float(scene.get("musicVolume", 0.15)):g}"></audio>')
         track[0] += 1
     for who in names.values():
-        make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])} }})"
+        make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])}" + (f", items: {js(who['holds'])}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back')}

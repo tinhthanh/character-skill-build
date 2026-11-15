@@ -39,7 +39,10 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   shows every character. `x` is where the character
   **stands** (its centre, px from the left); `height` the host height in px. `enter:
   "left" | "right" | true` walks it in from outside the frame to `x` (`true` = the nearer edge); `seated: true | "chair" |
-  "stool"` starts it seated (and draws the seat); `faces` names who it looks at.
+  "stool"` starts it seated (and draws the seat); `faces` names who it looks at. `holds: "cup"`
+  (or `"clipboard"`, `"phone"`, or `{ "L": "cup" }` for the left hand) gives a person that item;
+  `"holdsHidden": true` keeps it put away, so it can be received mid-scene:
+  `{ "together": [ { "who": "barista", "do": [["handOver", "@granny"]] }, { "who": "granny", "do": [["take", "@barista"]] } ] }`.
 - `script` — turns, in order. `say` speaks: with `audio` it lip-syncs to the file (cues are
   made for you, the `<audio>` clip is added and timed), without it the mouth is estimated
   over `dur` seconds. `do` is a list of `sequence()` steps; `"@name"` inside a step refers to

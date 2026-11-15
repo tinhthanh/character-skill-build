@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.32.0';
+export const VERSION = '0.33.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -55,7 +55,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 
 /* ─────────────────────────────────────────────────────────────── bộ đồ nghề */
@@ -238,12 +238,17 @@ export function applyConfig(rig, config) {
   return rig;
 }
 
+// Món đồ có sẵn để cho nhân vật cầm bằng tên: createCharacter(host, { id, items: { R: 'cup' } }).
+const ITEMS = { cup, clipboard, phone };
+
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.
- *   id      id nhân vật ('vet' mặc định); `list()` liệt kê
- *   config  object bộ số. Bỏ trống → dùng bộ số đã nướng vào bản dựng (nếu có); `null` → không dùng
+ *   id           id nhân vật ('vet' mặc định); `list()` liệt kê
+ *   config       object bộ số. Bỏ trống → dùng bộ số đã nướng vào bản dựng (nếu có); `null` → không dùng
+ *   items        { L | R: 'cup' | 'clipboard' | 'phone' | (p, colours) => svg } — cho nhân vật cầm thêm món đồ ấy
+ *   itemsHidden  true (hoặc ['R']) — món đồ có sẵn nhưng đang cất: để `take()` nhận nó, hay `showItem()` lấy ra
  */
-export function createCharacter(host, { id = 'vet', config } = {}) {
+export function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
@@ -251,6 +256,12 @@ export function createCharacter(host, { id = 'vet', config } = {}) {
   const rig = new RigSVG(host, id);
   rig.publicId = id;
   applyConfig(rig, config);
+  for (const [side, item] of Object.entries(items || {})) {
+    if (side !== 'L' && side !== 'R') throw new Error(`[character] createCharacter: items keys must be 'L' or 'R', got ${JSON.stringify(side)}`);
+    const draw = typeof item === 'function' ? item : ITEMS[item] ? (p, colours) => ITEMS[item](colours) : null;
+    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, or a function returning SVG)`);
+    rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
+  }
   return { rig, id };
 }
 
@@ -286,7 +297,7 @@ export function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE],
     petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
@@ -613,8 +624,8 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
     const root = element.closest('[data-composition-id]') || element.offsetParent || element.parentElement;
     const actors = source.sequences.map((item) => item && item.data && item.data.rig).filter((rig) => rig && rig.el && rig.el.dau);
     const reels = [...source.sequences, source.camera].filter(Boolean), before = reels.map((reel) => reel.time());
-    const wasText = slot.textContent, wasOpacity = element.style.opacity, wasTransform = element.style.transform;
-    element.style.transform = '';
+    const wasText = slot.textContent, wasOpacity = element.style.opacity;
+    element.style.translate = 'none';
     for (const line of lines) {
       slot.textContent = label(line);
       const frame = root.getBoundingClientRect(), box = element.getBoundingClientRect(), ratio = frame.height / (root.offsetHeight || frame.height) || 1;
@@ -654,7 +665,7 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
       }
     }
     reels.forEach((reel, index) => reel.time(before[index]));
-    slot.textContent = wasText; element.style.opacity = wasOpacity; element.style.transform = wasTransform;
+    slot.textContent = wasText; element.style.opacity = wasOpacity;
   }
   const total = lines[lines.length - 1].end + hold + fade;
   let shown = null;
@@ -666,7 +677,9 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
       if (line) {
         slot.textContent = label(line);
         if (follow && line.x !== undefined) { element.style.left = `${line.x.toFixed(1)}px`; element.style.top = `${line.y.toFixed(1)}px`; element.style.transform = 'translate(-50%, -100%)'; }
-        else if (!follow && avoid) element.style.transform = line.shift ? `translateY(${line.shift.toFixed(1)}px)` : '';
+        // Dời bằng thuộc tính CSS `translate`, KHÔNG ghi `transform`: hộp chữ thường được canh giữa bằng
+        // `transform: translateX(-50%)` trong stylesheet — ghi đè nó là hộp chữ nhảy sang phải nửa bề ngang.
+        else if (!follow && avoid) element.style.translate = line.shift ? `0 ${line.shift.toFixed(1)}px` : 'none';
       }
     }
     const opacity = !line ? 0 : Math.max(0, Math.min(1, (time - (line.start - fade)) / fade, (line.end + hold + fade - time) / fade));
@@ -759,8 +772,9 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...written] = turn, mine = part(rig);
-      const steps = written.map((step) => (Array.isArray(step) && step[0] === 'face' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
-        ? ['face', anchor(step[1]), ...step.slice(2)] : step));
+      // `face`, `handOver`, `take`, `stroke` nhận một NHÂN VẬT KHÁC làm đích: thay bằng mỏ neo (xem `anchor`).
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+        ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
@@ -820,6 +834,10 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
       // Lượt KHÔNG LỜI (con chó sủa, ai đó reo mừng) mà người diễn đang nằm ngoài cảnh cận hiện tại: lùi
       // về toàn cảnh cho khán giả thấy. Người diễn đang ở trong khung thì máy quay đứng yên.
+      // Lượt không lời có động tác VƯƠN TỚI người / vật khác (đưa đồ, nhận đồ, vuốt ve): cận cảnh của một người thì
+      // không thấy bàn tay và bên kia — về toàn cảnh.
+      const reaching = !spoken.length && turn.steps.find((step) => ['handOver', 'take', 'stroke'].includes(step.name));
+      if (reaching && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));

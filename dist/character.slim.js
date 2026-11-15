@@ -1,4 +1,4 @@
-/* VGCharacter v0.32.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.33.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -15,6 +15,8 @@ const NGHI = Object.freeze({
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
+  itemTiltL: 0, itemTiltR: 0,   // độ nghiêng thêm của đồ vật về phía mặt (độ) — nghiêng cốc khi uống
+  carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   tayL: 'mo', tayR: 'mo',
 });
 const MAU_MAC_DINH = {
@@ -367,9 +369,10 @@ class RigSVG {
   static NGHI = NGHI;
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke'];
   static DI_NGANG = ['walk', 'enter', 'exit'];
   static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem'];
+  static EXCHANGE = ['handOver', 'take'];
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
   static COLOR_ALIASES = {};
@@ -677,7 +680,7 @@ class RigSVG {
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     for (const ben of ['L', 'R']) {
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
-      const tay = e['bat' + ben], cho = ben === xa && !carrying ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      const tay = e['bat' + ben], cho = ben === xa ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
       if (tay.parentNode !== cho) cho.appendChild(tay);
       const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah : 0;
       for (const limb of [e['chan' + ben], tay]) {
@@ -803,7 +806,7 @@ class RigSVG {
       return { bat: 24 * v - gap * 0.2, cang: clamp(4 + gap + 6 * v + 16 * Math.max(0, v), 2, 150) };
     };
     const nL = tayNghieng(s.cangL, s.vungL), nR = tayNghieng(s.cangR, s.vungR);
-    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) arm.cang = Math.max(arm.cang, 86);
+    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) arm.cang += (Math.max(arm.cang, 86) - arm.cang) * clamp(s['carry' + side], 0, 1);
     const gocVai = { L: GOC_VAI_MAX * mem((Math.abs(tL.bat) * cF - 40) / 110), R: GOC_VAI_MAX * mem((Math.abs(tR.bat) * cF - 40) / 110) };
     const ghep = { L: mem((Math.abs(tL.bat) * cF - 15) / 50), R: mem((Math.abs(tR.bat) * cF - 15) / 50) };
     const chotX = { L: -CHOT_VAI.x * (1 - ah * 0.92) - ah * 2, R: CHOT_VAI.x * (1 - ah * 0.92) + ah * 2 };
@@ -831,7 +834,8 @@ class RigSVG {
     const armTurn = { L: tL.bat * cF - sF * nL.bat + tL.cang * cF - sF * nL.cang, R: -tR.bat * cF - sF * nR.bat - tR.cang * cF - sF * nR.cang };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
-      e['item' + side].setAttribute('transform', `rotate(${upright.toFixed(2)} 0 10)`);
+      const tilt = s['itemTilt' + side];
+      e['item' + side].setAttribute('transform', `rotate(${(upright + (side === 'L' ? 1 : -1) * tilt).toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
     }
     for (const ben of ['L', 'R']) {
       const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
@@ -1426,10 +1430,110 @@ class RigSVG {
   hideItem(side = 'R') { return this.#toggleItem(side, 0); }
   showItem(side = 'R') { return this.#toggleItem(side, 1); }
   #toggleItem(side, value) {
-    const keep = {};
+    const t = this.tl(), s = this.s, keep = {};
     if (side !== 'R') keep.itemL = value;
     if (side !== 'L') keep.itemR = value;
-    return this.#khep(this.tl(), 0.25, 0, keep);
+    const acting = (side === 'both' ? ['L', 'R'] : [side]).filter((k) => this.holds[k] && (s['item' + k] > 0.5) !== (value > 0.5));
+    if (!acting.length) return this.#khep(t, 0.25, 0, keep);
+    for (const k of acting) {
+      if (value > 0.5) t.set(s, { ['tay' + k]: 'nam' }, 0);
+      t.to(s, { ['bat' + k]: -12, ['cang' + k]: -4, ['carry' + k]: 0, duration: 0.3, ease: 'power2.inOut' }, 0);
+      t.to(s, { ['item' + k]: value, duration: 0.13 }, 0.22);
+    }
+    t.to(s, { dauY: 2.5, nhinY: 1.2, duration: 0.3, ease: 'sine.inOut' }, 0);            // liếc xuống theo tay
+    this.#khep(t, 0.38, 0.36, keep);
+    return t;
+  }
+  setItem(side, draw, { shown = true } = {}) {
+    if (side !== 'L' && side !== 'R') throw new Error(`[character] setItem(side, …): side must be 'L' or 'R', got ${JSON.stringify(side)}`);
+    if (typeof draw !== 'function') throw new Error('[character] setItem(side, draw): draw must be a function returning SVG');
+    this.nv = { ...this.nv, ['heldItem' + side]: draw };
+    const carry = { ['bat' + side]: 14, ['cang' + side]: -85, ['tay' + side]: 'nam' };
+    this.NGHI = Object.freeze({ ...this.NGHI, ...carry, ['item' + side]: shown ? 1 : 0 });
+    this.#dungLai();
+    Object.assign(this.s, shown ? carry : { ['bat' + side]: NGHI['bat' + side], ['cang' + side]: NGHI['cang' + side], ['tay' + side]: 'mo' }, { ['item' + side]: shown ? 1 : 0 });
+    this.apDung();
+    return this;
+  }
+  #towards(target, side) {
+    if (target === 'left') return -1;
+    if (target === 'right') return 1;
+    if (target && typeof target.centerX === 'function') { const dx = target.centerX() - this.centerX(); if (Math.abs(dx) > 1) return dx < 0 ? -1 : 1; }
+    else if (target && target.getBoundingClientRect) { const box = target.getBoundingClientRect(), dx = box.left + box.width / 2 - this.centerX(); if (Math.abs(dx) > 1) return dx < 0 ? -1 : 1; }
+    return side === 'L' ? -1 : 1;
+  }
+  #reach(t, side, dir, at) {
+    const s = this.s, N = this.NGHI, own = (side === 'R') === (dir > 0), [upper, fore] = own ? [44, 56] : [28, -124];
+    t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, than: N.than - dir * 4, dau: N.dau + dir * 3, nhinX: dir * 1.6, cuoi: 0.8, mayL: 0.4, mayR: 0.4,
+              duration: 0.42, ease: 'power2.out' }, at);
+  }
+  handOver(target = null, side = 'auto') {
+    const s = this.s, held = ['R', 'L'].filter((k) => this.holds[k] && s['item' + k] > 0.5), k = side === 'auto' ? held[0] : side;
+    if (!k || !held.includes(k)) throw new Error('[character] handOver: this character is not holding an item' + (side === 'auto' ? '' : ` in hand ${side}`) + ' — give it one with heldItemL / heldItemR, or createCharacter(host, { id, items: { R: "cup" } })');
+    const t = this.tl(), dir = this.#towards(target, k);
+    this.#openUp(t);
+    t.to(s, { ['bat' + k]: this.NGHI['bat' + k] - 3, ['carry' + k]: 0, duration: 0.12, ease: 'sine.in' }, 0);            // lấy đà
+    this.#reach(t, k, dir, 0.12);
+    t.to(s, { ['item' + k]: 0, duration: 0.15 }, 0.62);                                                // món đồ rời tay
+    t.set(s, { ['tay' + k]: 'mo' }, 0.7);
+    this.#khep(t, 0.45, 0.88, { ['item' + k]: 0 });
+    return t;
+  }
+  take(source = null, side = 'auto') {
+    const s = this.s, stored = ['R', 'L'].filter((k) => this.holds[k] && s['item' + k] <= 0.5), k = side === 'auto' ? stored[0] : side;
+    if (!k || !stored.includes(k)) throw new Error('[character] take: this character has no put-away item to receive' + (side === 'auto' ? '' : ` in hand ${side}`) + ' — create it with createCharacter(host, { id, items: { R: "cup" }, itemsHidden: true })');
+    const t = this.tl(), dir = this.#towards(source, k);
+    this.#openUp(t);
+    t.set(s, { ['tay' + k]: 'mo', ['carry' + k]: 0 }, 0);
+    this.#reach(t, k, dir, 0.12);
+    t.set(s, { ['tay' + k]: 'nam' }, 0.62);
+    t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0.62);                                                // món đồ vào tay
+    this.#khep(t, 0.45, 0.88, { ['item' + k]: 1 });
+    return t;
+  }
+  drink(side = 'auto') {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    const held = ['R', 'L'].filter((k) => this.holds[k] && s['item' + k] > 0.5), k = side === 'auto' ? held[0] || this.#freeHand() : side, m = k === 'L' ? -1 : 1;
+    if (Math.abs(s.huong) > 0.02) t.to(s, { huong: 0, duration: 0.3, ease: 'sine.inOut' }, 0);
+    t.set(s, { ['tay' + k]: 'nam' }, 0);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    t.to(s, { ['bat' + k]: 10, ['cang' + k]: -155, vai: N.vai - 5, dau: N.dau + m * 4, dauX: m * 3, dauY: 5, mieng: 0.3, chum: 0.6, nhinY: 1.5, duration: 0.42, ease: 'power2.out' }, 0);
+    t.to(s, { ['itemTilt' + k]: 30, dauY: 9, matY: 0.7, duration: 0.3, ease: 'sine.inOut' }, 0.42);                                   // nghiêng cốc, nhắm mắt uống
+    t.to(s, { ['itemTilt' + k]: 0, dauY: 3, matY: 0, duration: 0.28, ease: 'sine.inOut' }, 1.0);
+    t.to(s, { cuoi: 1, mieng: 0.2, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.2 }, 1.2);                                              // "à…"
+    this.#khep(t, 0.5, 1.35);
+    return t;
+  }
+  stroke(target = null) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    let tx = 300, ty = 400;
+    const live = target && target.live ? target.live : target;
+    if (live && typeof live.x === 'number' && typeof live.y === 'number' && !live.el) { tx = live.x - s.x; ty = live.y - s.y - DOI_Y; }
+    else if (live) {
+      const node = live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null;
+      if (node) {
+        const r = node.getBoundingClientRect(), sv = this.svg.getBoundingClientRect();
+        const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+        tx = (r.left + r.width / 2 - ox) / unit - s.x; ty = (r.top + r.height * 0.2 - oy) / unit - s.y - DOI_Y;
+      }
+    }
+    let k = tx < HONG.x ? 'L' : 'R';
+    if (this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
+    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const shoulder = VAI[k], angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;
+    const lean = clamp((tx - HONG.x) * 0.06, -9, 9), upper = clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95);
+    this.#openUp(t);
+    t.set(s, { ['tay' + k]: 'mo' }, 0);
+    if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { ['bat' + k]: upper, ['cang' + k]: 0, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
+              cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
+    for (let n = 0; n < 3; n++) {
+      t.to(s, { ['cang' + k]: -9, ['bat' + k]: upper - 4, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+       .to(s, { ['cang' + k]: 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+    }
+    this.#chop(t, 1.0);
+    this.#khep(t, 0.5, 1.7);
+    return t;
   }
   sitDown() {
     const t = this.tl(), s = this.s;
@@ -3329,7 +3433,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.32.0';
+const VERSION = '0.33.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3352,7 +3456,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 const publicOutfit = (outfit) => definitionToPublic(outfit);
 const kit = {
@@ -3477,7 +3581,8 @@ function applyConfig(rig, config) {
   }
   return rig;
 }
-function createCharacter(host, { id = 'vet', config } = {}) {
+const ITEMS = { cup, clipboard, phone };
+function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
@@ -3485,6 +3590,12 @@ function createCharacter(host, { id = 'vet', config } = {}) {
   const rig = new RigSVG(host, id);
   rig.publicId = id;
   applyConfig(rig, config);
+  for (const [side, item] of Object.entries(items || {})) {
+    if (side !== 'L' && side !== 'R') throw new Error(`[character] createCharacter: items keys must be 'L' or 'R', got ${JSON.stringify(side)}`);
+    const draw = typeof item === 'function' ? item : ITEMS[item] ? (p, colours) => ITEMS[item](colours) : null;
+    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, or a function returning SVG)`);
+    rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
+  }
   return { rig, id };
 }
 function createPet(host, { species = 'dog', config } = {}) {
@@ -3507,7 +3618,7 @@ function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE],
     petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
@@ -3702,8 +3813,8 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
     const root = element.closest('[data-composition-id]') || element.offsetParent || element.parentElement;
     const actors = source.sequences.map((item) => item && item.data && item.data.rig).filter((rig) => rig && rig.el && rig.el.dau);
     const reels = [...source.sequences, source.camera].filter(Boolean), before = reels.map((reel) => reel.time());
-    const wasText = slot.textContent, wasOpacity = element.style.opacity, wasTransform = element.style.transform;
-    element.style.transform = '';
+    const wasText = slot.textContent, wasOpacity = element.style.opacity;
+    element.style.translate = 'none';
     for (const line of lines) {
       slot.textContent = label(line);
       const frame = root.getBoundingClientRect(), box = element.getBoundingClientRect(), ratio = frame.height / (root.offsetHeight || frame.height) || 1;
@@ -3733,7 +3844,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
       }
     }
     reels.forEach((reel, index) => reel.time(before[index]));
-    slot.textContent = wasText; element.style.opacity = wasOpacity; element.style.transform = wasTransform;
+    slot.textContent = wasText; element.style.opacity = wasOpacity;
   }
   const total = lines[lines.length - 1].end + hold + fade;
   let shown = null;
@@ -3744,7 +3855,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
       if (line) {
         slot.textContent = label(line);
         if (follow && line.x !== undefined) { element.style.left = `${line.x.toFixed(1)}px`; element.style.top = `${line.y.toFixed(1)}px`; element.style.transform = 'translate(-50%, -100%)'; }
-        else if (!follow && avoid) element.style.transform = line.shift ? `translateY(${line.shift.toFixed(1)}px)` : '';
+        else if (!follow && avoid) element.style.translate = line.shift ? `0 ${line.shift.toFixed(1)}px` : 'none';
       }
     }
     const opacity = !line ? 0 : Math.max(0, Math.min(1, (time - (line.start - fade)) / fade, (line.end + hold + fade - time) / fade));
@@ -3799,8 +3910,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...written] = turn, mine = part(rig);
-      const steps = written.map((step) => (Array.isArray(step) && step[0] === 'face' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
-        ? ['face', anchor(step[1]), ...step.slice(2)] : step));
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+        ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
       if (wait < 0) wait = 0;
@@ -3843,6 +3954,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
       const walksFirst = crossing && (!spoken.length || crossing.start <= from);
       if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
+      const reaching = !spoken.length && turn.steps.find((step) => ['handOver', 'take', 'stroke'].includes(step.name));
+      if (reaching && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));

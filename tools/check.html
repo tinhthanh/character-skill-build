@@ -143,7 +143,7 @@ try {
   { const sweep = (rig, label) => {
       const keys = Object.keys(rig.NGHI), read = () => JSON.stringify(keys.map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k])));
       for (const name of rig.actions) {
-        if (name === 'idle') continue;
+        if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
         L.seed(3); rig.reset();
         const step = name === 'point' ? [name, { x: 60, y: 80 }] : (name === 'speak' || name === 'explain') ? [name, 'xin chào bạn nhé một hai ba', 2.4] : name;
         const t = L.sequence(rig, ['idle', step, 'idle']), D = t.duration();
@@ -163,7 +163,7 @@ try {
   { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
     const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
     for (const name of rig.actions) {
-      if (['walkAway', 'exit'].includes(name)) continue;
+      if (['walkAway', 'exit', 'handOver', 'take'].includes(name)) continue;
       rig.reset();
       const t = name === 'point' ? rig.point({ x: 60, y: 80 }) : rig[name](); t.progress(1); rig.apDung();
       if (Math.abs(rig.state.headTilt - 4) > 1e-3 || rig.state.handR !== 'fist') hong('restPose', `${name}: ends with headTilt ${rig.state.headTilt}, handR ${rig.state.handR} instead of the character's rest pose (4, fist)`);
@@ -503,16 +503,16 @@ try {
       if (wag < 38) hong('wagTail', `the tail swings only ${wag.toFixed(0)}°`);
       t.kill(); pet.svg.remove();
     }
-    // Đi ngang: tay đang cầm đồ ở lại phía TRƯỚC thân dù là tay xa (từng lùi ra sau thân, cái cốc biến mất); cất đồ rồi thì lùi ra sau như thường.
+    // Đi ngang, tay cầm đồ là tay XA: cánh tay nằm SAU thân (không vắt ngang qua ngực), còn món đồ ló ra khỏi mép
+    // trước của thân nên vẫn thấy trọn.
     {
-      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', toward = side === 'R' ? 120 : -120;
-      const arm = actor.el['bat' + side], other = actor.el['bat' + (side === 'R' ? 'L' : 'R')];
-      let t = actor.walk(4, toward); t.progress(0.5); actor.render();
-      if (arm.parentNode !== actor.el.tren) hong('held item', 'walking sideways: the arm carrying the item goes behind the body');
-      else if (!(arm.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING)) hong('held item', 'the near arm is drawn under the far arm');
-      t.kill(); actor.reset(); actor.s['item' + side] = 0;
-      t = actor.walk(4, toward); t.progress(0.5); actor.render();
-      if (arm.parentNode === actor.el.tren) hong('held item', 'with the item put away the far arm should go behind the body');
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', toward = side === 'R' ? 120 : -120, dir = Math.sign(toward);
+      const arm = actor.el['bat' + side];
+      const t = actor.walk(4, toward); t.progress(0.5); actor.render();
+      if (arm.parentNode === actor.el.tren) hong('held item', 'walking sideways: the far arm carrying the item is drawn across the front of the body');
+      const item = actor.el['item' + side].getBoundingClientRect(), body = actor.el.ao.getBoundingClientRect();
+      const clear = dir > 0 ? item.right - body.right : body.left - item.left;
+      if (clear < item.width * 0.6) hong('held item', `walking sideways: only ${Math.round(clear / item.width * 100)}% of the carried item shows in front of the body`);
       t.kill(); actor.svg.remove();
     }
     // Nhịp thở nền của `sequence()`: trong lúc giữ dáng ngực vẫn phồng xẹp; chuỗi kết thúc đúng trạng thái nghỉ; `breathe: false` thì tắt.
@@ -673,7 +673,7 @@ try {
         const words = L.captions(talk, text, options), reel = gsap.timeline({ paused: true }); talk.addTo(reel, 0); reel.add(words.paused(false), 0); reel.time(1.5);
         const box = text.getBoundingClientRect(), head = pet.el.dau.getBoundingClientRect(), frame = stage4.getBoundingClientRect();
         const hit = head.right > box.left && head.left < box.right && head.bottom > box.top && head.top < box.bottom, inside = box.top >= frame.top && box.bottom <= frame.bottom;
-        words.kill(); reel.kill(); text.style.transform = '';
+        words.kill(); reel.kill(); text.style.translate = 'none';
         return { hit, inside };
       };
       const plain = covers({ avoid: false }), moved = covers({});
@@ -703,7 +703,7 @@ try {
           if (x > 0 && y > 0) covered = Math.max(covered, (x * y) / (head.width * head.height));
         }
         const said = words.data.lines.length;
-        words.kill(); reel.kill(); talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill(); L.shot(scene5, null, 'wide').progress(1); text.style.transform = '';
+        words.kill(); reel.kill(); talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill(); L.shot(scene5, null, 'wide').progress(1); text.style.translate = 'none';
         return { covered, said };
       };
       const plain = worst({ avoid: false }), careful = worst({});
@@ -726,6 +726,73 @@ try {
       const barking = L.conversation([[person, ['explain', 'mot hai ba bon nam sau', 3]], [pet, 'bark']]);
       if (barking.turns[1].start < spoken(barking, 0)[1] - 1e-6) hong('conversation', 'a wordless turn that is not an entrance starts before the previous line ends');
       barking.sequences.forEach((item) => item.kill()); person.svg.remove(); pet.svg.remove();
+    }
+    // ── TƯƠNG TÁC ──
+    // Cho một nhân vật bất kỳ cầm đồ (`items`), kể cả ở trạng thái đang cất (`itemsHidden`).
+    {
+      const giver = L.createCharacter(host, { id: 'barista' }).rig, side = giver.holds.R ? 'R' : 'L';
+      const taker = L.createCharacter(host, { id: 'granny', items: { L: 'cup' }, itemsHidden: true }).rig;
+      if (!taker.holds.L || taker.s.itemL !== 0 || taker.NGHI.itemL !== 0) hong('items', 'a character created with a hidden item should have it put away');
+      if (Math.abs(taker.s.cangL - RigSVG.NGHI.cangL) > 1) hong('items', 'the arm of a put-away item should rest relaxed');
+      const shown = L.createCharacter(host, { id: 'boy', items: { R: 'phone' } }).rig;
+      if (!shown.holds.R || shown.s.itemR !== 1 || shown.s.cangR > -60) hong('items', 'a character created with an item should hold it in a carrying pose');
+      shown.svg.remove();
+      for (const [label, make] of [['unknown item', () => L.createCharacter(host, { id: 'boy', items: { R: 'sword' } })], ['bad side', () => L.createCharacter(host, { id: 'boy', items: { X: 'cup' } })]]) {
+        let message = ''; try { make(); } catch (error) { message = error.message; }
+        if (!message.includes('[character]')) hong('items', `${label} is not refused with a clear message`);
+      }
+      // ĐƯA và NHẬN cùng lúc: món đồ rời tay người đưa và vào tay người nhận; cả hai về nghỉ.
+      const give = giver.handOver(taker), get = taker.take(giver);
+      if (Math.abs(give.duration() - get.duration()) > 1e-6) hong('handOver', 'handOver and take should last the same time');
+      give.time(0.5); get.time(0.5);
+      if (giver.s['item' + side] < 0.99 || taker.s.itemL > 0.01) hong('handOver', 'the item changes hands before the arms have met');
+      if (Math.abs(giver.s['cang' + side] - giver.NGHI['cang' + side]) < 20 || Math.abs(taker.s.cangL - RigSVG.NGHI.cangL) < 20) hong('handOver', 'the arms do not reach out');
+      give.progress(1); get.progress(1);
+      if (giver.s['item' + side] !== 0 || taker.s.itemL !== 1) hong('handOver', 'the item did not change hands');
+      if (Math.abs(giver.s['cang' + side] - RigSVG.NGHI['cang' + side]) > 1 || giver.s['tay' + side] !== 'mo') hong('handOver', 'the giver\'s empty hand does not relax');
+      if (Math.abs(taker.s.cangL - taker.NGHI.cangL) > 1 || taker.s.carryL !== 1) hong('take', 'the receiver does not end in the carrying pose');
+      give.kill(); get.kill();
+      // Không có gì để đưa / nhận thì báo lỗi rõ ràng.
+      for (const [label, call] of [['handOver with empty hands', () => giver.handOver(taker)], ['take with nothing put away', () => taker.take(giver)]]) {
+        let message = ''; try { call(); } catch (error) { message = error.message; }
+        if (!message.includes('createCharacter(host')) hong('handOver', `${label} should say how to give the character an item`);
+      }
+      // UỐNG: tay nâng lên, cốc nghiêng rồi về thẳng; đang quay 3/4 thì quay về phía người xem và trả lại hướng cũ.
+      taker.s.huong = -0.55; const sip = taker.drink(); let tilt = 0, front = 9, fold = 0;
+      for (let time = 0; time <= sip.duration(); time += 1 / 30) { sip.time(time); tilt = Math.max(tilt, taker.s.itemTiltL); front = Math.min(front, Math.abs(taker.s.huong)); fold = Math.min(fold, taker.s.cangL); }
+      if (tilt < 25 || fold > -140) hong('drink', `the cup is not raised and tilted (tilt ${tilt.toFixed(0)}°, forearm ${fold.toFixed(0)}°)`);
+      if (front > 0.05) hong('drink', 'a turned character should face the viewer to drink');
+      sip.progress(1); if (taker.s.itemTiltL !== 0 || Math.abs(taker.s.huong + 0.55) > 1e-6 || taker.s.carryL !== 1) hong('drink', 'does not return to the held stance');
+      sip.kill();
+      // CẤT ĐỒ có động tác: giữa chừng món đồ còn thấy và tay đang đi xuống hông; xong thì đã cất, tay buông.
+      const away = taker.hideItem('L'); away.time(0.15);
+      if (taker.s.itemL < 0.9 || !(taker.s.cangL > taker.NGHI.cangL + 15)) hong('hideItem', 'the hand should carry the item down to the hip before it disappears');
+      away.progress(1); if (taker.s.itemL !== 0) hong('hideItem', 'the item is not put away');
+      if (away.duration() < 0.6) hong('hideItem', `takes only ${away.duration().toFixed(2)}s — no room for a putting-away move`);
+      away.kill(); giver.svg.remove(); taker.svg.remove();
+    }
+    // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
+    {
+      const stage6 = document.createElement('div'); stage6.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:400px';
+      const mk = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage6.appendChild(d); return d; };
+      const mid = mk('left:280px;top:0;width:340px;height:400px'), right = mk('left:560px;top:250px;width:180px;height:149px'), left = mk('left:160px;top:250px;width:180px;height:149px');
+      document.body.appendChild(stage6);
+      const person = L.createCharacter(mid, { id: 'vet' }).rig, dogR = L.createPet(right, { species: 'dog' }).rig, dogL = L.createPet(left, { species: 'cat' }).rig;
+      for (const [pet, near, far] of [[dogR, 'R', 'L'], [dogL, 'L', 'R']]) {
+        const t = person.stroke(pet); t.time(0.6);
+        const moved = (side) => Math.abs(person.s['bat' + side] - person.NGHI['bat' + side]);
+        if (moved(near) < 20 || moved(far) > 1) hong('stroke', `a pet on the ${near === 'R' ? 'right' : 'left'} should be stroked with arm ${near} (moved ${moved(near).toFixed(0)}°, other ${moved(far).toFixed(0)}°)`);
+        const hand = person.el['coTay' + near].getBoundingClientRect(), head = pet.el.dau.getBoundingClientRect(), frame = person.svg.getBoundingClientRect();
+        if ((hand.top + hand.height / 2) < frame.top + frame.height * 0.45) hong('stroke', 'the hand does not come down toward the pet');
+        if (((hand.left + hand.width / 2) - (frame.left + frame.width / 2)) * ((head.left + head.width / 2) - (frame.left + frame.width / 2)) <= 0) hong('stroke', 'the hand goes to the wrong side');
+        t.progress(1); if (moved(near) > 1e-6 || person.s.seat !== 0) hong('stroke', 'does not return to rest');
+        t.kill();
+      }
+      person.svg.remove();
+      const holder = L.createCharacter(mid, { id: 'barista' }).rig, busy = holder.holds.R ? 'R' : 'L', pet = busy === 'R' ? dogR : dogL, t = holder.stroke(pet); let carried = 0;
+      for (let p = 0; p <= 1; p += 0.02) { t.progress(p); carried = Math.max(carried, Math.abs(holder.s['bat' + busy] - holder.NGHI['bat' + busy])); }
+      if (carried > 1) hong('stroke', 'the hand holding an item is used to stroke');
+      t.kill(); stage6.remove();
     }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
@@ -1100,7 +1167,7 @@ try {
     });
     const cells = (frame) => [...frame.contentDocument.body.children].filter((el) => el.tagName === 'DIV');
     const names = JSON.parse(listAtStart);
-    for (const [id, expected] of [['receptionist', 23], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
+    for (const [id, expected] of [['receptionist', 25], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
       const { frame, done } = await load(`sheet.html?nv=${id}`);
       if (!done) hong(`sheet.html?nv=${id}`, 'the pose sheet does not finish (script error?)');
       else if (cells(frame).length !== expected) hong(`sheet.html?nv=${id}`, `the pose sheet shows ${cells(frame).length} panels, expected ${expected}`);

@@ -51,6 +51,8 @@ with tempfile.TemporaryDirectory() as work:
         staged['characters'].append({'name': 'late', 'id': 'nurse', 'x': 1700, 'faces': 'vet'})
         staged['script'].insert(3, {'who': 'late', 'enter': 'right', 'say': 'Xin lỗi, tôi đến muộn.', 'dur': 1.6, 'exit': 'right'})
         staged['music'] = '../voiceover/voice.wav'
+        # Nhân vật được cho cầm một món đồ đang cất (để nhận từ người khác).
+        staged['characters'][0].update({'holds': {'L': 'clipboard'}, 'holdsHidden': True})
         # Một cái bàn đặt đúng chỗ con chó đứng: phải có lời nhắc là cái bàn sẽ che nó.
         staged['props'].append({'kind': 'table', 'x': next(who['x'] for who in staged['characters'] if who.get('species'))})
         staged_path = os.path.join(os.path.dirname(example), '_check_staged.json')
@@ -75,6 +77,7 @@ with tempfile.TemporaryDirectory() as work:
             if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
             if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
             if '"clerk" sits behind the counter' not in built.stdout or '"tabletop"' not in built.stdout: problems.append('no note about a seated character hidden behind a tall front counter')
+            if 'items: {"L": "clipboard"}, itemsHidden: true' not in page: problems.append('"holds" / "holdsHidden" are not passed to createCharacter')
             if '"bella" stands at x' not in built.stdout or 'inside the table' not in built.stdout: problems.append('no note about a pet standing inside a table')
             # Sửa tay làm lệch giờ → --retime đưa <audio> và tổng thời lượng về đúng.
             index = os.path.join(work, 'staged', 'index.html')

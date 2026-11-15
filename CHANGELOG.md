@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.33.0
+
+Added
+- **Interaction actions for people.**
+  - `drink()` — raise the held cup to the mouth, tilt it, lower it. A turned character faces
+    the viewer for the sip.
+  - `stroke(target)` — lean toward a pet and stroke it with the hand on that side.
+  - `handOver(target)` and `take(source)` — pass a held item from one character to another;
+    run them `together`.
+- **Any character can hold an item.** `createCharacter(host, { id, items: { R: 'cup' } })`
+  (`'cup'`, `'clipboard'`, `'phone'`, or your own drawing), with `itemsHidden: true` to start
+  with it put away. Scene files: `"holds": "cup"` and `"holdsHidden": true` on a character.
+  On a rig: `rig.setItem(side, draw, { shown })`.
+
+Changed
+- **`hideItem` / `showItem` are a move, not a fade.** The hand goes down to the hip, the item
+  disappears or appears there, then the arm relaxes or takes its carrying pose. **Timing:**
+  0.74 s instead of 0.25 s.
+- In `conversation()` the camera goes back to the wide shot for a wordless turn that reaches
+  for someone (`handOver`, `take`, `stroke`).
+
+Fixed
+- **A carrying arm drawn across the chest.** Walking sideways with the item in the far hand,
+  the whole arm was drawn in front of the body (since 0.24.0), so the forearm seemed to grow
+  out of the chest. The far arm is behind the body again; the hand and the item show in front
+  of it.
+- **A moved caption jumped sideways.** Since 0.31.0 a caption moved off a head lost its own
+  CSS `transform` (usually the horizontal centring). It is now moved with the separate
+  `translate` property.
+
 ## 0.32.0
 
 Changed

@@ -9,7 +9,7 @@ A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds, on
 inserts a 0.1 s gap between consecutive steps by default; change it with
 `sequence(rig, steps, { gap: 0 })`.
 
-## People — `VGCharacter.createCharacter(host, { id, config }).rig`
+## People — `VGCharacter.createCharacter(host, { id, config, items, itemsHidden }).rig`
 
 | Action | Arguments | What it does | ≈ seconds |
 |---|---|---|---|
@@ -22,6 +22,10 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
+| `drink` | `(side = 'auto')` | raise the held item (a cup) to the mouth, tilt it, eyes closed, then lower it with a smile; a turned character faces the viewer to drink. With empty hands it mimes the sip | 1.85 |
+| `stroke` | `(target)` | lean toward a pet (a rig, an element, or `{ x, y }`) and stroke it three times with the hand on that side; crouches if the target is below the hips. Keep the pet within about 0.25 × host height of the person, arms are short | 2.2 |
+| `handOver` | `(target, side = 'auto')` | reach the held item toward `target` (a rig, `'left'`, `'right'`); it leaves the hand, which relaxes. Throws if nothing is held | 1.33 |
+| `take` | `(source, side = 'auto')` | reach toward `source` and receive an item into the hand: the character must already have it put away (`items` + `itemsHidden`, below). Run it `together` with the giver's `handOver` | 1.33 |
 | `speak` | `(text, dur = 2, { mood })` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
 | `explain` | `(text, dur = 2.4, { mood, hand })` | like `speak` with livelier head and hand gestures; `hand: 'L'` or `'R'` picks the arm that leads them (e.g. the one on the side of the content the character is presenting) | `dur` + 0.55 |
 | `speakCues` | `(cues, dur, { cuChi, mood, hand })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
@@ -32,7 +36,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |
 | `standUp` | — | stand up from `sitDown` | 0.55 |
 | `face` | `(target = 'right', amount = 0.55)` | turn toward `'left'` / `'right'` and **stay turned**; `'front'` turns back. `target` may also be a DOM element or another rig — the character turns to whichever side it is on | 0.45 |
-| `hideItem` `showItem` | `(side = 'R')` | put away / take out the held item of hand `'L'`, `'R'` or `'both'`; it stays that way | 0.25 |
+| `hideItem` `showItem` | `(side = 'R')` | put away / take out the held item of hand `'L'`, `'R'` or `'both'`: the hand goes down to the hip, the item disappears (or appears) there, and the arm relaxes (or takes its carrying pose); it stays that way | 0.74 |
 | `march` | `(steps = 6)` | march on the spot, fists pumping in front of the chest | 2.7 |
 | `stroll` | `(steps = 6)` | slow, low steps on the spot, arms swaying loosely | 3.65 |
 | `stepInPlace` | `(steps = 6)` | steps on the spot, arms still | 2.9 |
@@ -183,7 +187,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 
 | Call | Use |
 |---|---|
-| `VGCharacter.createCharacter(host, { id, config })` | build a person; returns `{ rig, id }`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
+| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
