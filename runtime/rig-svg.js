@@ -2041,12 +2041,18 @@ export class RigSVG {
   present() {
     const t = this.tl(), s = this.s;
     this.#openUp(t);
-    t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
-    t.to(s, { batL: 8, batR: 8, cangL: -75, cangR: -75, dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
-    t.to(s, { batL: 62, batR: 72, cangL: -22, cangR: -26, than: 2, dau: 6, dauX: 3,
+    // Tay đang cầm đồ thì đứng yên; tay còn lại diễn một mình.
+    const arms = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    const pose = (values) => Object.fromEntries(arms.flatMap((side) => [['bat' + side, values[side][0]], ['cang' + side, values[side][1]]]));
+    t.set(s, Object.fromEntries(arms.map((side) => ['tay' + side, 'mo'])), 0);
+    t.to(s, { ...pose({ L: [8, -75], R: [8, -75] }), dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
+    // Mở hai tay ra, CẲNG TAY NÂNG LÊN, lòng bàn tay ngửa — dáng "xin mời / đây ạ". Bản trước dang cả cánh tay chếch
+    // xuống (bắp 62–72°, cẳng −22°): lòng bàn tay úp, trông như dáng chữ A lúc kiểm tra rig.
+    t.to(s, { ...pose({ L: [40, 72], R: [46, 76] }), than: 2, dau: 6, dauX: 3,
               mayL: 0.7, mayR: 0.7, cuoi: 0.9, mieng: 0.3, nhinX: 1.5,
               duration: 0.5, ease: 'back.out(1.2)' }, 0.25);                       // mở ra
-    t.to(s, { batR: 80, cangR: -18, dau: 8, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.95); // nhấn
+    const lead = arms.includes('R') ? 'R' : arms[0];
+    t.to(s, { ...(lead ? { ['bat' + lead]: 54, ['cang' + lead]: 84 } : {}), dau: 8, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.95); // nhấn
     this.#chop(t, 1.2);
     this.#khep(t, 0.55, 1.65);
     return t;

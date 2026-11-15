@@ -577,6 +577,13 @@ export class RigThu {
     return t;
   }
 
+  // Nhịp chạy cho một quãng `far`: quãng ngắn thì lúp xúp như trước (52 đơn vị mỗi chu kỳ 0,36 s); quãng DÀI (cảnh
+  // rộng) thì phi — sải dài hơn, nhịp nhanh hơn — để băng qua nửa khung hình trong khoảng ba giây chứ không phải năm.
+  #pace(far) {
+    if (far <= 380) return { cycles: Math.max(6, Math.round(far / 52)), beat: 0.36, A: 16, lift: 11 };
+    return { cycles: Math.max(6, Math.round(far / 86)), beat: 0.3, A: 22, lift: 15 };
+  }
+
   // Quãng từ chỗ đứng gốc ra hẳn ngoài khung hình về phía `dir` — xem `#offstage` trong rig-svg.js.
   #offstage(dir) {
     const frame = this.svg.getBoundingClientRect();
@@ -591,7 +598,7 @@ export class RigThu {
   enter(from = 'left', distance = null) {
     const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1, far = distance > 0 ? distance : this.#offstage(-dir);
     t.set(s, { x: -far * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
-    const at = this.#di(t, 0, Math.max(6, Math.round(far / 52)), 0.36, { vao: false, quang: far * dir, x0: -far * dir, A: 16, cao: 11 });
+    const run = this.#pace(far), at = this.#di(t, 0, run.cycles, run.beat, { vao: false, quang: far * dir, x0: -far * dir, A: run.A, cao: run.lift });
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
@@ -652,7 +659,8 @@ export class RigThu {
     // `face('left')` là đi giật lùi ra khỏi khung. Xuất phát từ chỗ đang đứng (`x0`), không phải từ giữa.
     if ((s.huong < 0 ? -1 : 1) !== dir) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
     const far = Math.max(60, (dir * (distance > 0 ? distance : this.#offstage(dir)) - x0) * dir);
-    at = this.#di(t, at, Math.max(6, Math.round(far / 52)), 0.36, { ra: false, quang: dir * far, x0, A: 16, cao: 11 });
+    const run = this.#pace(far);
+    at = this.#di(t, at, run.cycles, run.beat, { ra: false, quang: dir * far, x0, A: run.A, cao: run.lift });
     t.to(s, { mo: 0, duration: 0.2 }, at - 0.2);
     this.#khep(t, 0.2, at, { x: x0 + dir * far, mo: 0, huong: dir });
     return t;
@@ -705,8 +713,10 @@ export class RigThu {
     t.to(s, { taiL: 1, taiR: 1, duoi: 14, duration: 0.15 }, 0);
     let at = 0.15;
     for (let i = 0; i < lan; i++) {
-      t.to(s, { mieng: 0.95, dau: -9, dauY: -5, dauX: 3, truocY: -4, taiL: 0.3, taiR: 0.3, duration: 0.09, ease: 'power2.out' }, at)
-       .to(s, { mieng: 0.1, dau: 0, dauY: 0, dauX: 0, truocY: 0, taiL: 1, taiR: 1, duration: 0.17, ease: 'power2.in' }, at + 0.11);
+      // Thụp nhẹ lấy đà rồi hất đầu lên sủa; ngực nảy theo. Miệng mở trong ba khung hình (0,12 s), không bật trong một.
+      t.to(s, { dauY: 3, truocY: 2, duration: 0.07, ease: 'sine.in' }, at - 0.07)
+       .to(s, { mieng: 0.95, dau: -15, dauY: -9, dauX: 4, truocY: -7, duoi: 22, taiL: 0.2, taiR: 0.2, duration: 0.12, ease: 'power2.out' }, at)
+       .to(s, { mieng: 0.1, dau: 0, dauY: 0, dauX: 0, truocY: 0, duoi: 14, taiL: 1, taiR: 1, duration: 0.2, ease: 'power2.in' }, at + 0.14);
       at += 0.42;
     }
     this.#khep(t, 0.35, at + 0.1);
@@ -828,7 +838,7 @@ export class RigThu {
   hiss() {
     const t = this.tl(), s = this.s;
     let at = this.#dung(t, 0);
-    t.to(s, { cong: 1, xu: 1, truocY: -5, sauY: -7, duoi: 30, duoiCong: 0.55, taiL: -1, taiR: -1, dongTu: 0.35, cuoi: -0.6, dau: -4, dauY: 3,
+    t.to(s, { cong: 1, xu: 1, truocY: -5, sauY: -7, duoi: 18, duoiCong: 1.1, taiL: -2.6, taiR: -2.6, dongTu: 0.35, matY: 0.38, cuoi: -0.8, dau: -6, dauY: 5,       // tai ÉP ra sau (−1 gần như không thấy với tai mèo), mắt nheo, đuôi cong xù
               duration: 0.22, ease: 'back.out(2)' }, at);
     t.to(s, { mieng: 0.8, duration: 0.12 }, at + 0.15);
     for (let i = 0; i < 8; i++) t.to(s, { dauX: i % 2 ? -1.6 : 1.6, duoi: i % 2 ? 27 : 33, duration: 0.08 }, at + 0.3 + i * 0.08);      // run lên

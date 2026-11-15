@@ -17,7 +17,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `wave` | `(hand = 'auto')` | raise a hand and wave | 2.3 |
 | `thumbsUp` | `(hand = 'auto')` | fist to the chest, thumb out, small nod | 2.0 |
 | `point` | `(target)` | point at a DOM element, or at `{ x, y }` in the rig's 400 × 470 frame; with no target, points right | 2.0 |
-| `present` | — | open both arms to present | 2.2 |
+| `present` | — | open both arms, forearms raised and palms up, to present (a hand holding an item stays put) | 2.2 |
 | `nod` | — | nod twice | 1.4 |
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
@@ -104,7 +104,7 @@ viewer. `walk` with a negative distance turns the animal round first.
 |---|---|---|---|
 | `idle` | `(dur = 4)` | breathe, blink, gentle tail wag, ear flick | `dur` |
 | `wagTail` | — | fast wag, wiggling hips, tongue out | 1.9 |
-| `bark` | `(times = 2)` | head jerks up, mouth snaps open | 1.4 |
+| `bark` | `(times = 2)` | a small dip, then the head tosses up and the mouth opens | 1.4 |
 | `sit` | `(hold = 1.6)` | sit, pant, stand up again | `hold` + 0.9 |
 | `tiltHead` | — | tilt one way, then the other | 2.3 |
 | `jump` | `(times = 2)` | happy hops | 2.0 |
@@ -125,7 +125,7 @@ stand them up first:
 | `purr` | — | eyes closed, smiling, body trembles, head rubs | 2.0 |
 | `lickPaw` | — | raise a front paw and lick it | 2.2 |
 | `stretch` | — | chest to the floor, rump up, yawn | 2.4 |
-| `hiss` | — | arched back, puffed tail, flat ears, slit pupils | 2.0 |
+| `hiss` | — | arched back, curled puffed tail, ears pinned back, narrowed eyes with slit pupils | 2.0 |
 | `tailSwish` | — | slow wide tail swish | 2.4 |
 | `tiltHead` | — | tilt one way, then the other | 2.3 |
 | `pounce` | — | crouch, wiggle, leap | 2.4 |

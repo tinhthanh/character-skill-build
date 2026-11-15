@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.0
+
+Changed
+- **Pets cross a wide frame faster.** Since 0.26.0 a pet runs in from the real edge of the
+  frame, which took over five seconds on a wide stage. Runs longer than 380 units now use a
+  longer, quicker stride (about three seconds for the longest run); shorter runs keep their
+  timing.
+- **`present`** raises the forearms with the palms up; it used to hold both arms out and
+  down, palms turned in. A hand holding an item now stays put and the other arm presents.
+- A dog's **`bark`** dips, then tosses the head higher, and the mouth opens over three frames
+  instead of one. A cat's **`hiss`** pins the ears back, narrows the eyes and curls the tail.
+
 ## 0.26.0
 
 Changed

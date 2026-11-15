@@ -577,6 +577,36 @@ try {
       }
       stage.remove();
     }
+    // `present`: cẳng tay nâng lên, lòng bàn tay ngửa (không dang chếch xuống); tay cầm đồ đứng yên.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig; let t = actor.present(); t.time(0.85);
+      if (actor.s.cangL < 50 || actor.s.cangR < 50) hong('present', `the forearms are not raised (${actor.s.cangL.toFixed(0)}°, ${actor.s.cangR.toFixed(0)}°)`);
+      t.progress(1); if (Math.abs(actor.s.cangR - actor.NGHI.cangR) > 1e-6) hong('present', 'does not return to rest');
+      t.kill(); actor.svg.remove();
+      const holder = L.createCharacter(host, { id: 'barista' }).rig, side = holder.holds.R ? 'R' : 'L', free = side === 'R' ? 'L' : 'R'; t = holder.present(); let moved = 0, other = 0;
+      for (let p = 0; p <= 1; p += 0.02) { t.progress(p); moved = Math.max(moved, Math.abs(holder.s['cang' + side] - holder.NGHI['cang' + side])); other = Math.max(other, Math.abs(holder.s['cang' + free] - holder.NGHI['cang' + free])); }
+      if (moved > 1) hong('present', `the arm holding an item moves ${moved.toFixed(0)}°`);
+      if (other < 40) hong('present', 'the free arm does not present');
+      t.kill(); holder.svg.remove();
+    }
+    // Thú ở cảnh RỘNG chạy vào trong khoảng ba giây (từng mất hơn năm); quãng ngắn vẫn giữ nhịp cũ. Sủa: miệng mở dần chứ không bật; gừ: tai ép hẳn ra sau.
+    {
+      const stage = document.createElement('div'); stage.setAttribute('data-composition-id', 'check-wide');
+      stage.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:400px;overflow:hidden';
+      const spot = document.createElement('div'); spot.style.cssText = 'position:absolute;left:560px;top:150px;width:300px;height:248px';
+      stage.appendChild(spot); document.body.appendChild(stage);
+      const pet = L.createPet(spot, { species: 'dog' }).rig; let t = pet.enter();
+      if (t.duration() > 3.6) hong('pet enter', `takes ${t.duration().toFixed(1)}s to run in on a wide stage`);
+      t.kill(); t = pet.enter('left', 300); if (Math.abs(t.duration() - 2.56) > 0.05) hong('pet enter', `a 300-unit run should keep its old timing (2.56s), got ${t.duration().toFixed(2)}s`);
+      t.kill(); pet.reset();
+      t = pet.bark(); t.time(0.15 + 0.045); const half = pet.s.mieng; t.time(0.15 + 0.13); const open = pet.s.mieng;
+      if (!(half > 0.15 && half < 0.8 && open > 0.85)) hong('bark', `the mouth should open over about three frames (${half.toFixed(2)} then ${open.toFixed(2)})`);
+      t.kill(); pet.svg.remove(); stage.remove();
+      const cat = L.createPet(host, { species: 'cat' }).rig; t = cat.hiss(); t.time(0.8);
+      if (cat.s.taiL > -2 || cat.s.matY < 0.3) hong('hiss', 'the ears are not flattened or the eyes not narrowed');
+      t.progress(1); if (Math.abs(cat.s.taiL - cat.NGHI.taiL) > 1e-6 || Math.abs(cat.s.matY - cat.NGHI.matY) > 1e-6) hong('hiss', 'does not return to rest');
+      t.kill(); cat.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

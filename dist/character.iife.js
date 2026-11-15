@@ -1,4 +1,4 @@
-/* VGCharacter v0.26.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.27.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2048,12 +2048,18 @@ class RigSVG {
   present() {
     const t = this.tl(), s = this.s;
     this.#openUp(t);
-    t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
-    t.to(s, { batL: 8, batR: 8, cangL: -75, cangR: -75, dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
-    t.to(s, { batL: 62, batR: 72, cangL: -22, cangR: -26, than: 2, dau: 6, dauX: 3,
+    // Tay đang cầm đồ thì đứng yên; tay còn lại diễn một mình.
+    const arms = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    const pose = (values) => Object.fromEntries(arms.flatMap((side) => [['bat' + side, values[side][0]], ['cang' + side, values[side][1]]]));
+    t.set(s, Object.fromEntries(arms.map((side) => ['tay' + side, 'mo'])), 0);
+    t.to(s, { ...pose({ L: [8, -75], R: [8, -75] }), dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
+    // Mở hai tay ra, CẲNG TAY NÂNG LÊN, lòng bàn tay ngửa — dáng "xin mời / đây ạ". Bản trước dang cả cánh tay chếch
+    // xuống (bắp 62–72°, cẳng −22°): lòng bàn tay úp, trông như dáng chữ A lúc kiểm tra rig.
+    t.to(s, { ...pose({ L: [40, 72], R: [46, 76] }), than: 2, dau: 6, dauX: 3,
               mayL: 0.7, mayR: 0.7, cuoi: 0.9, mieng: 0.3, nhinX: 1.5,
               duration: 0.5, ease: 'back.out(1.2)' }, 0.25);                       // mở ra
-    t.to(s, { batR: 80, cangR: -18, dau: 8, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.95); // nhấn
+    const lead = arms.includes('R') ? 'R' : arms[0];
+    t.to(s, { ...(lead ? { ['bat' + lead]: 54, ['cang' + lead]: 84 } : {}), dau: 8, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.95); // nhấn
     this.#chop(t, 1.2);
     this.#khep(t, 0.55, 1.65);
     return t;
@@ -3461,6 +3467,13 @@ class RigThu {
     return t;
   }
 
+  // Nhịp chạy cho một quãng `far`: quãng ngắn thì lúp xúp như trước (52 đơn vị mỗi chu kỳ 0,36 s); quãng DÀI (cảnh
+  // rộng) thì phi — sải dài hơn, nhịp nhanh hơn — để băng qua nửa khung hình trong khoảng ba giây chứ không phải năm.
+  #pace(far) {
+    if (far <= 380) return { cycles: Math.max(6, Math.round(far / 52)), beat: 0.36, A: 16, lift: 11 };
+    return { cycles: Math.max(6, Math.round(far / 86)), beat: 0.3, A: 22, lift: 15 };
+  }
+
   // Quãng từ chỗ đứng gốc ra hẳn ngoài khung hình về phía `dir` — xem `#offstage` trong rig-svg.js.
   #offstage(dir) {
     const frame = this.svg.getBoundingClientRect();
@@ -3475,7 +3488,7 @@ class RigThu {
   enter(from = 'left', distance = null) {
     const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1, far = distance > 0 ? distance : this.#offstage(-dir);
     t.set(s, { x: -far * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
-    const at = this.#di(t, 0, Math.max(6, Math.round(far / 52)), 0.36, { vao: false, quang: far * dir, x0: -far * dir, A: 16, cao: 11 });
+    const run = this.#pace(far), at = this.#di(t, 0, run.cycles, run.beat, { vao: false, quang: far * dir, x0: -far * dir, A: run.A, cao: run.lift });
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
@@ -3536,7 +3549,8 @@ class RigThu {
     // `face('left')` là đi giật lùi ra khỏi khung. Xuất phát từ chỗ đang đứng (`x0`), không phải từ giữa.
     if ((s.huong < 0 ? -1 : 1) !== dir) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
     const far = Math.max(60, (dir * (distance > 0 ? distance : this.#offstage(dir)) - x0) * dir);
-    at = this.#di(t, at, Math.max(6, Math.round(far / 52)), 0.36, { ra: false, quang: dir * far, x0, A: 16, cao: 11 });
+    const run = this.#pace(far);
+    at = this.#di(t, at, run.cycles, run.beat, { ra: false, quang: dir * far, x0, A: run.A, cao: run.lift });
     t.to(s, { mo: 0, duration: 0.2 }, at - 0.2);
     this.#khep(t, 0.2, at, { x: x0 + dir * far, mo: 0, huong: dir });
     return t;
@@ -3589,8 +3603,10 @@ class RigThu {
     t.to(s, { taiL: 1, taiR: 1, duoi: 14, duration: 0.15 }, 0);
     let at = 0.15;
     for (let i = 0; i < lan; i++) {
-      t.to(s, { mieng: 0.95, dau: -9, dauY: -5, dauX: 3, truocY: -4, taiL: 0.3, taiR: 0.3, duration: 0.09, ease: 'power2.out' }, at)
-       .to(s, { mieng: 0.1, dau: 0, dauY: 0, dauX: 0, truocY: 0, taiL: 1, taiR: 1, duration: 0.17, ease: 'power2.in' }, at + 0.11);
+      // Thụp nhẹ lấy đà rồi hất đầu lên sủa; ngực nảy theo. Miệng mở trong ba khung hình (0,12 s), không bật trong một.
+      t.to(s, { dauY: 3, truocY: 2, duration: 0.07, ease: 'sine.in' }, at - 0.07)
+       .to(s, { mieng: 0.95, dau: -15, dauY: -9, dauX: 4, truocY: -7, duoi: 22, taiL: 0.2, taiR: 0.2, duration: 0.12, ease: 'power2.out' }, at)
+       .to(s, { mieng: 0.1, dau: 0, dauY: 0, dauX: 0, truocY: 0, duoi: 14, taiL: 1, taiR: 1, duration: 0.2, ease: 'power2.in' }, at + 0.14);
       at += 0.42;
     }
     this.#khep(t, 0.35, at + 0.1);
@@ -3712,7 +3728,7 @@ class RigThu {
   hiss() {
     const t = this.tl(), s = this.s;
     let at = this.#dung(t, 0);
-    t.to(s, { cong: 1, xu: 1, truocY: -5, sauY: -7, duoi: 30, duoiCong: 0.55, taiL: -1, taiR: -1, dongTu: 0.35, cuoi: -0.6, dau: -4, dauY: 3,
+    t.to(s, { cong: 1, xu: 1, truocY: -5, sauY: -7, duoi: 18, duoiCong: 1.1, taiL: -2.6, taiR: -2.6, dongTu: 0.35, matY: 0.38, cuoi: -0.8, dau: -6, dauY: 5,       // tai ÉP ra sau (−1 gần như không thấy với tai mèo), mắt nheo, đuôi cong xù
               duration: 0.22, ease: 'back.out(2)' }, at);
     t.to(s, { mieng: 0.8, duration: 0.12 }, at + 0.15);
     for (let i = 0; i < 8; i++) t.to(s, { dauX: i % 2 ? -1.6 : 1.6, duoi: i % 2 ? 27 : 33, duration: 0.08 }, at + 0.3 + i * 0.08);      // run lên
@@ -5090,7 +5106,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.26.0';
+const VERSION = '0.27.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
