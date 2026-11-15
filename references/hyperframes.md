@@ -145,18 +145,75 @@ characters speaking at the same time; then it saves one contact-sheet image of t
 frames. Use it to fit the script to the planned
 length and to check staging, instead of rendering.
 
-## Lip-sync to a voice-over
+## Voice-over and lip-sync
 
-Put the audio in its own `<audio>` clip and give `explain(text, dur)` the same `text` and
-the clip's duration. Start both at the same time:
+Two ways to move the mouth:
+
+| | Use when | Mouth follows |
+|---|---|---|
+| `['explain', text, dur]` / `['speak', text, dur]` | there is no audio yet, or a rough match is enough | an estimate from the syllables of `text`, spread over `dur` |
+| `['speakCues', cues]` | there is a voice file | the audio itself: opens on the words, closes in the pauses, gestures on the breaks between phrases |
+
+**With a voice file:**
+
+1. Make the cues from the audio (nothing is uploaded; run it again whenever the audio changes):
+
+   ```bash
+   python3 tools/cues.py voice.wav --js          # → voice.cues.js, sets window.VOICE_CUES.voice
+   ```
+
+   It uses [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync) when the
+   `rhubarb` program is installed (on `PATH`, or its path in `$RHUBARB`) — mouth shapes then
+   follow the phonemes; add `--dialog words.txt` to help it. Otherwise it falls back to
+   **loudness**: timing is right, shapes are approximate (open / wider / widest). Force one
+   with `--method rhubarb|amplitude`. WAV is read directly; mp3, m4a and other formats need
+   `ffmpeg`. Without `--js` it writes Rhubarb-format JSON.
+
+2. Load the cues as a plain script (a composition cannot `fetch`) and use them as a step:
+
+   ```html
+   <audio id="voice" class="clip" src="voice.wav" data-start="5.31" data-duration="6" data-track-index="4" data-volume="1"></audio>
+   <script src="voice.cues.js"></script>
+   ```
+   ```js
+   const act = VGCharacter.sequence(rig, [['enter', 'left'], ['speakCues', window.VOICE_CUES.voice], 'wave']);
+   ```
+
+3. Set the audio clip's `data-start` to where the `speakCues` step starts — the number
+   `tools/peek.sh` prints for it (`act.data.steps` holds the same). The step lasts the audio's
+   length plus about 0.55 s of settling; the mouth is closed again when the audio ends.
+
+Several lines: one audio clip and one cue script per line (`--name line2` sets the key in
+`window.VOICE_CUES`). Complete example: `examples/voiceover/index.html` (its `voice.wav` is a
+synthetic placeholder hum — replace it with your recording or TTS output).
+
+**Without audio**, give `explain(text, dur)` the text and the planned length; when the audio
+arrives, switch the step to `speakCues`.
+
+## Camera shots
+
+`VGCharacter.shot(scene, rig, kind, options)` zooms the scene onto a character and returns a
+paused timeline to add to the composition's:
 
 ```js
-const act = VGCharacter.sequence(rig, ['enter', 1.0, ['explain', 'Chào bạn, mình là bác sĩ Lan.', 3.1]]);
+const scene = ['#wall', '#floor', '#dog', '#vet'];            // everything that belongs to the scene
+const speech = act.data.steps.find((step) => step.name === 'speakCues');
+tl.add(VGCharacter.shot(scene, vet, 'chest', { sequence: act, time: speech.start + 1 }).paused(false), speech.start - 0.3);
+tl.add(VGCharacter.shot(scene, vet, 'face',  { sequence: act, time: speech.start + 4 }).paused(false), speech.start + 4);
+tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), speech.start + speech.duration);
 ```
 
-`sequence` places the speech after `enter` and the 1 s pause. Read where it landed from
-`act.data.steps` — `[{ name, start, duration }, …]`, times relative to the start of `act` — or
-from the `tools/peek.sh` printout, and set the audio clip's `data-start` to match.
+- `scene` — a selector, an element, or an array of them. Every listed element gets the same
+  move and zoom, so they stay flat siblings in the composition (no wrapper). Leave out what
+  must not move: captions, a logo, the audio.
+- `kind` — `'face'`, `'chest'` (top of the head to the hips), `'full'`, or `'wide'` (back to
+  the whole frame; `rig` may be `null`).
+- `options` — `duration` (0.6 s; `0` is a hard cut), `ease`, `fill` (0.82: how much of the
+  frame height the target takes), and `sequence` + `time`: the character's sequence and the
+  moment of the shot **in that sequence**, so the camera aims at where the character is by
+  then (after a walk, seated…). Without them it aims at the character's first frame.
+- The aim is computed once, when the timeline is built: the camera does not follow a
+  character that walks during the shot. Only people have shots.
 
 ## Validate and render
 

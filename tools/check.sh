@@ -4,6 +4,8 @@
 set -e
 cd "$(dirname "$0")/.."
 python3 tools/build.py >/dev/null
+# Công cụ tạo cue nhép miệng (Python thuần) có bài tự kiểm riêng.
+python3 tools/check_cues.py
 CHROME_BIN="$(sh tools/chrome.sh)"
 PORT="${PORT:-8391}"
 python3 tools/serve.py "$PORT" >/dev/null 2>&1 &

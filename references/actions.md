@@ -23,7 +23,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shrug` | — | shrug with open palms | 1.7 |
 | `speak` | `(text, dur = 2)` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
 | `explain` | `(text, dur = 2.4)` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
-| `speakCues` | `(cues, dur, opts)` | lip-sync from timed Rhubarb mouth cues instead of an estimate | cue length |
+| `speakCues` | `(cues, dur, { cuChi })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
 | `worry` | — | brows up, hands fidget | 2.1 |
 | `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
@@ -165,6 +165,8 @@ granny.state.seat = 1;                       // already seated in the first fram
 | `VGCharacter.createCharacter(host, { id, config })` | build a person; returns `{ rig, id }`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
+| `VGCharacter.shot(scene, rig, kind, options)` | camera: zoom the scene onto a character's `'face'` / `'chest'` / `'full'`, or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
+| `rig.shotBox(kind)` | the box such a shot aims at, in frame units, for the rig's current state |
 | `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps`. The result is pre-sampled, so seeking to any time, in any order, gives the same frame |
 | `VGCharacter.seed(n)` | fix all randomness; `null` restores `Math.random` |
 | `VGCharacter.list()` | ids, action names, expression names, baked config ids |

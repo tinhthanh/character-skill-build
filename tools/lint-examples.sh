@@ -15,6 +15,7 @@ failed=0
 for example in examples/*/index.html; do
   name="$(basename "$(dirname "$example")")"
   mkdir -p "$WORK/$name"
+  cp -R "$(dirname "$example")/." "$WORK/$name/"            # audio, cue scripts and anything else the example loads
   # Cùng một phép thay mà người dùng làm khi chép ví dụ vào project thật.
   sed 's#\.\./\.\./dist/character\.iife\.js#character.iife.js#' "$example" > "$WORK/$name/index.html"
   cp dist/character.iife.js "$WORK/$name/"

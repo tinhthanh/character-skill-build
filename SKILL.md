@@ -161,6 +161,10 @@ and non-hex colours. These still fail without an error:
 - **Furniture:** `VGCharacter.createProp(host, 'chair' | 'stool' | 'table' | 'counter', { for: rig })`
   draws props in the character's own frame, so a chair with the same `left` / `bottom` /
   `height` as its sitter lines up by itself. See `references/actions.md` → Scene props.
+- **Voice and camera:** with a voice file, `python3 tools/cues.py voice.wav --js` makes mouth
+  cues and `['speakCues', window.VOICE_CUES.voice]` lip-syncs to them; `VGCharacter.shot(scene,
+  rig, 'face' | 'chest' | 'full' | 'wide')` cuts or pushes in to a character. Both are in
+  `references/hyperframes.md`; `examples/voiceover/` uses them together.
 - **Conversations:** `sitDown`, `standUp` and `face(target)` change the stance and *keep* it, so
   a character can speak while seated or while turned to another character. See
   `references/actions.md` → Stance.
@@ -187,8 +191,10 @@ dist/                 character.iife.js (commented) · character.slim.js (use th
 studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
                       describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture) ·
-                      lint-examples.sh (hyperframes lint on the examples; needs Node)
-examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated)
+                      lint-examples.sh (hyperframes lint on the examples; needs Node) ·
+                      cues.py (mouth cues from a voice file)
+examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated) ·
+                      voiceover/ (lip-sync to an audio file, camera shots)
 references/           slots.md · actions.md · hyperframes.md
 ```
 

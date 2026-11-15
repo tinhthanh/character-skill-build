@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.9.0
+
+Added
+- `tools/cues.py <audio>`: mouth cues for `speakCues` from a voice file — Rhubarb Lip Sync when
+  installed, a dependency-free loudness method otherwise; `--js` writes a script that sets
+  `window.VOICE_CUES`. `tools/check.sh` runs its self-test.
+- `VGCharacter.shot(scene, rig, 'face' | 'chest' | 'full' | 'wide', options)`: camera pushes
+  and cuts. It moves flat scene elements together (no wrapper) and can aim at where the
+  character will be at a given time of its sequence. `rig.shotBox(kind)`.
+- `examples/voiceover/`: lip-sync to an audio clip with three camera shots (its `voice.wav` is
+  a synthetic placeholder).
+- Docs: "Voice-over and lip-sync" and "Camera shots" in `references/hyperframes.md`.
+
+Fixed
+- `speakCues` shifted the character's weight around the middle of its host, so a character
+  that had walked slid back to the centre when it started to speak, and stayed there.
+- `speakCues` could end slightly off the rest pose (position, head tilt) when a sway or drift
+  beat outlasted the line.
+- The vet's chest-badge text made `hyperframes check` report `text_occluded`,
+  `text_below_floor` and `line_unread`; it is now marked as texture.
+
+Changed
+- `tools/lint-examples.sh` copies each example's whole folder (audio, cue scripts).
+
 ## 0.8.1
 
 Fixed

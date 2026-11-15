@@ -410,6 +410,49 @@ try {
     if (Object.keys(L.kit.hair).length < 10 || !L.kit.outfits.dress || !L.kit.bodies.child) hong('kit', 'hair / outfits / bodies presets are missing');
   }
 
+  // ── Nhép miệng theo cue và máy quay ──
+  {
+    const stage = document.createElement('div'); stage.dataset.compositionId = 'check-stage';
+    stage.style.cssText = 'position:fixed;left:-4000px;top:0;width:1920px;height:1080px;overflow:hidden';
+    stage.innerHTML = '<div id="ck-wall" style="position:absolute;inset:0"></div><div id="ck-host" style="position:absolute;left:300px;bottom:96px;height:760px"></div><div id="ck-caption" style="position:absolute;left:0;bottom:0;width:100px;height:40px"></div>';
+    document.body.appendChild(stage);
+    const rig = L.createCharacter(stage.querySelector('#ck-host'), { id: 'vet' }).rig;
+    const cues = { metadata: { duration: 3 }, mouthCues: [{ start: 0, end: 0.4, value: 'X' }, { start: 0.4, end: 1.2, value: 'D' }, { start: 1.2, end: 1.8, value: 'X' }, { start: 1.8, end: 2.7, value: 'C' }, { start: 2.7, end: 3, value: 'X' }] };
+    const act = L.sequence(rig, [['walk', 4, 200], 'sitDown', ['speakCues', cues], 'nod']);
+    const speech = act.data.steps[2];
+    let low = Infinity, high = -Infinity;
+    for (let time = speech.start; time <= speech.start + speech.duration; time += 0.05) { act.time(time); low = Math.min(low, rig.state.x); high = Math.max(high, rig.state.x); if (Math.abs(rig.state.seat - 1) > 1e-3) hong('speakCues', 'the character stands up while speaking'); }
+    if (low < 190 || high > 210) hong('speakCues', `the character drifts away from where it walked to (x ${low.toFixed(0)}…${high.toFixed(0)}, expected about 200)`);
+    act.time(speech.start + 0.8); if (rig.state.mouthOpen < 0.3) hong('speakCues', `mouth is closed during an open cue (${rig.state.mouthOpen})`);
+    act.time(speech.start + 1.55); if (rig.state.mouthOpen > 0.12) hong('speakCues', `mouth is open during a pause (${rig.state.mouthOpen})`);
+    act.time(speech.start + speech.duration);
+    if (Math.abs(rig.state.x - 200) > 1e-3) hong('speakCues', `ends at x ${rig.state.x} instead of 200`);
+    for (const key of ['thighL', 'thighR', 'shinL', 'shinR', 'upperArmL', 'forearmR', 'mouthOpen', 'headTilt'].filter((k) => k in rig.state))
+      if (Math.abs(rig.state[key] - rig.NGHI[S.PERSON_STATE_KEYS[key]]) > 1e-3) hong('speakCues', `does not return ${key} to rest (${rig.state[key]})`);
+    act.time(0);
+    // Máy quay: mọi phần tử của cảnh nhận CÙNG một phép phóng; nhân vật nằm giữa khung; 'wide' trả về như cũ.
+    const scene = ['#ck-wall', '#ck-host'];
+    const centreOf = (kind) => { const frame = stage.getBoundingClientRect(), svg = rig.svg.getBoundingClientRect(), box = rig.shotBox(kind), unit = svg.height / 470, left = svg.left + (svg.width - 400 * unit) / 2;
+      return { x: left + (box.x + box.width / 2) * unit - frame.left, y: svg.top + (box.y + box.height / 2) * unit - frame.top, height: box.height * unit }; };
+    for (const kind of ['face', 'chest', 'full']) {
+      const push = L.shot(scene, rig, kind, { sequence: act, time: speech.start + 1 }); push.progress(1); act.time(speech.start + 1);
+      const seen = centreOf(kind);
+      if (Math.abs(seen.x - 960) > 3) hong('shot', `${kind}: the character is ${Math.round(seen.x - 960)}px off the centre of the frame (it had walked 200 units and sat down)`);
+      if (Math.abs(seen.height - 0.82 * 1080) > 6 && push.data.target.scale > 1.001) hong('shot', `${kind}: the target fills ${Math.round(seen.height)}px of the frame height instead of ${Math.round(0.82 * 1080)}`);
+      const wall = stage.querySelector('#ck-wall').getBoundingClientRect(), frame = stage.getBoundingClientRect();
+      if (wall.left > frame.left + 0.5 || wall.top > frame.top + 0.5 || wall.right < frame.right - 0.5 || wall.bottom < frame.bottom - 0.5) hong('shot', `${kind}: the scene no longer covers the frame`);
+      if (Math.abs(wall.width / 1920 - rig.host.getBoundingClientRect().height / 760) > 1e-3) hong('shot', `${kind}: scene elements are not scaled alike`);
+      push.kill(); act.time(0);
+    }
+    const wide = L.shot(scene, null, 'wide'); wide.progress(1);
+    const back = stage.querySelector('#ck-wall').getBoundingClientRect(), frame = stage.getBoundingClientRect();
+    if (Math.abs(back.width - 1920) > 0.5 || Math.abs(back.left - frame.left) > 0.5) hong('shot', "'wide' does not return to the full frame");
+    if (stage.querySelector('#ck-caption').style.transform) hong('shot', 'an element outside the scene list was moved');
+    try { L.shot('#nothing-here', rig, 'face'); hong('shot', 'an empty scene should throw'); } catch (error) { /* đúng */ }
+    try { L.shot(scene, rig, 'closeup'); hong('shot', 'an unknown shot kind should throw'); } catch (error) { /* đúng */ }
+    stage.remove();
+  }
+
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
   {
     const load = (url) => new Promise((resolve) => {

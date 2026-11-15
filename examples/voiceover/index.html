@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HyperFrames example — voice-over with lip-sync and camera shots</title>
+<style>
+  html, body { margin: 0; background: #0b1218; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+  #wall { position: absolute; inset: 0; background: linear-gradient(165deg, #1f4a5c 0%, #0c1c26 72%); }
+  #floor { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; background: #0f2a38; }
+  #vet { position: absolute; left: -60px; bottom: 96px; height: 760px; }       /* at the edge: enters from outside the frame */
+  #dog { position: absolute; left: 1050px; bottom: 96px; height: 330px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="voiceover" data-start="0" data-duration="16" data-width="1920" data-height="1080">
+  <div id="wall" class="clip" data-start="0" data-duration="16" data-track-index="0"></div>
+  <div id="floor" class="clip" data-start="0" data-duration="16" data-track-index="1"></div>
+  <div id="dog" class="clip" data-start="0" data-duration="16" data-track-index="2"></div>
+  <div id="vet" class="clip" data-start="0" data-duration="16" data-track-index="3"></div>
+  <!-- The voice. Its data-start is where the `speakCues` step lands in the sequence below
+       (printed by tools/peek.sh). voice.wav here is a synthetic placeholder hum — replace it
+       with your recording or TTS output and re-run:  python3 tools/cues.py voice.wav --js -->
+  <audio id="voice" class="clip" src="voice.wav" data-start="5.31" data-duration="6" data-track-index="4" data-volume="1"></audio>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <!-- In a real project: copy dist/character.slim.js next to index.html and load that. -->
+  <script src="../../dist/character.iife.js"></script>
+  <!-- Mouth cues made from the audio by tools/cues.py; sets window.VOICE_CUES.voice. -->
+  <script src="voice.cues.js"></script>
+  <script>
+    VGCharacter.seed(5);
+    // Everything that belongs to the scene. The camera moves these together; clips stay flat
+    // siblings (HyperFrames does not want timed clips inside a wrapper).
+    const scene = ['#wall', '#floor', '#dog', '#vet'];
+    const vet = VGCharacter.createCharacter(document.getElementById('vet'), { id: 'vet' }).rig;
+    const dog = VGCharacter.createPet(document.getElementById('dog'), { species: 'dog' }).rig;
+
+    // `speakCues` moves the mouth from the real audio (and gestures on the pauses between
+    // phrases), where `speak` / `explain` only estimate from the text.
+    const act = VGCharacter.sequence(vet, [
+      ['enter', 'left'], ['walk', 4, 230], ['face', dog],
+      ['speakCues', window.VOICE_CUES.voice],
+      ['face', 'front'], 'wave',
+    ]);
+    const pet = VGCharacter.sequence(dog, [['face', vet], ['idle', 3], 'sitDown', 'wagTail', ['idle', 2], 'tiltHead', 'bark', 'wagTail']);
+
+    const speech = act.data.steps.find((step) => step.name === 'speakCues');     // { start, duration }
+    const tl = gsap.timeline({ paused: true });
+    tl.add(act.paused(false), 0);
+    tl.add(pet.paused(false), 0);
+    // Camera: push in to the vet's chest as she starts to speak, to her face for the last phrase,
+    // back to the wide shot when she is done. `sequence` + `time` aim at where she is by then.
+    tl.add(VGCharacter.shot(scene, vet, 'chest', { sequence: act, time: speech.start + 1, duration: 0.8 }).paused(false), speech.start - 0.3);
+    tl.add(VGCharacter.shot(scene, vet, 'face', { sequence: act, time: speech.start + 4.6, duration: 0.5 }).paused(false), speech.start + 4.3);
+    tl.add(VGCharacter.shot(scene, null, 'wide', { duration: 0.8 }).paused(false), speech.start + speech.duration - 0.2);
+    window.__timelines = window.__timelines || {};
+    window.__timelines['voiceover'] = tl;
+  </script>
+</div>
+</body>
+</html>

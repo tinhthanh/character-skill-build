@@ -1,4 +1,4 @@
-/* VGCharacter v0.8.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.9.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -660,7 +660,7 @@ const NV_BAC_SI_THU_Y = {
 // rộng thì chữ tự ở giữa. Ảnh mẫu để chữ cao ~10.6 đơn vị, gần kín lòng túi.
 NV_BAC_SI_THU_Y.phuKien = ((goc) => (p, m, nv) => goc(p, m).replace('__HUYHIEU__',
   nv && nv.huyHieu
-    ? `<text x="14" y="-49.5" font-family="Arial, sans-serif" font-size="12" font-weight="800" fill="#fff" text-anchor="middle">${nv.huyHieu}</text>`
+    ? `<text x="14" y="-49.5" font-family="Arial, sans-serif" font-size="12" font-weight="800" fill="#fff" text-anchor="middle" data-layout-ignore="" data-layout-allow-occlusion="">${nv.huyHieu}</text>`     // chữ là HOẠ TIẾT trên áo, không phải chữ để đọc — báo cho bộ kiểm bố cục của HyperFrames
     : `<g fill="#fff" transform="translate(14 -54)"><ellipse cx="0" cy="2.2" rx="4.4" ry="3.6"/><circle cx="-5" cy="-2.8" r="1.8"/><circle cx="-1.7" cy="-5" r="1.8"/><circle cx="1.7" cy="-5" r="1.8"/><circle cx="5" cy="-2.8" r="1.8"/></g>`))(NV_BAC_SI_THU_Y.phuKien);
 
 class RigSVG {
@@ -1595,6 +1595,25 @@ class RigSVG {
     return HONG.y + DOI_Y + this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 + 13 * nv.dayChan * nv.coChan;
   }
 
+  /**
+   * KHUNG NGẮM của một cỡ cảnh, tính từ hình học của rig ở TRẠNG THÁI HIỆN TẠI (đã đi tới đâu,
+   * đang ngồi hay đứng) — trong đơn vị khung 400 × 470. Máy quay (`shot` trong index.js) dùng nó.
+   *   'face'   cận mặt      'chest'  từ đỉnh đầu tới hông      'full'  cả người
+   * Trả về { x, y, width, height }.
+   */
+  shotBox(kind = 'face') {
+    const nv = this.nv, s = this.s;
+    const drop = this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + s.y;
+    const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
+    const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
+    const centre = KHUNG.w / 2 + s.x, hip = HONG.y + DOI_Y + drop;
+    const box = (top, bottom) => ({ x: centre - (bottom - top) / 2, y: top, width: bottom - top, height: bottom - top });
+    if (kind === 'face') return box(headY - head * 1.3, headY + head * 1.08 + 5);     // chừa chỗ cho búi tóc / mũ phía trên
+    if (kind === 'chest') return box(headY - head * 1.2, hip + 12);
+    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14);
+    throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+  }
+
   hangChan() {
     const nv = this.nv;
     return (428 - HONG.y) - (DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan) * nv.coChan;
@@ -2316,7 +2335,10 @@ class RigSVG {
   #troi(t, khoa, min, max, D, nganNhat = 0.7, daiNhat = 2.0) {
     let at = 0;
     while (at < D) {
-      const d = nhieu(nganNhat, daiNhat);
+      // Nhịp cuối bị cắt cho vừa `D`: một nhịp trôi còn chạy sau `D` sẽ đè lên `#khep` và để kênh
+      // ấy (đầu nghiêng, hơi thở) dừng lệch khỏi tư thế nghỉ.
+      const d = Math.min(nhieu(nganNhat, daiNhat), D - at);
+      if (d < 0.05) break;
       t.to(this.s, { [khoa]: nhieu(min, max), duration: d, ease: 'sine.inOut' }, at);
       at += d;
     }
@@ -2492,15 +2514,21 @@ class RigSVG {
     // với thở (1.9) và với đầu (2.6/3.1) — ba nhịp không bao giờ trùng pha.
     // Dồn trọng tâm: ĐỔI BÊN rồi GIỮ một lúc, cả hai đều ngẫu nhiên. Người
     // đứng không lắc lư theo nhịp — họ tì một chân, đứng đó một lúc, rồi đổi.
+    // Dồn trọng tâm quanh CHỖ ĐANG ĐỨNG (`x0`), không quanh giữa khung: nhân vật đã `walk` tới
+    // một điểm đánh dấu mà dồn quanh 0 thì vừa mở miệng đã trượt về giữa khung và ở luôn đó.
+    const x0 = s.x;
     let atC = nhieu(0.2, 0.9), ben = ngau() < 0.5 ? 1 : -1;
     while (atC < D) {
       const doi = nhieu(0.7, 1.3);
+      // Nhịp dồn trọng tâm phải XONG trước khi câu nói kết thúc: nhịp nào còn chạy lúc `#khep`
+      // đưa người về chỗ cũ thì nó thắng, và nhân vật dừng lại ở tư thế lệch.
+      if (atC + doi > D - 0.05) break;
       // ĐỔI BÊN chỉ 70% số lần — 30% còn lại chỉnh lại trọng tâm trên CÙNG
       // một chân. Luân phiên cứng trái–phải là một sóng vuông, và tự-tương-
       // quan bắt được nó ngay (đo được đỉnh quay lại 0.57 ở `x`).
       if (ngau() < 0.7) ben = -ben;
       const manh = nhieu(0.45, 1);
-      t.to(s, { x: ben * 2.3 * manh, duiL: ben * 3.0 * manh, duiR: -ben * 3.0 * manh,
+      t.to(s, { x: x0 + ben * 2.3 * manh, duiL: ben * 3.0 * manh, duiR: -ben * 3.0 * manh,
                 ongL: -ben * 2.0 * manh, ongR: ben * 2.0 * manh,
                 duration: doi, ease: 'sine.inOut' }, atC);
       atC += doi + nhieu(0.9, 3.2);
@@ -2544,7 +2572,7 @@ class RigSVG {
 
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
     t.to(s, { mieng: 0, chum: 0, duration: 0.18 }, D);
-    this.#khep(t, 0.5, D + 0.05);
+    this.#khep(t, 0.5, D + 0.05, { x: x0 });       // `#khep` không đụng `x`; trả về đúng chỗ đứng lúc bắt đầu
     return t;
   }
 
@@ -4757,7 +4785,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.8.1';
+const VERSION = '0.9.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5107,13 +5135,78 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   return timeline;
 }
 
+/**
+ * MÁY QUAY: phóng CẢNH vào một nhân vật — cận mặt, ngang ngực, cả người — hoặc trả về toàn
+ * cảnh. Trả về một timeline (paused) để `add` vào timeline của composition.
+ *
+ *   const scene = ['#wall', '#floor', '#dog', '#vet'];          // mọi thứ thuộc về cảnh
+ *   tl.add(VGCharacter.shot(scene, rig, 'face', { sequence: act, time: 5.2 }).paused(false), 5.0);
+ *   tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), 9.0);
+ *
+ *   scene     các phần tử của cảnh: một selector, một phần tử, hoặc một mảng của hai thứ đó.
+ *             TỪNG phần tử được dịch và phóng như nhau quanh góc trên-trái của khung hình, nên
+ *             chúng cứ nằm phẳng cạnh nhau trong composition — không cần (và không nên) bọc
+ *             chung vào một lớp. Thứ không nằm trong danh sách (phụ đề, logo) thì đứng yên.
+ *   rig       nhân vật NGƯỜI cần ngắm (bỏ qua khi kind = 'wide')
+ *   kind      'face' | 'chest' | 'full' | 'wide'
+ *   options   duration (0.6; 0 = cắt cảnh), ease, fill (0.82 — phần chiều cao khung mà vùng ngắm chiếm),
+ *             sequence + time: chuỗi của nhân vật và thời điểm (tính trong chuỗi) của cảnh quay —
+ *             để ngắm đúng chỗ nhân vật ĐANG Ở lúc ấy (đã đi, đã ngồi). Không đưa thì lấy
+ *             trạng thái hiện tại của rig, tức khung đầu của chuỗi.
+ *             frame: phần tử làm khung hình (mặc định: phần tử gốc có data-composition-id).
+ *
+ * Vị trí tính MỘT LẦN lúc dựng, từ bố cục trang và hình học của rig — nên tua tới đâu cũng ra
+ * cùng một khung hình. Máy quay không bám theo nhân vật đang di chuyển.
+ */
+function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: actions, time, frame } = {}) {
+  const elements = [].concat(scene || []).flatMap((item) => (typeof item === 'string' ? [...document.querySelectorAll(item)] : [item])).filter((item) => item && item.nodeType === 1);
+  if (!elements.length) throw new Error('[character] shot(scene, …): scene must be a selector, an element, or an array of them — and match at least one element');
+  const root = frame || elements[0].closest('[data-composition-id]') || elements[0].parentElement;
+  const frameWidth = root.offsetWidth, frameHeight = root.offsetHeight;
+  // Vị trí của một phần tử trong khung hình, cộng dồn theo chuỗi offsetParent — KHÔNG dùng
+  // getBoundingClientRect, vì số ấy đã gồm cả phép phóng của một cảnh quay trước.
+  const place = (element) => {
+    let x = 0, y = 0;
+    for (let node = element; node && node !== root; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
+    return { x, y };
+  };
+  let target = { x: 0, y: 0, scale: 1 };
+  if (kind !== 'wide') {
+    if (!rig || typeof rig.shotBox !== 'function') throw new Error(`[character] shot(scene, rig, "${kind}"): rig must be a person rig (createCharacter(...).rig)`);
+    // Đưa nhân vật tới đúng thời điểm của cảnh quay để đọc vị trí, rồi trả chuỗi về chỗ cũ.
+    const before = actions ? actions.time() : 0;
+    if (actions) actions.time(time ?? before);
+    const box = rig.shotBox(kind);
+    if (actions) actions.time(before);
+    // Khung của rig (400 × 470) nằm vừa trong host, canh giữa.
+    const host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
+    const unit = Math.min(hostWidth / RigSVG.KHUNG.w, hostHeight / RigSVG.KHUNG.h);
+    const left = host.x + (hostWidth - RigSVG.KHUNG.w * unit) / 2, top = host.y + (hostHeight - RigSVG.KHUNG.h * unit) / 2;
+    const centreX = left + (box.x + box.width / 2) * unit, centreY = top + (box.y + box.height / 2) * unit;
+    const scale = Math.max(1, Math.min(8, fill * frameHeight / (box.height * unit)));
+    // Canh vùng ngắm vào giữa khung, nhưng không để lộ ra ngoài mép cảnh.
+    const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
+    target = { x: within(frameWidth / 2 - centreX * scale, frameWidth), y: within(frameHeight / 2 - centreY * scale, frameHeight), scale };
+  }
+  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  for (const element of elements) {
+    // Gốc phóng của TỪNG phần tử là góc trên-trái của khung hình (tính trong toạ độ của nó), nên
+    // mọi phần tử chịu đúng một phép biến đổi như thể chúng nằm chung một lớp.
+    const at = place(element);
+    gsap.set(element, { transformOrigin: `${-at.x}px ${-at.y}px` });
+    timeline.to(element, { ...target, duration: Math.max(duration, 0.001), ease: duration > 0 ? ease : 'none' }, 0);
+  }
+  timeline.data = { type: 'character-shot', kind, target };
+  return timeline;
+}
+
 // Đăng ký nhân vật có sẵn rồi tới nhân vật tuỳ chỉnh. Đặt ở CUỐI module: việc đăng ký dùng
 // các hằng kiểm tra khai báo phía trên, chạy sớm hơn là đụng vào chúng trước khi chúng có giá trị.
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
 
 
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, RigSVG, RigThu, createProp };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, RigSVG, RigThu, createProp };
 })();
 
 __m['runtime/index.js'].__setBakedConfigs({});

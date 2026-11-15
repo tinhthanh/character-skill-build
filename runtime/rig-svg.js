@@ -653,7 +653,7 @@ const NV_BAC_SI_THU_Y = {
 // rộng thì chữ tự ở giữa. Ảnh mẫu để chữ cao ~10.6 đơn vị, gần kín lòng túi.
 NV_BAC_SI_THU_Y.phuKien = ((goc) => (p, m, nv) => goc(p, m).replace('__HUYHIEU__',
   nv && nv.huyHieu
-    ? `<text x="14" y="-49.5" font-family="Arial, sans-serif" font-size="12" font-weight="800" fill="#fff" text-anchor="middle">${nv.huyHieu}</text>`
+    ? `<text x="14" y="-49.5" font-family="Arial, sans-serif" font-size="12" font-weight="800" fill="#fff" text-anchor="middle" data-layout-ignore="" data-layout-allow-occlusion="">${nv.huyHieu}</text>`     // chữ là HOẠ TIẾT trên áo, không phải chữ để đọc — báo cho bộ kiểm bố cục của HyperFrames
     : `<g fill="#fff" transform="translate(14 -54)"><ellipse cx="0" cy="2.2" rx="4.4" ry="3.6"/><circle cx="-5" cy="-2.8" r="1.8"/><circle cx="-1.7" cy="-5" r="1.8"/><circle cx="1.7" cy="-5" r="1.8"/><circle cx="5" cy="-2.8" r="1.8"/></g>`))(NV_BAC_SI_THU_Y.phuKien);
 
 export class RigSVG {
@@ -1588,6 +1588,25 @@ export class RigSVG {
     return HONG.y + DOI_Y + this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 + 13 * nv.dayChan * nv.coChan;
   }
 
+  /**
+   * KHUNG NGẮM của một cỡ cảnh, tính từ hình học của rig ở TRẠNG THÁI HIỆN TẠI (đã đi tới đâu,
+   * đang ngồi hay đứng) — trong đơn vị khung 400 × 470. Máy quay (`shot` trong index.js) dùng nó.
+   *   'face'   cận mặt      'chest'  từ đỉnh đầu tới hông      'full'  cả người
+   * Trả về { x, y, width, height }.
+   */
+  shotBox(kind = 'face') {
+    const nv = this.nv, s = this.s;
+    const drop = this.hangChan() + DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + s.y;
+    const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
+    const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
+    const centre = KHUNG.w / 2 + s.x, hip = HONG.y + DOI_Y + drop;
+    const box = (top, bottom) => ({ x: centre - (bottom - top) / 2, y: top, width: bottom - top, height: bottom - top });
+    if (kind === 'face') return box(headY - head * 1.3, headY + head * 1.08 + 5);     // chừa chỗ cho búi tóc / mũ phía trên
+    if (kind === 'chest') return box(headY - head * 1.2, hip + 12);
+    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14);
+    throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+  }
+
   hangChan() {
     const nv = this.nv;
     return (428 - HONG.y) - (DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan) * nv.coChan;
@@ -2309,7 +2328,10 @@ export class RigSVG {
   #troi(t, khoa, min, max, D, nganNhat = 0.7, daiNhat = 2.0) {
     let at = 0;
     while (at < D) {
-      const d = nhieu(nganNhat, daiNhat);
+      // Nhịp cuối bị cắt cho vừa `D`: một nhịp trôi còn chạy sau `D` sẽ đè lên `#khep` và để kênh
+      // ấy (đầu nghiêng, hơi thở) dừng lệch khỏi tư thế nghỉ.
+      const d = Math.min(nhieu(nganNhat, daiNhat), D - at);
+      if (d < 0.05) break;
       t.to(this.s, { [khoa]: nhieu(min, max), duration: d, ease: 'sine.inOut' }, at);
       at += d;
     }
@@ -2485,15 +2507,21 @@ export class RigSVG {
     // với thở (1.9) và với đầu (2.6/3.1) — ba nhịp không bao giờ trùng pha.
     // Dồn trọng tâm: ĐỔI BÊN rồi GIỮ một lúc, cả hai đều ngẫu nhiên. Người
     // đứng không lắc lư theo nhịp — họ tì một chân, đứng đó một lúc, rồi đổi.
+    // Dồn trọng tâm quanh CHỖ ĐANG ĐỨNG (`x0`), không quanh giữa khung: nhân vật đã `walk` tới
+    // một điểm đánh dấu mà dồn quanh 0 thì vừa mở miệng đã trượt về giữa khung và ở luôn đó.
+    const x0 = s.x;
     let atC = nhieu(0.2, 0.9), ben = ngau() < 0.5 ? 1 : -1;
     while (atC < D) {
       const doi = nhieu(0.7, 1.3);
+      // Nhịp dồn trọng tâm phải XONG trước khi câu nói kết thúc: nhịp nào còn chạy lúc `#khep`
+      // đưa người về chỗ cũ thì nó thắng, và nhân vật dừng lại ở tư thế lệch.
+      if (atC + doi > D - 0.05) break;
       // ĐỔI BÊN chỉ 70% số lần — 30% còn lại chỉnh lại trọng tâm trên CÙNG
       // một chân. Luân phiên cứng trái–phải là một sóng vuông, và tự-tương-
       // quan bắt được nó ngay (đo được đỉnh quay lại 0.57 ở `x`).
       if (ngau() < 0.7) ben = -ben;
       const manh = nhieu(0.45, 1);
-      t.to(s, { x: ben * 2.3 * manh, duiL: ben * 3.0 * manh, duiR: -ben * 3.0 * manh,
+      t.to(s, { x: x0 + ben * 2.3 * manh, duiL: ben * 3.0 * manh, duiR: -ben * 3.0 * manh,
                 ongL: -ben * 2.0 * manh, ongR: ben * 2.0 * manh,
                 duration: doi, ease: 'sine.inOut' }, atC);
       atC += doi + nhieu(0.9, 3.2);
@@ -2537,7 +2565,7 @@ export class RigSVG {
 
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
     t.to(s, { mieng: 0, chum: 0, duration: 0.18 }, D);
-    this.#khep(t, 0.5, D + 0.05);
+    this.#khep(t, 0.5, D + 0.05, { x: x0 });       // `#khep` không đụng `x`; trả về đúng chỗ đứng lúc bắt đầu
     return t;
   }
 

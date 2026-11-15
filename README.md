@@ -28,6 +28,9 @@ And what a scene can do with them:
   draws props that line up with a seated character.
 - **Conversations** — one sequence per character, lines taking turns;
   `examples/conversation/` is a complete two-person scene.
+- **Voice and camera** — `tools/cues.py voice.wav` turns a voice file into mouth cues for
+  `speakCues` (Rhubarb when installed, loudness otherwise); `shot(scene, rig, 'face')` pushes
+  the camera in. `examples/voiceover/` shows both.
 
 - **`SKILL.md`** — instructions an AI agent follows to create a character from a brief,
   verify it, and place it in a composition.
