@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.25.0
+
+Fixed
+- **A worried or angry character smiled every time it opened its mouth.** While speaking
+  with a `mood`, wide mouth shapes pulled the corners of the mouth up to level, and an open
+  mouth with level corners reads as a smile. The corners now stay close to the mood for the
+  whole line.
+- **A cup held in the right hand was upside down** (lid pointing down) — the item drawing
+  for the right hand is not mirrored, and the upright reference introduced in 0.22.0 kept
+  that orientation. Items now stand lid-up in either hand.
+- **The cup dropped to the hip when the character turned sideways.** A carrying arm keeps
+  its forearm folded in front of the body in side view, so the item stays at belly height.
+
+Changed
+- `express('laughing')` shakes the shoulders and head visibly (and bobs the body when
+  standing); it moved about one pixel in a 720p full-body shot before.
+
 ## 0.24.0
 
 Added

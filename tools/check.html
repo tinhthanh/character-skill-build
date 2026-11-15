@@ -450,7 +450,7 @@ try {
     }
     // Đồ cầm LUÔN ĐỨNG THẲNG trên màn hình: lúc nghỉ, lúc đi ngang cả hai chiều, lúc quay mặt.
     {
-      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', upright = side === 'R' ? 90 : -90;
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', upright = -90;       // −90° là nắp cốc hướng LÊN, cho cả hai tay
       const tilt = () => { actor.render(); const m = actor.el['item' + side].getScreenCTM(); let off = Math.atan2(m.b, m.a) * 180 / Math.PI - upright; off = ((off + 540) % 360) - 180; return Math.abs(off); };
       const poses = [['at rest', null, 0], ['walking right', ['walk', 4, 120], 0.5], ['walking left', ['walk', 4, -120], 0.5], ['facing left', ['face', 'left'], 1], ['waving', ['wave'], 0.5]];
       for (const [label, step, progress] of poses) {
@@ -526,6 +526,29 @@ try {
       const still = L.sequence(actor, steps, { breathe: false }), frozen = range(still);
       if (frozen > 0.05) hong('breathing', '`breathe: false` still breathes');
       still.kill(); actor.svg.remove();
+    }
+    // Nói với nét mặt buồn / giận: khoé miệng TRỄ XUỐNG suốt câu, kể cả lúc miệng mở to (từng ngang ra — đọc thành cười).
+    for (const mood of ['worried', 'angry', 'sad']) {
+      L.seed(3); const actor = L.createCharacter(host, { id: 'vet' }).rig;
+      const line = L.sequence(actor, [['explain', 'Xin chào các bạn, hôm nay mình khám định kỳ cho bé nhé.', 4, { mood }]]); let highest = -9;
+      for (let time = 0.5; time <= 3.9; time += 1 / 60) { line.time(time); highest = Math.max(highest, actor.s.cuoi); }
+      if (highest > -0.3) hong('mood', `explain (${mood}): the mouth corners rise to ${highest.toFixed(2)} while speaking — reads as a smile`);
+      line.kill(); actor.svg.remove();
+    }
+    // Cười: vai và đầu rung đủ lớn để thấy.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig, t = actor.express('laughing', 1.2); let low = 99, high = -99;
+      for (let time = 0.4; time <= 1.4; time += 1 / 60) { t.time(time); low = Math.min(low, actor.s.vai); high = Math.max(high, actor.s.vai); }
+      if (high - low < 5) hong('express', `laughing: the shoulders shake only ${(high - low).toFixed(1)} units`);
+      t.kill(); actor.svg.remove();
+    }
+    // Đi ngang: cái cốc vẫn ở ngang bụng như lúc đứng (từng tụt xuống ngang hông ngay khi quay người).
+    {
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', item = actor.el['item' + side];
+      const height = () => { actor.render(); const box = item.getBoundingClientRect(), frame = actor.svg.getBoundingClientRect(); return (box.top + box.height / 2 - frame.top) / frame.height * 470; };
+      const rest = height();
+      for (const distance of [120, -120]) { const t = actor.walk(4, distance); t.progress(0.5); const now = height(); if (Math.abs(now - rest) > 26) hong('held item', `walking ${distance > 0 ? 'right' : 'left'}: the item moves ${(now - rest).toFixed(0)} units from where it is held at rest`); t.kill(); actor.reset(); }
+      actor.svg.remove();
     }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {

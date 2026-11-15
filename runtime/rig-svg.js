@@ -1307,6 +1307,9 @@ export class RigSVG {
       return { bat: 24 * v - gap * 0.2, cang: clamp(4 + gap + 6 * v + 16 * Math.max(0, v), 2, 150) };
     };
     const nL = tayNghieng(s.cangL, s.vungL), nR = tayNghieng(s.cangR, s.vungR);
+    // Tay đang CẦM ĐỒ thì nhìn nghiêng vẫn gập cẳng tay ngang trước bụng (bưng đồ). Nhân vật nghỉ ở dáng gập hờ thì
+    // công thức trên chỉ gập ~50°: vừa quay người là cái cốc tụt từ ngang bụng xuống ngang hông trong hai khung hình.
+    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) arm.cang = Math.max(arm.cang, 86);
     // Bờ vai chỉ nhấc theo phần giơ tay CÒN THẤY trong mặt phẳng trán (× cos ψ):
     // nhìn nghiêng thì tay đánh trước–sau, không có gì đẩy vai lên.
     const gocVai = { L: GOC_VAI_MAX * mem((Math.abs(tL.bat) * cF - 40) / 110), R: GOC_VAI_MAX * mem((Math.abs(tR.bat) * cF - 40) / 110) };
@@ -1352,7 +1355,9 @@ export class RigSVG {
     // TAY (0, 10) để nó vẫn nằm trong tay.
     const armTurn = { L: tL.bat * cF - sF * nL.bat + tL.cang * cF - sF * nL.cang, R: -tR.bat * cF - sF * nR.bat - tR.cang * cF - sF * nR.cang };
     for (const side of ['L', 'R']) if (this.holds[side]) {
-      const upright = chuanHoaGoc((side === 'L' ? -90 : 90) - armTurn[side] - s.than);
+      // Mốc là −90° cho CẢ HAI tay: hình tay trái được soi gương sẵn bên trong, còn hình tay phải vẽ nguyên — ở dáng
+      // bưng đồ của tay phải (+90°) nắp cốc chúc XUỐNG. Trước bản này cốc của người cầm tay phải luôn lộn ngược.
+      const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
       e['item' + side].setAttribute('transform', `rotate(${upright.toFixed(2)} 0 10)`);
     }
 
@@ -2238,7 +2243,13 @@ export class RigSVG {
     } else if (name === 'sad') {
       t.to(s, { than: N.than + 1.5, duration: 0.5, ease: 'sine.inOut' }, 0);
     }
-    if (name === 'laughing') t.to(s, { dauY: face.dauY + 4.5, vai: face.vai + 3.5, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
+    if (name === 'laughing') {
+      // Rung người vì cười: vai và đầu nảy theo nhịp, thân ngả nhẹ ra sau. Bản trước chỉ nảy 4 đơn vị — đo trên phim
+      // 720p là một điểm ảnh, nhìn như ảnh tĩnh.
+      const beats = Math.max(1, 2 * Math.round(hold / 0.3) - 1);
+      t.to(s, { dauY: face.dauY + 9, vai: face.vai + 7, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: beats }, into);
+      if (standing) t.to(s, { y: -4, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: beats }, into);
+    }
     else if (name !== 'surprised' && hold > 0.8) { this.blinkTo = face.matY || 0; this.#chop(t, into + hold * 0.5); this.blinkTo = 0; }      // ngạc nhiên thì không chớp mắt
     this.#khep(t, 0.4, into + hold);
     return t;
@@ -2414,7 +2425,10 @@ export class RigSVG {
     if (!mood) return { start: { mayL: brows, mayR: brows, cuoi: smile }, corner: (value) => value, eyes: 0 };
     const face = RigSVG.EXPRESSIONS[mood];
     if (!face) throw new Error(`[character] no mood "${mood}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
-    const corner = (value) => face.cuoi * 0.7 + value * 0.3;
+    // Khoé miệng bám SÁT nét mặt, khẩu hình chỉ xê dịch nó chút ít. Trộn 70/30 thì với nét mặt buồn / giận (khoé −0,5)
+    // khẩu hình mở to (khoé +0,7) vẫn đẩy khoé miệng lên gần mức ngang — miệng há với khoé ngang đọc ra một nụ cười,
+    // và nhân vật lo lắng cứ mở miệng là cười.
+    const corner = (value) => face.cuoi * 0.9 + (value - 0.45) * 0.22;
     // Mắt chỉ khép MỘT PHẦN so với nét mặt đứng yên: nói mà mắt lim dim (vui, cười) thì thành ra nhếch mép, buồn ngủ.
     const eyes = (face.matY || 0) * 0.35;
     return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: eyes }, corner, eyes };

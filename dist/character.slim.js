@@ -1,4 +1,4 @@
-/* VGCharacter v0.24.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.25.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -803,6 +803,7 @@ class RigSVG {
       return { bat: 24 * v - gap * 0.2, cang: clamp(4 + gap + 6 * v + 16 * Math.max(0, v), 2, 150) };
     };
     const nL = tayNghieng(s.cangL, s.vungL), nR = tayNghieng(s.cangR, s.vungR);
+    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) arm.cang = Math.max(arm.cang, 86);
     const gocVai = { L: GOC_VAI_MAX * mem((Math.abs(tL.bat) * cF - 40) / 110), R: GOC_VAI_MAX * mem((Math.abs(tR.bat) * cF - 40) / 110) };
     const ghep = { L: mem((Math.abs(tL.bat) * cF - 15) / 50), R: mem((Math.abs(tR.bat) * cF - 15) / 50) };
     const chotX = { L: -CHOT_VAI.x * (1 - ah * 0.92) - ah * 2, R: CHOT_VAI.x * (1 - ah * 0.92) + ah * 2 };
@@ -829,7 +830,7 @@ class RigSVG {
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${-tR.cang * cF - sF * nR.cang})`);
     const armTurn = { L: tL.bat * cF - sF * nL.bat + tL.cang * cF - sF * nL.cang, R: -tR.bat * cF - sF * nR.bat - tR.cang * cF - sF * nR.cang };
     for (const side of ['L', 'R']) if (this.holds[side]) {
-      const upright = chuanHoaGoc((side === 'L' ? -90 : 90) - armTurn[side] - s.than);
+      const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
       e['item' + side].setAttribute('transform', `rotate(${upright.toFixed(2)} 0 10)`);
     }
     for (const ben of ['L', 'R']) {
@@ -1386,7 +1387,11 @@ class RigSVG {
     } else if (name === 'sad') {
       t.to(s, { than: N.than + 1.5, duration: 0.5, ease: 'sine.inOut' }, 0);
     }
-    if (name === 'laughing') t.to(s, { dauY: face.dauY + 4.5, vai: face.vai + 3.5, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
+    if (name === 'laughing') {
+      const beats = Math.max(1, 2 * Math.round(hold / 0.3) - 1);
+      t.to(s, { dauY: face.dauY + 9, vai: face.vai + 7, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: beats }, into);
+      if (standing) t.to(s, { y: -4, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: beats }, into);
+    }
     else if (name !== 'surprised' && hold > 0.8) { this.blinkTo = face.matY || 0; this.#chop(t, into + hold * 0.5); this.blinkTo = 0; }      // ngạc nhiên thì không chớp mắt
     this.#khep(t, 0.4, into + hold);
     return t;
@@ -1488,7 +1493,7 @@ class RigSVG {
     if (!mood) return { start: { mayL: brows, mayR: brows, cuoi: smile }, corner: (value) => value, eyes: 0 };
     const face = RigSVG.EXPRESSIONS[mood];
     if (!face) throw new Error(`[character] no mood "${mood}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
-    const corner = (value) => face.cuoi * 0.7 + value * 0.3;
+    const corner = (value) => face.cuoi * 0.9 + (value - 0.45) * 0.22;
     const eyes = (face.matY || 0) * 0.35;
     return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: eyes }, corner, eyes };
   }
@@ -3295,7 +3300,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.24.0';
+const VERSION = '0.25.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
