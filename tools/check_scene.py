@@ -132,6 +132,7 @@ with tempfile.TemporaryDirectory() as work:
     else:
         page = open(os.path.join(work, 'interact', 'index.html'), encoding='utf-8').read()
         if not re.search(r'together: \[\[vet, [^\n]*\["stroke", miu\]\], \[miu, "purr"\]\]', page): problems.append('stroking a pet in a wordless turn does not add the pet\'s reaction')
+        if not re.search(r"\[vet, \['walk', 4, \d+\]\],?\s*\n\s*\{ together: \[\[vet, \[\"handOver\", ba\]\]", page): problems.append('a giver standing out of reach does not walk up to the receiver before handing over')
         if 'items: "clipboard"' not in page and 'items: {"R": "clipboard"}' not in page: problems.append('"holds": "clipboard" is not passed to createCharacter')
     # Cảnh dọc: mèo đứng nửa phải, "enter": true → vào từ mép PHẢI (mép gần), không băng ngang qua cô bé.
     vertical = build(os.path.join(ROOT, 'examples', 'scene-vertical', 'scene.json'), os.path.join(work, 'vertical-near'))

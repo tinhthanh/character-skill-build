@@ -826,6 +826,35 @@ try {
       if (!(actor.s.cangL < -40)) hong('stroke', `the other arm should fold across toward the pet (forearm ${actor.s.cangL.toFixed(0)}°)`);
       t.kill(); actor.svg.remove();
     }
+    // MÁY QUAY: người vừa nói xong rồi `walk` sang chỗ khác ở lượt sau → về toàn cảnh (không ghì cận vào chỗ cũ).
+    // Và tóc của người đứng cạnh: một mảng tóc ló vào mép cận cảnh cũng tính là bị cắt.
+    {
+      const stage7 = document.createElement('div'); stage7.setAttribute('data-composition-id', 'check-walk-cam');
+      stage7.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
+      const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage7.appendChild(d); return d; };
+      const h1 = mk('wc-a', 'left:200px;bottom:40px;width:340px;height:400px'), h2 = mk('wc-b', 'left:760px;bottom:40px;width:340px;height:400px');
+      document.body.appendChild(stage7);
+      const p1 = L.createCharacter(h1, { id: 'vet' }).rig, p2 = L.createCharacter(h2, { id: 'granny' }).rig, scene7 = ['#wc-a', '#wc-b'];
+      const zoomNow = () => new DOMMatrix(getComputedStyle(h1).transform).a;
+      const talk = L.conversation([[p2, 'nod'], [p1, ['explain', 'mot hai ba', 1.6]], [p1, ['walk', 4, 180]], [p2, ['explain', 'bon', 1]]], { camera: scene7 });
+      const reel = gsap.timeline({ paused: true }); talk.addTo(reel, 0);
+      const stroll = talk.turns[2];
+      reel.time(talk.turns[1].start + 0.9); if (zoomNow() < 1.2) hong('camera', 'test setup: no close-up while the character speaks before walking');
+      reel.time((stroll.start + stroll.end) / 2); if (zoomNow() > 1.01) hong('camera', `the camera stays on a close-up (zoom ${zoomNow().toFixed(2)}) while its subject walks away`);
+      talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill(); L.shot(scene7, null, 'wide').progress(1);
+      // Tóc ở mép: dời người đứng cạnh từng chút; với mọi vị trí, cận cảnh có `avoid` không được để lại một mảng đầu / tóc
+      // của người ấy (5–92% bề ngang cái đầu kể cả tóc) trong khung.
+      let slivers = 0, worst = 0;
+      for (let left = 420; left <= 700; left += 20) {
+        h2.style.left = left + 'px';
+        const careful = L.shot(scene7, p1, 'chest', { avoid: [p1, p2] }); careful.progress(1);
+        const frame = stage7.getBoundingClientRect(), head = p2.el.dau.getBoundingClientRect(), seen = Math.min(frame.right, head.right) - Math.max(frame.left, head.left), part = seen > 0 ? seen / head.width : 0;
+        if (part > 0.05 && part < 0.92) { slivers++; worst = Math.max(worst, Math.min(part, 1 - part)); }
+        careful.kill(); L.shot(scene7, null, 'wide').progress(1);
+      }
+      if (slivers) hong('shot avoid', `at ${slivers} of 15 positions a slice of the neighbour's head or hair is left in the close-up (up to ${Math.round(worst * 100)}%)`);
+      stage7.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

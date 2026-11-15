@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.35.0
+
+Added
+- **Scene files: walk up before reaching.** A character that strokes a pet or hands an item
+  over (`["stroke", "@pet"]`, `["handOver", "@other"]`) first walks up to the target if it
+  stands out of reach — arms reach only about 0.2 × the host height. Seated characters and
+  pets do not move. `examples/scene-interact` now shows it.
+
+Changed
+- The camera goes back to the wide shot when a character walks to another spot (`walk`),
+  as it already did for `enter` and `exit`; a close-up used to stay on the place it left.
+
 ## 0.34.1
 
 Fixed

@@ -47,7 +47,8 @@ Scene file (every key except `characters` and `script` is optional):
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). Interaction steps: "drink", "write", ["stroke", "@pet"]
                (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), and
-               ["handOver", "@other"] together with the other's ["take", "@giver"]. `shot`: "face" | "wide" | false | ["vet", "bella"]
+               ["handOver", "@other"] together with the other's ["take", "@giver"]. A character that strokes
+               or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
@@ -456,6 +457,21 @@ def main():
             if 'image' in show and not os.path.isfile(os.path.join(base, show['image'])): fail(f'{where}: show.image not found: {show["image"]} (looked in {base})')
             shows.append(dict(show, turn=flat))
         flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
+        # LẠI GẦN trước khi vuốt ve / đưa đồ: tay nhân vật ngắn (với tới chừng 0,2 × chiều cao host). Đích đứng xa hơn tầm
+        # ấy thì chèn một lượt bước tới trước — người vuốt ve dừng cách con vật 0,24 × chiều cao, người đưa đồ dừng cách
+        # người nhận 0,45 × chiều cao (hai cánh tay cùng vươn). Chỗ đứng mới được ghi lại cho các lượt sau.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or turn.get('who') not in names: continue
+            who = names[turn['who']]
+            if who['_pet'] or who.get('seated'): continue
+            for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver') and isinstance(step[1], str) and step[1][1:] in names): continue
+                gap = float(names[step[1][1:]]['x']) - float(who['x'])
+                wanted = (0.24 if step[0] == 'stroke' else 0.45) * who['_host_height']
+                if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
+                move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
+                turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                who['x'] = float(who['x']) + move
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
             known(where, entry, ('together',))
