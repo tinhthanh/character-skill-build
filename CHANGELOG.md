@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.34.1
+
+Fixed
+- **An item in the far hand vanished in a three-quarter stance.** Since 0.33.0 the far arm
+  carrying an item is drawn behind the body, which is right when walking side-on but hid the
+  item when the character merely faces someone. The arm goes behind only when the character
+  is turned nearly side-on.
+- **`stroke` with the far arm.** When the hand on the pet's side holds an item, the other arm
+  now folds across the body toward the pet instead of hanging down.
+
 ## 0.34.0
 
 Added

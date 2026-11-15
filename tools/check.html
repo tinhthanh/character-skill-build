@@ -812,6 +812,20 @@ try {
       line.time(line.duration()); if (late.s.itemL !== 1) hong('take', 'the item is not received after walking in');
       line.kill(); late.svg.remove();
     }
+    // Đứng dáng 3/4 mà món đồ ở tay XA: cánh tay vẫn ở lớp trước thân (không thì món đồ khuất sau người); quay hẳn
+    // sang ngang thì mới ra sau. Và vuốt ve con vật ở phía tay đang cầm đồ: tay kia vắt sang phía ấy.
+    {
+      const actor = L.createCharacter(host, { id: 'vet', items: { R: 'clipboard' } }).rig, arm = actor.el.batR;
+      actor.s.huong = 0.55; actor.render();
+      if (arm.parentNode !== actor.el.tren) hong('held item', 'three-quarter stance: the far arm with the item is hidden behind the body');
+      actor.s.huong = 1; actor.render();
+      if (arm.parentNode === actor.el.tren) hong('held item', 'side-on: the far arm with the item should be behind the body');
+      actor.reset();
+      const t = actor.stroke({ x: 330, y: 400 }); t.time(0.6);          // đích ở bên PHẢI, phía tay cầm bìa kẹp
+      if (Math.abs(actor.s.cangR - actor.NGHI.cangR) > 1) hong('stroke', 'the hand holding the item moves');
+      if (!(actor.s.cangL < -40)) hong('stroke', `the other arm should fold across toward the pet (forearm ${actor.s.cangL.toFixed(0)}°)`);
+      t.kill(); actor.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

@@ -1,4 +1,4 @@
-/* VGCharacter v0.34.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.34.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1118,7 +1118,9 @@ class RigSVG {
       // (Bản 0.24 để cả cánh tay ấy ở lớp TRÊN thân: cẳng tay vắt ngang qua ngực như mọc ra từ giữa người.) Chỉ
       // không làm TỐI nó đi, để món đồ giữ nguyên màu.
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
-      const tay = e['bat' + ben], cho = ben === xa ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      // …nhưng CHỈ khi đã quay gần hẳn sang ngang (đang đi). Đứng dáng 3/4 thì bàn tay ấy còn nằm sau thân: đẩy cánh
+      // tay ra sau là món đồ biến mất — bác sĩ quay về phía khách mà không thấy bìa kẹp đâu.
+      const tay = e['bat' + ben], cho = ben === xa && !(carrying && ah < 0.8) ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
       if (tay.parentNode !== cho) cho.appendChild(tay);
       const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah : 0;
       // Tối đi bằng CSS `filter`. Thuộc tính CSS ĐÈ lên thuộc tính SVG `filter="url(#…-vien)"` của
@@ -2482,15 +2484,19 @@ class RigSVG {
     const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const shoulder = VAI[k], angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;
     // Thân ngả về phía con vật làm cánh tay bên ấy nhấc lên đúng chừng ấy độ — trừ đi, không thì bàn tay chĩa cao hơn đích.
-    const lean = clamp((tx - HONG.x) * 0.06, -9, 9), upper = clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95);
+    const lean = clamp((tx - HONG.x) * 0.06, -9, 9);
+    // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
+    // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
+    const across = (k === 'L') !== (tx < HONG.x);
+    const upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
     this.#openUp(t);
     t.set(s, { ['tay' + k]: 'mo' }, 0);
     if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
-    t.to(s, { ['bat' + k]: upper, ['cang' + k]: 0, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
+    t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
     for (let n = 0; n < 3; n++) {
-      t.to(s, { ['cang' + k]: -9, ['bat' + k]: upper - 4, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
-       .to(s, { ['cang' + k]: 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+      t.to(s, { ['cang' + k]: fore - 9, ['bat' + k]: upper - 4, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+       .to(s, { ['cang' + k]: fore + 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 1.7);
@@ -5286,7 +5292,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.34.0';
+const VERSION = '0.34.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
