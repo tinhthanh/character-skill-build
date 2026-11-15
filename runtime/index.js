@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.12.0';
+export const VERSION = '0.12.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -166,6 +166,13 @@ export function registerCharacter({ id, base = 'vet', define }) {
     if (skirt.flare !== undefined && !(typeof skirt.flare === 'number' && skirt.flare >= 0 && skirt.flare <= 30)) fail(`skirt.flare must be a number from 0 to 30, got ${JSON.stringify(skirt.flare)}`);
   }
   if (stoop !== undefined && !(typeof stoop === 'number' && stoop >= 0 && stoop <= 1)) fail(`stoop must be a number from 0 to 1, got ${JSON.stringify(stoop)}`);
+  // `top` (đường bao thân áo) phải là HÀM trả về chuỗi `d` của path. Đưa thẳng một chuỗi, hay một
+  // giá trị không có (`kit.outlines.stocky`), thì lỗi lộ ra rất muộn và bằng tên nội bộ của rig.
+  if (definition.ao !== undefined) {
+    if (typeof definition.ao !== 'function') fail(`top must be a function returning path data, e.g. top: () => kit.outlines.scrubs — got ${definition.ao === null ? 'null' : typeof definition.ao === 'string' ? 'a string (wrap it: top: () => "M …")' : JSON.stringify(definition.ao)}`);
+    const outline = definition.ao();
+    if (typeof outline !== 'string' || !/^\s*M/i.test(outline)) fail(`top() must return SVG path data starting with "M", got ${outline === undefined ? 'undefined (kit.outlines has: ' + Object.keys(kit.outlines).join(', ') + ')' : JSON.stringify(outline).slice(0, 60)}`);
+  }
   // Khoá vẽ phải là HÀM trả về chuỗi: quên `return` là ra chữ "undefined" trong SVG.
   for (const internalKey of DRAWING_SLOTS) {
     const publicKey = Object.keys(DEFINITION_KEYS).find((key) => DEFINITION_KEYS[key] === internalKey) || internalKey;
@@ -340,6 +347,8 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
       const text = name === 'speakCues' ? (args[2] && args[2].text) || (args[0] && args[0].metadata && args[0].metadata.text) : args[0];
       if (typeof text === 'string' && text.trim()) entry.text = text.trim();
       entry.speech = Math.max(0, entry.duration - SPEECH_SETTLE);          // tiếng nói ngắn hơn bước đúng quãng "về chỗ"
+      // Tệp tiếng mà bộ cue này được tạo ra từ đó — tools/peek.sh ghép <audio> với bước theo tên tệp.
+      if (name === 'speakCues' && args[0] && args[0].metadata && args[0].metadata.soundFile) entry.sound = args[0].metadata.soundFile;
     }
     steps.push(entry);
     at += child.duration() + gap;
@@ -576,8 +585,11 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
     const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
     const begin = clock;
     let finish = begin;
-    for (const turn of parallel) {
-      if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps] or { together: [[rig, ...steps], …] }`);
+    for (let turn of parallel) {
+      // Lượt bên trong `together` cũng có thể mang `shot` riêng: { turn: [rig, …], shot }.
+      let own = override;
+      if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
+      if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...steps] = turn, mine = part(rig);
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
@@ -594,7 +606,7 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
       mine.end = measured.duration; mine.used = true;
       finish = Math.max(finish, mine.end);
-      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: override });
+      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     clock = finish + gap;
   });

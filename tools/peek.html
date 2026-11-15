@@ -58,7 +58,7 @@ try {
     const start = +child.startTime().toFixed(3), end = +(child.startTime() + child.duration()).toFixed(3);
     if (end > probe.declared + 0.01) info.warnings.push(`the sequence of "${child.data.character}" ends at ${end}s, after data-duration ${probe.declared}s`);
     return { character: child.data.character, start, end,
-             steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2) })) };
+             steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2), ...(step.sound ? { sound: step.sound } : {}) })) };
   });
   // Hai nhân vật NÓI chồng lên nhau: gần như luôn là lỗi dàn cảnh, mà nhìn ảnh tĩnh không thấy.
   // Bước nói kéo dài hơn TIẾNG NÓI 0,55 giây (miệng đã khép, tay đang về chỗ) — phần đuôi ấy không
@@ -73,12 +73,17 @@ try {
   // TIẾNG phải khớp MIỆNG: mỗi bước `speakCues` cần một <audio> bắt đầu đúng lúc và dài bằng tiếng nói
   // (bước dài hơn tiếng 0,55 s). Xem ảnh tĩnh thì không thể thấy tiếng lệch — nên soát bằng số.
   {
-    const clips = [...probe.doc.querySelectorAll('audio[data-start]')].map((clip) => ({ id: clip.id || clip.getAttribute('src') || 'audio', start: +clip.dataset.start, duration: +clip.dataset.duration, used: false }));
-    const lines = info.sequences.flatMap((seq) => seq.steps.filter((step) => step.name === 'speakCues').map((step) => ({ who: seq.character, start: step.start, length: Math.max(0, step.end - step.start - 0.55) })));
+    const fileOf = (path) => (path || '').split(/[\\/]/).pop().split('?')[0];
+    const clips = [...probe.doc.querySelectorAll('audio[data-start]')].map((clip) => ({ id: clip.id || clip.getAttribute('src') || 'audio', file: fileOf(clip.getAttribute('src')), start: +clip.dataset.start, duration: +clip.dataset.duration, used: false }));
+    const lines = info.sequences.flatMap((seq) => seq.steps.filter((step) => step.name === 'speakCues').map((step) => ({ who: seq.character, start: step.start, length: Math.max(0, step.end - step.start - 0.55), sound: step.sound })));
     for (const line of lines) {
-      const clip = clips.filter((item) => !item.used).sort((a, b) => Math.abs(a.start - line.start) - Math.abs(b.start - line.start))[0];
-      const paste = `<audio data-start="${line.start.toFixed(2)}" data-duration="${line.length.toFixed(2)}">`;
-      if (!clip || Math.abs(clip.start - line.start) > 1.5) { info.warnings.push(`"${line.who}" lip-syncs at ${line.start.toFixed(2)}s but no <audio> clip starts near it — add ${paste}`); continue; }
+      // Ghép theo TÊN TỆP TIẾNG mà bộ cue được tạo ra từ đó; chỉ khi không biết tên mới ghép theo giờ gần nhất
+      // (ghép theo giờ thì sau một lần sửa làm lệch giờ, clip của người này bị gán cho câu của người kia).
+      const free = clips.filter((item) => !item.used);
+      const named = line.sound ? free.find((item) => item.file === line.sound) : null;
+      const clip = named || (line.sound && free.some((item) => item.file) ? null : free.sort((a, b) => Math.abs(a.start - line.start) - Math.abs(b.start - line.start))[0]);
+      const paste = `<audio${line.sound ? ` src="${line.sound}"` : ''} data-start="${line.start.toFixed(2)}" data-duration="${line.length.toFixed(2)}">`;
+      if (!clip || (!named && Math.abs(clip.start - line.start) > 1.5)) { info.warnings.push(`"${line.who}" lip-syncs at ${line.start.toFixed(2)}s but no <audio> clip starts near it — add ${paste}`); continue; }
       clip.used = true;
       if (Math.abs(clip.start - line.start) > 0.06) info.warnings.push(`#${clip.id} starts at ${clip.start}s but "${line.who}" starts lip-syncing at ${line.start.toFixed(2)}s — the voice will be ${Math.abs(clip.start - line.start).toFixed(2)}s ${clip.start > line.start ? 'late' : 'early'}; set data-start="${line.start.toFixed(2)}"`);
       if (Number.isFinite(clip.duration) && Math.abs(clip.duration - line.length) > 0.2) info.warnings.push(`#${clip.id} has data-duration ${clip.duration}s but its cues are ${line.length.toFixed(2)}s long — set data-duration="${line.length.toFixed(2)}" (or remake the cues if the audio changed)`);

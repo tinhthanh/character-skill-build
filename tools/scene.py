@@ -9,6 +9,8 @@ The tool writes the composition: hosts and clips, furniture, a `conversation()` 
 camera and captions, mouth cues for every voice file, and `<audio>` clips with the right
 `data-start` (it loads the result once in headless Chrome to read the timing).
 The output is ordinary, commented HTML — edit it by hand afterwards if you want something else.
+Once you have, the tool will not overwrite it (it stores a fingerprint of what it wrote); pass
+--force to discard your edits and regenerate. Unknown keys in the scene file are errors.
 
 Scene file (every key except `characters` and `script` is optional):
 
@@ -41,9 +43,15 @@ Scene file (every key except `characters` and `script` is optional):
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
+  props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
   audio        paths are relative to the scene file; WAV is read directly, other formats need ffmpeg.
+
+After editing the generated index.html by hand (longer walks, other reactions…), the audio
+clips and the total duration are out of date. Fix them in place with:
+
+    python3 tools/scene.py --retime path/to/index.html
 """
-import argparse, json, os, re, shutil, subprocess, sys, tempfile, time
+import argparse, difflib, hashlib, json, os, re, shutil, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -60,21 +68,102 @@ def slug(text):
     return value or 'x'
 
 
+def known(where, given, allowed):
+    """Reject keys the tool does not know — a misspelt key would otherwise be ignored in silence."""
+    for key in given:
+        if key in allowed: continue
+        close = difflib.get_close_matches(key, allowed, n=1, cutoff=0.6)
+        hint = f' — did you mean "{close[0]}"?' if close else f' (allowed: {", ".join(sorted(allowed))})'
+        fail(f'{where}: unknown key "{key}"{hint}')
+
+
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces')
+PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'height_units', 'back', 'front')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot')
+BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight')
+
+
+def fingerprint(html):
+    """Short hash of a generated page, ignoring the line that stores the hash itself."""
+    return hashlib.sha256(re.sub(r'<!-- scene\.py:[0-9a-f]{16} -->\n?', '', html).encode('utf-8')).hexdigest()[:16]
+
+
+def read_timings(folder, target):
+    """Load the composition once in headless Chrome and return its window.__sceneTimings."""
+    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
+    if not chrome: fail('no Chrome found (tools/chrome.sh) — it is needed to time the audio clips')
+    with socket.socket() as probe_socket:                   # một cổng trống do hệ điều hành cấp
+        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
+    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={folder}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=ROOT)
+    try:
+        url = f'http://127.0.0.1:{port}/__project/{os.path.basename(target)}'
+        for _ in range(50):
+            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
+            time.sleep(0.1)
+        with tempfile.TemporaryDirectory() as work:
+            log = os.path.join(work, 'log')
+            probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '45',
+                                    '--eval', 'window.__sceneTimings', '--log', log], capture_output=True, text=True)
+            errors = open(log, encoding='utf-8').read().strip() if os.path.exists(log) else ''
+        if probe.returncode != 0 or not probe.stdout.strip() or probe.stdout.strip() == 'null':
+            fail('the composition did not build:\n  ' + (errors or probe.stderr.strip() or 'no error message').replace('\n', '\n  ') + f'\n  (see {target})')
+        return json.loads(probe.stdout)
+    finally:
+        server.terminate()
+
+
+def retime(target):
+    """Re-read the timing of a (possibly hand-edited) generated composition and write it back:
+    every <audio> clip's data-start / data-duration, and the total data-duration of the clips."""
+    if not os.path.isfile(target): fail(f'no such file: {target}')
+    html = open(target, encoding='utf-8').read()
+    if '__sceneTimings' not in html: fail(f'{target} was not written by tools/scene.py (it has no window.__sceneTimings) — time it from the tools/peek.sh printout instead')
+    timings = read_timings(os.path.dirname(os.path.abspath(target)), target)
+    stage = re.search(r'data-composition-id="[^"]*"[^>]*data-duration="([\d.]+)"', html)
+    if not stage: fail('could not find the composition root (data-composition-id … data-duration)')
+    old_total, new_total = stage.group(1), f"{max(1.0, round(timings['duration'] + 0.6, 1)):g}"
+    changed = []
+    for line in timings['speech']:
+        if not line.get('sound'): continue
+        pattern = re.compile(r'(<audio\b[^>]*\bsrc="(?:[^"]*/)?' + re.escape(line['sound']) + r'"[^>]*>)')
+        found = pattern.search(html)
+        if not found: print(f'  ! no <audio src="{line["sound"]}"> clip for the line lip-synced at {line["start"]:.2f} s'); continue
+        tag = re.sub(r'data-start="[^"]*"', f'data-start="{line["start"]:.2f}"', found.group(1))
+        tag = re.sub(r'data-duration="[^"]*"', f'data-duration="{line["length"]:.2f}"', tag)
+        if tag != found.group(1): changed.append(f'{line["sound"]} → {line["start"]:.2f} s')
+        html = html[:found.start()] + tag + html[found.end():]
+    if new_total != old_total:
+        html = html.replace(f'data-start="0" data-duration="{old_total}"', f'data-start="0" data-duration="{new_total}"')
+        changed.append(f'total {old_total} → {new_total} s')
+    open(target, 'w', encoding='utf-8').write(html)
+    print(target)
+    print('  ' + ('; '.join(changed) if changed else 'already in time — nothing changed'))
+
+
 def js(value):
     return json.dumps(value, ensure_ascii=False)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Build a HyperFrames composition from a scene description.')
-    parser.add_argument('scene')
+    parser.add_argument('scene', nargs='?')
+    parser.add_argument('--retime', metavar='INDEX_HTML', help='re-time a generated composition after hand edits: fix every <audio> clip and the total duration in place')
     parser.add_argument('-o', '--output', help='output folder (default: <scene folder>/<id>)')
+    parser.add_argument('--force', action='store_true', help='overwrite index.html even if it was edited by hand since the tool wrote it')
     parser.add_argument('--cues', default='auto', choices=['auto', 'rhubarb', 'spectral', 'amplitude'], help='lip-sync method for voice files')
     args = parser.parse_args()
+    if args.retime: return retime(args.retime)
+    if not args.scene: parser.error('give a scene file, or --retime path/to/index.html')
     if not os.path.isfile(args.scene): fail(f'no such file: {args.scene}')
     try:
         scene = json.load(open(args.scene, encoding='utf-8'))
     except json.JSONDecodeError as error:
         fail(f'{args.scene} is not valid JSON: {error}')
+    if not isinstance(scene, dict): fail('the scene file must be a JSON object')
+    known('scene', scene, TOP_KEYS)
+    if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
+    if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
     base = os.path.dirname(os.path.abspath(args.scene))
     scene_id = slug(scene.get('id') or os.path.splitext(os.path.basename(args.scene))[0])
     width, height = int(scene.get('width', 1920)), int(scene.get('height', 1080))
@@ -87,6 +176,7 @@ def main():
     for who in cast:
         if not isinstance(who, dict) or not who.get('name'): fail('every character needs a "name"')
         name = who['name']
+        known(f'character "{name}"', who, CHARACTER_KEYS)
         if name in names: fail(f'two characters are named "{name}"')
         if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name): fail(f'character name "{name}" must be a plain identifier (letters, digits, underscore)')
         if bool(who.get('id')) == bool(who.get('species')): fail(f'character "{name}" needs either "id" (a person) or "species" (a pet)')
@@ -102,10 +192,13 @@ def main():
         unit = host_height / frame[1]
         stand = float(who['x'])
         centre = stand
-        if who.get('enter') == 'left': centre = min(stand, (0.36 if not pet else 0.3) * host_height)      # bắt đầu ngoài mép trái
-        if who.get('enter') == 'right': centre = max(stand, width - 0.36 * host_height)
-        names[name] = dict(who, pet=pet, host_height=host_height, host_width=host_width, unit=unit, left=centre - host_width / 2,
-                           walk=round((stand - centre) / unit), element=f'{slug(name)}')
+        # Điểm xuất phát của `enter` cách tâm host 0,57 × chiều cao; đầu + tóc rộng tới 0,3 × chiều cao về mỗi
+        # phía. Đặt tâm host cách mép 0,18 × chiều cao thì cả cái đầu nằm ngoài khung lúc bắt đầu.
+        if who.get('enter') == 'left': centre = min(stand, (0.18 if not pet else 0.3) * host_height)
+        if who.get('enter') == 'right': centre = max(stand, width - 0.18 * host_height)
+        # Số tính ra cất dưới khoá có gạch dưới ở đầu — khoá của người viết kịch bản không bao giờ trùng được.
+        names[name] = dict(who, _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
+                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}')
     for who in names.values():
         if who.get('faces') and who['faces'] not in names: fail(f'character "{who["name"]}" faces "{who["faces"]}", who is not in the scene')
 
@@ -129,10 +222,11 @@ def main():
 
     def turn_code(turn, where):
         if not isinstance(turn, dict) or turn.get('who') not in names: fail(f'{where}: "who" must name a character in the scene (got {js(turn.get("who") if isinstance(turn, dict) else turn)})')
+        known(where, turn, TURN_KEYS)
         who = names[turn['who']]
         steps = []
         if 'say' in turn:
-            if who['pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
+            if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
             if turn.get('audio'):
                 source = os.path.join(base, turn['audio'])
@@ -162,15 +256,22 @@ def main():
     turns = []
     # Mở đầu: ai `enter` thì bước vào (và đi tới chỗ đứng); xong thì mọi người quay về phía người mình nhìn.
     entering = [who for who in names.values() if who.get('enter')]
+    arrivals = []
     for who in entering:
-        steps = [f"['enter', {js(who['enter'])}]"] if not who['pet'] else ["'enter'"]
-        if abs(who['walk']) >= 5: steps.append(f"['walk', 4, {who['walk']}]")
-        turns.append(('  // ' + who['name'] + ' walks in from outside the frame to its mark', f"[{who['name']}, " + ', '.join(steps) + ']'))
+        steps = [f"['enter', {js(who['enter'])}]"] if not who['_pet'] else ["'enter'"]
+        if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
+        arrivals.append(f"[{who['name']}, " + ', '.join(steps) + ']')
+    # Mọi người bước vào CÙNG LÚC: vào lần lượt thì người vào sau đứng sẵn trong khung chờ tới lượt
+    # rồi mới "bước vào" — và cảnh mất thêm vài giây trước câu nói đầu tiên.
+    if arrivals: turns.append(('  // ' + ', '.join(who['name'] for who in entering) + (' walk' if len(entering) > 1 else ' walks') + ' in from outside the frame to the mark',
+                               '{ together: [' + ', '.join(arrivals) + '] }' if len(arrivals) > 1 else arrivals[0]))
     facing = [f"[{who['name']}, ['face', {who['faces']}]]" for who in names.values() if who.get('faces')]
     if facing: turns.append(('  // everyone turns toward the one they look at', '{ together: [' + ', '.join(facing) + '] }' if len(facing) > 1 else facing[0]))
     for index, entry in enumerate(script):
         where = f'script[{index}]'
         if isinstance(entry, dict) and 'together' in entry:
+            if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
+            known(where, entry, ('together',))
             if not isinstance(entry['together'], list) or not entry['together']: fail(f'{where}: "together" must be a non-empty list of turns')
             turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
         else:
@@ -180,12 +281,24 @@ def main():
     props = []
     for index, prop in enumerate(scene.get('props', [])):
         if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter) and "x"')
+        known(f'props[{index}]', prop, PROP_KEYS)
         host_height = float(prop.get('height', 760))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
-                      'options': {key: prop[key] for key in ('color', 'width', 'height_units', 'back') if key in prop}})
+                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'height_units', 'back') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
         if who.get('seated') in ('chair', 'stool'):
-            who['seat'] = {'element': f'{who["element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['left'] + (who['walk'] * who['unit']), 'host_height': who['host_height']}
+            who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
+
+    # ── không ghi đè bản đã SỬA TAY ──
+    target = os.path.join(out, 'index.html')
+    if os.path.exists(target) and not args.force:
+        existing = open(target, encoding='utf-8').read()
+        mark = re.search(r'<!-- scene\.py:([0-9a-f]{16}) -->', existing)
+        if not mark:
+            fail(f'{target} exists and was not written by this tool — choose another folder with -o, or pass --force to replace it')
+        if fingerprint(existing) != mark.group(1):
+            fail(f'{target} has been edited by hand since this tool wrote it; running again would discard those edits.\n'
+                 '  Keep the edits: change that file directly from now on.  Discard them: run again with --force.')
 
     # ── ghi tệp ──
     os.makedirs(out, exist_ok=True)
@@ -211,13 +324,15 @@ def main():
 
     clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
     clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
-    for prop in props:
+    for prop in [item for item in props if not item['front']]:
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
     for who in names.values():
-        if who.get('seat'):
-            seat = who['seat']
+        if who.get('_seat'):
+            seat = who['_seat']
             clip(seat['element'], f'position: absolute; left: {seat["left"]:.0f}px; bottom: {ground}px; height: {seat["host_height"]:.0f}px;'); layers.append('#' + seat['element'])
-        clip(who['element'], f'position: absolute; left: {who["left"]:.0f}px; bottom: {ground}px; height: {who["host_height"]:.0f}px;'); layers.append('#' + who['element'])
+        clip(who['_element'], f'position: absolute; left: {who["_left"]:.0f}px; bottom: {ground}px; height: {who["_host_height"]:.0f}px;'); layers.append('#' + who['_element'])
+    for prop in [item for item in props if item['front']]:           # "front": true — vẽ SAU nhân vật, tức che phía trước họ (đứng sau quầy)
+        clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
     captions = scene.get('captions', True) and '"say"' in json.dumps(script)        # không ai nói thì không cần phụ đề
     if captions:
         clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; padding: 18px 34px; border-radius: 18px; '
@@ -227,21 +342,21 @@ def main():
         track[0] += 1
 
     for who in names.values():
-        make = f"VGCharacter.createPet($('{who['element']}'), {{ species: {js(who['species'])} }})" if who['pet'] else f"VGCharacter.createCharacter($('{who['element']}'), {{ id: {js(who['id'])} }})"
+        make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])} }})"
         setup.append(f"    const {who['name']} = {make}.rig;")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('height_units'), 'back': prop['options'].get('back')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
-        if who.get('seat'): setup.append(f"    VGCharacter.createProp($('{who['seat']['element']}'), {js(who['seat']['kind'])}, {{ for: {who['name']} }});")
-        if who.get('seated') and not who['pet']:
+        if who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
+        if who.get('seated') and not who['_pet']:
             setup.append(f"    {who['name']}.state.seat = 1;                 // already seated in the first frame")
     camera = scene.get('camera', True)
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
         camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)} }}, "
-    seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['pet'] and who.get('seated')]
+    seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['_pet'] and who.get('seated')]
     lines = []
     for comment, code in ([('  // pets that start seated', '{ together: [' + ', '.join(seated_pets) + '] }' if len(seated_pets) > 1 else seated_pets[0])] if seated_pets else []) + turns:
         if comment: lines.append('    ' + comment)
@@ -282,45 +397,27 @@ def main():
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
-    window.__sceneTimings = {{ duration: tl.duration(), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => step.start)) }};
+    window.__sceneTimings = {{ duration: tl.duration(), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: step.start, sound: step.sound, length: step.speech }}))) }};
   </script>
 </div>
 </body>
 </html>
 '''
-    target = os.path.join(out, 'index.html')
     open(target, 'w', encoding='utf-8').write(html.replace('__TOTAL__', '60'))
 
-    # ── nạp một lần trong Chrome để đọc giờ: tổng thời lượng và lúc từng câu có tiếng bắt đầu ──
-    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
-    if not chrome: fail('no Chrome found (tools/chrome.sh) — it is needed to time the audio clips')
-    port = 8500 + os.getpid() % 400
-    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={out}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=ROOT)
-    try:
-        url = f'http://127.0.0.1:{port}/__project/index.html'
-        for _ in range(50):
-            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
-            time.sleep(0.1)
-        with tempfile.TemporaryDirectory() as work:
-            log = os.path.join(work, 'log')
-            probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings || window.__sceneFailed', '--timeout', '60',
-                                    '--eval', 'window.__sceneTimings', '--log', log], capture_output=True, text=True)
-            errors = open(log, encoding='utf-8').read().strip() if os.path.exists(log) else ''
-        if probe.returncode != 0 or not probe.stdout.strip() or probe.stdout.strip() == 'null':
-            fail('the generated composition did not build:\n  ' + (errors or probe.stderr.strip() or 'no error message').replace('\n', '\n  ') + f'\n  (left in {target} for inspection)')
-        timings = json.loads(probe.stdout)
-    finally:
-        server.terminate()
+    timings = read_timings(out, target)
     total = max(1.0, round(timings['duration'] + 0.6, 1))
     final = html.replace('__TOTAL__', f'{total:g}')
     if len(timings['speech']) != len(voices): fail(f'expected {len(voices)} lip-synced lines but the composition has {len(timings["speech"])}')
-    for voice, start in zip(voices, timings['speech']):
-        final = final.replace(f'__START_{voice["key"]}__', f'{start:.2f}')
+    for voice, line in zip(voices, timings['speech']):
+        final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
+    # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
+    final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')
     open(target, 'w', encoding='utf-8').write(final)
     print(f'{target}')
     print(f'  {len(names)} characters · {len(script)} script entries · {len(voices)} voice lines · {total:g} s')
-    for voice, start in zip(voices, timings['speech']):
-        print(f'  {voice["file"]}: {voice["who"]} at {start:.2f} s ({voice["length"]:.2f} s)')
+    for voice, line in zip(voices, timings['speech']):
+        print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
     print(f'next: sh tools/peek.sh {os.path.relpath(target)}      # timings, warnings and a contact sheet')
 
 

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.12.1
+
+Fixed
+- `tools/scene.py` crashed with a traceback when a scene file used the key `seat` (a likely
+  misspelling of `seated`): the tool kept its own data next to the user's keys.
+- `tools/scene.py` ignored keys it did not know, so a misspelt `faces`, `dur` or `captions`
+  silently did nothing. Unknown keys are now errors that suggest the nearest valid name.
+- Running `tools/scene.py` again silently overwrote an `index.html` that had been edited by
+  hand. It now stores a fingerprint of what it wrote and refuses to overwrite an edited (or
+  foreign) file unless `--force` is given.
+- `tools/chrome_run.py` could fail with "Directory not empty" on Linux while removing its
+  temporary Chrome profile.
+
+From a third independent agent trial (a baker, a three-person scene with three voice lines):
+
+Fixed
+- Tools used fixed ports, so two runs at once (or another program on the port) produced
+  unrelated failures. Each tool now takes a free port; `PORT=` still overrides.
+- `tools/shot.sh` left the previous PNG in place when the sheet failed to render; it now
+  removes it first, prints the page error and exits non-zero.
+- `tools/peek.sh` paired `<audio>` clips with lip-sync steps by nearest time, so after a hand
+  edit it could tell you to move one speaker's audio onto another's line. Clips are matched by
+  the sound file their cues were made from.
+- `tools/scene.py`: characters with `enter` walked in one after another, the later ones
+  standing in frame while they waited — they now enter together; hosts are placed far enough
+  out that the head starts off-frame; `shot` on a `together` entry is an error instead of
+  being dropped, and works on a turn inside it.
+- `kit.bodies.stocky` did not look stocky (the torso outline stayed narrow); it now sets
+  `torsoWidth`.
+- `top` given as a string, or returning nothing (`kit.outlines.stocky`), failed late with an
+  internal name; it is now a clear registration error.
+- `kit.parts.apronBib`: the straps stay attached when `width` changes.
+
+Added
+- `torsoWidth`: the width of the torso relative to its height (shoulders, belly and arms; the
+  head keeps its shape).
+- `cheer`: both arms up with two hops — a whole-body "happy".
+- `tools/scene.py`: `"front": true` on a prop (a counter someone stands behind), and
+  `--retime index.html` to fix the audio clips and total duration after hand edits.
+- Docs: what `kit.outlines` holds, `apronBib` options, the height of a counter top in px.
+
 ## 0.12.0
 
 Added

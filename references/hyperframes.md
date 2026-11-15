@@ -42,13 +42,21 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   another character (`["face", "@boy"]`). `shot` overrides the camera for one turn
   (`"face"`, `"wide"`, `false`, or a list of names to frame together). `{ "together": […] }`
   runs turns at the same time.
-- Also: `props` (`kind`, `x`, `color`, `height`), `background` (`wall`, `wallDark`, `floor`,
+- Characters with `enter` walk in **together**, before the script. A prop with `"front": true`
+  is drawn in front of the characters — a counter someone stands behind. `shot` goes on a turn
+  (also on a turn inside `together`), not on the `together` entry itself.
+- Also: `props` (`kind`, `x`, `color`, `height`, `front`), `background` (`wall`, `wallDark`, `floor`,
   `floorHeight`), `camera` (`true` / `{ "kind": "face" }` / `false`), `captions`, `seed`,
   `width`, `height`, `gap`.
 
 The result is plain, commented HTML using the same API as the rest of this page — edit it by
 hand for anything the scene file cannot say (your own background art, extra clips, effects),
-or change the scene file and run the tool again. `examples/scene/scene.json` is a complete
+or change the scene file and run the tool again. Not both: once `index.html` has been edited
+by hand, the tool refuses to overwrite it (`--force` discards the edits) — from then on change
+that file directly, and when your edits change the timing (longer walks, other reactions) run
+`python3 tools/scene.py --retime path/to/index.html`: it re-reads the timing and fixes every
+`<audio>` clip and the total duration in place. A key the tool does not know is an error, with
+the nearest valid name. `examples/scene/scene.json` is a complete
 scene file. The tool needs Chrome (it loads the result once to time the audio).
 
 ## Setup in a HyperFrames project
@@ -221,7 +229,8 @@ ordinary element behind the seated character. Run `tools/peek.sh`: it prints eve
 start and end, and warns about speech overlapping by more than 0.15 s (the 0.55 s settling
 tail of a speaking step does not count), a character facing away
 from the one it turned to, and an `enter` that starts with the head already inside the frame, and an `<audio>` clip that does
-not line up with its `speakCues` step (wrong start, wrong length, or missing). Complete example: `examples/conversation/index.html`.
+not line up with its `speakCues` step (wrong start, wrong length, or missing; clips are matched
+to steps by the sound file the cues were made from). Complete example: `examples/conversation/index.html`.
 
 **Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
 the *left* of the person it should look toward, or expect to see its tail first.

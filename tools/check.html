@@ -110,6 +110,7 @@ try {
     for (const [label, wrong] of [['skirt as a string', { skirt: 'apron' }], ['skirt with an unknown kind', { skirt: { kind: 'dress' } }], ['skirt without kind', { skirt: { length: 1 } }],
                                   ['skirt with a misspelt key', { skirt: { kind: 'skirt', lenght: 1 } }], ['skirt.length out of range', { skirt: { kind: 'skirt', length: 9 } }],
                                   ['stoop out of range', { stoop: 5 }], ['stoop as a boolean', { stoop: true }], ['heldItemR as a string', { heldItemR: 'cup' }],
+                                  ['top as a path string', { top: 'M 0 0 L 1 1' }], ['top returning undefined', { top: () => undefined }],
                                   ['hair that is not a function', { hair: '<g/>' }], ['accessories returning nothing', { accessories: () => {} }]])
       expectThrow(label, () => L.registerCharacter({ id: 'check_tmp_bad', define: (base) => ({ ...base, ...wrong }) }));
     if (RigSVG.NHAN_VAT.check_tmp_bad) hong('registerCharacter', 'a rejected definition was registered anyway');
@@ -307,6 +308,30 @@ try {
       const chosen = full.wave('R'); chosen.progress(0.45);
       if (Math.abs(full.state.upperArmR - full.NGHI.batR) < 5) hong('wave', "wave('R') must use that hand even when both are full");
       chosen.kill(); full.svg.remove(); free.svg.remove();
+    }
+    // Reo mừng: nhún lên rồi về đúng mặt đất; đang ngồi thì không nhún; tay cầm đồ thì đứng yên.
+    {
+      const happy = L.createCharacter(host, { id: 'barista' }).rig, rest = happy.NGHI.batR;
+      const t = happy.cheer(); let top = 0, armR = 0, armL = 0;
+      for (let p = 0; p <= 1; p += 0.02) { t.progress(p); top = Math.min(top, happy.state.y); armR = Math.max(armR, Math.abs(happy.state.upperArmR - rest)); armL = Math.max(armL, happy.state.upperArmL); }
+      if (top > -8) hong('cheer', `the character does not hop (highest y ${top})`);
+      if (armL < 120) hong('cheer', 'the free arm does not go up');
+      if (armR > 1) hong('cheer', 'the hand holding an item is raised');
+      t.progress(1); if (Math.abs(happy.state.y) > 1e-6) hong('cheer', 'does not land back on the ground');
+      t.kill(); happy.reset(); happy.state.seat = 1;
+      const seated = happy.cheer(); let lift = 0; for (let p = 0; p <= 1; p += 0.02) { seated.progress(p); lift = Math.min(lift, happy.state.y); }
+      if (lift < -0.5) hong('cheer', 'a seated character hops off the chair');
+      seated.kill(); happy.svg.remove();
+    }
+    // `torsoWidth`: thân rộng ra, đầu vẫn tròn.
+    {
+      L.registerCharacter({ id: 'check_tmp_wide', base: 'nurse', define: (base) => ({ ...base, torsoWidth: 1.3 }) });
+      const wide = L.createCharacter(host, { id: 'check_tmp_wide' }).rig, plain = L.createCharacter(host, { id: 'nurse' }).rig;
+      const size = (rig, el) => { const box = rig.el[el].getBoundingClientRect(), unit = rig.svg.getBoundingClientRect().height / 470; return { w: box.width / unit, h: box.height / unit }; };
+      if (size(wide, 'ao').w < size(plain, 'ao').w * 1.2) hong('torsoWidth', 'the torso does not get wider');
+      if (Math.abs(size(wide, 'dau').w - size(plain, 'dau').w) > 1.5) hong('torsoWidth', `the head is stretched with the torso (${size(wide, 'dau').w.toFixed(1)} vs ${size(plain, 'dau').w.toFixed(1)} units wide)`);
+      wide.svg.remove(); plain.svg.remove();
+      if (L.kit.bodies.stocky.torsoWidth < 1.2) hong('kit.bodies.stocky', 'has no wide torso');
     }
     // Tay / chân XA tối đi khi quay nhưng không được mất nét viền.
     {
@@ -557,7 +582,7 @@ try {
     });
     const cells = (frame) => [...frame.contentDocument.body.children].filter((el) => el.tagName === 'DIV');
     const names = JSON.parse(listAtStart);
-    for (const [id, expected] of [['receptionist', 22], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
+    for (const [id, expected] of [['receptionist', 23], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
       const { frame, done } = await load(`sheet.html?nv=${id}`);
       if (!done) hong(`sheet.html?nv=${id}`, 'the pose sheet does not finish (script error?)');
       else if (cells(frame).length !== expected) hong(`sheet.html?nv=${id}`, `the pose sheet shows ${cells(frame).length} panels, expected ${expected}`);

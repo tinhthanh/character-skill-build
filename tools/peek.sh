@@ -13,7 +13,8 @@ DIR="$(cd "$(dirname "$FILE")" && pwd)"; NAME="$(basename "$FILE")"
 case "$OUT" in /*) ;; *) OUT="$(pwd)/$OUT" ;; esac
 cd "$(dirname "$0")/.."
 CHROME_BIN="$(sh tools/chrome.sh)"
-PORT="${PORT:-8393}"
+# Cổng: một cổng TRỐNG do hệ điều hành cấp (hai lượt chạy song song không đụng nhau). PORT=… để chỉ định.
+PORT="${PORT:-$(python3 -c "import socket; s = socket.socket(); s.bind(('127.0.0.1', 0)); print(s.getsockname()[1])")}"
 # Tệp tạm nằm trong thư mục tạm riêng (theo TMPDIR nếu có), dọn khi thoát.
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/peek.XXXXXX")"
 python3 tools/serve.py "$PORT" "--mount=$DIR" >/dev/null 2>&1 &

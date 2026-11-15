@@ -38,9 +38,9 @@ export const tall = {
   hostScale: 1.08,
 };
 
-/** Người to con: thân lớn, cổ rụt, tay chân to. */
+/** Người to con: thân lớn và RỘNG NGANG, cổ rụt, tay chân to. */
 export const stocky = {
-  headSize: 1.34, neckDrop: 15, torsoScale: 1.08, legScale: 0.64,
+  headSize: 1.34, neckDrop: 15, torsoScale: 1.08, torsoWidth: 1.28, legScale: 0.64,
   upperArmLength: 1.0, forearmLength: 0.7, armThickness: 1.05, handSize: 1.08,
   thighLength: 1.3, shinLength: 1.2, legThickness: 1.4, legGap: 17, footSize: 1.1,
   hostScale: 1,

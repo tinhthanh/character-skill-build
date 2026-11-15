@@ -9,7 +9,8 @@ python3 tools/check_cues.py
 # Công cụ dựng cảnh từ kịch bản: dựng kịch bản mẫu, và kịch bản sai phải bị từ chối.
 python3 tools/check_scene.py
 CHROME_BIN="$(sh tools/chrome.sh)"
-PORT="${PORT:-8391}"
+# Cổng: một cổng TRỐNG do hệ điều hành cấp (hai lượt chạy song song không đụng nhau). PORT=… để chỉ định.
+PORT="${PORT:-$(python3 -c "import socket; s = socket.socket(); s.bind(('127.0.0.1', 0)); print(s.getsockname()[1])")}"
 python3 tools/serve.py "$PORT" >/dev/null 2>&1 &
 SRV=$!
 # Dọn dẹp khi thoát mà GIỮ NGUYÊN mã thoát của script: `wait` trả về mã của tiến trình nền vừa

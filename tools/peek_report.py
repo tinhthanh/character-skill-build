@@ -17,7 +17,7 @@ for seq in info.get('sequences', []):
     print(f"\n  {seq['character']}  {seq['start']:.2f} → {seq['end']:.2f} s")
     for step in seq['steps']:
         # Bước nhép miệng theo tệp tiếng: in luôn số để dán vào thẻ <audio> (tiếng dài = bước − 0,55 s).
-        audio = f'   ← <audio data-start="{step["start"]:.2f}" data-duration="{max(0, step["end"] - step["start"] - 0.55):.2f}">' if step['name'] == 'speakCues' else ''
+        audio = f'   ← <audio{" src=" + chr(34) + step["sound"] + chr(34) if step.get("sound") else ""} data-start="{step["start"]:.2f}" data-duration="{max(0, step["end"] - step["start"] - 0.55):.2f}">' if step['name'] == 'speakCues' else ''
         print(f"    {step['start']:6.2f} – {step['end']:6.2f}  {step['name']}{audio}")
 if not info.get('sequences'):
     print('\n  (no character sequences in the timeline)')

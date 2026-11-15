@@ -21,6 +21,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `nod` | — | nod twice | 1.4 |
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
+| `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
 | `speak` | `(text, dur = 2)` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
 | `explain` | `(text, dur = 2.4)` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
 | `speakCues` | `(cues, dur, { cuChi })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
@@ -143,6 +144,10 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `stool` | `for`, `color`, `width = 84` | |
 | `table` | `color`, `width = 230`, `height = 150` | thin top on two legs |
 | `counter` | `color`, `width = 300`, `height = 150` | solid to the floor |
+
+The top of a table or counter is `(12 + height) × hostHeight / 470` px above the bottom of its
+host (the floor line sits 12 units above the host's bottom edge) — e.g. 262 px for the default
+150-unit counter in a 760 px host. Use that to place things on it.
 
 `for: rig` sets the seat to the height at which that person sits (`rig.seatY()`); without it a
 default that fits the built-in characters is used. `color` is `#rrggbb`; the darker tone and

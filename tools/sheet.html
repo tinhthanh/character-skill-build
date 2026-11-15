@@ -41,7 +41,7 @@ if (pet) {
   panel('rest' + tag); panel('torso close-up', null, chestBox); panel('face close-up', null, faceBox);
   panel('turned 50%', (rig) => { rig.state.facing = 0.5; }); panel('turned 100%', (rig) => { rig.state.facing = 1; });
   for (const [action, progress, ...args] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
-                                             ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],
+                                             ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5], ['cheer', 0.4],
                                              ['express', 0.5, 'happy'], ['express', 0.5, 'sad'], ['express', 0.5, 'surprised'], ['express', 0.5, 'angry'], ['turn', 0.5, 'left']])
 
     panel(action === 'express' ? `express: ${args[0]}` : action === 'turn' ? `turn: ${args[0]}` : action, mid(action, progress, ...args));

@@ -138,7 +138,7 @@ glasses stay on the eyes; it does not move when the character looks around or bl
 
 | Group | Keys | Meaning |
 |---|---|---|
-| proportions | `headSize` `neckDrop` `torsoScale` `legScale` | head scale, how far the head sinks onto the neck (bigger = shorter neck), torso scale, leg scale |
+| proportions | `headSize` `neckDrop` `torsoScale` `torsoWidth` `legScale` | head scale, how far the head sinks onto the neck (bigger = shorter neck), torso scale, torso **width** relative to its height (1 = default, 1.28 = stocky: shoulders, belly and arms widen, the head does not), leg scale |
 | arms | `upperArmLength` `forearmLength` `armThickness` `handSize` | multipliers, 1 = adult default |
 | legs | `thighLength` `shinLength` `legThickness` `legGap` `footSize` | multipliers; `legGap` is the half-distance between the legs in units |
 | sleeves | `sleeveLength` `sleeveSlant` `sleeveFlare` `sleeveHemWidth` `sleeveCornerRadius` `sleeveHemColor` `sleeveHemDash` `sleeveHemInset` | length, hem slant, flare, hem stroke width, inner-corner rounding, hem colour, hem dash pattern, hem inset |
@@ -200,14 +200,14 @@ drawing functions. Derived automatically when you do not set them: `brows` (from
 | `kit.outfits.hoodie` | long-sleeved hoodie: hood behind the neck, drawstrings (`colors.drawstrings`), kangaroo pocket, hem band |
 | `kit.outfits.suit` | jacket with lapels over a shirt (`colors.innerShirt`) and tie (`colors.tie`, falls back to `accent`), two buttons (`colors.buttons`), pocket lines |
 | `kit.hair.<style>(options)` | **ready-made hair** — call it and put the result in `hair`: `hair: kit.hair.bob()`. Styles: `crop` · `sidePart({ side })` · `bob` · `long({ length = 0.5 })` (0 = ends at the shoulders, 1 = mid-chest; the hair hangs beside the body, clear of the shoulders, because the head is wider than the torso) · `ponytail({ side, tie })` · `bun({ size = 1 })` (0.7 … 1.4) · `pigtails({ tie })` · `curly({ volume = 1 })` (0.7 tight … 1.4 big) · `spiky` · `tufts` (use with `backHair: 'low'`) · `bald` (use with `backHair: 'none'`). `side` is `'left'` / `'right'` on screen; `tie` is a colour (default `colors.accent`). Colours come from `colors.hair` and `colors.hairHighlight` |
-| `kit.bodies.<preset>` | **body proportions** to spread: `child` · `teen` · `adult` · `tall` · `stocky`. Each also carries `hostScale` — the host height to use relative to an adult's when they share a scene (child 0.75, teen 0.84, tall 1.08); the rig ignores that key; in a composition read it as `VGCharacter.kit.bodies.teen.hostScale` |
-| `kit.outlines.<same names>` | the bare torso outlines, if you only want the shape |
+| `kit.bodies.<preset>` | **body proportions** to spread: `child` · `teen` · `adult` · `tall` · `stocky` (wide torso, `torsoWidth: 1.28`). Each also carries `hostScale` — the host height to use relative to an adult's when they share a scene (child 0.75, teen 0.84, tall 1.08); the rig ignores that key; in a composition read it as `VGCharacter.kit.bodies.teen.hostScale` |
+| `kit.outlines.scrubs` · `.pawTunic` · `.coat` | the torso outlines of those three **outfits**, as path-data strings — use as `top: () => kit.outlines.scrubs`. (Body presets do not have outlines; a wider torso is `torsoWidth`.) |
 | `kit.partsOf(id)` | another character's definition, to borrow parts from |
 | `kit.parts.roundGlasses(c, { x, y, r, color })` | round glasses for `faceExtras` |
 | `kit.parts.shortBeard(c, { color, chin = 54, mouthY = 30, width = 43 })` | short beard for `beard`; lower `chin` for a short face, `width` = half-width at the jaw |
 | `kit.parts.moustache(c, { color, mouthY = 30, width = 17 })` | moustache for `beard`; `width` = half-width |
 | `kit.parts.wrinkles(c, { color, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true })` | crow's feet, cheek lines and forehead lines for `faceExtras` — an age cue, with grey `hair` and `stoop`. `faceExtras` is drawn **over** `hat`: with a cap or hat pass `forehead: false`, or the lines land on the hat band |
-| `kit.parts.apronBib(c, { color, top, width, waist })` | chest panel and neck straps of an apron, for inside the `accessories` group; colour `colors.skirt` |
+| `kit.parts.apronBib(c, { color, top = -70, width = 16, waist = 14 })` | chest panel and neck straps of an apron, for inside the `accessories` group; colour `colors.skirt`. Torso space: `top` and `waist` are the y of the bib's upper and lower edge, `width` is **half** the width of its upper edge (22–26 for a wide torso); the straps follow |
 | `kit.parts.cup(c, { color, lid, sleeve, size })` · `clipboard(c, { color, paper })` · `phone(c, { color, screen })` | held items for `heldItemL` / `heldItemR` |
 | `kit.sideShading(points)` | side shading from an outline's edge points |
 | `kit.shoulderPatches(c)` | the two shoulder wedges every collar needs |

@@ -8,7 +8,7 @@ description: Create custom 2D SVG characters (people, plus dogs and cats) on a s
 A library of **100% SVG characters driven by GSAP**, a studio to tune them, and a
 single-file build that drops into a [HyperFrames](https://github.com/heygen-com/hyperframes)
 composition. A character is a small JS definition on top of a shared skeleton, so a new
-character gets all 22 actions (wave, talk, walk, sit, react…) and 5 stance actions (sit down,
+character gets all 23 actions (wave, talk, walk, sit, cheer, react…) and 5 stance actions (sit down,
 stand up, face someone, put an item away, take it out) for free.
 
 Everything you write and read while using the skill is English: definitions, configs, API
