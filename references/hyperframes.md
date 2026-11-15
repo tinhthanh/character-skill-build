@@ -45,6 +45,16 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 - Characters with `enter` walk in **together**, before the script. A prop with `"front": true`
   is drawn in front of the characters — a counter someone stands behind. `shot` goes on a turn
   (also on a turn inside `together`), not on the `together` entry itself.
+- **Voices from text — `"voice"`.** With the [`voice-tts`](https://github.com/tinhthanh/voice-process)
+  command installed (Vietnamese text-to-speech, CPU, eight voices — `voice-tts voices`), put
+  `"voice": "maichi"` on a character, or on one turn, and its lines are spoken, lip-synced
+  and timed with no audio files to prepare. Each line is synthesised **once** into `voice/`
+  next to the scene file and reused afterwards — TTS output differs between runs, so keep
+  those files (commit them with the scene); delete one to have that line spoken again, and a
+  changed text or voice makes a new file. `"voice": false` on a turn keeps it silent. Without
+  `voice-tts`, a scene whose voice files already exist still builds; otherwise use `audio`
+  or `dur`. Install: `uv tool install "git+https://github.com/tinhthanh/voice-process#subdirectory=tts"`
+  then `voice-tts download-models` (about 860 MB).
 - **Explainer videos — `"layout": "presenter"`.** The characters stand to one side and the
   other side is a content panel. A turn can carry
   `"show": { "title": "…", "bullets": ["…", "…"], "image": "file.png" }`: it appears as the
@@ -387,6 +397,9 @@ npx hyperframes render -o out.mp4 .
     centre, but these rotate about a joint — the knee, or the pelvis when a dog sits — so their
     centre is meant to travel.
   - `film_silent` on a composition that has no audio.
+  - `line_unread` on a caption that follows speech: the check wants 0.5 s + 0.3 s a word for
+    on-screen text, and people speak faster than that. Captions made by `tools/scene.py` carry
+    `data-layout-ignore` for this reason; add it to your own caption element too.
 
   `sh tools/lint-examples.sh --check` (run in CI) fails on anything outside this list.
   `check` prints a count per section ("0 error(s), 1 warning(s)"); the warning itself is the

@@ -51,6 +51,10 @@ Scene file (every key except `characters` and `script` is optional):
                side is a CONTENT PANEL. A turn can then carry `"show": { "title": "…", "bullets": ["…"], "image":
                "file.png" }` — it appears as the turn starts (bullets one by one while the line is spoken) and
                stays until the next `show` (`"show": false` clears the panel). No close-up camera in this layout.
+  voice        `"voice": "maichi"` on a character (or on one turn) speaks its lines with the `voice-tts` command
+               (Vietnamese; `voice-tts voices` lists them). Each line is synthesised ONCE into voice/ next to the
+               scene file and reused — delete a file to have it spoken again. `"voice": false` on a turn keeps
+               that line silent. Without voice-tts installed, use "audio" or "dur".
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
                `"tabletop"` is the height of a table or counter top in frame units (150; lower it for
                someone seated behind it — the tool tells you when a seated character would be hidden).
@@ -90,9 +94,9 @@ def known(where, given, allowed):
 
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image')
@@ -178,6 +182,28 @@ def place_shows(html, timings, total):
     return re.sub(r'<(?:div|img)\b[^>]*\bdata-show-turn="\d+"[^>]*>', fix, html)
 
 
+def speak_line(base, who, voice, words, where):
+    """Make (once) the voice file of one spoken line with the `voice-tts` command and return its path
+    relative to the scene file. The file name carries a hash of the voice and the words, so a line is
+    synthesised again only when either changes — TTS output differs from run to run, and a voice that
+    changed under a finished scene would move every lip-sync cue and every start time."""
+    digest = hashlib.sha256(f'{voice}\n{words}'.encode('utf-8')).hexdigest()[:8]
+    relative = os.path.join('voice', f'{slug(who)}-{digest}.wav')
+    target = os.path.join(base, relative)
+    if os.path.isfile(target): return relative
+    program = os.environ.get('VOICE_TTS') or shutil.which('voice-tts') or (os.path.expanduser('~/.local/bin/voice-tts') if os.path.isfile(os.path.expanduser('~/.local/bin/voice-tts')) else None)
+    if not program:
+        fail(f'{where}: "voice" needs the voice-tts command (Vietnamese text-to-speech), which is not installed.\n'
+             '  Install:  uv tool install "git+https://github.com/tinhthanh/voice-process#subdirectory=tts"  &&  voice-tts download-models\n'
+             '  Or give the line an "audio" file of your own, or drop "voice" to estimate the mouth from the text.')
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    done = subprocess.run([program, 'say', words, '-v', voice, '-o', target, '--sample-rate', '24000'], capture_output=True, text=True)
+    if done.returncode != 0 or not os.path.isfile(target):
+        fail(f'{where}: voice-tts could not speak this line with voice "{voice}":\n  ' + (done.stderr.strip() or done.stdout.strip() or 'no message').splitlines()[-1] + '\n  (voices: run `voice-tts voices`)')
+    print(f'  voice: {relative}  ({voice})')
+    return relative
+
+
 def js(value):
     return json.dumps(value, ensure_ascii=False)
 
@@ -225,6 +251,7 @@ def main():
         if 'x' not in who: fail(f'character "{name}" needs "x" (where it stands, px from the left)')
         if who.get('enter') not in (None, 'left', 'right'): fail(f'character "{name}": "enter" must be "left" or "right"')
         if pet and who.get('enter') == 'right': fail(f'character "{name}": pets can only enter from the left')
+        if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
         frame = PET if pet else PERSON
@@ -277,6 +304,11 @@ def main():
         if 'say' in turn:
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
+            # Giọng đọc: lượt (hoặc nhân vật) khai `voice` mà chưa có tệp tiếng thì tạo tệp bằng voice-tts — một lần.
+            voice = turn.get('voice', who.get('voice'))
+            if voice is not None and voice is not False and not isinstance(voice, str): fail(f'{where}: "voice" must be a voice name (see `voice-tts voices`) or false')
+            if voice and not turn.get('audio'):
+                turn = dict(turn, audio=speak_line(base, who['name'], voice, words, where))
             if turn.get('audio'):
                 source = os.path.join(base, turn['audio'])
                 if not os.path.isfile(source): fail(f'{where}: audio file not found: {turn["audio"]} (looked in {base})')
@@ -469,14 +501,16 @@ def main():
     captions = scene.get('captions', True) and '"say"' in json.dumps(script)        # không ai nói thì không cần phụ đề
     if captions:
         look = f'padding: 18px 34px; border-radius: 18px; box-sizing: border-box; background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(min(width, height) * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;'
+        # `data-layout-ignore`: phụ đề đi theo LỜI NÓI, mà người nói nhanh hơn tốc độ đọc mà `hyperframes check` đòi cho
+        # chữ trên màn hình (0,5 s + 0,3 s mỗi từ) — khán giả nghe câu ấy chứ không chỉ đọc. Vị trí phụ đề do công cụ tính.
         caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.52))
         if width >= height:
-            clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; ' + look)
+            clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; ' + look, extra=' data-layout-ignore=\"\"')
         else:
             # Khung DỌC: chữ phải nằm trong vùng mà giao diện TikTok / Reels / Shorts không che — theo bảng của
             # HyperFrames là từ 15% tới 65% chiều cao, và ở nửa dưới của vùng ấy thì lùi khỏi cột nút bên phải
             # (11%–72% bề ngang). Neo bằng `top` để ba dòng chữ vẫn nằm trọn trong vùng.
-            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {caption_top}px; ' + look)
+            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {caption_top}px; ' + look, extra=' data-layout-ignore=\"\"')
     for voice in voices:
         body.append(f'  <audio id="voice-{voice["key"].replace("_", "-")}" class="clip" src="{voice["file"]}" data-start="__START_{voice["key"]}__" data-duration="{voice["length"]:.2f}" data-track-index="{track[0]}" data-volume="1"></audio>')
         track[0] += 1

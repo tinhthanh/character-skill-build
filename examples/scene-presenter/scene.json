@@ -1,17 +1,53 @@
 {
   "id": "checkup-tips",
   "layout": "presenter",
-  "background": { "wall": "#1f4a5c", "wallDark": "#0c1c26", "floor": "#0f2a38" },
+  "background": {
+    "wall": "#1f4a5c",
+    "wallDark": "#0c1c26",
+    "floor": "#0f2a38"
+  },
   "characters": [
-    { "name": "host", "id": "receptionist", "x": 1480 }
+    {
+      "name": "host",
+      "id": "receptionist",
+      "x": 1480,
+      "voice": "maichi"
+    }
   ],
   "script": [
-    { "who": "host", "say": "Ba điều cần nhớ khi đưa thú cưng đi khám định kỳ.",
-      "show": { "title": "Khám định kỳ cho thú cưng" } },
-    { "who": "host", "say": "Một: mang theo sổ tiêm chủng. Hai: cho bé nhịn ăn bốn tiếng trước khi khám. Ba: ghi lại những thay đổi bạn thấy ở bé trong tháng qua.",
-      "show": { "title": "Ba điều cần nhớ", "bullets": ["Mang theo sổ tiêm chủng", "Nhịn ăn bốn tiếng trước khi khám", "Ghi lại thay đổi của bé trong tháng"] } },
-    { "who": "host", "say": "Đội ngũ của chúng tôi luôn sẵn sàng đón bé.", "mood": "happy",
-      "show": { "title": "Đội ngũ phòng khám", "image": "../../docs/characters.png" } },
-    { "who": "host", "do": ["wave"] }
+    {
+      "who": "host",
+      "say": "Ba điều cần nhớ khi đưa thú cưng đi khám định kỳ.",
+      "show": {
+        "title": "Khám định kỳ cho thú cưng"
+      }
+    },
+    {
+      "who": "host",
+      "say": "Một: mang theo sổ tiêm chủng. Hai: cho bé nhịn ăn bốn tiếng trước khi khám. Ba: ghi lại những thay đổi bạn thấy ở bé trong tháng qua.",
+      "show": {
+        "title": "Ba điều cần nhớ",
+        "bullets": [
+          "Mang theo sổ tiêm chủng",
+          "Nhịn ăn bốn tiếng trước khi khám",
+          "Ghi lại thay đổi của bé trong tháng"
+        ]
+      }
+    },
+    {
+      "who": "host",
+      "say": "Đội ngũ của chúng tôi luôn sẵn sàng đón bé.",
+      "mood": "happy",
+      "show": {
+        "title": "Đội ngũ phòng khám",
+        "image": "../../docs/characters.png"
+      }
+    },
+    {
+      "who": "host",
+      "do": [
+        "wave"
+      ]
+    }
   ]
 }

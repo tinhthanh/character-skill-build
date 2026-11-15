@@ -24,7 +24,11 @@ with tempfile.TemporaryDirectory() as work:
             if not os.path.isfile(os.path.join(out, name)): problems.append(f'{name} was not written next to index.html')
         if '__TOTAL__' in html or '__START_' in html: problems.append('index.html still contains unfilled placeholders')
         audio = re.findall(r'<audio[^>]*data-start="([\d.]+)" data-duration="([\d.]+)"', html)
-        if len(audio) != 1 or float(audio[0][0]) < 2 or abs(float(audio[0][1]) - 6.0) > 0.05: problems.append(f'the audio clip is not timed (found {audio})')
+        import wave
+        with wave.open(os.path.join(ROOT, 'examples', 'voiceover', 'voice.wav')) as clip: length = clip.getnframes() / clip.getframerate()
+        # Ba câu có tiếng: một tệp dùng chung với ví dụ voiceover, hai tệp trong examples/scene/voice/ (đã tạo sẵn
+        # bằng voice-tts và commit — dựng lại KHÔNG cần voice-tts).
+        if len(audio) != 3 or float(audio[0][0]) < 2 or abs(float(audio[0][1]) - length) > 0.05 or not all(float(a[0]) < float(b[0]) for a, b in zip(audio, audio[1:])): problems.append(f'the audio clips are not timed (found {audio})')
         total = re.search(r'data-composition-id="clinic-visit" data-start="0" data-duration="([\d.]+)"', html)
         if not total or float(total.group(1)) < 12: problems.append('the composition duration was not filled in')
         if 'VGCharacter.conversation(' not in html or 'VGCharacter.captions(' not in html or 'camera:' not in html: problems.append('the composition lacks the conversation, captions or camera')
@@ -75,7 +79,7 @@ with tempfile.TemporaryDirectory() as work:
         beyond = subprocess.run(['sh', os.path.join(HERE, 'peek.sh'), os.path.join(out, 'index.html'), '--mouth=9'], capture_output=True, text=True)
         if beyond.returncode == 0 or 'spoken line' not in beyond.stderr: problems.append('peek.sh --mouth=9 on a scene with fewer lines does not explain itself')
         cues = open(os.path.join(out, 'voice.cues.js'), encoding='utf-8').read()
-        if 'Bella is due for her check-up' not in cues: problems.append('the spoken words were not stored in the cues (captions would be empty)')
+        if 'khám định kỳ cho bé Bella' not in cues: problems.append('the spoken words were not stored in the cues (captions would be empty)')
     # Chạy lại lên bản CHƯA sửa thì ghi đè bình thường; lên bản ĐÃ sửa tay thì dừng, trừ khi --force.
     if not problems:
         again = build(example, out)
@@ -113,6 +117,8 @@ with tempfile.TemporaryDirectory() as work:
     cases = [
         ('an unknown speaker', lambda s: s['script'].append({'who': 'nobody', 'do': ['wave']}), 'nobody'),
         ('a pet that speaks', lambda s: s['script'].append({'who': 'bella', 'say': 'woof'}), 'pet'),
+        ('a voice on a pet', lambda s: s['characters'][2].update({'voice': 'maichi'}), 'pet'),
+        ('a voice that is not a name', lambda s: s['script'][2].update({'voice': 3}), 'voice'),
         ('a missing audio file', lambda s: s['script'].append({'who': 'vet', 'say': 'hi', 'audio': 'nope.wav'}), 'nope.wav'),
         ('an @reference to nobody', lambda s: s['script'].append({'who': 'vet', 'do': [['face', '@ghost']]}), '@ghost'),
         ('two characters with one name', lambda s: s['characters'].append({'name': 'vet', 'id': 'nurse', 'x': 100}), 'vet'),

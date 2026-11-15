@@ -4,3 +4,4 @@ __pycache__/
 !docs/*.png
 node_modules/
 examples/scene*/*/
+!examples/scene*/voice/

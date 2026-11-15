@@ -119,7 +119,9 @@ clips for every voice file.
    }
    ```
 
-   `say` + `audio` lip-syncs to the file; `say` + `dur` estimates the mouth. `mood` is the
+   `say` + `audio` lip-syncs to the file; `say` + `dur` estimates the mouth; with the
+   `voice-tts` command installed, `"voice": "maichi"` on a character speaks its lines for you
+   (Vietnamese; made once into `voice/` and reused). `mood` is the
    tone of the line (`happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
    `confused`, `tired`). `do` takes any action step. Vertical video: `"width": 1080,
    "height": 1920`. **Explainer with one presenter:** `"layout": "presenter"` and

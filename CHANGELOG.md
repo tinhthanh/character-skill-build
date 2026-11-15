@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.16.0
+
+Added
+- **Voices from text.** `tools/scene.py`: `"voice"` on a character or a turn speaks the line
+  with the `voice-tts` command ([voice-process](https://github.com/tinhthanh/voice-process),
+  Vietnamese, CPU). Each line is synthesised once into `voice/` beside the scene file and
+  reused, so a scene keeps its timing; a scene whose voice files exist builds without
+  `voice-tts`.
+- The examples now speak: `examples/voiceover/voice.wav` is real speech (it was a synthetic
+  hum), and the `scene` and `scene-presenter` samples carry generated voice lines.
+
+Changed
+- `tools/cues.py` writes accented text unescaped, and analyses audio at up to 12 kHz.
+
 ## 0.15.0
 
 Added

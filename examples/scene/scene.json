@@ -1,25 +1,95 @@
 {
   "id": "clinic-visit",
   "seed": 7,
-  "background": { "wall": "#1f4a5c", "wallDark": "#0c1c26", "floor": "#0f2a38" },
+  "background": {
+    "wall": "#1f4a5c",
+    "wallDark": "#0c1c26",
+    "floor": "#0f2a38"
+  },
   "characters": [
-    { "name": "vet", "id": "vet", "x": 640, "height": 760, "enter": "left", "faces": "boy" },
-    { "name": "boy", "id": "boy", "x": 1380, "height": 570, "seated": "chair", "faces": "vet" },
-    { "name": "bella", "species": "dog", "x": 1050, "height": 320, "faces": "vet" }
+    {
+      "name": "vet",
+      "id": "vet",
+      "x": 640,
+      "height": 760,
+      "enter": "left",
+      "faces": "boy",
+      "voice": "maichi"
+    },
+    {
+      "name": "boy",
+      "id": "boy",
+      "x": 1380,
+      "height": 570,
+      "seated": "chair",
+      "faces": "vet",
+      "voice": "hamy"
+    },
+    {
+      "name": "bella",
+      "species": "dog",
+      "x": 1050,
+      "height": 320,
+      "faces": "vet"
+    }
   ],
   "props": [
-    { "kind": "counter", "x": 250, "color": "#5f7d8c" }
+    {
+      "kind": "counter",
+      "x": 250,
+      "color": "#5f7d8c"
+    }
   ],
   "script": [
-    { "who": "bella", "do": ["wagTail"] },
-    { "who": "vet", "say": "Good morning! Bella is due for her check-up today.", "audio": "../voiceover/voice.wav" },
-    { "who": "boy", "say": "Thank you, doctor. She has been excited all morning.", "dur": 3.2 },
-    { "who": "vet", "say": "Then let's get started.", "shot": ["vet", "bella"] },
-    { "together": [
-      { "who": "vet", "do": [["face", "front"], "wave"] },
-      { "who": "bella", "do": ["bark"] },
-      { "who": "boy", "do": ["standUp"] }
-    ] }
+    {
+      "who": "bella",
+      "do": [
+        "wagTail"
+      ]
+    },
+    {
+      "who": "vet",
+      "say": "Chào bạn! Hôm nay mình khám định kỳ cho bé Bella nhé. Chỉ mất mười phút thôi, và bé sẽ có quà.",
+      "audio": "../voiceover/voice.wav"
+    },
+    {
+      "who": "boy",
+      "say": "Cảm ơn bác sĩ. Bé háo hức từ sáng tới giờ."
+    },
+    {
+      "who": "vet",
+      "say": "Vậy mình bắt đầu nhé.",
+      "shot": [
+        "vet",
+        "bella"
+      ]
+    },
+    {
+      "together": [
+        {
+          "who": "vet",
+          "do": [
+            [
+              "face",
+              "front"
+            ],
+            "wave"
+          ]
+        },
+        {
+          "who": "bella",
+          "do": [
+            "bark"
+          ]
+        },
+        {
+          "who": "boy",
+          "do": [
+            "standUp"
+          ]
+        }
+      ]
+    }
   ],
   "camera": true,
   "captions": true

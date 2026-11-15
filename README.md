@@ -111,7 +111,9 @@ sh tools/peek.sh examples/scene/clinic-visit/index.html
 A scene file lists the characters (who, where, seated or walking in), the furniture, and the
 script — who says what (optionally with a voice file) and who does what, in order. The tool
 writes a complete HyperFrames composition: turns timed automatically, the camera on whoever
-speaks, captions, lip-sync cues and timed audio clips. Horizontal or vertical (9:16) frames;
+speaks, captions, lip-sync cues and timed audio clips. With
+[`voice-tts`](https://github.com/tinhthanh/voice-process) installed, `"voice": "maichi"` on a
+character speaks its lines in Vietnamese — text in, talking video out. Horizontal or vertical (9:16) frames;
 an explainer layout (`"layout": "presenter"`) puts titles, bullet points and pictures beside
 the presenter as they speak;
 `tools/peek.sh … --mouth` shows a line's lip-sync frame by frame.
