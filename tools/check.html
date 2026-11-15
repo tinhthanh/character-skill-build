@@ -293,6 +293,31 @@ try {
       line.time(0.9); if (Math.abs(seated.state.facing) > L.RigSVG.GESTURE_TURN + 1e-3) hong('speak', 'the body does not open toward the viewer for the gesture while turned');
       line.kill(); seated.svg.remove();
     }
+    // Hai tay đều cầm đồ: vẫy / tán thành bằng ĐẦU, hai tay đứng yên, thời lượng không đổi.
+    {
+      L.registerCharacter({ id: 'check_tmp_full', base: 'clerk', define: (base, kit) => ({ ...base, heldItemR: (p, c) => kit.parts.phone(c), restPose: { ...base.restPose, handR: 'fist' } }) });
+      const full = L.createCharacter(host, { id: 'check_tmp_full' }).rig, free = L.createCharacter(host, { id: 'clerk' }).rig;
+      for (const name of ['wave', 'thumbsUp']) {
+        const t = full[name](), reference = free[name](); t.progress(0.45); full.render();
+        if (Math.abs(full.state.upperArmL - full.NGHI.batL) > 1 || Math.abs(full.state.upperArmR - full.NGHI.batR) > 1) hong(name, 'moves an arm although both hands hold items');
+        if (Math.abs(full.state.headTilt - full.NGHI.dau) < 2) hong(name, 'with both hands full there is no head gesture either');
+        if (Math.abs(t.duration() - reference.duration()) > 1e-6) hong(name, `the hands-full version lasts ${t.duration()}s instead of ${reference.duration()}s`);
+        t.kill(); reference.kill(); full.reset();
+      }
+      const chosen = full.wave('R'); chosen.progress(0.45);
+      if (Math.abs(full.state.upperArmR - full.NGHI.batR) < 5) hong('wave', "wave('R') must use that hand even when both are full");
+      chosen.kill(); full.svg.remove(); free.svg.remove();
+    }
+    // Tay / chân XA tối đi khi quay nhưng không được mất nét viền.
+    {
+      const turned = L.createCharacter(host, { id: 'receptionist' }).rig; turned.state.facing = 0.55; turned.render();
+      const leg = turned.el.chanR, wanted = leg.getAttribute('filter');
+      if (wanted && !leg.style.filter.includes('url(')) hong('outline', `the far leg loses its outline filter when turned (style.filter: ${leg.style.filter})`);
+      if (!leg.style.filter.includes('brightness')) hong('outline', 'the far leg is not darkened when turned');
+      turned.state.facing = 0; turned.render();
+      if (leg.style.filter) hong('outline', 'the far-limb filter stays on after turning back');
+      turned.svg.remove();
+    }
     // face(target) phải tính cả quãng nhân vật đã đi: A đi sang bên phải của B rồi quay về phía B = quay TRÁI.
     const hostA = document.createElement('div'), hostB = document.createElement('div');
     hostA.style.cssText = 'position:fixed;left:0;top:0;height:300px'; hostB.style.cssText = 'position:fixed;left:150px;top:0;height:300px'; document.body.append(hostA, hostB);

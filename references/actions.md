@@ -69,7 +69,9 @@ stance-dependent timelines with `sequence()` — it gives each action the state 
 left behind.
 
 `wave` and `thumbsUp` use the right hand unless it holds an item and the left is free; pass
-`'L'` or `'R'` to choose. A hand holding an item stays closed around it during every action.
+`'L'` or `'R'` to choose. With an item in **both** hands they become a greeting without arms
+(head tilt, smile, two nods) of the same length. A hand holding an item stays closed around it
+during every action.
 
 **Held items** are part of the stance too: `hideItem(side)` puts one away and it stays away
 until `showItem(side)`. Do not tween `rig.state.itemR` beside a `sequence()` — the sequence

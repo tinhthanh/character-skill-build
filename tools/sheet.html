@@ -35,8 +35,10 @@ if (pet) {
   // Khung cận TÍNH từ tỉ lệ của chính nhân vật (cỡ đầu, cỡ thân, độ dài chân), không đặt cứng:
   // khung cứng hợp với nhân vật chibi thì cắt mất cằm hoặc tay của nhân vật ít chibi hơn.
   const faceBox = (rig) => khungMat(rig, 80);
-  const chestBox = (rig) => { const cy = 262 - 52 * rig.nv.coThan + 30 + rig.hangChan(), half = 82 * rig.nv.coThan; return `${200 - half} ${cy - half * 1.05} ${half * 2} ${half * 2.35}`; };
-  panel('rest' + tag); panel('chest close-up', null, chestBox); panel('face close-up', null, faceBox);
+  // Cận THÂN: từ cằm xuống quá hông — thấy cổ áo, túi, đồ cầm tay và phần trên của váy / tạp dề.
+  // Đầu nằm ngoài khung nên không che nhãn. Khung giữ đúng tỉ lệ của ô (256 × 300).
+  const chestBox = (rig) => { const hip = 262 + 30 + rig.hangChan(), top = hip - 118 * rig.nv.coThan, height = 118 * rig.nv.coThan + 70, width = height * 256 / 300; return `${200 - width / 2} ${top} ${width} ${height}`; };
+  panel('rest' + tag); panel('torso close-up', null, chestBox); panel('face close-up', null, faceBox);
   panel('turned 50%', (rig) => { rig.state.facing = 0.5; }); panel('turned 100%', (rig) => { rig.state.facing = 1; });
   for (const [action, progress, ...args] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
                                              ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],

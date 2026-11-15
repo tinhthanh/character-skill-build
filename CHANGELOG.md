@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.1
+
+Fixed
+- The far arm and far leg lost their cartoon outline when the character turned (the darkening
+  filter replaced the outline filter).
+- At a three-quarter turn the far arm showed as a thin sliver beside the torso; it now tucks
+  behind the body.
+- `wave` and `thumbsUp` with an item in both hands waved the item. They are now a head
+  gesture of the same length; `wave('L')` / `wave('R')` still force a hand.
+
+Changed
+- Pose sheet: the "chest close-up" panel is now "torso close-up" — chin to below the hips, so
+  collar, pockets, held items and the top of a skirt or apron are all in view.
+- `references/hyperframes.md` lists `rotation_pivot_drift` on the shin and on a pet's withers
+  as a known false positive of `hyperframes check` (both rotate about a joint by design).
+
 ## 0.8.0
 
 Added

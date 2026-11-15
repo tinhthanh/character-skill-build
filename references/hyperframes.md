@@ -174,6 +174,10 @@ npx hyperframes render -o out.mp4 .
   - `off_pivot_rotation` on arm parts (`#rig1-batR`, `#rig1-cangL`) or a pet's head
     (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
     joint. Several can appear. (Element ids inside the SVG use the rigs' internal names.)
+  - `rotation_pivot_drift` on a leg part (`#rig1-ongL`, the shin) or a pet's body part
+    (`#thu1-gu`, the withers): the check expects a rotating element to spin about its own
+    centre, but these rotate about a joint — the knee, or the pelvis when a dog sits — so their
+    centre is meant to travel.
   - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` (internal names for smile and right arm)
     inside `explain`: two of the library's own gesture tweens meet within a frame. Cosmetic.
 
