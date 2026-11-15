@@ -7,8 +7,9 @@ library is built to that contract. A complete composition is in
 
 ## Setup in a HyperFrames project
 
-1. Copy `dist/character.iife.js` into the project (next to `index.html`, or under `assets/`).
-   Re-copy it whenever a character changes.
+1. Copy `dist/character.slim.js` into the project (next to `index.html`, or under `assets/`).
+   Re-copy it whenever a character or a config changes. (`character.iife.js` is the same code
+   with comments, for debugging.)
 2. Load GSAP, then the bundle, with plain `<script src>` tags, inside the composition root.
 3. Build everything synchronously in one inline `<script>` and register the timeline.
 
@@ -22,15 +23,15 @@ library is built to that contract. A complete composition is in
        style="position:absolute; right:760px; bottom:96px; height:330px"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-  <script src="character.iife.js"></script>
+  <script src="character.slim.js"></script>
   <script>
-    VGCharacter.gieo(7);
+    VGCharacter.seed(7);
 
-    const vet = VGCharacter.taoNhanVat(document.getElementById('vet'), { khoa: 'bac_si_thu_y' }).rig;
-    const dog = VGCharacter.taoThuCung(document.getElementById('dog'), { loai: 'cho' }).rig;
+    const vet = VGCharacter.createCharacter(document.getElementById('vet'), { id: 'vet' }).rig;
+    const dog = VGCharacter.createPet(document.getElementById('dog'), { species: 'dog' }).rig;
 
-    const vetAct = VGCharacter.kichBan(vet, ['enter', 'wave', ['giaiThich', 'Chào bạn!', 2.4], ['idle', 3]]);
-    const dogAct = VGCharacter.kichBan(dog, [['idle', 1.2], 'wagTail', 'sit', 'bark']);
+    const vetAct = VGCharacter.sequence(vet, ['enter', 'wave', ['explain', 'Chào bạn!', 2.4], ['idle', 3]]);
+    const dogAct = VGCharacter.sequence(dog, [['idle', 1.2], 'wagTail', 'sit', 'bark']);
 
     const tl = gsap.timeline({ paused: true });
     tl.add(vetAct.paused(false), 0);
@@ -46,23 +47,26 @@ library is built to that contract. A complete composition is in
 
 - **The key in `window.__timelines` must equal `data-composition-id`.**
 - **No ES modules, no `fetch`, no timers.** The `runtime/*.js` sources are modules; the
-  composition must use the IIFE bundle. A config tuned in the studio goes in as an object:
+  composition must use a bundle from `dist/`.
+- **Tuned configs travel inside the bundle.** `tools/build.py` bakes every `configs/<id>.json`
+  into the bundle, so `createCharacter(host, { id: 'surgeon' })` already returns the character
+  as tuned in the studio. To override or bypass it:
 
   ```js
-  const config = { than: { coDau: 1.3 }, mau: { ao: '#2f9e8f' } };   // contents of configs/<id>.json
-  VGCharacter.taoNhanVat(host, { khoa: 'bs_nam', config });
+  VGCharacter.createCharacter(host, { id: 'surgeon', config: { proportions: { headSize: 1.3 }, colors: { top: '#2f9e8f' } } });
+  VGCharacter.createCharacter(host, { id: 'surgeon', config: null });   // definition defaults only
   ```
 
-  The studio's ⋯ menu has **Chép mã nhúng HyperFrames** ("copy HyperFrames embed code"),
-  which produces this snippet with the current config inlined.
-- **Seed before building.** `VGCharacter.gieo(n)` must run before the first action method is
+  The studio's ⋯ menu has **Chép mã nhúng HyperFrames** ("copy HyperFrames embed code"), which
+  produces a snippet with the current, possibly unsaved, config inlined.
+- **Seed before building.** `VGCharacter.seed(n)` must run before the first action method is
   called. Change `n` to get a different (still reproducible) pattern of blinks and gestures.
-- **`kichBan` timelines are created paused.** Un-pause the child when adding it to the
+- **`sequence` timelines are created paused.** Un-pause the child when adding it to the
   composition timeline — `tl.add(act.paused(false), at)` — or it will not follow the parent.
-- **Budget the duration.** `kichBan(...).duration()` is the length of the sequence; the
+- **Budget the duration.** `sequence(...).duration()` is the length of the sequence; the
   composition's `data-duration` and the host clip's `data-duration` must cover it. Pad the end
   with `['idle', n]` so the character is not frozen while other elements finish.
-- **A bad config throws.** `taoNhanVat` / `taoThuCung` reject unknown groups or keys, non-numeric
+- **A bad config throws.** `createCharacter` / `createPet` reject unknown groups or keys, non-numeric
   values and non-hex colours with a message listing every problem, instead of drawing a broken
   character. `hyperframes check` surfaces it as a runtime error.
 - **A character's host is a normal `.clip`.** Do not tween `display` or `visibility` on it.
@@ -102,12 +106,12 @@ starts 270 units to the left of it. Two ways to use that:
 
   ```js
   // host: left:-60px; height:760px → centre ≈ 263 px. Mark at 670 px → 407 px → 251 units.
-  VGCharacter.kichBan(rig, ['enter', ['walk', 4, 250], 'wave']);
+  VGCharacter.sequence(rig, ['enter', ['walk', 4, 250], 'wave']);
   ```
 
   A character keeps the position it walked to, so everything after the walk happens at the mark.
 
-**Enter from the right:** `['enter', 'phai']` (people). Mirror the layout above.
+**Enter from the right:** `['enter', 'right']` (people). Mirror the layout above.
 
 **Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
 the *left* of the person it should look toward, or expect to see its tail first.
@@ -129,14 +133,14 @@ length and to check staging, instead of rendering.
 
 ## Lip-sync to a voice-over
 
-Put the audio in its own `<audio>` clip and give `giaiThich(text, dur)` the same `text` and
+Put the audio in its own `<audio>` clip and give `explain(text, dur)` the same `text` and
 the clip's duration. Start both at the same time:
 
 ```js
-const act = VGCharacter.kichBan(rig, ['enter', 1.0, ['giaiThich', 'Chào bạn, mình là bác sĩ Lan.', 3.1]]);
+const act = VGCharacter.sequence(rig, ['enter', 1.0, ['explain', 'Chào bạn, mình là bác sĩ Lan.', 3.1]]);
 ```
 
-`kichBan` places the speech after `enter` and the 1 s pause. Read where it landed from
+`sequence` places the speech after `enter` and the 1 s pause. Read where it landed from
 `act.data.steps` — `[{ name, start, duration }, …]`, times relative to the start of `act` — or
 from the `tools/peek.sh` printout, and set the audio clip's `data-start` to match.
 
@@ -154,9 +158,9 @@ npx hyperframes render -o out.mp4 .
 - `check` reports warnings that are not defects of the composition. Expect, per character:
   - `off_pivot_rotation` on arm parts (`#rig1-batR`, `#rig1-cangL`) or a pet's head
     (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
-    joint. Several can appear.
-  - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` inside `giaiThich`: two of the library's own
-    gesture tweens meet within a frame. Cosmetic.
+    joint. Several can appear. (Element ids inside the SVG use the rigs' internal names.)
+  - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` (internal names for smile and right arm)
+    inside `explain`: two of the library's own gesture tweens meet within a frame. Cosmetic.
 
   Errors, and warnings on your own elements, are still yours to fix.
 - After rendering, scrub the first two seconds of any `enter`: the character must walk in and

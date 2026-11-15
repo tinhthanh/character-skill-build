@@ -73,8 +73,10 @@ const NGHI = Object.freeze({
 /* ───────────────────────────────────────────────────────────── ĐẦU CHÓ
  * Toạ độ tâm đầu. Tai cụp, mõm sáng, hai đốm mày, lưỡi thè được.
  */
-const dauCho = (p, m) => `
-  ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
+const dauCho = (p, m, nv) => `
+  ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return nv.ears === 'pointed' ? `
+  <g id="${p}-tai${b}"><path d="M ${g * 37} -12 L ${g * 33} -54 L ${g * 6} -31 Z" fill="${m.long}" stroke="${m.long}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M ${g * 31.500} -20 L ${g * 30} -44 L ${g * 14} -30 Z" fill="${m.longSang}"/></g>` : `
   <g id="${p}-tai${b}"><path d="M ${g * 20} -31 Q ${g * 50} -36 ${g * 50} 0 Q ${g * 47} 15 ${g * 36} 8 Q ${g * 30} -10 ${g * 15} -24 Z" fill="${m.longToi}"/></g>`; }).join('')}
   <ellipse rx="40" ry="36" fill="${m.long}"/>
   <path d="M -8 -35 Q 0 -20 -3 -4 Q 0 0 3 -4 Q 0 -20 8 -35 Q 0 -37.500 -8 -35 Z" fill="${m.longSang}"/>
@@ -128,8 +130,8 @@ const dauMeo = (p, m) => `
  * trên, b = đốt dưới, rong = bề dày, dui = bán kính khối đùi). `mom`: cỡ miệng.
  */
 const LOAI = {
-  cho: {
-    ten: 'Chó — cún vàng', loai: 'cho',
+  dog: {
+    ten: 'Chó — cún vàng', loai: 'dog',
     H0: { x: 150, y: 236 }, S0: { x: 232, y: 232 }, dayThan: 30,
     chanT: { a: 30, b: 31, rong: 17 }, chanS: { a: 31, b: 32, rong: 18, dui: 25 },
     dau: { dx: 26, dy: -50, r: 40 }, mom: { y: 15, co: 1 }, veDau: dauCho, taiTam: [22, -28], taiGoc: 16,
@@ -138,8 +140,8 @@ const LOAI = {
     mau: { long: '#dc9a4c', longToi: '#b87a34', longSang: '#fbead0', ma: '#f2a3a3', mui: '#2a2024', mat: '#2e1c12',
            mieng: '#5a2530', luoi: '#ef8a94', vongCo: '#d6453d', the: '#f1c232', vien: '#1d0d10', vienNet: '#2a1519' },
   },
-  meo: {
-    ten: 'Mèo — mướp xám', loai: 'meo',
+  cat: {
+    ten: 'Mèo — mướp xám', loai: 'cat',
     H0: { x: 154, y: 242 }, S0: { x: 224, y: 240 }, dayThan: 23,
     chanT: { a: 26, b: 27, rong: 12.5 }, chanS: { a: 27, b: 28, rong: 13.5, dui: 19 },
     dau: { dx: 18, dy: -42, r: 36 }, mom: { y: 14.5, co: 0.72 }, veDau: dauMeo, taiTam: [19, -22], taiGoc: 20,
@@ -150,6 +152,54 @@ const LOAI = {
            vien: '#1d0d10', vienNet: '#2a1519' },
   },
 };
+
+// GIỐNG khác của cùng một loài: lấy nguyên hình thể rồi đổi vài thứ. `loai` (dog / cat) quyết
+// định bộ động tác; khoá của bảng là id giống.
+LOAI.shiba = {
+  ...LOAI.dog, ten: 'Chó — shiba', ears: 'pointed', taiTam: [22, -24], taiGoc: 14,
+  duoi: { ...LOAI.dog.duoi, dai: 50, cong: 1.15 },
+  mau: { ...LOAI.dog.mau, long: '#e08a3c', longToi: '#b96a25', longSang: '#fff3e0', vongCo: '#2f6fd0' },
+};
+LOAI.orange_cat = {
+  ...LOAI.cat, ten: 'Mèo — mướp cam',
+  mau: { ...LOAI.cat.mau, long: '#eda24a', longToi: '#c9802e', dom: '#c9712a', longSang: '#fff6e8', mat: '#7cb342', vongCo: '#d6453d' },
+};
+LOAI.black_cat = {
+  ...LOAI.cat, ten: 'Mèo — mun',
+  // Mèo một màu: vằn trùng màu lông nên không hiện; mõm và bàn chân chỉ sáng hơn một nấc.
+  mau: { ...LOAI.cat.mau, long: '#2f2d35', longToi: '#211f26', dom: '#2f2d35', longSang: '#4b4853', taiTrong: '#6b5560',
+         mui: '#4a3f47', mat: '#f1c232', vongCo: '#8a5ad6' },
+};
+
+/* ───────────────────────────────────────────────────────── HÌNH DÁNG chỉnh được
+ * Bảy núm, đều là hệ số so với hình thể gốc của giống (1 = như gốc), riêng `tailCurl` là
+ * lượng CỘNG vào độ cuộn đuôi. Khoảng hợp lệ để `setShape` kẹp lại.
+ */
+const SHAPE_RANGE = {
+  headSize: [0.7, 1.4], bodyLength: [0.7, 1.5], bodyThickness: [0.7, 1.4], legLength: [0.6, 1.5],
+  tailLength: [0.3, 1.8], tailCurl: [-1, 1], earSize: [0.6, 1.6],
+};
+const DEFAULT_SHAPE = Object.freeze({ headSize: 1, bodyLength: 1, bodyThickness: 1, legLength: 1, tailLength: 1, tailCurl: 0, earSize: 1 });
+
+// Hình thể của một giống sau khi áp các núm hình dáng.
+function shapedSpecies(base, shape) {
+  const half = (base.S0.x - base.H0.x) / 2, mid = (base.S0.x + base.H0.x) / 2;
+  const leg = (c) => ({ ...c, a: c.a * shape.legLength, b: c.b * shape.legLength, rong: c.rong * (0.5 + 0.5 * shape.bodyThickness),
+                        ...(c.dui ? { dui: c.dui * shape.bodyThickness } : {}) });
+  // Hông và vai cao lên theo chân; vai–hông dãn ra theo chiều dài thân, quanh điểm giữa.
+  const lift = (y) => DAT - (DAT - y) * (0.35 + 0.65 * shape.legLength) - base.dayThan * (shape.bodyThickness - 1) * 0.5;
+  return {
+    ...base,
+    H0: { x: mid - half * shape.bodyLength, y: lift(base.H0.y) },
+    S0: { x: mid + half * shape.bodyLength, y: lift(base.S0.y) },
+    dayThan: base.dayThan * shape.bodyThickness,
+    chanT: leg(base.chanT), chanS: leg(base.chanS),
+    // Đầu to ra thì tâm đầu nhích lên và ra trước một nửa chừng ấy, để cằm vẫn tựa trên cổ.
+    dau: { ...base.dau, dx: base.dau.dx * (0.5 + 0.5 * shape.headSize), dy: base.dau.dy * (0.45 + 0.55 * shape.headSize) - base.dayThan * (shape.bodyThickness - 1) * 0.3 },
+    duoi: { ...base.duoi, dai: base.duoi.dai * shape.tailLength, cong: base.duoi.cong + shape.tailCurl * 0.6 },
+    headScale: shape.headSize, earScale: shape.earSize,
+  };
+}
 
 // Giải khớp giữa của một chân hai đốt: gốc R, bàn chân T, hai đốt a và b.
 // `raTruoc` = khớp gập về phía ĐẦU (gối chân sau), ngược lại là về phía đuôi (khuỷu chân trước).
@@ -174,19 +224,28 @@ export class RigThu {
   static NGHI = NGHI;
   static LOAI = LOAI;
   static DONG_TAC = {
-    cho: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'walk', 'enter', 'exit'],
-    meo: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'walk', 'enter', 'exit'],
+    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'walk', 'enter', 'exit'],
+    cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'walk', 'enter', 'exit'],
   };
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
+  /** Tên màu công khai → khoá màu nội bộ. `index.js` gán bảng này lúc nạp thư viện. */
+  static COLOR_ALIASES = {};
+  static #withAliases(palette) {
+    const m = { ...palette };
+    for (const [alias, key] of Object.entries(RigThu.COLOR_ALIASES)) if (key in m && !(alias in m)) m[alias] = m[key];
+    return m;
+  }
 
-  constructor(host, loai = 'cho') {
+  constructor(host, loai = 'dog') {
     const nv = typeof loai === 'string' ? LOAI[loai] : loai;
     if (!nv) throw new Error(`[RigThu] không có loài "${loai}" (có: ${Object.keys(LOAI).join(', ')})`);
     this.host = host;
-    this.nv = { ...nv };
+    this.base = nv;                               // hình thể gốc của giống — setShape tính lại từ đây
+    this.shape = { ...DEFAULT_SHAPE };
+    this.nv = shapedSpecies(nv, this.shape);
     this.mauKhai = { ...nv.mau };
-    this.mau = this.nv.mau = { ...this.mauKhai };
+    this.mau = this.nv.mau = RigThu.#withAliases(this.mauKhai);
     this.DONG_TAC = RigThu.DONG_TAC[nv.loai];
     this.NGHI = Object.freeze({ ...NGHI, ...(nv.nghi || {}) });
     this.id = `thu${++RigThu.#dem}`;
@@ -245,7 +304,7 @@ export class RigThu {
       ${chan('sx', m.longToi, nv.chanS)}${chan('tx', m.longToi, nv.chanT)}
     </g>
     <g${V}><path id="${p}-duoi" stroke="${m.long}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path id="${p}-duoiDau" stroke="${nv.loai === 'meo' ? m.dom : m.longSang}" fill="none" stroke-linecap="round"/></g>
+      <path id="${p}-duoiDau" stroke="${nv.loai === 'cat' ? m.dom : m.longSang}" fill="none" stroke-linecap="round"/></g>
     <g id="${p}-than"${V}>
       <circle id="${p}-mong" r="${nv.dayThan + 1}" fill="${m.long}"/>
       <circle id="${p}-gu" r="${nv.dayThan * 0.92}" fill="${m.long}"/>
@@ -255,7 +314,7 @@ export class RigThu {
       <circle id="${p}-nguc" r="${nv.dayThan}" fill="${m.long}"/>
       <ellipse id="${p}-bung" fill="${m.longSang}"/>
       <circle id="${p}-ucSang" r="${nv.dayThan * 0.6}" fill="${m.longSang}"/>
-      <g id="${p}-van">${nv.loai === 'meo'
+      <g id="${p}-van">${nv.loai === 'cat'
         ? [-17, -2, 13].map((x) => `<path d="M ${x} ${-nv.dayThan + 1} q 4 7 1 14" stroke="${m.dom}" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('') : ''}</g>
     </g>
     <g id="${p}-chanGan"${V}>
@@ -266,7 +325,7 @@ export class RigThu {
       <path id="${p}-vong" stroke="${m.vongCo}" stroke-width="6" fill="none" stroke-linecap="round"/>
       <circle id="${p}-the" r="4.200" fill="${m.the}" stroke="${m.vienNet}" stroke-width="0.900"/>
     </g>
-    <g id="${p}-dau"${V}>${nv.veDau(p, m)}</g>
+    <g id="${p}-dau"${V}>${nv.veDau(p, m, nv)}</g>
   </g>
 </svg>`;
   }
@@ -350,7 +409,7 @@ export class RigThu {
     e.duoi.setAttribute('stroke-width', fx(rongDuoi));
     const giua = { x: (P[2].x + P[3].x) / 2, y: (P[2].y + P[3].y) / 2 };
     e.duoiDau.setAttribute('d', `M ${fx(giua.x)} ${fx(giua.y)} L ${fx(P[3].x)} ${fx(P[3].y)}`);
-    e.duoiDau.setAttribute('stroke-width', fx(rongDuoi * (nv.loai === 'meo' ? 1 : 0.86)));
+    e.duoiDau.setAttribute('stroke-width', fx(rongDuoi * (nv.loai === 'cat' ? 1 : 0.86)));
 
     // ---- cổ, vòng cổ, đầu
     const dd = nv.dau, tam = { x: S.x + dd.dx + s.dauX, y: S.y + dd.dy + s.dauY - ng * 2 };
@@ -360,11 +419,13 @@ export class RigThu {
     const dc = Math.atan2(tam.y - goi.y, tam.x - goi.x) + Math.PI / 2, rc = nv.dayThan * 0.6;
     e.vong.setAttribute('d', `M ${fx(cg.x - rc * Math.cos(dc))} ${fx(cg.y - rc * Math.sin(dc))} L ${fx(cg.x + rc * Math.cos(dc))} ${fx(cg.y + rc * Math.sin(dc))}`);
     e.the.setAttribute('transform', `translate(${fx(cg.x + rc * 0.75 * Math.cos(dc) + 2)} ${fx(cg.y + rc * 0.75 * Math.sin(dc) + 5)})`);
-    e.dau.setAttribute('transform', `translate(${fx(tam.x)} ${fx(tam.y)}) rotate(${fx(s.dau)})`);
+    e.dau.setAttribute('transform', `translate(${fx(tam.x)} ${fx(tam.y)}) rotate(${fx(s.dau)}) scale(${fx(nv.headScale)})`);
 
     const [tx, ty] = nv.taiTam;
-    e.taiL.setAttribute('transform', `rotate(${fx(-s.taiL * nv.taiGoc)} ${-tx} ${ty})`);
-    e.taiR.setAttribute('transform', `rotate(${fx(s.taiR * nv.taiGoc)} ${tx} ${ty})`);
+    // Tai xoay quanh chân tai, rồi phóng theo `earScale` cũng quanh chân tai.
+    const ear = (side, angle) => `rotate(${fx(angle)} ${side * tx} ${ty}) translate(${side * tx} ${ty}) scale(${fx(nv.earScale)}) translate(${-side * tx} ${-ty})`;
+    e.taiL.setAttribute('transform', ear(-1, -s.taiL * nv.taiGoc));
+    e.taiR.setAttribute('transform', ear(1, s.taiR * nv.taiGoc));
     const mi = Math.max(0.06, 1 - s.matY);
     for (const [b, g] of [['L', -1], ['R', 1]]) {
       const goc0 = e['mat' + b].getAttribute('transform').match(/translate\([^)]*\)/)[0];
@@ -392,14 +453,35 @@ export class RigThu {
 
   /** Đổi MÀU — dựng lại SVG từ bảng màu mới. `long` đổi thì `longToi` (chân xa, tai) tự tối theo. */
   doiMau(kieu = {}) {
+    kieu = Object.fromEntries(Object.entries(kieu).map(([name, v]) => [RigThu.COLOR_ALIASES[name] || name, v]));
     assertColors(kieu, 'doiMau');
     const k = { ...kieu };
     if (k.long && !k.longToi) k.longToi = chinhSang(k.long, -0.2);
     Object.assign(this.mauKhai, k);
-    this.mau = this.nv.mau = { ...this.mauKhai };
+    this.mau = this.nv.mau = RigThu.#withAliases(this.mauKhai);
     this.#dungLai();
     return { ...this.mau };
   }
+
+  /**
+   * Đổi HÌNH DÁNG — trả về bộ đang dùng. Chỉ truyền núm cần đổi; giá trị bị kẹp vào khoảng
+   * hợp lệ. Dựng lại SVG (bán kính thân, đùi… nằm trong markup), trạng thái và timeline còn nguyên.
+   *   headSize · bodyLength · bodyThickness · legLength · tailLength · earSize   hệ số, 1 = gốc
+   *   tailCurl                                                                    −1…1, cộng vào độ cuộn
+   */
+  setShape(changes = {}) {
+    for (const [key, value] of Object.entries(changes)) {
+      if (!(key in SHAPE_RANGE)) throw new Error(`[RigThu] không có núm hình dáng "${key}" (có: ${Object.keys(SHAPE_RANGE).join(', ')})`);
+      if (!Number.isFinite(value)) throw new Error(`[RigThu] ${key}: ${JSON.stringify(value)} phải là số`);
+      this.shape[key] = clamp(value, SHAPE_RANGE[key][0], SHAPE_RANGE[key][1]);
+    }
+    const palette = this.nv.mau;
+    this.nv = shapedSpecies(this.base, this.shape);
+    this.nv.mau = palette;
+    this.#dungLai();
+    return { ...this.shape };
+  }
+  static SHAPE_RANGE = SHAPE_RANGE;
 
   datNghi() { Object.assign(this.s, this.NGHI); this.apDung(); }
 
@@ -505,7 +587,7 @@ export class RigThu {
   /* ------------------------------------------------------- động tác chung */
 
   idle(dur = 4) {
-    const t = this.tl(), s = this.s, ck = 2.6, meo = this.nv.loai === 'meo';
+    const t = this.tl(), s = this.s, ck = 2.6, meo = this.nv.loai === 'cat';
     for (let a = 0; a < dur; a += ck) { const d = Math.min(ck, dur - a);
       t.to(s, { tho: 1, duration: d * 0.45, ease: 'sine.inOut' }, a).to(s, { tho: 0, duration: d * 0.55, ease: 'sine.inOut' }, a + d * 0.45); }
     for (let b = nhieu(0.5, 1.2); b < dur - 0.3; b += nhieu(1.6, 3.4)) this.#chop(t, b);

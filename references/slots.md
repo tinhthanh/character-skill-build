@@ -1,28 +1,73 @@
-# Character slots (people)
+# Character definitions (people)
 
-A definition is a plain object. `dinhNghia(goc, kit)` returns `{ ...goc, …overrides }`,
-where `goc` is the base character's definition and `kit` is the toolkit exported from
-`runtime/characters.js`. Every slot you leave out comes from the base.
+A definition is a plain object returned by `define(base, kit)`:
 
-In the drawing functions, `p` is the rig's id prefix (use it for every `id`), `m` is the
-resolved palette, and `ben` is `'L'` or `'R'` (screen left / right).
+```js
+export default { id: 'my_character', base: 'vet', define: (base, kit) => ({ ...base, /* overrides */ }) };
+```
+
+`base` is the base character's definition, `kit` is the toolkit described at the end. Every
+key you leave out comes from the base.
+
+In the drawing functions, `p` is the rig's id prefix (use it for every `id`), `c` is the
+resolved palette (`c.hair`, `c.top`, …) and `side` is `'L'` or `'R'` (screen left / right).
+
+## What each base already sets
+
+Know what you inherit before you override. "—" means none / off.
+
+| Base | Hair | `hat` | `faceExtras` | Top | `longSleeves` | `shoulderAccessories` | Rest pose | Extra colours |
+|---|---|---|---|---|---|---|---|---|
+| `default` | short | — | — | T-shirt, no outline (`colors.outline: null`) | — | — | arms down | — |
+| `vet` | bun | — | — | wrap scrubs, chest-pocket text (`badgeText`) | — | stethoscope | hands clasped | — |
+| `surgeon` | short | surgical cap, `backSkullColor: 'hat'` | — | boxy V-neck scrubs, mask at the neck | — | — | arms down | `hat`, `hatHighlight` |
+| `nurse` | ponytail, tie in `colors.accent` | — | — | paw-print tunic, flared sleeves | — | — | arms slightly out | — |
+| `doctor` | side parting | — | glasses, frame in `colors.accent` | long coat with lapels | `true` | stethoscope | hands clasped | `innerShirt`, `stethoscope` |
+| `receptionist` | bob | — | — | blazer (coat outline), bow tie | `true` | — | hands clasped | `innerShirt` |
+
+## Removing, replacing or borrowing a part
+
+You cannot delete a key, only override it.
+
+| To remove | Override |
+|---|---|
+| a hat | `hat: () => ''` — the back of the head falls back to the hair colour by itself |
+| glasses or other face extras | `faceExtras: () => ''` |
+| a beard | `beard: () => ''` |
+| a stethoscope / lanyard | `shoulderAccessories: () => ''` **and** an `accessories` that does not draw it. For the coat, spread `kit.outfits.plainCoat` instead of `kit.outfits.coat` — same coat, no stethoscope |
+| the chest-pocket text of `vet` | `badgeText: ''` (shows a paw mark instead) |
+| the cartoon outline | `colors: { ...base.colors, outline: null }` |
+| long sleeves | `longSleeves: false` |
+
+To **borrow** a part from another character, read it from `kit.partsOf(id)`:
+
+```js
+faceExtras: kit.partsOf('doctor').faceExtras,     // her glasses, on any head
+hair: kit.partsOf('nurse').hair,                  // the ponytail
+hat: kit.partsOf('surgeon').hat, backSkullColor: 'hat',
+colors: { ...base.colors, hat: '#237a6e', hatHighlight: '#4fb8a9' },   // a borrowed part needs its colours too
+```
+
+A borrowed drawing reads its colours from *your* palette, so add any extra colour keys it
+uses (see the last column of the table above).
 
 ## Coordinate systems
 
 Two, both with **y pointing down**.
 
-**Head space** — origin at the centre of the head. Used by `toc`, `mu`, `mat`, `mui`, `net`.
+**Head space** — origin at the centre of the head. Used by `hair`, `hat`, `eye`, `nose`,
+`faceExtras`, `beard`.
 
 | Landmark | Position |
 |---|---|
-| skull | x −50…50, top y ≈ −56, chin y ≈ +56 (set by `khuon`) |
-| eyes | (±`matX`, `matY`), about (±20, 2) |
-| eyebrows | y = `mayY`, about −18 |
-| mouth | y = `miengY`, about 30 |
-| ears | (±`taiX`, 4), about ±51 |
+| skull | x −50…50, top y ≈ −56, chin y ≈ +56 (set by `faceShape`) |
+| eyes | (±`eyeSpacing`, `eyeY`), about (±20, 2) |
+| eyebrows | y = `browY`, about −18 |
+| mouth | y = `mouthY`, about 30 |
+| ears | (±`earX`, 4), about ±51 |
 
-**Torso space** — origin at the **hip**, y negative is up. Used by `ao`, `suon`, `coAo`,
-`phuKien`, `phuKienTren`.
+**Torso space** — origin at the **hip**, y negative is up. Used by `top`, `sideShading`,
+`collar`, `accessories`, `shoulderAccessories`.
 
 | Landmark | Position |
 |---|---|
@@ -33,140 +78,143 @@ Two, both with **y pointing down**.
 | hem of a normal top | y ≈ +20 (a coat can go to +40; it is drawn over the thighs) |
 | sleeve cap | covers \|x\| > 21 from y −100 down to the sleeve hem |
 
-Frame (`viewBox`) is 400 × 470; the ground is at y = 428 and the character is centred on x = 200.
-
-## What each base already sets
-
-Know what you inherit before you override. "—" means the default (none / off).
-
-| Base | Hair | Hat (`mu`) | Face extras (`net`) | Top | `tayDai` | Over the shoulders (`phuKienTren`) | Rest pose | Extra palette keys |
-|---|---|---|---|---|---|---|---|---|
-| `mac_dinh` | short | — | — | T-shirt, no outline (`mau.vien: null`) | — | — | arms down | — |
-| `bac_si_thu_y` | bun (`tocBui`) | — | — | wrap scrubs, chest pocket badge (`huyHieu`) | — | stethoscope | hands clasped | — |
-| `bs_nam` | short | surgical cap, `mauSoSau: 'mu'` | — | boxy V-neck scrubs, mask at the neck | — | — | arms down | `mu`, `muSang` |
-| `dieu_duong` | ponytail, tie in `mau.phuKien` | — | — | paw-print tunic, flared sleeves | — | — | arms slightly out | — |
-| `bs_kinh` | side parting | — | glasses, frame in `mau.phuKien` | long coat with lapels | `true` | stethoscope | hands clasped | `aoTrong`, `ongNghe` |
-| `le_tan` | bob | — | — | blazer (coat outline), bow tie | `true` | — | hands clasped | `aoTrong` |
-
-## Removing or replacing an inherited part
-
-You cannot delete a slot, only override it. To drop something the base has:
-
-| To remove | Override |
-|---|---|
-| a hat | `mu: () => ''` — the back of the head falls back to the hair colour by itself |
-| glasses or other face extras | `net: () => ''` |
-| a stethoscope / lanyard | `phuKienTren: () => ''` **and** a `phuKien` that does not draw it. For `kit.boDo.aoBlouse` that means writing your own `phuKien` (copy the one in `characters/le_tan.js`); the outfit's own one includes the stethoscope |
-| the chest-pocket text of `bac_si_thu_y` | `huyHieu: ''` (shows a paw mark instead) |
-| the cartoon outline | `mau: { ...goc.mau, vien: null }` |
-| long sleeves | `tayDai: false` |
-
-Parts live in the base they were written for; there is no way to take, say, the glasses of
-`bs_kinh` onto a `bs_nam` head other than drawing them again in your own `net`. Round
-glasses are about ten lines: two `<circle r="11">` at (±20, 2), a bridge path, two temple
-lines out to x = ±48.
+The frame (`viewBox`) is 400 × 470; the ground is at y = 428 and the character is centred on x = 200.
 
 ## Draw order on the head
 
 Back to front. Later items cover earlier ones.
 
-1. back-of-skull hair mass — generated; hair colour, or the `mauSoSau` colour when there is a hat
-2. face skin (`khuon`)
-3. `toc()` — your hair
+1. back-of-skull hair mass — generated; hair colour, or the `backSkullColor` colour while a hat is drawn
+2. face skin (`faceShape`)
+3. `hair`
 4. nape hair — generated when the head turns, clipped to the face outline
 5. ears
-6. `mu()` — hat
+6. `hat`
 7. cheek blush
-8. eyes (`mat()`), eyebrows, nose (`mui()`)
-9. `net()` — glasses, freckles, **facial hair**
-10. mouth — always on top
+8. eyes (`eye`), eyebrows, `nose`
+9. `faceExtras` — glasses, freckles
+10. `beard` — beard, moustache
+11. mouth — always on top
 
-All of 8–10 shift and narrow together when the head turns.
+Items 8–11 shift and narrow together when the head turns.
 
-**Beards and moustaches go in `net()`**, in head space (same origin as hair: centre of the
-head). The mouth is drawn after it, so a beard shape can simply cover the chin and upper lip
-area and the mouth stays visible. A short beard: a path hugging the jaw from about (−40, 14)
-down through the chin at y ≈ 52 and back up to (40, 14), with a notch around the mouth at
-y ≈ 30.
+`faceExtras` is **not** attached to the pupils. When a config moves or resizes the eyes
+(`eyeSpacing`, `eyeY`, `eyeSize`), `faceExtras` is shifted and scaled by the same amount so
+glasses stay on the eyes; it does not move when the character looks around or blinks. Set
+`extrasFollowEyes: false` to switch that off. `beard` never follows the eyes.
 
-`net()` is **not** attached to the pupils. "Follows the eyes" means: when a config moves or
-resizes the eyes (`matX`, `matY`, `matCo`), `net()` is shifted and scaled by the same amount so
-glasses stay on the eyes. It does not move when the character looks around or blinks. Set
-`netTheoMat: false` to switch even that off (use it for a beard-only `net`, so retuning the
-eyes does not stretch the beard).
+## Drawing keys
 
-## Drawing slots
-
-| Slot | Signature | Notes |
+| Key | Signature | Notes |
 |---|---|---|
-| `toc` | `(p, m) => svg` | Hair. **Must** contain `<g id="${p}-tocTruoc">` holding every hair shape visible from the front. An optional `<g id="${p}-tocBui">` inside it (bun, ponytail) is pushed toward the back of the head when the character turns. Hair behind the skull is generated by the rig. |
-| `mu` | `(p, m) => svg` | Hat or cap, drawn above all hair layers. Set `mauSoSau: '<palette key>'` so the back of the head takes the hat colour when turned; it is ignored while `mu` draws nothing. The key must exist in `mau`. |
-| `mat` | `(p, ben, m) => svg` | One eye, drawn around (0,0). **Must** contain `<g id="${p}-mat${ben}">` (scaled to blink) wrapping `<g id="${p}-nguoi${ben}">` (moved to look around). |
-| `mui` | `(m) => svg` | Nose. |
-| `net` | `(p, m) => svg` | Extra face detail in **head space**: glasses, freckles, beard. Drawn above eyes and nose, below the mouth. See *Draw order on the head*. |
-| `ao` | `() => pathData` | Outline of the torso garment (a path `d` string). |
-| `suon` | `pathData` | Side shading, must lie inside `ao`. Build it with `kit.suonTu([[x, y], …])` from the right-hand edge points of `ao`. Opacity is `damSuon`. |
-| `coAo` | `(p, m) => svg` | Collar, drawn over the neck. Start with `kit.vaiCo(m)` to cover the flare at the base of the neck. |
-| `phuKien` | `(p, m, nv) => svg` | Everything on the torso: pockets, buttons, badges, stitching. **Must** be wrapped in `<g id="${p}-phuKien">`. |
-| `phuKienTren` | `(p, m, nv) => svg` | A second copy of whatever hangs over the shoulders (stethoscope, lanyard, scarf). Drawn above the sleeves, clipped to the shoulder area. Return `''` if nothing does. |
-| `giay` | `(p, ben, m, ong) => svg` | Front-view shoe; `ong` is the ankle's y. **Must** carry `id="${p}-ban${ben}"`. `kit.giayKin(stripeColour or null)` gives a closed shoe. |
+| `hair` | `(p, c) => svg` | **Must** contain `<g id="${p}-hair-front">` holding every hair shape visible from the front. An optional `<g id="${p}-hair-bun">` inside it (bun, ponytail) is pushed toward the back of the head when the character turns. |
+| `hat` | `(p, c) => svg` | Hat or cap, above all hair layers. Set `backSkullColor: '<colour key>'` (e.g. `'hat'`) so the back of the head takes the hat colour when turned; the key must exist in `colors`. |
+| `eye` | `(p, side, c) => svg` | One eye, drawn around (0,0). **Must** contain `<g id="${p}-eye-${side}">` (scaled to blink) wrapping `<g id="${p}-pupil-${side}">` (moved to look around). |
+| `nose` | `(c) => svg` | |
+| `faceExtras` | `(p, c) => svg` | Glasses, freckles. Head space. `kit.parts.roundGlasses(c)` is ready-made. |
+| `beard` | `(p, c) => svg` | Beard and moustache. Head space. `kit.parts.shortBeard(c)`, `kit.parts.moustache(c)`. |
+| `top` | `() => pathData` | Outline of the torso garment (a path `d` string). |
+| `sideShading` | `pathData` | Side shading, must lie inside `top`. Build it with `kit.sideShading([[x, y], …])` from the right-hand edge points of `top`. Opacity is `sideShadingOpacity`. |
+| `collar` | `(p, c) => svg` | Drawn over the neck. Start with `kit.shoulderPatches(c)` to cover the flare at the base of the neck. |
+| `accessories` | `(p, c, def) => svg` | Everything on the torso: pockets, buttons, badges. **Must** be wrapped in `<g id="${p}-accessories">`. |
+| `shoulderAccessories` | `(p, c, def) => svg` | A second copy of whatever hangs over the shoulders (stethoscope, lanyard, scarf). Drawn above the sleeves, clipped to the shoulder area. |
+| `shoes` | `(p, side, c, ankleY) => svg` | Front-view shoe. **Must** carry `id="${p}-shoe-${side}"`. `kit.closedShoes(stripeColour or null)` returns a ready-made one. |
 
-## Numbers
+## Number keys
 
 | Group | Keys | Meaning |
 |---|---|---|
-| proportions | `coDau` `dauLech` `coThan` `coChan` | head size, how far the head sinks onto the neck (bigger = shorter neck), torso scale, leg scale |
-| arms | `daiCanhTay` `daiCangTay` `dayTay` `coBanTay` | upper-arm length, forearm length, thickness, hand size |
-| legs | `daiDui` `daiOng` `dayChan` `cachChan` `coBanChan` | thigh, shin, thickness, half-gap between legs, foot size |
-| sleeves | `daiTayAo` `xeoTayAo` `rongTayAo` `vienGau` `boGocTayAo` `mauGau` `netGau` `lechGau` | length, hem slant, flare, hem stroke width, inner-corner rounding, hem colour, hem dash pattern, hem inset |
-| long sleeves | `tayDai` | `true` paints the whole arm in the top's colour with a cuff |
-| face outline | `khuon: { rong, cao, cam, yRong, tranVuong, hamVuong, rongTran, rongCam }` | half-width, crown height, chin length, height of the widest point, forehead / jaw squareness (−1 pointed … +1 square), forehead / chin width factors |
-| eyebrows | `may: { dai, day, cong, thon, xech }`, `mayX`, `mayY` | half-length, thickness, arch, taper (0–1), slant in degrees (+ = tail up), spacing, height |
-| face layout | `matX` `matY` `matCo` `muiY` `muiCo` `miengY` `miengRong` `moiRong` `maX` `maY` `maRong` `taiX` | eye spacing / height / size, nose offset / size, mouth height / width, lip stroke, cheek blush x / y / radius, ear x |
-| turning | `netLech` `tocLech` `buiLech` | how far face features, fringe and bun shift when the head turns |
-| outline | `mau.vien` (colour or `null`), `vienRong` | cartoon outline around clothing; `null` = flat style |
-| rest pose | `nghi: { batL, batR, cangL, cangR, cuoi, mieng, chum, mayL, mayR, … }` | any state key; see below |
+| proportions | `headSize` `neckDrop` `torsoScale` `legScale` | head scale, how far the head sinks onto the neck (bigger = shorter neck), torso scale, leg scale |
+| arms | `upperArmLength` `forearmLength` `armThickness` `handSize` | multipliers, 1 = adult default |
+| legs | `thighLength` `shinLength` `legThickness` `legGap` `footSize` | multipliers; `legGap` is the half-distance between the legs in units |
+| sleeves | `sleeveLength` `sleeveSlant` `sleeveFlare` `sleeveHemWidth` `sleeveCornerRadius` `sleeveHemColor` `sleeveHemDash` `sleeveHemInset` | length, hem slant, flare, hem stroke width, inner-corner rounding, hem colour, hem dash pattern, hem inset |
+| long sleeves | `longSleeves` | `true` paints the whole arm in the top's colour with a cuff |
+| face outline | `faceShape: { halfWidth, crownHeight, chinLength, widestY, foreheadSquareness, jawSquareness, foreheadWidth, chinWidth }` | squareness runs −1 pointed … +1 square; the two widths are factors |
+| eyebrows | `brows: { halfLength, thickness, arch, taper, slant }`, `browSpacing`, `browY` | `taper` 0–1; `slant` in degrees, + = tail up |
+| face layout | `eyeSpacing` `eyeY` `eyeSize` `noseOffsetY` `noseSize` `mouthY` `mouthWidth` `lipWidth` `cheekX` `cheekY` `cheekRadius` `earX` | positions in head space, sizes as factors |
+| turning | `featureTurnShift` `hairTurnShift` `bunTurnShift` | how far face features, fringe and bun shift when the head turns |
+| outline | `colors.outline` (colour or `null`), `outlineWidth` | cartoon outline around clothing; `null` = flat style |
 
-Rest-pose angles are in degrees: `bat*` raises the upper arm away from the body, `cang*` bends
-the forearm (negative = folds inward across the body). Arms down ≈ `bat 10, cang −13`; hands
-clasped at the belly ≈ `bat 17…19, cang −92…−97` (shorter forearms need a deeper fold).
-`cuoi` −1…1 is the smile, `mieng` 0…1 opens the mouth.
+## Rest pose
 
-## Palette (`mau`)
+`restPose` takes any state key. The common ones:
 
-`da` skin · `daToi` skin shadow · `toc` hair · `tocSang` hair highlight · `ao` top ·
-`aoToi` top shadow · `quan` trousers · `giay` shoes · `mat` iris · `mieng` lips ·
-`ma` cheek blush · `phuKien` accent · `vien` outline · `vienNet` stroke colour for drawn lines.
+| Key | Meaning |
+|---|---|
+| `upperArmL` `upperArmR` | degrees the upper arm is raised away from the body |
+| `forearmL` `forearmR` | degrees the forearm bends; negative folds inward across the body |
+| `smile` | −1 … 1 |
+| `mouthOpen` `pucker` | 0 … 1 |
+| `browL` `browR` | −1 (lowered, frowning) … 1 (raised) |
+| `headTilt` | degrees |
+| `handL` `handR` | `'relaxed'` · `'fist'` · `'thumb'` · `'point'` |
 
-Every value must be a hex colour (`#rgb` or `#rrggbb`); `vien` may also be `null`. CSS colour
-names are rejected — shades are derived arithmetically from the hex value.
+Arms down ≈ `upperArm 10, forearm −13`; hands clasped at the belly ≈ `upperArm 17…19,
+forearm −92…−97` (shorter forearms need a deeper fold).
 
-Add your own keys freely (`mu`, `aoTrong`, `ongNghe`…) and read them as `m.<key>` in the
-drawing slots. Derived automatically when you do not set them: `may` (from `toc`),
-`miengToi` and `luoi` (from `mieng`), `vienNet` (from `ao`).
+## Palette (`colors`)
+
+`skin` · `skinShadow` · `hair` · `hairHighlight` · `top` · `topShadow` · `trousers` ·
+`shoes` · `iris` · `lips` · `cheeks` · `accent` · `outline` · `lineStroke` (colour for
+drawn lines such as pocket edges).
+
+Every value must be a hex colour (`#rgb` or `#rrggbb`); `outline` may also be `null`. CSS
+colour names are rejected — shades are derived arithmetically from the hex value.
+
+Add your own keys freely (`hat`, `innerShirt`, `scarf`…) and read them as `c.<key>` in the
+drawing functions. Derived automatically when you do not set them: `brows` (from `hair`),
+`mouthInside` and `tongue` (from `lips`), `lineStroke` (from `top`).
 
 ## Toolkit (`kit`)
 
 | Member | Use |
 |---|---|
-| `kit.boDo.doMo` | boxy V-neck scrubs with chest pocket and name tag (spread into the definition) |
-| `kit.boDo.aoDauChan` | round-neck tunic with paw prints, flared trimmed sleeves, two pockets, fob watch |
-| `kit.boDo.aoBlouse` | long-sleeved coat with lapels, buttons, pockets, stethoscope; inner shirt colour is `mau.aoTrong`, stethoscope `mau.ongNghe` |
-| `kit.AO.<same keys>` | the bare torso outlines, if you only want the shape |
-| `kit.suonTu(points)` | side shading from an outline's edge points |
-| `kit.vaiCo(m)` | the two shoulder wedges every collar needs |
-| `kit.giayKin(stripe)` | closed-toe shoe slot |
-| `kit.theTen(x, y, bandColour, stroke)` | a name tag |
-| `kit.dauChan(x, y, scale, rotate)` | a paw print (wrap several in a `<g fill>`) |
-| `kit.ongNgheVatCo(tube, stroke)` | a stethoscope round the neck |
+| `kit.outfits.scrubs` | boxy V-neck scrubs with chest pocket and name tag |
+| `kit.outfits.pawTunic` | round-neck tunic with paw prints, flared trimmed sleeves, two pockets, fob watch |
+| `kit.outfits.coat` | long-sleeved coat with lapels, buttons, pockets, stethoscope; inner shirt colour is `colors.innerShirt` (falls back to `topShadow`), stethoscope `colors.stethoscope` (falls back to `accent`) |
+| `kit.outfits.plainCoat` | the same coat without the stethoscope |
+| `kit.outlines.<same names>` | the bare torso outlines, if you only want the shape |
+| `kit.partsOf(id)` | another character's definition, to borrow parts from |
+| `kit.parts.roundGlasses(c, { x, y, r, color })` | round glasses for `faceExtras` |
+| `kit.parts.shortBeard(c, { color, chin, mouthY })` | short beard for `beard`; lower `chin` for a short face |
+| `kit.parts.moustache(c, { color, mouthY })` | moustache for `beard` |
+| `kit.sideShading(points)` | side shading from an outline's edge points |
+| `kit.shoulderPatches(c)` | the two shoulder wedges every collar needs |
+| `kit.closedShoes(stripe)` | closed-toe shoe |
+| `kit.nameTag(x, y, bandColour, stroke)` | a name tag |
+| `kit.pawPrint(x, y, scale, rotate)` | a paw print (wrap several in a `<g fill>`) |
+| `kit.stethoscope(tubeColour, stroke)` | a stethoscope round the neck |
 
-Spreading an outfit overrides the base's `ao`, `suon`, `coAo`, `phuKien`, `phuKienTren`,
-`giay`, the sleeve numbers and `tayDai`. Put your own overrides **after** the spread.
+Spreading an outfit sets `top`, `sideShading`, `collar`, `accessories`,
+`shoulderAccessories`, `shoes`, the sleeve numbers and `longSleeves`. Put your own overrides
+**after** the spread.
+
+## Configs
+
+A config is the same numbers grouped for the studio, stored as `configs/<id>.json` and baked
+into the bundle. Groups for people: `proportions`, `arms` (plus `restUpperArm`,
+`restForearm`), `sleeves`, `legs`, `faceShape`, `brows`, `browPosition`, `features`
+(`eyeSpacing`, `eyeY`, `eyeSize`, `noseOffsetY`, `noseSize`, `mouthY`, `mouthWidth`),
+`restPose`, `colors`. `VGCharacter.validateConfig(config)` lists what is wrong with one.
 
 ## Pets
 
-Dogs and cats use a separate rig and are not defined through slots. Colours only, via the
-palette keys `long` fur · `longSang` light fur (muzzle, chest, paws) · `longToi` far legs and
-ears (derived from `long`) · `dom` stripes (cat) · `mat` · `mui` nose · `vongCo` collar ·
-`the` tag. A new breed means adding an entry to `LOAI` in `runtime/rig-thu.js` with its own
-head-drawing function.
+Dogs and cats use a separate rig; they are configured, not defined through drawing keys.
+
+| Species | Notes |
+|---|---|
+| `dog` | golden puppy, floppy ears |
+| `shiba` | pointed ears, curled tail |
+| `cat` | grey tabby |
+| `orange_cat` | orange tabby |
+| `black_cat` | plain black, yellow eyes |
+
+Config: `{ shape: { … }, colors: { … } }`.
+
+- `shape` — `headSize`, `bodyLength`, `bodyThickness`, `legLength`, `tailLength`, `earSize`
+  (multipliers, 1 = the breed's own) and `tailCurl` (−1…1, added to the curl). Values are
+  clamped to sane ranges. `rig.setShape({ legLength: 0.7 })` changes it live.
+- `colors` — `fur` · `furLight` (muzzle, chest, paws) · `furDark` (far legs and ears, derived
+  from `fur`) · `stripes` (cats) · `iris` · `nose` · `collar` · `tag` · `earInner`.
+
+A new breed is an entry added to the species table in `runtime/rig-thu.js`.

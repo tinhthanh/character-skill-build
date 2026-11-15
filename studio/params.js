@@ -19,8 +19,7 @@
 
 /* ─────────────────────────────────────────────────── KHẨU HÌNH (ba kênh) */
 // mở (`mieng`) · rộng/khoé (`cuoi`) · chúm (`chum`) — đúng ba kênh
-// [open, wide, round] của <vg-actor> và của bộ viseme trong
-// tools/character/nhanvat/mieng.py, nên bảng khẩu hình dùng chung được.
+// [open, wide, round] quen thuộc của các bộ viseme, nên bảng khẩu hình dùng chung được.
 const KIEU_MIENG = [
   ['nghỉ — mím cười',     { mieng: 0,    cuoi: 0.35, chum: 0 }],
   ['nghỉ của bác sĩ',     { mieng: 0.6,  cuoi: 1,    chum: 0 }],
@@ -291,7 +290,7 @@ export const NHOM = {
  *
  * Phải tính chứ không hằng số hoá được: tâm đầu phụ thuộc `coDau`, `dauLech`,
  * `coThan`, `coChan` — bốn thứ mỗi nhân vật một khác. Khung cứng hợp với bác
- * sĩ thú y sẽ lệch 7px với `bs_nam`, đủ để cắt mất cằm.
+ * sĩ thú y sẽ lệch 7px với `surgeon`, đủ để cắt mất cằm.
  *
  * Chuỗi transform trong `apDung`, đi từ trong ra:
  *   đầu:  translate(0 −62)·scale(coDau)  rồi  translate(0, −103 + dauLech)

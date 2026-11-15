@@ -6,10 +6,10 @@
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
 <body style="margin:0;background:#1d3a4b;display:flex;flex-wrap:wrap;font:12px system-ui;color:#cfe">
 <script type="module">
-import { RigSVG, RigThu, gieo } from '../runtime/index.js';
+import { RigSVG, RigThu, seed } from '../runtime/index.js';
 import { khungMat } from '../studio/params.js';
-gieo(1);
-const nv = new URLSearchParams(location.search).get('nv') || 'bac_si_thu_y', thu = nv in RigThu.LOAI;
+seed(1);
+const nv = new URLSearchParams(location.search).get('nv') || 'vet', thu = nv in RigThu.LOAI;
 const o = (nhan, fn, khung) => {
   const hop = document.createElement('div'); hop.style.cssText = 'width:256px;height:300px;outline:1px solid #345;overflow:hidden;position:relative';
   const d = document.createElement('div'); d.style.cssText = 'width:100%;height:100%'; hop.appendChild(d); document.body.appendChild(hop);
@@ -20,7 +20,7 @@ const o = (nhan, fn, khung) => {
 const giua = (m, p = 0.45, ...ts) => (r) => { r[m](...ts).progress(p); };
 if (thu) {
   o('nghỉ'); o('cận mặt', null, (r) => r.khungMat(70));
-  for (const m of RigThu.DONG_TAC[nv].slice(1)) o(m, giua(m, 0.5));
+  for (const m of RigThu.DONG_TAC[RigThu.LOAI[nv].loai].slice(1)) o(m, giua(m, 0.5));
 } else {
   // Khung cận TÍNH từ tỉ lệ của chính nhân vật (cỡ đầu, cỡ thân, độ dài chân), không đặt cứng:
   // khung cứng hợp với nhân vật chibi thì cắt mất cằm hoặc tay của nhân vật ít chibi hơn.
@@ -28,8 +28,9 @@ if (thu) {
   const chestBox = (r) => { const cy = 262 - 52 * r.nv.coThan + 30 + r.hangChan(), half = 82 * r.nv.coThan; return `${200 - half} ${cy - half * 1.05} ${half * 2} ${half * 2.35}`; };
   o('nghỉ'); o('cận ngực', null, chestBox); o('cận mặt', null, faceBox);
   o('nghiêng 50%', (r) => { r.s.huong = 0.5; }); o('nghiêng 100%', (r) => { r.s.huong = 1; });
-  for (const [m, p, ...ts] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['giaiThich', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
-                               ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['loLang', 0.5], ['nod', 0.25]]) o(m, giua(m, p, ...ts));
+  for (const [m, p, ...ts] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
+                               ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],
+                               ['express', 0.5, 'happy'], ['express', 0.5, 'sad'], ['express', 0.5, 'surprised'], ['express', 0.5, 'angry'], ['turn', 0.5, 'left']]) o(m, giua(m, p, ...ts));
 }
 document.title = 'XONG';
 </script>

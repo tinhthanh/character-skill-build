@@ -265,7 +265,8 @@
  */
 // `runtime/index.js` đăng ký sẵn mọi nhân vật: ba nhân vật có sẵn và các nhân vật
 // tuỳ chỉnh trong `characters/`.
-import { RigSVG, RigThu, IIFE_TEN } from '../runtime/index.js';
+import { RigSVG, RigThu, GLOBAL_NAME, VERSION } from '../runtime/index.js';
+import { configToPublic, configToInternal } from '../runtime/schema.js';
 import { NHOM, khungMat } from './params.js';
 
 const $ = (id) => document.getElementById(id);
@@ -300,6 +301,9 @@ const MUC = [
   { k: 'chan', ten: 'Chân', nhin: 'than', moTa: 'Từng đốt chân và bàn chân.',
     icon: I('<path d="M9 3v9l-1 9M15 3v9l1 9M5.500 21H10M14 21h4.500"/>'),
     chinh: ['daiDui', 'daiOng', 'dayChan', 'cachChan', 'coBanChan'] },
+  { k: 'petShape', ten: 'Hình dáng', nhin: 'than', moTa: 'Cỡ đầu, thân, chân, đuôi và tai của thú cưng.',
+    icon: I('<path d="M4 15c0-4 3-6.500 7-6.500h4l3.500-3 .5 4.500c1 1 1.500 2.200 1.500 3.500 0 3-2.500 5-6 5H9c-3 0-5-1.500-5-3.500z"/><path d="M4.500 14c-1.500-.5-2.500-2-2-4"/>'),
+    chinh: ['headSize', 'bodyLength', 'bodyThickness', 'legLength', 'tailLength', 'tailCurl', 'earSize'] },
   { k: 'mau', ten: 'Màu sắc', nhin: 'than', moTa: 'Màu tối đi kèm tự suy theo màu chính: tay áo và bóng sườn theo áo, chân mày theo tóc, chân xa và tai theo lông.',
     icon: I('<path d="M12 3s6 6.500 6 11a6 6 0 0 1-12 0c0-4.500 6-11 6-11z"/>') },
 ];
@@ -312,6 +316,7 @@ const TEN = {
   dauLech: 'Cổ ngắn', coDau: 'Cỡ đầu', coThan: 'Cỡ thân', coChan: 'Cỡ chân',
   daiCanhTay: 'Cánh tay', daiCangTay: 'Cẳng tay', dayTay: 'Độ mập', coBanTay: 'Bàn tay', batNghi: 'Nghỉ: bắp tay', cangNghi: 'Nghỉ: cẳng tay',
   daiTayAo: 'Dài', xeoTayAo: 'Gấu xéo', rongTayAo: 'Rộng', vienGau: 'Viền gấu', boGocTayAo: 'Bo góc',
+  headSize: 'Cỡ đầu', bodyLength: 'Thân dài', bodyThickness: 'Thân mập', legLength: 'Chân dài', tailLength: 'Đuôi dài', tailCurl: 'Đuôi cuộn', earSize: 'Cỡ tai',
   daiDui: 'Đùi', daiOng: 'Ống chân', dayChan: 'Độ mập', cachChan: 'Khoảng cách', coBanChan: 'Bàn chân',
 };
 const BANG_MAU = [
@@ -334,12 +339,14 @@ const BANG_MAU = [
   ['mui', 'Mũi', ['#2a2024', '#e58b96', '#7a4b3a', '#b9606c']],
 ];
 const DONG_TAC = [
-  ['idle', 'Đứng yên'], ['wave', 'Vẫy tay'], ['giaiThich', 'Giải thích'], ['speak', 'Nói'], ['point', 'Chỉ'],
+  ['idle', 'Đứng yên'], ['wave', 'Vẫy tay'], ['explain', 'Giải thích'], ['speak', 'Nói'], ['point', 'Chỉ'],
   ['present', 'Giới thiệu'], ['thumbsUp', 'Tán thành'], ['nod', 'Gật đầu'], ['shake', 'Lắc đầu'], ['shrug', 'Nhún vai'],
-  ['loLang', 'Lo lắng'], ['march', 'Dậm chân'], ['stroll', 'Bước nhẹ'], ['stepInPlace', 'Bước tại chỗ'],
+  ['worry', 'Lo lắng'], ['express', 'Biểu cảm'], ['turn', 'Quay người'], ['sit', 'Ngồi'], ['march', 'Dậm chân'], ['stroll', 'Bước nhẹ'], ['stepInPlace', 'Bước tại chỗ'],
   ['walk', 'Đi ngang'], ['enter', 'Bước vào'], ['exit', 'Bước ra'], ['walkForward', 'Tiến lại gần'], ['walkAway', 'Đi ra xa'],
 ].filter(([m]) => typeof RigSVG.prototype[m] === 'function');
-const DT_CAN_MAT = new Set(['idle', 'speak', 'giaiThich', 'nod', 'shake', 'loLang']);   // xem được khi đang cận mặt
+const DT_CAN_MAT = new Set(['idle', 'speak', 'explain', 'nod', 'shake', 'worry', 'express']);
+const EXPRESSIONS = Object.keys(RigSVG.EXPRESSIONS);
+let expressionIndex = 0;                 // nút "Biểu cảm" đi lần lượt qua các nét mặt   // xem được khi đang cận mặt
 
 /* ─────────────────────────────────────────────────────────── trạng thái */
 // `tt` = con số ĐANG dùng, lấy từ chính giá trị rig trả về (không đọc ngược từ
@@ -347,6 +354,23 @@ const DT_CAN_MAT = new Set(['idle', 'speak', 'giaiThich', 'nod', 'shake', 'loLan
 // Thứ tự đặt có ý: thân/tay/chân trước, rồi khuôn mặt, rồi mày và nét — vì đổi
 // khuôn mặt thì rig tính lại `matX`/`mayX` theo viền, hai nhóm kia phải đè lên sau.
 const THU_TU = ['than', 'tay', 'tayAo', 'chan', 'mat', 'may', 'net', 'mieng'];
+// HÌNH DÁNG của thú — bảy núm của `RigThu.setShape`. Khai ở đây chứ không trong params.js:
+// tệp ấy mô tả khung xương người.
+const PET_GROUPS = ['petShape'];
+const PET_SHAPE_DEFAULT = { headSize: 1, bodyLength: 1, bodyThickness: 1, legLength: 1, tailLength: 1, tailCurl: 0, earSize: 1 };
+NHOM.petShape = {
+  ten: 'Hình dáng',
+  kieu: [
+    ['gốc',        { ...PET_SHAPE_DEFAULT }],
+    ['chân ngắn',  { ...PET_SHAPE_DEFAULT, legLength: 0.68, bodyLength: 1.15 }],
+    ['đầu to',     { ...PET_SHAPE_DEFAULT, headSize: 1.25, earSize: 1.1 }],
+    ['thân dài',   { ...PET_SHAPE_DEFAULT, bodyLength: 1.35 }],
+    ['mũm mĩm',    { ...PET_SHAPE_DEFAULT, bodyThickness: 1.28, legLength: 0.85, headSize: 1.08 }],
+    ['cao gầy',    { ...PET_SHAPE_DEFAULT, legLength: 1.3, bodyThickness: 0.85, tailLength: 1.2 }],
+  ],
+  muc: Object.fromEntries(Object.entries(RigThu.SHAPE_RANGE).map(([key, [min, max]]) => [key, { min, max, buoc: 0.01, ten: key }])),
+  dat: (r, k) => r.setShape(k),
+};
 let khoa, rig, tt, goc, daLuu;
 // THÚ CƯNG dùng bộ rig riêng (`rig-thu.js`): chỉ có bảng màu và bộ động tác của
 // chính loài ấy — các nhóm chỉnh khuôn mặt/tay/chân bên trái là của khung xương người.
@@ -382,7 +406,7 @@ function taoRig(host) {
 // Đọc bộ số của một rig VỪA DỰNG (trước khi có động tác nào chạy).
 function docTrangThai(r) {
   const o = { mau: {} };
-  if (laThu()) return o;
+  if (laThu()) { o.petShape = r.setShape({}); return o; }
   for (const k of THU_TU) o[k] = k === 'mieng' ? { mieng: r.NGHI.mieng, cuoi: r.NGHI.cuoi, chum: r.NGHI.chum } : NHOM[k].dat(r, {});
   return o;
 }
@@ -396,14 +420,19 @@ function apTrangThai(r, st) {
     r._mauDoi = { ...m };
   }
   const ra = { mau: { ...m } };
-  if (!laThu()) for (const k of THU_TU) ra[k] = datNhom(r, k, st[k] || {});
+  for (const k of laThu() ? PET_GROUPS : THU_TU) ra[k] = datNhom(r, k, st[k] || {});
   r.datNghi();
   return ra;
 }
 
 // Định dạng tệp config — đúng thứ `napBoSo()` trong runtime/index.js nạp và tools/serve.py ghi ra.
 function raConfig(st) {
-  if (laThu()) return Object.keys(st.mau || {}).length ? { mau: st.mau } : {};
+  if (laThu()) {
+    const c = {};
+    if (khac(st.petShape, PET_SHAPE_DEFAULT)) c.shape = st.petShape;
+    if (Object.keys(st.mau || {}).length) c.mau = st.mau;
+    return c;
+  }
   const { batNghi, cangNghi, ...tay } = st.tay;
   const may = {}, viTriMay = {};
   for (const [k, v] of Object.entries(st.may)) (NHOM.may.khoaKieu.includes(k) ? may : viTriMay)[k] = v;
@@ -417,7 +446,7 @@ function raConfig(st) {
 }
 function tuConfig(c, nen) {
   const st = sao(nen);
-  if (laThu()) { if (c.mau) st.mau = { ...c.mau }; return st; }
+  if (laThu()) { if (c.mau) st.mau = { ...c.mau }; if (c.shape) Object.assign(st.petShape, c.shape); return st; }
   const gop = (k, o) => { if (o) Object.assign(st[k], o); };
   gop('than', c.than); gop('tay', c.tay); gop('tayAo', c.tayAo); gop('chan', c.chan);
   gop('mat', c.khuon); gop('may', c.may); gop('may', c.viTriMay); gop('net', c.net);
@@ -483,7 +512,7 @@ function toast(chu, loi = false) {
 }
 
 async function luu() {
-  const nut = $('luu'), c = raConfig(tt);
+  const nut = $('luu'), c = configToPublic(raConfig(tt), laThu());
   nut.disabled = true; nut.textContent = 'Đang lưu…';
   try {
     const res = await fetch('/api/character/config/' + khoa, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
@@ -556,7 +585,7 @@ function chay(m) {
   if (m === 'idle') return ranh();
   if (nhin === 'mat' && !canMat(m)) datNhin('than');
   const loi = $('loi').value;
-  const t = laThu() ? rig[m]() : m === 'point' ? rig.point({ x: 70, y: 110 }) : (m === 'speak' || m === 'giaiThich') ? rig[m](loi, 2.6) : rig[m]();
+  const t = laThu() ? rig[m]() : m === 'express' ? rig.express(EXPRESSIONS[expressionIndex++ % EXPRESSIONS.length], 1.4) : m === 'point' ? rig.point({ x: 70, y: 110 }) : (m === 'speak' || m === 'explain') ? rig[m](loi, 2.6) : rig[m]();
   dangChay = m; tl = t;
   t.timeScale(Number($('tocDo').value));
   t.eventCallback('onComplete', () => { henRanh = setTimeout(ranh, 450); });
@@ -731,14 +760,14 @@ function veDongTac() {
   $('dongTac').innerHTML = ds.map(([m, ten]) => `<button data-m="${m}">${ten}</button>`).join('');
   $('dongTac').scrollLeft = 0;
   $('loi').style.display = laThu() ? 'none' : '';            // thú không nói
-  for (const b of $('ray').children) b.hidden = laThu() && b.dataset.k !== 'mau';
+  for (const b of $('ray').children) b.hidden = laThu() ? !['mau', 'petShape'].includes(b.dataset.k) : b.dataset.k === 'petShape';
 }
 $('dongTac').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chay(b.dataset.m); });
 $('phat').addEventListener('click', () => { if (!tl) return ranh(); clearTimeout(henRanh); tl.paused(!tl.paused()); veNutPhat(); });
 // Dừng hẳn động tác đang diễn (kể cả đang tạm dừng giữa chừng) và về đứng yên.
 $('dung').addEventListener('click', dungDongTac);
 $('tocDo').addEventListener('change', (e) => { if (tl && dangChay !== 'idle') tl.timeScale(Number(e.target.value)); });
-$('loi').addEventListener('keydown', (e) => { if (e.key === 'Enter') chay('giaiThich'); });
+$('loi').addEventListener('keydown', (e) => { if (e.key === 'Enter') chay('explain'); });
 
 $('hoanTac').addEventListener('click', () => veLichSu(viTri - 1));
 $('lamLai').addEventListener('click', () => veLichSu(viTri + 1));
@@ -751,34 +780,38 @@ $('veGoc').addEventListener('click', () => datLai(goc, 'Đã về mặc định 
 $('datLai').addEventListener('click', () => datLai(goc, `Đã đặt lại “${tenNV()}” về bộ số gốc.`));
 $('taiJson').addEventListener('click', () => {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(raConfig(tt), null, 2)], { type: 'application/json' }));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(configToPublic(raConfig(tt), laThu()), null, 2)], { type: 'application/json' }));
   a.download = khoa + '.json'; a.click(); URL.revokeObjectURL(a.href);
 });
+// "Chép định nghĩa": các dòng dán thẳng vào `define` của một tệp characters/<id>.js — khoá
+// tiếng Anh, đúng lược đồ công khai. Với thú thì chép object config (thú không có tệp định nghĩa).
 $('chepMa').addEventListener('click', async () => {
-  if (laThu()) {
-    const ma = `mau: ${JSON.stringify(tt.mau)},`;
-    try { await navigator.clipboard.writeText(ma); toast('Đã chép bảng màu vào clipboard.'); } catch (e) { console.log(ma); }
-    return;
+  const c = configToPublic(raConfig(tt), laThu());
+  const value = (v) => (typeof v === 'number' ? +v.toFixed(3) : `'${v}'`);
+  const inline = (o) => '{ ' + Object.entries(o).map(([k, v]) => `${k}: ${value(v)}`).join(', ') + ' }';
+  const flat = (o) => Object.entries(o).map(([k, v]) => `${k}: ${value(v)}`).join(', ') + ',';
+  let code;
+  if (laThu()) code = `config: ${JSON.stringify(c)}`;
+  else {
+    const { restUpperArm, restForearm, ...arms } = c.arms;      // hai góc nghỉ đã nằm trong restPose
+    code = [flat(c.proportions), flat(arms), flat(c.sleeves), flat(c.legs), `restPose: ${inline(c.restPose)},`,
+            `faceShape: ${inline(c.faceShape)},`, `brows: ${inline(c.brows)},`, flat(c.browPosition), flat(c.features),
+            ...(c.colors ? [`colors: { ...base.colors, ${inline(c.colors).slice(2)},`] : [])].join('\n');
   }
-  const c = raConfig(tt), so = (v) => (typeof v === 'number' ? +v.toFixed(3) : `'${v}'`);
-  const goi = (o) => '{ ' + Object.entries(o).map(([k, v]) => `${k}: ${so(v)}`).join(', ') + ' }';
-  const phang = (o) => Object.entries(o).map(([k, v]) => `${k}: ${so(v)}`).join(', ') + ',';
-  const ma = [phang(c.than), phang(c.tay), phang(c.tayAo), phang(c.chan), `nghi: ${goi(c.nghi)},`, `khuon: ${goi(c.khuon)},`,
-              `may: ${goi(c.may)},`, phang(c.viTriMay), phang(c.net), ...(c.mau ? [`mau: { ...m0, ${goi(c.mau).slice(2)},`] : [])].join('\n');
-  try { await navigator.clipboard.writeText(ma); toast('Đã chép định nghĩa vào clipboard.'); }
-  catch (e) { console.log(ma); toast('Trình duyệt chặn clipboard — định nghĩa đã in ra console.', true); }
+  try { await navigator.clipboard.writeText(code); toast('Đã chép định nghĩa vào clipboard.'); }
+  catch (e) { console.log(code); toast('Trình duyệt chặn clipboard — định nghĩa đã in ra console.', true); }
 });
 
 // Mã nhúng cho HyperFrames: bản dựng `dist/character.iife.js` nạp bằng thẻ script thường
 // và CONFIG NẰM NGAY TRONG MÃ — composition không được fetch gì lúc render.
 $('chepNhung').addEventListener('click', async () => {
-  const c = raConfig(tt), cs = Object.keys(c).length ? `, config: ${JSON.stringify(c)}` : '';
-  const goi = laThu() ? `${IIFE_TEN}.taoThuCung(host, { loai: '${khoa}'${cs} })` : `${IIFE_TEN}.taoNhanVat(host, { khoa: '${khoa}'${cs} })`;
+  const c = configToPublic(raConfig(tt), laThu()), cs = Object.keys(c).length ? `, config: ${JSON.stringify(c)}` : '';
+  const goi = laThu() ? `${GLOBAL_NAME}.createPet(host, { species: '${khoa}'${cs} })` : `${GLOBAL_NAME}.createCharacter(host, { id: '${khoa}'${cs} })`;
   const dt = laThu() ? rig.DONG_TAC[1] : 'wave';
   const ma = `<div id="nv-${khoa}" class="clip" data-start="0" data-duration="6" data-track-index="1" style="position:absolute;left:60%;bottom:6%;height:70%"></div>
 <script src="character.iife.js"><\/script>
 <script>
-  ${IIFE_TEN}.gieo(1);                                  // cố định chớp mắt / khẩu hình
+  ${GLOBAL_NAME}.seed(1);                               // cố định chớp mắt / khẩu hình
   const host = document.getElementById('nv-${khoa}');
   const { rig } = ${goi};
   // tl là timeline paused của composition:
@@ -806,11 +839,11 @@ async function khoiDong(k) {
   dungTl();
   luotHinh++; hinhNho = [];
   rig = taoRig($('nv'));
-  window.rig = rig;                                    // kiem-khung.mjs / kiem-muot.mjs đòi đúng tên này
+  window.rig = rig;                                    // các công cụ đo bên ngoài tìm rig ở đúng tên này
   $('nv').style.aspectRatio = `${rig.constructor.KHUNG.w}/${rig.constructor.KHUNG.h}`;
   veDongTac();
   // Thú chỉ có nhóm Màu sắc; quay lại nhân vật người thì trả về nhóm đang xem trước đó.
-  if (laThu()) { if (mucChon !== 'mau') mucNguoi = mucChon; mucChon = 'mau'; nhin = 'than'; }
+  if (laThu()) { if (!['mau', 'petShape'].includes(mucChon)) { mucNguoi = mucChon; mucChon = 'petShape'; } nhin = 'than'; }
   else if (mucNguoi) { mucChon = mucNguoi; mucNguoi = null; nhin = MUC.find((x) => x.k === mucChon).nhin; }
   goc = docTrangThai(rig);
   tt = sao(goc);
@@ -818,11 +851,11 @@ async function khoiDong(k) {
   daLuu = sao(goc);
   try {
     const res = await fetch(`../configs/${khoa}.json`, { cache: 'no-store' });
-    if (res.ok) daLuu = tuConfig(await res.json(), goc);
+    if (res.ok) daLuu = tuConfig(configToInternal(await res.json(), laThu()), goc);
   } catch (e) { /* chưa lưu lần nào: dùng số gốc */ }
   let nhap = null;
   try { nhap = JSON.parse(localStorage.getItem(KHOA_NHAP()) || 'null'); } catch (e) {}
-  const batDau = nhap && (nhap.mat || (laThu() && nhap.mau)) ? { ...sao(daLuu), ...nhap } : daLuu;
+  const batDau = nhap && (nhap.mat || (laThu() && nhap.petShape)) ? { ...sao(daLuu), ...nhap } : daLuu;
   tt = apTrangThai(rig, batDau);
   // Mốc "đã lưu" cũng phải đi qua rig một lượt, để so với `tt` bằng cùng một kiểu số.
   if (khac(batDau, daLuu)) { const tam = taoRig(document.createElement('div')); daLuu = apTrangThai(tam, daLuu); } else daLuu = sao(tt);
@@ -842,7 +875,7 @@ for (const [nhan, ds, bang] of [['Người', Object.keys(RigSVG.NHAN_VAT), RigSV
   $('chonNV').appendChild(g);
 }
 let dau = new URLSearchParams(location.search).get('nv');
-if (!DS_NV.includes(dau)) dau = 'bac_si_thu_y';
+if (!DS_NV.includes(dau)) dau = 'vet';
 $('chonNV').value = dau;
 $('chonNV').addEventListener('change', (e) => khoiDong(e.target.value));
 veNutPhat();

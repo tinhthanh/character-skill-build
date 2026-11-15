@@ -14,8 +14,8 @@
 //  • dau/dauX/dauY: đầu nghiêng / lắc ngang / gật xuống.
 //  • matY 0..1  : mắt nhắm;  mieng 0..1: miệng mở;  cuoi -1..1: khóe miệng.
 //  • chum 0..1  : chúm môi — hẹp ngang, dày dọc. Ba kênh (mieng, cuoi, chum)
-//    đúng bằng ba kênh [mở, rộng, tròn] của <vg-actor> và của bộ viseme trong
-//    tools/character/nhanvat/mieng.py, nên bảng khẩu hình dùng chung được.
+//    đúng bằng ba kênh [mở, rộng, tròn] quen thuộc của các bộ viseme, nên bảng khẩu hình
+//    của công cụ nhép miệng khác dùng lại được.
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
 
 const KHUNG = { w: 400, h: 470 };
@@ -27,6 +27,7 @@ const NGHI = Object.freeze({
   dau: 0, dauX: 0, dauY: 0,
   batL: 11, batR: 11, cangL: -17, cangR: -17, vungL: 0, vungR: 0,
   duiL: 0, duiR: 0, ongL: 0, ongR: 0, nhacL: 0, nhacR: 0,
+  seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   tayL: 'mo', tayR: 'mo',
@@ -155,11 +156,11 @@ export function veChanMay({ dai = 10.5, day = 3, cong = 2.25, thon = 0, xech = 0
 }
 
 // Bốn khẩu hình cho speak(), viết bằng ba kênh (mở, cười/rộng, chúm) — rút gọn
-// từ bảng VISEME 9 hình của <vg-actor>: bốn nhóm này bao được nhịp của một câu
+// từ một bảng viseme 9 hình: bốn nhóm này bao được nhịp của một câu
 // nói, còn phân biệt B với C thì chỉ có ý nghĩa khi bám cue Rhubarb thật.
 // Chín hình của Rhubarb quy về BA kênh miệng của rig (mở / chúm / khoé môi).
 // Đây là bảng cho nhép miệng THẬT — bám cue đo từ âm thanh. `KHAU` bên dưới
-// là bảng ƯỚC LƯỢNG cho `speak()`/`giaiThich()` khi không có âm thanh.
+// là bảng ƯỚC LƯỢNG cho `speak()`/`explain()` khi không có âm thanh.
 const RHUBARB = {
   A: { mieng: 0.05, chum: 0.15, cuoi: 0.28 },   // M B P — mím
   B: { mieng: 0.22, chum: 0.04, cuoi: 0.46 },   // K S T — hé, răng gần khít
@@ -375,6 +376,9 @@ const NV_MAC_DINH = {
   // gấu chứ không đè cả cánh tay: cẳng tay và bàn tay đưa ra trước ngực thì
   // vẫn phải nằm TRÊN ống nghe.
   phuKienTren: () => '',
+  // RÂU (ria, râu quai nón), toạ độ tâm đầu. Vẽ SAU kính và các nét thêm, TRƯỚC miệng — nên
+  // râu phủ được cả cằm lẫn môi trên mà miệng vẫn hiện. Khác `net()`: không co theo cỡ mắt.
+  beard: () => '',
   // MŨ đội đầu (mũ mổ, mũ y tá…), toạ độ tâm đầu như `toc()`. Vẽ TRÊN mọi lớp tóc,
   // kể cả mảng tóc gáy rig tự sinh lúc xoay — để mũ trong `toc()` thì quay nghiêng
   // là mảng tóc gáy quét một vệt đen chéo qua mũ. Rig dịch và co nó cùng với tóc.
@@ -453,7 +457,7 @@ const NV_MAC_DINH = {
 };
 
 /* ------------------------------------------------ BỘ SCRUBS CỦA BÁC SĨ THÚ Y
- * Mọi con số dưới đây ĐO từ `character/thu-nghiem-style/do.png` (ảnh mẫu bộ
+ * Mọi con số dưới đây ĐO từ ảnh mẫu của bộ đồ (không kèm trong repo — ảnh mẫu bộ
  * đồ), không ước lượng bằng mắt. Ảnh mẫu và rig KHÔNG cùng tỉ lệ: khớp theo
  * bề ngang thì 1px = 0.168 đơn vị, khớp theo chiều cao thì 1px = 0.273 —
  * người trong rig là chibi, thân ngắn hơn bản vẽ. Nên toạ độ NGANG quy đổi
@@ -552,10 +556,10 @@ const NV_BAC_SI_THU_Y = {
   mui: (m) => `<path d="M -1 8 q -3 4 1 5" stroke="${m.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none"/>`,
   // Bề dày viền phải BẰNG nét vẽ sẵn trong ảnh đầu, không phải một số chọn cho
   // đẹp. Đo trên bản dựng thật (nền trắng, deviceScaleFactor 4): nét quanh tóc
-  // của ảnh Gemini dày 8px, còn `vienRong` 2.4 cho ra viền 17px quanh cánh tay
+  // của bản vẽ mẫu dày 8px, còn `vienRong` 2.4 cho ra viền 17px quanh cánh tay
   // — dày gấp 2.1 lần. Mặt một cỡ bút, thân một cỡ bút khác thì nhìn ra cánh
   // tay bị kẻ đậm chứ không ra cùng một bản vẽ. 8px ÷ 7.1px-mỗi-đơn-vị = 1.13.
-  // Màu #1d0d10 là trung vị nét viền đo trong `do.png`.
+  // Màu #1d0d10 là trung vị nét viền đo trong ảnh mẫu.
   vien: '#1d0d10', vienRong: 1.15,
   huyHieu: 'C+',                                 // chữ trên túi ngực ('' = dấu chân thú)
   // Gấu tay áo không phải nét viền vải mà là ĐƯỜNG CHỈ MAY — cùng màu tím với
@@ -563,7 +567,7 @@ const NV_BAC_SI_THU_Y = {
   mauGau: CHI_TIM, netGau: '3 2.6', lechGau: 7, vienGau: 2.5, boGocTayAo: 6,
   damSuon: 0.34,
   nghi: { batL: 19, batR: 19, cangL: -97, cangR: -97, cuoi: 1, mieng: 0.6, mayL: 0.15, mayR: 0.15 },
-  // Sáu màu vải đo TRUNG VỊ từ `thu-nghiem-style/do.png` chứ không ước lượng:
+  // Sáu màu vải đo TRUNG VỊ từ ảnh mẫu chứ không ước lượng:
   // thân áo và quần CÙNG một mã (#4f5b64) — trong ảnh mẫu chúng chỉ tách nhau
   // nhờ nét viền, nên bỏ viền đi là hai mảnh dính làm một.
   mau: { da: '#f7d9c4', daToi: '#e2b39a', toc: '#151319', tocSang: '#3a3644', ao: '#4f5b64', aoToi: '#3b454a',
@@ -594,7 +598,7 @@ const NV_BAC_SI_THU_Y = {
               <path d="M -11.5 -4 Q 0 -15.5 11.5 -4" stroke="#17110c" stroke-width="2.6" fill="none" stroke-linecap="round"/>
               <path d="${ben === 'L' ? 'M -11 -6 l -3.4 -2.2 M -10 -9.5 l -2.6 -3.2' : 'M 11 -6 l 3.4 -2.2 M 10 -9.5 l 2.6 -3.2'}" stroke="#17110c" stroke-width="1.9" stroke-linecap="round"/>
             </g>`,
-  // CỔ CHỮ V BẮT CHÉO (surplice), đo từ `do.png`: KHÔNG phải một chữ V mà là
+  // CỔ CHỮ V BẮT CHÉO (surplice), đo từ ảnh mẫu: KHÔNG phải một chữ V mà là
   // hai vạt áo vắt qua nhau. Mép trong hai vạt cắt nhau ở (0,−79) rồi mỗi mép
   // còn thò tiếp một đoạn ngắn xuống dưới; mép ngoài mới là chữ V khép ở
   // (0,−68). Vẽ đúng một chữ V thì mất hẳn cái nút thắt ở đáy cổ.
@@ -638,7 +642,7 @@ export class RigSVG {
   static NGHI = NGHI;
   // `enter`/`exit` đã bỏ: hai động tác duy nhất DỜI nhân vật theo phương ngang
   // (đo được 262 và 300 đơn vị) nên chúng chạy ra ngoài khung hình — chính vì
-  // thế `kiem-khung.mjs` và `kiem-muot.mjs` vẫn phải lọc chúng ra khỏi phép đo.
+  // thế các công cụ đo khung hình phải lọc chúng ra khỏi phép đo.
   // `walk` cũng bỏ: nó không dời chỗ nhưng QUAY NGƯỜI sang ngang (`huong` 1)
   // rồi bước, nên nhìn ra đi ngang. Ba động tác bước còn lại (`march`,
   // `stroll`, `stepInPlace`) dậm tại chỗ và vẫn nhìn thẳng, `walkForward`/
@@ -646,7 +650,7 @@ export class RigSVG {
   // `wave` bỏ theo yêu cầu, không phải vì dịch ngang (nó dịch ngang 0).
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'giaiThich', 'loLang'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -654,10 +658,12 @@ export class RigSVG {
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
-  static NHAN_VAT = { mac_dinh: NV_MAC_DINH, bac_si_thu_y: NV_BAC_SI_THU_Y };
+  /** Tên màu công khai → khoá màu nội bộ. `index.js` gán bảng này lúc nạp thư viện. */
+  static COLOR_ALIASES = {};
+  static NHAN_VAT = { default: NV_MAC_DINH, vet: NV_BAC_SI_THU_Y };
   static dangKy(ten, dinhNghia) { RigSVG.NHAN_VAT[ten] = { ...NV_MAC_DINH, ...dinhNghia }; return RigSVG.NHAN_VAT[ten]; }
 
-  constructor(host, nhanVat = 'mac_dinh') {
+  constructor(host, nhanVat = 'default') {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
     if (!nv) throw new Error(`[RigSVG] không có nhân vật "${nhanVat}"`);
     this.host = host;
@@ -716,6 +722,9 @@ export class RigSVG {
     if (!m.luoi) m.luoi = tron(m.mieng, '#e8848f', 0.62);
     if (!m.rang) m.rang = '#fffaf4';
     if (!m.may) m.may = m.toc;
+    // Bí danh CÔNG KHAI (tiếng Anh) cho từng màu, để hàm vẽ của nhân vật tuỳ chỉnh đọc
+    // được `c.hair`, `c.top`… Bảng bí danh do `index.js` nạp vào; rig không tự biết nó.
+    for (const [alias, key] of Object.entries(RigSVG.COLOR_ALIASES)) if (key in m && !(alias in m)) m[alias] = m[key];
     this.mau = this.nv.mau = m;
   }
 
@@ -747,6 +756,8 @@ export class RigSVG {
    * lần gọi này không truyền nó — đổi áo sang đỏ mà bóng sườn vẫn xanh thì hỏng.
    */
   doiMau(kieu = {}) {
+    // Nhận cả tên màu công khai lẫn khoá nội bộ.
+    kieu = Object.fromEntries(Object.entries(kieu).map(([name, v]) => [RigSVG.COLOR_ALIASES[name] || name, v]));
     assertColors(kieu, 'doiMau');
     const k = { ...kieu };
     if (k.ao && !k.aoToi) k.aoToi = chinhSang(k.ao, -0.21);
@@ -880,7 +891,7 @@ export class RigSVG {
   // Bộ lọc chạy trên TỪNG NHÓM, nên mỗi nhóm tự bọc một vòng viền quanh mình,
   // kể cả những cạnh nằm đè lên nhóm khác. Hai chỗ hỏng vì thế:
   //   • nhóm tay viền cả CẠNH NÁCH — cạnh nằm trên ngực — ra một nét đen tách
-  //     tay áo khỏi thân, nhìn như tay áo dán lên người. Trong `do.png` vai và
+  //     tay áo khỏi thân, nhìn như tay áo dán lên người. Trong ảnh mẫu vai và
   //     tay áo là MỘT khối liền, không có nét nào ngăn giữa.
   //   • nhóm cổ viền quanh hình thang cổ, kể cả phần loe ở đáy nằm trên ngực,
   //     nên trong lòng chữ V hiện một nét đen viền quanh cổ.
@@ -950,6 +961,7 @@ export class RigSVG {
             <path id="${p}-mayR" d="${veChanMay(this.nv.may, 'R')}" fill="${this.mau.may}"/>
             <g id="${p}-mui">${this.nv.mui(this.mau)}</g>
             <g id="${p}-netThem">${this.nv.net(p, this.mau)}</g>
+            <g id="${p}-beard">${this.nv.beard(p, this.mau, this.nv)}</g>
             <g id="${p}-momG">
               <path id="${p}-mieng" fill="${this.mau.miengToi}" stroke="${this.mau.mieng}" stroke-linejoin="round" stroke-linecap="round"/>
               <g clip-path="url(#${p}-momClip)">
@@ -1124,10 +1136,15 @@ export class RigSVG {
       e['tai' + ben].setAttribute('transform', `translate(${dau * x} 4) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6}) scale(1 ${1 - s.nhacL * 0.42})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6}) scale(1 ${1 - s.nhacR * 0.42})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})`);
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})`);
+    // NGỒI (`seat`): nhìn từ trước, đùi chĩa về phía người xem nên chỉ còn một khúc ngắn, còn
+    // ống chân vẫn dài nguyên. Nhóm chân co theo chiều dọc để rút đùi; ống chân là con của nhóm
+    // ấy nên nhận phép co NGƯỢC lại cho khỏi ngắn theo. (Khác `nhac`, vốn rút cả chân — dùng cho
+    // dậm chân, chỗ đó cả chân nhấc về phía trước.)
+    const thighSeen = 1 - clamp(s.seat, 0, 1) * 0.72, shinFix = ` scale(1 ${(1 / thighSeen).toFixed(4)})`;
+    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})${shinFix}`);
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})${shinFix}`);
 
     e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than}) scale(${this.nv.coThan})`);
     e.chanG.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) scale(1 ${this.nv.coChan})`);
@@ -1285,7 +1302,7 @@ export class RigSVG {
   /**
    * Miệng: hai cung parabol + khoang + răng + lưỡi, cắt bằng clipPath.
    *
-   * Cùng họ hình với `tools/character/nhanvat/mieng.py` và với `<vg-actor>` —
+   * Cùng họ hình với các bộ viseme ba kênh thông dụng —
    * ba kênh liên tục (mở, rộng/cười, chúm) thay vì một tá hình vẽ rời, nên
    * chuyển giữa các khẩu hình là liên tục, không giật.
    *
@@ -1306,7 +1323,7 @@ export class RigSVG {
    *     nhọn hoắt như mũi kim, vì hai parabol gặp nhau ở đúng một điểm.
    *
    * `chum` thu bề ngang và cộng thêm độ hé: chúm mà chỉ hẹp ngang thì ra
-   * "miệng nhỏ", không ra "chúm môi" (bài học đã ghi trong mieng.py).
+   * "miệng nhỏ", không ra "chúm môi" (đã thử và thấy ngay).
    */
   #veMom() {
     const s = this.s, e = this.el, R = this.nv.miengRong;
@@ -1335,7 +1352,7 @@ export class RigSVG {
     // Nét môi trên là parabol — đó là đường cười. Nhưng ĐÁY khoang phải là
     // BẬC BA: parabol khép quá nhanh về hai khoé nên miệng mở ra hình chữ V.
     // Bậc ba với điểm điều khiển kéo vào 0.42w giữ độ sâu ra sát khoé — đúng ý
-    // số mũ u^0.7 của mieng.py. Đỉnh giữa của bậc ba đối xứng bằng 0.75·H.
+    // số mũ u^0.7 quen dùng cho hình miệng. Đỉnh giữa của bậc ba đối xứng bằng 0.75·H.
     const cungTren = `M ${-w} 0 Q 0 ${2 * dinhTren} ${w} 0`;
     const khoang = `${cungTren} C ${w * 0.42} ${dinhDuoi / 0.75} ${-w * 0.42} ${dinhDuoi / 0.75} ${-w} 0 Z`;
     e.mieng.setAttribute('d', khoang);
@@ -1691,7 +1708,7 @@ export class RigSVG {
   /**
    * VẪY TAY CHÀO. Từng bị bỏ cùng `enter`/`exit`, nay đưa lại theo yêu cầu —
    * và nó vốn KHÔNG thuộc nhóm "di chuyển ngang": đo thì `wave` dịch ngang 0,
-   * chỉ giơ tay và nghiêng người. Mã nguyên văn bản `files-13`.
+   * chỉ giơ tay và nghiêng người.
    */
   wave() {
     const t = this.tl(), s = this.s;
@@ -1874,6 +1891,60 @@ export class RigSVG {
     return t;
   }
 
+  /* ------------------------------------------------- biểu cảm · quay · ngồi */
+
+  // Nét mặt dựng sẵn. Mỗi mục là các kênh trạng thái ở đỉnh biểu cảm; `eyesClosed` âm là
+  // mở mắt TO hơn bình thường.
+  static EXPRESSIONS = {
+    happy:     { cuoi: 1, mieng: 0.5, mayL: 0.55, mayR: 0.55, matY: 0.18, dau: -3, dauY: -1 },
+    sad:       { cuoi: -0.85, mieng: 0, mayL: 0.75, mayR: 0.75, matY: 0.3, dau: 5, dauY: 5, nhinY: 1.6, vai: 3 },
+    surprised: { cuoi: 0, mieng: 0.72, chum: 0.6, mayL: 1, mayR: 1, matY: -0.16, dauY: -3, vai: -3 },
+    angry:     { cuoi: -0.6, mieng: 0.12, mayL: -0.9, mayR: -0.9, matY: 0.22, dau: 0, dauY: 2, than: 1.5 },
+    thinking:  { cuoi: 0.1, mieng: 0, chum: 0.25, mayL: 0.7, mayR: -0.2, nhinX: 2.2, nhinY: -1.8, dau: 6, dauX: 2 },
+  };
+
+  /**
+   * Làm một BIỂU CẢM rồi trở về: `express('happy')`, `express('sad', 2)`.
+   * Tên hợp lệ: happy · sad · surprised · angry · thinking. `hold` = số giây giữ nét mặt.
+   */
+  express(name = 'happy', hold = 1.2) {
+    const face = RigSVG.EXPRESSIONS[name];
+    if (!face) throw new Error(`[RigSVG] không có biểu cảm "${name}" (có: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
+    const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
+    t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
+    if (name !== 'surprised' && hold > 0.8) this.#chop(t, into + hold * 0.5);      // ngạc nhiên thì không chớp mắt
+    this.#khep(t, 0.4, into + hold);
+    return t;
+  }
+
+  /**
+   * QUAY NGƯỜI sang một bên (dáng 3/4), giữ, rồi quay lại nhìn thẳng.
+   * `direction`: 'right' | 'left'. `amount` 0…1 — 0.55 là nghiêng 3/4, 1 là nghiêng hẳn.
+   */
+  turn(direction = 'right', hold = 1.5, amount = 0.55) {
+    const t = this.tl(), s = this.s, side = direction === 'left' ? -1 : 1;
+    t.to(s, { huong: side * clamp(amount, 0, 1), nhinX: side * 1.2, duration: 0.4, ease: 'power2.inOut' }, 0);
+    if (hold > 1) this.#chop(t, 0.4 + hold * 0.5);
+    this.#khep(t, 0.4, 0.4 + hold);
+    return t;
+  }
+
+  /**
+   * NGỒI xuống (như ngồi lên một chiếc ghế vô hình, nhìn thẳng), giữ, rồi đứng dậy.
+   * Đùi rút ngắn theo phối cảnh — đầu gối đưa về phía người xem — và cả người hạ xuống đúng
+   * bằng phần đùi vừa rút, nên bàn chân vẫn nằm trên mặt đất. Composition tự vẽ ghế nếu cần.
+   */
+  sit(hold = 2) {
+    const t = this.tl(), s = this.s, nv = this.nv;
+    // Đùi rút 72% khi ngồi hẳn; thân hạ xuống đúng bằng phần đùi vừa rút, bàn chân ở lại mặt đất.
+    const drop = DAI.dui * nv.daiDui * nv.coChan * 0.72;
+    t.to(s, { seat: 1, y: drop, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { batL: 14, batR: 14, cangL: -38, cangR: -38, cuoi: 0.6, duration: 0.4, ease: 'power2.out' }, 0.15);   // hai tay đặt lên đùi
+    for (let a = 0.6; a < 0.45 + hold - 0.3; a += 2.4) this.#chop(t, a + 0.5);
+    this.#khep(t, 0.5, 0.45 + hold);
+    return t;
+  }
+
   /**
    * Đi NGHIÊNG.
    *
@@ -1899,9 +1970,9 @@ export class RigSVG {
     return t;
   }
 
-  /** Bước VÀO khung rồi dừng ở giữa. `tu`: 'trai' (mặc định, đi sang phải) hoặc 'phai'. */
-  enter(tu = 'trai') {
-    const t = this.tl(), s = this.s, chieu = tu === 'phai' ? -1 : 1, x0 = -270 * chieu;
+  /** Bước VÀO khung rồi dừng ở giữa. `from`: 'left' (mặc định, đi sang phải) hoặc 'right'. */
+  enter(from = 'left') {
+    const t = this.tl(), s = this.s, chieu = from === 'right' ? -1 : 1, x0 = -270 * chieu;
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
@@ -1909,9 +1980,9 @@ export class RigSVG {
     return t;
   }
 
-  /** Bước RA khỏi khung và ẩn đi. `ve`: 'phai' (mặc định) hoặc 'trai'. */
-  exit(ve = 'phai') {
-    const t = this.tl(), s = this.s, chieu = ve === 'trai' ? -1 : 1;
+  /** Bước RA khỏi khung và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. */
+  exit(to = 'right') {
+    const t = this.tl(), s = this.s, chieu = to === 'left' ? -1 : 1;
     const d = this.#doBuoc(300, true, false);              // nhấc chân bước đi, ra khỏi khung khi vẫn đang đi
     t.to(s, { huong: chieu, cuoi: 0.6, duration: 0.35, ease: 'power2.inOut' }, 0);
     const at = this.#di(t, 0.1, d.buoc, 0.42, { ra: false, kA: d.kA, chieu, x: (b) => chieu * d.x(b) });
@@ -1942,7 +2013,7 @@ export class RigSVG {
   // nhô một hình duy nhất theo độ mở. Bốn hình đủ để câu nói có nhịp: mở to,
   // hé rộng, chúm, gần mím — và chúng là ba kênh của cùng một họ hình nên nối
   // vào nhau liên tục.
-  // Tách riêng vì `speak()` và `giaiThich()` dùng CHUNG. Để hai bản chép tay
+  // Tách riêng vì `speak()` và `explain()` dùng CHUNG. Để hai bản chép tay
   // thì sớm muộn cũng trôi khỏi nhau, và lúc ấy hai động tác cùng một nhân vật
   // lại mấp máy môi theo hai kiểu khác nhau.
   #khauHinh(t, soAm, nhip) {
@@ -2000,7 +2071,7 @@ export class RigSVG {
   }
 
   /**
-   * CỬ CHỈ CÓ CẤU TRÚC — bốn pha, dùng chung cho `giaiThich()` và `noiTheoCue()`.
+   * CỬ CHỈ CÓ CẤU TRÚC — bốn pha, dùng chung cho `explain()` và `speakCues()`.
    *
    * HAI BẢN TRƯỚC ĐỀU SAI, VÀ SAI NGƯỢC CHIỀU NHAU:
    *   · Bản 1 là BỘ XUNG: vung ra rồi kéo nguyên về, giữa hai xung không có
@@ -2082,7 +2153,7 @@ export class RigSVG {
    *     cùng làm mọi nhịp là quay lại đúng dáng bù nhìn.
    *   • Nhịp cách 4 âm, không phải mỗi âm — và đủ dài để nâng rồi lắng cho hết.
    */
-  giaiThich(text = null, dur = 2.4) {
+  explain(text = null, dur = 2.4) {
     const t = this.tl(), s = this.s;
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     // Nền THẤP và LỆCH: tay trái buông gần thõng, tay phải hé hơn một chút.
@@ -2110,12 +2181,12 @@ export class RigSVG {
   /**
    * NÓI THEO CUE THẬT — nhép miệng bám âm thanh, kèm nhịp tay.
    *
-   * Khác `speak()`/`giaiThich()`: hai hàm kia ĐOÁN nhịp từ số từ, nên môi chạy
+   * Khác `speak()`/`explain()`: hai hàm kia ĐOÁN nhịp từ số từ, nên môi chạy
    * đúng tiết tấu nhưng không đúng lời. Hàm này nhận cue đo từ chính file
-   * tiếng (`tools/character/lipsync.py`, định dạng Rhubarb) nên môi khớp lời.
+   * tiếng (định dạng Rhubarb) nên môi khớp lời.
    *
    *   const cue = await (await fetch('loi.cues.json')).json();
-   *   tl.add(rig.noiTheoCue(cue).paused(false), 2.0);
+   *   tl.add(rig.speakCues(cue).paused(false), 2.0);
    *
    * HAI QUYẾT ĐỊNH đáng ghi:
    *
@@ -2129,15 +2200,15 @@ export class RigSVG {
    *    vào mệnh đề mới. Chia đều thì tay rơi vào giữa từ — đó chính là cái
    *    "cứng đơ": tay vẫn động nhưng động lệch chỗ nên não đọc ra máy móc.
    */
-  noiTheoCue(cue, dur = null, { cuChi = true } = {}) {
+  speakCues(cue, dur = null, { cuChi = true } = {}) {
     const t = this.tl(), s = this.s;
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
     const D = dur || (cue && cue.metadata && cue.metadata.duration)
                   || (ds.length ? ds[ds.length - 1].end : 2);
     // Không có cue thì rơi về nhịp ước lượng, đừng đứng im mở mắt.
-    if (!ds.length) return this.giaiThich(null, D);
+    if (!ds.length) return this.explain(null, D);
 
-    // Nền CAO hơn `giaiThich`: người dẫn tin giữ thế sẵn sàng, hai tay tách
+    // Nền CAO hơn `explain`: người dẫn tin giữ thế sẵn sàng, hai tay tách
     // nhau ngang bụng — không phải thế nghỉ đan tay. Giữa hai mệnh đề tay về
     // đây, nên nền chính là tư thế người xem nhìn thấy nhiều nhất.
     const NEN = { batL: 20, batR: 28, cangL: -70, cangR: -80 };
@@ -2233,13 +2304,13 @@ export class RigSVG {
    * như cùng bộ mặt (mày nhướn + khoé miệng trĩu) vì đó là bộ mặt duy nhất rig
    * diễn được cho cả hai; phân biệt nằm ở chỗ khác:
    *   `shrug`  — nhanh, hai tay hất ra ngoài, vai giật lên: "chịu, không biết".
-   *   `loLang` — chậm, MỘT tay thu vào ngực, vai hơi rụt: "tôi đang lo".
+   *   `worry` — chậm, MỘT tay thu vào ngực, vai hơi rụt: "tôi đang lo".
    *
    * Nhịp quan trọng nhất là MẮT NGƯỚC LÊN ở giữa: vào thì cúi nhìn xuống, giữa
    * chừng mới ngước lên nhìn thẳng người xem. Đó là chỗ câu hỏi chạm tới khán
    * giả; thiếu nó thì chỉ là một người đang buồn chuyện riêng.
    */
-  loLang() {
+  worry() {
     const t = this.tl(), s = this.s;
     // Tay phải lên ngực bằng `cang` (gập khuỷu) — đo thì bàn tay từ y 320 lên
     // 285, tức vừa chạm dưới túi ngực. Tay trái buông thấp cho lệch hẳn.

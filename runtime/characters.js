@@ -4,11 +4,11 @@
 // Mỗi nhân vật có ĐẦU riêng và BỘ ĐỒ riêng; bộ xương, khớp và mọi động tác thì
 // dùng chung (xem NV_MAC_DINH trong ./rig-svg.js).
 //
-//   bs_nam      bác sĩ phẫu thuật — đồ mổ xanh ngọc cổ chữ V, mũ mổ, khẩu trang
+//   surgeon      bác sĩ phẫu thuật — đồ mổ xanh ngọc cổ chữ V, mũ mổ, khẩu trang
 //               kéo xuống cổ, thẻ tên, dép trắng; đứng buông tay
-//   dieu_duong  điều dưỡng — áo hồng in dấu chân, tay loe viền trắng, đồng hồ
+//   nurse  điều dưỡng — áo hồng in dấu chân, tay loe viền trắng, đồng hồ
 //               cài ngực, hai túi dưới, quần xanh đậm, giày thể thao trắng
-//   bs_kinh     bác sĩ đeo kính — áo blouse trắng DÀI TAY, ve áo, hàng cúc, bút
+//   doctor     bác sĩ đeo kính — áo blouse trắng DÀI TAY, ve áo, hàng cúc, bút
 //               cài túi ngực, thẻ tên, ống nghe, quần tây, giày đen
 //
 // Slot của ĐẦU:  khuon · coDau/dauLech · toc() · mu() · mat() · mui() · net() · bố cục
@@ -137,13 +137,18 @@ const DO_DD = {
 // áo phủ lên đùi; bước đi thì đùi lùa dưới vạt.
 const AO_BL = 'M -34 38 Q 0 42 34 38 Q 31 0 27 -42 Q 28 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105'
             + ' Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -28 -70 -27 -42 Q -31 0 -34 38 Z';
+// Bộ áo khoác dùng hai màu mà không phải nhân vật gốc nào cũng khai (`aoTrong`, `ongNghe`).
+// Thiếu thì lấy màu dự phòng, không để `undefined` lọt vào SVG — trải bộ áo này lên một
+// nhân vật mặc đồ mổ là chuyện thường, và hình hỏng vì thiếu một màu thì rất khó đoán.
+const innerShirtColor = (m) => m.aoTrong || m.aoToi;
+const stethoscopeColor = (m) => m.ongNghe || m.phuKien;
 const DO_BL = {
   ao: () => AO_BL,
   suon: suonTu([[35, -88], [28, -70], [27, -42], [31, 0], [34, 38]]),
   damSuon: 0.6,
   // Áo trong màu `mau.aoTrong` lộ ra giữa hai ve; ve là hai nét bẻ có khấc.
   coAo: (p, m) => `${vaiCo(m)}
-        <path d="M -11.500 -104 L 11.500 -104 L 0 -68 Z" fill="${m.aoTrong}"/>
+        <path d="M -11.500 -104 L 11.500 -104 L 0 -68 Z" fill="${innerShirtColor(m)}"/>
         <path d="M -12.500 -104 L 0 -67 L -9 -74 L -15.500 -84 L -9.500 -87.500 Z" fill="${m.ao}" stroke="${m.vienNet}" stroke-width="1.2" stroke-linejoin="round"/>
         <path d="M 12.500 -104 L 0 -67 L 9 -74 L 15.500 -84 L 9.500 -87.500 Z" fill="${m.ao}" stroke="${m.vienNet}" stroke-width="1.2" stroke-linejoin="round"/>`,
   phuKien: (p, m) => `
@@ -156,11 +161,11 @@ const DO_BL = {
         <path d="M 16.500 -51.500 v 7" stroke="#d6453d" stroke-width="2.1" stroke-linecap="round"/>
         ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
         <path d="M ${g * 9} 6 H ${g * 27.500} L ${g * 29} 28 H ${g * 9} Z" fill="none" stroke="${m.vienNet}" stroke-width="1.2" stroke-linejoin="round"/>`; }).join('')}
-        ${theTen(-22.500, -47, m.aoTrong, m.vienNet)}
+        ${theTen(-22.500, -47, innerShirtColor(m), m.vienNet)}
         <path d="M -16 -47 v -2.500" stroke="${m.vienNet}" stroke-width="1.6" stroke-linecap="round"/>
-        ${ongNgheVatCo(m.ongNghe, m.vienNet)}
+        ${STETHOSCOPE_MARK}${ongNgheVatCo(stethoscopeColor(m), m.vienNet)}
       </g>`,
-  phuKienTren: (p, m) => ongNgheVatCo(m.ongNghe, m.vienNet),
+  phuKienTren: (p, m) => ongNgheVatCo(stethoscopeColor(m), m.vienNet),
   giay: giayKin(null),
   daiTayAo: 1, xeoTayAo: 3, rongTayAo: 1.12, vienGau: 0, mauGau: null, netGau: null, lechGau: 0, boGocTayAo: 3,
   tayDai: true, huyHieu: '',
@@ -171,8 +176,16 @@ const DO_BL = {
  *   boDo     ba bộ trang phục dựng sẵn — trải vào định nghĩa rồi ghi đè màu / chi tiết
  *   còn lại  các mảnh vẽ dùng chung (xem chú thích ở từng hàm phía trên)
  */
+// Áo khoác KHÔNG ống nghe: cùng bộ áo, bỏ ống nghe khỏi cả hai lớp (thân áo và vắt vai).
+const STETHOSCOPE_MARK = '<!--stethoscope-->';
+const DO_BL_PLAIN = {
+  ...DO_BL,
+  phuKien: (p, m) => DO_BL.phuKien(p, m).split(STETHOSCOPE_MARK)[0] + '\n      </g>',
+  phuKienTren: () => '',
+};
+
 export const KIT = {
-  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL },
+  boDo: { doMo: DO_MO, aoDauChan: DO_DD, aoBlouse: DO_BL, plainCoat: DO_BL_PLAIN },
   AO: { doMo: AO_MO, aoDauChan: AO_DD, aoBlouse: AO_BL },
   suonTu, vaiCo, giayKin, theTen, dauChan, ongNgheVatCo,
 };
@@ -184,7 +197,7 @@ export function dungDau(goc) {
   // ─────────────────────────────────────────────── A. Bác sĩ nam, tóc ngắn
   // Sọ vuông hơn, cằm rộng, mắt nhỏ lại (rx 9.5 so với 11.5 của bản gốc),
   // không mi giả. Đầu nhỏ hơn một nấc (1.38 so với 1.45) cho bớt trẻ con.
-  const bs_nam = {
+  const surgeon = {
     ...goc, ...DO_MO,
     ten: 'Bác sĩ nam — đồ mổ',
     // Cao và vững hơn ba nhân vật nữ: đầu nhỏ nhất, chân dài, tay và chân dày hơn.
@@ -237,7 +250,7 @@ export function dungDau(goc) {
   // Vẽ đuôi TRƯỚC khối tóc chính để khối tóc phủ lên chân đuôi, không lộ mối.
   // Đuôi cố ý dừng ở x ≥ −78: xa hơn nữa là đè lên cánh tay trái, vì tay trái
   // vẽ TRƯỚC nhóm `tren` (nằm trong `sau`) nên tóc sẽ phủ lên tay.
-  const dieu_duong = {
+  const nurse = {
     ...goc, ...DO_DD,
     ten: 'Điều dưỡng — áo dấu chân',
     // Trẻ và tròn trịa nhất: đầu to nhất trong bốn người, tay chân mềm, mày cong.
@@ -270,14 +283,14 @@ export function dungDau(goc) {
 
   // ──────────────────────────────── C. Bác sĩ đeo kính, tóc rẽ ngôi lệch
   // Kính vẽ trong slot `net` — vì `net` là nhóm ĐI THEO MẶT khi xoay
-  // (translate netLech, scale ngang theo phối cảnh, rig-svg.js:376). Vẽ kính ở
+  // (dịch theo netLech, co ngang theo phối cảnh — xem apDung trong rig-svg.js). Vẽ kính ở
   // chỗ khác — ví dụ trong `toc` — thì lúc quay mặt kính sẽ đứng yên tại chỗ.
   //
   // Búi tóc thấp đặt ở (−42, 30), KHÔNG phải (−4, 46). Bản đầu để giữa và thấp:
   // đứng thẳng thì `tocSau` trong suốt nên không thấy gì, nhưng vừa quay người
   // là búi hiện ra ngay dưới cằm — trông hệt bộ râu quai nón. Mọi mảng trong
   // `tocSau` phải nằm về phía GÁY (x âm, xa trục), vì nó chỉ tồn tại ở góc xoay.
-  const bs_kinh = {
+  const doctor = {
     ...goc, ...DO_BL,
     ten: 'Bác sĩ đeo kính — áo blouse',
     // Thanh và nghiêm hơn: chân dài, mày ngang hơi xếch, tay đan cao trước bụng.
@@ -314,13 +327,13 @@ export function dungDau(goc) {
             </g>`,
   };
 
-  return { bs_nam, dieu_duong, bs_kinh };
+  return { surgeon, nurse, doctor };
 }
 
 /** Đăng ký cả ba vào RigSVG.NHAN_VAT; trả về danh sách khoá. */
-export function dangKyDau(RigSVG, gocTen = 'bac_si_thu_y') {
+export function dangKyDau(RigSVG, gocTen = 'vet') {
   const goc = RigSVG.NHAN_VAT[gocTen];
-  if (!goc) throw new Error(`[dau-thu-nghiem] không có nhân vật gốc "${gocTen}"`);
+  if (!goc) throw new Error(`[characters] không có nhân vật gốc "${gocTen}"`);
   const ds = dungDau(goc);
   for (const [k, v] of Object.entries(ds)) RigSVG.dangKy(k, v);
   return Object.keys(ds);
