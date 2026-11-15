@@ -1,4 +1,4 @@
-/* VGCharacter v0.27.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.28.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1552,11 +1552,12 @@ class RigSVG {
     }
     return t;
   }
-  #cuChi(t, moc, D, beats = []) {
+  #cuChi(t, moc, D, beats = [], hand = null) {
     const s = this.s, N = this.NGHI;
     if (!moc.length && !beats.length) return t;
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
-    const free = (s.huong < -0.1 ? ['L', 'R'] : ['R', 'L']).filter((side) => !busy(side));
+    const order = hand === 'L' || (hand !== 'R' && s.huong < -0.1) ? ['L', 'R'] : ['R', 'L'];
+    const free = order.filter((side) => !busy(side));
     if (!free.length) return t;
     const lead = free[0], other = free[1] || null;                    // tay chủ đạo (phải, nếu rảnh) và tay phụ
     const key = (side, joint) => (joint ? 'cang' : 'bat') + side;
@@ -1636,7 +1637,7 @@ class RigSVG {
     }
     return t;
   }
-  explain(text = null, dur = 2.4, { mood = null } = {}) {
+  explain(text = null, dur = 2.4, { mood = null, hand = null } = {}) {
     const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.45, 0.5);
     this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
@@ -1647,14 +1648,14 @@ class RigSVG {
     for (let i = 1; i < soAm && i * nhip <= dur - 0.5; i++) moc.push(i * nhip);
     const stress = [];
     for (let i = 1; i < soAm; i += 3) stress.push(i * nhip);
-    this.#cuChi(t, moc, dur, stress);
+    this.#cuChi(t, moc, dur, stress, hand);
     if (dur > 1.2) this.#chop(t, dur * nhieu(0.4, 0.65));
     this.blinkTo = 0;
     t.to(s, { mieng: 0, chum: 0, duration: 0.15 }, dur);
     this.#khep(t, 0.5, dur + 0.05);
     return t;
   }
-  speakCues(cue, dur = null, { cuChi = true, mood = null } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
+  speakCues(cue, dur = null, { cuChi = true, mood = null, hand = null } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
     const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.4, 0.45);
     this.blinkTo = tone.eyes;
     this.#openUp(t);
@@ -1699,7 +1700,7 @@ class RigSVG {
     if (!moc.length && D > 1.6) moc.push(D * 0.35);
     const stress = [];
     ds.forEach((c, i) => { if (c.value === 'D' || (i && ds[i - 1].value === 'X' && c.value !== 'X' && c.value !== 'A')) stress.push(c.start); });
-    if (cuChi) this.#cuChi(t, moc, D, stress);
+    if (cuChi) this.#cuChi(t, moc, D, stress, hand);
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
     this.blinkTo = 0;
     t.to(s, { mieng: 0, chum: 0, duration: 0.18 }, D);
@@ -3328,7 +3329,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.27.0';
+const VERSION = '0.28.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

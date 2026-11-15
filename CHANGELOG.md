@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.28.0
+
+Added
+- **Scene files: enter and exit by the nearer edge.** `"enter": true` (on a character or a
+  turn) and `"exit": true` pick the edge closer to where the character stands, so it no
+  longer crosses the other characters on its way. Pets can now enter from the right and
+  exit to the left in scene files, like people.
+- **`hand` for spoken gestures.** `explain(text, dur, { hand: 'L' })` and
+  `speakCues(cues, dur, { hand })` choose the arm that leads the gestures.
+
+Changed
+- In the `presenter` layout (horizontal frame) the presenter gestures with the arm on the
+  side of the content panel; it used to open its right arm away from the content.
+- `examples/scene-vertical`: the cat stands on the right and now runs in from the right
+  (`"enter": true`) instead of running through the girl from the left.
+
 ## 0.27.0
 
 Changed

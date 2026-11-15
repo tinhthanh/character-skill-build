@@ -23,8 +23,8 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shrug` | — | shrug with open palms | 1.7 |
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
 | `speak` | `(text, dur = 2, { mood })` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
-| `explain` | `(text, dur = 2.4, { mood })` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
-| `speakCues` | `(cues, dur, { cuChi, mood })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
+| `explain` | `(text, dur = 2.4, { mood, hand })` | like `speak` with livelier head and hand gestures; `hand: 'L'` or `'R'` picks the arm that leads them (e.g. the one on the side of the content the character is presenting) | `dur` + 0.55 |
+| `speakCues` | `(cues, dur, { cuChi, mood, hand })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
 | `worry` | — | brows up, hands fidget | 2.1 |
 | `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired`. The body joins in: a hop when `happy`, arms flung out when `surprised`, a hand raised to the chest when `thinking`, fists when `angry`, a sigh when `tired` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |

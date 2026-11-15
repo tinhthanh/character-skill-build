@@ -607,6 +607,14 @@ try {
       t.progress(1); if (Math.abs(cat.s.taiL - cat.NGHI.taiL) > 1e-6 || Math.abs(cat.s.matY - cat.NGHI.matY) > 1e-6) hong('hiss', 'does not return to rest');
       t.kill(); cat.svg.remove();
     }
+    // `hand` chọn tay chủ đạo của cử chỉ khi nói (người dẫn diễn về phía bảng nội dung).
+    for (const [hand, lead, other] of [['L', 'L', 'R'], ['R', 'R', 'L']]) for (const step of [(o) => ['explain', 'mot hai ba bon nam sau bay tam', 4, o], (o) => ['speakCues', { metadata: { duration: 4 }, mouthCues: Array.from({ length: 13 }, (_, n) => ({ start: n * 0.3, end: n * 0.3 + 0.3, value: n % 3 ? 'B' : 'D' })) }, null, o]]) {
+      L.seed(5); const actor = L.createCharacter(host, { id: 'boy' }).rig, rest = { L: actor.state.forearmL, R: actor.state.forearmR };
+      const line = L.sequence(actor, [step({ hand })]), moved = { L: 0, R: 0 };
+      for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); for (const side of ['L', 'R']) moved[side] = Math.max(moved[side], Math.abs(actor.state['forearm' + side] - rest[side])); }
+      if (moved[lead] < 30 || moved[lead] < moved[other]) hong('gesture hand', `${line.data.steps[0].name} with hand ${hand}: arm ${lead} moves ${moved[lead].toFixed(0)}°, arm ${other} ${moved[other].toFixed(0)}°`);
+      line.kill(); actor.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

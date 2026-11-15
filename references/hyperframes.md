@@ -70,7 +70,8 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   about 0.45 × the character's host height wide, so in a 1080 px frame two default-size people
   fit at `x` ≈ 300 and 780; for three, give them smaller `height`s (about 600) or put a pet
   between two people. `examples/scene-vertical/scene.json` is a 9:16 sample.
-- **Coming and going mid-scene.** `"enter": "left" | "right"` on a **turn** brings that
+- **Coming and going mid-scene.** `"enter": "left" | "right" | true` on a **turn** (`true`
+  = the edge nearer to where it stands, so it does not cross the others) brings that
   character in then: it is off stage (invisible) until that turn, walks in to its `x`, then
   says or does the rest of the turn. `"exit"` on a turn walks it out afterwards. Order inside
   one turn: `enter` → `say` → `do` → `exit` (a `mood` without `say` comes first). The camera

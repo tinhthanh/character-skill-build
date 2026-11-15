@@ -1,4 +1,4 @@
-/* VGCharacter v0.27.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.28.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2550,7 +2550,7 @@ class RigSVG {
    * Và THÂN DẪN TRƯỚC TAY 0.10s: người thật khởi động từ thân rồi mới tới chi.
    * Thiếu độ trễ đó thì tay như que gắn vào khối gỗ.
    */
-  #cuChi(t, moc, D, beats = []) {
+  #cuChi(t, moc, D, beats = [], hand = null) {
     const s = this.s, N = this.NGHI;
     if (!moc.length && !beats.length) return t;
     // NỀN là TƯ THẾ NGHỈ CỦA CHÍNH NHÂN VẬT (đan tay, buông tay, một tay cầm đồ…), không phải một dáng "hai tay
@@ -2560,7 +2560,9 @@ class RigSVG {
     // Tay đang cầm đồ thì không diễn; tay còn lại diễn thay. Cả hai tay đều bận thì chỉ còn đầu và thân.
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
     // Đang quay mặt sang trái thì tay chủ đạo là tay trái (xem `#freeHand`).
-    const free = (s.huong < -0.1 ? ['L', 'R'] : ['R', 'L']).filter((side) => !busy(side));
+    // `hand` ('L' | 'R'): tay chủ đạo do người gọi chọn — người dẫn đứng cạnh bảng nội dung thì diễn bằng tay phía bảng.
+    const order = hand === 'L' || (hand !== 'R' && s.huong < -0.1) ? ['L', 'R'] : ['R', 'L'];
+    const free = order.filter((side) => !busy(side));
     if (!free.length) return t;
     const lead = free[0], other = free[1] || null;                    // tay chủ đạo (phải, nếu rảnh) và tay phụ
     // Các DÁNG ĐÍCH — góc của tay chủ đạo [bắp, cẳng] và của tay phụ (null = tay phụ chỉ nhích theo).
@@ -2688,7 +2690,7 @@ class RigSVG {
    *     cùng làm mọi nhịp là quay lại đúng dáng bù nhìn.
    *   • Nhịp cách 4 âm, không phải mỗi âm — và đủ dài để nâng rồi lắng cho hết.
    */
-  explain(text = null, dur = 2.4, { mood = null } = {}) {
+  explain(text = null, dur = 2.4, { mood = null, hand = null } = {}) {
     const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.45, 0.5);
     this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
@@ -2710,7 +2712,7 @@ class RigSVG {
     // Không có tiếng thật: nhịp nhấn ước theo âm tiết — cứ ba âm tiết một lần nhấn.
     const stress = [];
     for (let i = 1; i < soAm; i += 3) stress.push(i * nhip);
-    this.#cuChi(t, moc, dur, stress);
+    this.#cuChi(t, moc, dur, stress, hand);
 
     if (dur > 1.2) this.#chop(t, dur * nhieu(0.4, 0.65));
     this.blinkTo = 0;
@@ -2741,7 +2743,7 @@ class RigSVG {
    *    vào mệnh đề mới. Chia đều thì tay rơi vào giữa từ — đó chính là cái
    *    "cứng đơ": tay vẫn động nhưng động lệch chỗ nên não đọc ra máy móc.
    */
-  speakCues(cue, dur = null, { cuChi = true, mood = null } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
+  speakCues(cue, dur = null, { cuChi = true, mood = null, hand = null } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
     const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.4, 0.45);
     this.blinkTo = tone.eyes;
     this.#openUp(t);
@@ -2835,7 +2837,7 @@ class RigSVG {
     // TRỌNG ÂM lấy từ chính bộ cue: chỗ miệng mở to nhất (D), và âm tiết đầu tiên sau một quãng ngắt.
     const stress = [];
     ds.forEach((c, i) => { if (c.value === 'D' || (i && ds[i - 1].value === 'X' && c.value !== 'X' && c.value !== 'A')) stress.push(c.start); });
-    if (cuChi) this.#cuChi(t, moc, D, stress);
+    if (cuChi) this.#cuChi(t, moc, D, stress, hand);
 
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
     this.blinkTo = 0;
@@ -5106,7 +5108,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.27.0';
+const VERSION = '0.28.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

@@ -38,7 +38,8 @@ Scene file (every key except `characters` and `script` is optional):
                `x` is where the character STANDS: the centre, in px from the left of the frame.
                `height` is the host height in px (default: 0.7 × the frame height for people — 760 at
                1920×1080 — capped at 0.75 × the frame width in a vertical frame; pets 0.43 × that).
-               `enter`: "left" | "right" — walks in from outside the frame to `x` before the script.
+               `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
+               true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
@@ -55,9 +56,9 @@ Scene file (every key except `characters` and `script` is optional):
                (Vietnamese; `voice-tts voices` lists them). Each line is synthesised ONCE into voice/ next to the
                scene file and reused — delete a file to have it spoken again. `"voice": false` on a turn keeps
                that line silent. Without voice-tts installed, use "audio" or "dur".
-  enter/exit   `"enter": "left" | "right"` on a TURN brings that character in mid-scene: it is off stage until then,
-               walks in to its `x`, then says / does the rest of the turn. `"exit": "left" | "right"` walks it out
-               after the turn. Order inside one turn: enter → say → do → exit (a `mood` without `say` comes first).
+  enter/exit   `"enter": "left" | "right" | true` on a TURN brings that character in mid-scene: it is off stage until
+               then, walks in to its `x`, then says / does the rest of the turn. `"exit": "left" | "right" | true`
+               walks it out after the turn. true means the nearer edge. People and pets can use either side. Order inside one turn: enter → say → do → exit (a `mood` without `say` comes first).
   background   `"preset": "clinic" | "lobby" | "home"` draws a simple room (and sets the floor colour).
   music        `"music": "file.mp3"` plays under the whole scene at `"musicVolume"` (0.15).
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
@@ -298,8 +299,12 @@ def main():
         if bool(who.get('id')) == bool(who.get('species')): fail(f'character "{name}" needs either "id" (a person) or "species" (a pet)')
         pet = bool(who.get('species'))
         if 'x' not in who: fail(f'character "{name}" needs "x" (where it stands, px from the left)')
-        if who.get('enter') not in (None, 'left', 'right'): fail(f'character "{name}": "enter" must be "left" or "right"')
-        if pet and who.get('enter') == 'right': fail(f'character "{name}": pets can only enter from the left')
+        if who.get('enter') not in (None, False, True, 'left', 'right'): fail(f'character "{name}": "enter" must be "left", "right" or true (the nearer edge)')
+        # `true` = mép GẦN chỗ đứng hơn: đi vào từ mép xa là băng ngang qua những nhân vật đứng giữa đường.
+        nearer = 'left' if float(who['x']) < width / 2 else 'right'
+        if who.get('enter') is True: who['enter'] = nearer
+        if not who.get('enter'): who.pop('enter', None)
+        if late.get(name) is True: late[name] = nearer
         if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
@@ -312,14 +317,13 @@ def main():
         # Điểm xuất phát của `enter` cách tâm host 0,57 × chiều cao; đầu + tóc rộng tới 0,3 × chiều cao về mỗi
         # phía. Đặt tâm host cách mép 0,18 × chiều cao thì cả cái đầu nằm ngoài khung lúc bắt đầu.
         if who.get('enter') and name in late: fail(f'character "{name}" has "enter" both on the character (enters at the start) and on a turn (enters later) — keep one')
-        if late.get(name) not in (None, 'left', 'right'): fail(f'a turn of "{name}" has "enter": {js(late.get(name))} — it must be "left" or "right"')
-        if pet and late.get(name) == 'right': fail(f'character "{name}": pets can only enter from the left')
+        if late.get(name) not in (None, 'left', 'right'): fail(f'a turn of "{name}" has "enter": {js(late.get(name))} — it must be "left", "right" or true')
         coming = who.get('enter') or late.get(name)
         if coming == 'left': centre = min(stand, (0.18 if not pet else 0.3) * host_height)
-        if coming == 'right': centre = max(stand, width - 0.18 * host_height)
+        if coming == 'right': centre = max(stand, width - (0.18 if not pet else 0.3) * host_height)
         # Số tính ra cất dưới khoá có gạch dưới ở đầu — khoá của người viết kịch bản không bao giờ trùng được.
         names[name] = dict(who, _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
-                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}', _late=late.get(name))
+                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}', _late=late.get(name), _nearer=nearer)
     for who in names.values():
         if who.get('faces') and who['faces'] not in names: fail(f'character "{who["name"]}" faces "{who["faces"]}", who is not in the scene')
 
@@ -350,19 +354,25 @@ def main():
         # trước các động tác của lượt.
         # Thứ tự trong MỘT lượt: enter → (mood, nếu không có lời) → say → do → exit.
         if 'enter' in turn:
+            if turn['enter'] is True: turn['enter'] = who['_nearer']
             if who['_late'] != turn['enter'] or getattr(turn_code, 'entered', set()) & {who['name']}: fail(f'{where}: "{who["name"]}" can enter only once per scene')
             turn_code.entered = getattr(turn_code, 'entered', set()) | {who['name']}
-            steps.append(f"['enter', {js(turn['enter'])}]" if not who['_pet'] else "'enter'")
+            steps.append(f"['enter', {js(turn['enter'])}]")
             if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
             if who.get('faces'): steps.append(f"['face', {who['faces']}]")
-        if turn.get('exit') not in (None, 'left', 'right'): fail(f'{where}: "exit" must be "left" or "right"')
-        if who['_pet'] and turn.get('exit') == 'left': fail(f'{where}: pets can only exit to the right')
+        if turn.get('exit') not in (None, False, True, 'left', 'right'): fail(f'{where}: "exit" must be "left", "right" or true (the nearer edge)')
+        if turn.get('exit') is True: turn['exit'] = who['_nearer']
         mood = turn.get('mood')
         if 'mood' in turn:
             if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet — pets have no "mood"; use an action such as "wagTail" or "hiss"')
             if 'say' not in turn: steps.append(f"['express', {js(mood)}, 0.9]")
-        spoken_mood = f', {{ mood: {js(mood)} }}' if mood and 'say' in turn else ''
+        # Tuỳ chọn của bước NÓI: nét mặt giữ suốt câu, và — ở bố cục người dẫn khung ngang — tay diễn là tay phía BẢNG
+        # NỘI DUNG (bảng nằm bên kia khung hình so với người dẫn). Không thì người dẫn mở tay ra ngoài, quay lưng với nội dung.
+        options = []
+        if mood and 'say' in turn: options.append(f'mood: {js(mood)}')
+        if scene.get('layout') == 'presenter' and width >= height and not who['_pet']: options.append(f"hand: {js('L' if float(who['x']) > width / 2 else 'R')}")
+        spoken_mood = (', { ' + ', '.join(options) + ' }') if options and 'say' in turn else ''
         if 'say' in turn:
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
@@ -383,7 +393,7 @@ def main():
                 steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
         for step in turn.get('do', []):
             steps.append(step_code(step, where))
-        if turn.get('exit'): steps.append(f"['exit', {js(turn['exit'])}]" if not who['_pet'] else "'exit'")
+        if turn.get('exit'): steps.append(f"['exit', {js(turn['exit'])}]")
         if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
         # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
@@ -406,7 +416,7 @@ def main():
     entering = [who for who in names.values() if who.get('enter')]
     arrivals = []
     for who in entering:
-        steps = [f"['enter', {js(who['enter'])}]"] if not who['_pet'] else ["'enter'"]
+        steps = [f"['enter', {js(who['enter'])}]"]
         if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
         if who.get('faces'): steps.append(f"['face', {who['faces']}]")
         arrivals.append(f"[{who['name']}, " + ', '.join(steps) + ']')

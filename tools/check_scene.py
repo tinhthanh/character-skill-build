@@ -117,6 +117,15 @@ with tempfile.TemporaryDirectory() as work:
         if 'data-show-turn' in page and 'data-duration="1" data-track-index' in page.split('id="show-1-title"')[1][:200]: problems.append('content clips still carry the placeholder duration')
         if not os.path.isfile(os.path.join(work, 'presenter', 'characters.png')): problems.append('show.image was not copied next to index.html')
         if 'camera:' in page: problems.append('the presenter layout must not add the close-up camera by default')
+        # Người dẫn đứng bên phải, bảng nội dung bên trái: tay diễn phải là tay phía bảng (trái).
+        if 'hand: "L"' not in page or 'hand: "R"' in page: problems.append('the presenter does not gesture with the arm on the content side')
+    # Cảnh dọc: mèo đứng nửa phải, "enter": true → vào từ mép PHẢI (mép gần), không băng ngang qua cô bé.
+    vertical = build(os.path.join(ROOT, 'examples', 'scene-vertical', 'scene.json'), os.path.join(work, 'vertical-near'))
+    if vertical.returncode != 0:
+        problems.append('the vertical example does not build: ' + (vertical.stderr.strip() or vertical.stdout.strip())[:200])
+    else:
+        page = open(os.path.join(work, 'vertical-near', 'index.html'), encoding='utf-8').read()
+        if "[miu, ['enter', \"right\"]" not in page: problems.append('"enter": true on a character standing on the right does not enter from the right')
         if 'maxChars' not in page: problems.append('captions are not chunked')
         if '<h2' in page or '<ul' in page: problems.append('content must be flat clips, not nested elements')
     # Kịch bản sai phải bị từ chối, và thông báo phải gọi đúng tên chỗ sai.
