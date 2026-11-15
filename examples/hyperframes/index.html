@@ -11,21 +11,21 @@
   #tieu-de { position: absolute; left: 120px; top: 150px; margin: 0; font-size: 96px; font-weight: 800; color: #eaf2f6; letter-spacing: -1px; }
   #phu-de { position: absolute; left: 124px; top: 280px; margin: 0; font-size: 40px; color: #7fb9c4; }
   /* Chỗ đặt nhân vật: cho CHIỀU CAO, bề ngang tự theo tỉ lệ khung của rig (thư viện đặt aspect-ratio). */
-  #bac-si { position: absolute; right: 330px; bottom: 96px; height: 760px; }
+  #bac-si { position: absolute; right: -60px; bottom: 96px; height: 760px; }   /* sát mép phải: lúc bước vào còn ở ngoài khung */
   #cun { position: absolute; right: 760px; bottom: 96px; height: 330px; }
 </style>
 </head>
 <body>
-<div id="stage" data-composition-id="bac-si-va-cun" data-start="0" data-duration="15" data-width="1920" data-height="1080">
-  <div id="nen" class="clip" data-start="0" data-duration="15" data-track-index="0"></div>
-  <div id="san" class="clip" data-start="0" data-duration="15" data-track-index="1"></div>
-  <h1 id="tieu-de" class="clip" data-start="0" data-duration="15" data-track-index="2">Khám định kỳ</h1>
-  <p id="phu-de" class="clip" data-start="0" data-duration="15" data-track-index="3">Sáu tháng một lần cho bé nhà mình</p>
-  <div id="cun" class="clip" data-start="0" data-duration="15" data-track-index="4"></div>
-  <div id="bac-si" class="clip" data-start="0" data-duration="15" data-track-index="5"></div>
+<div id="stage" data-composition-id="bac-si-va-cun" data-start="0" data-duration="17" data-width="1920" data-height="1080">
+  <div id="nen" class="clip" data-start="0" data-duration="17" data-track-index="0"></div>
+  <div id="san" class="clip" data-start="0" data-duration="17" data-track-index="1"></div>
+  <h1 id="tieu-de" class="clip" data-start="0" data-duration="17" data-track-index="2">Khám định kỳ</h1>
+  <p id="phu-de" class="clip" data-start="0" data-duration="17" data-track-index="3">Sáu tháng một lần cho bé nhà mình</p>
+  <div id="cun" class="clip" data-start="0" data-duration="17" data-track-index="4"></div>
+  <div id="bac-si" class="clip" data-start="0" data-duration="17" data-track-index="5"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-  <!-- Bản dựng một tệp của thư viện nhân vật. Khi làm project thật: chép dist/character.iife.js vào project. -->
+  <!-- Bản dựng một tệp của thư viện nhân vật. Khi làm project thật: chép dist/character.slim.js vào project rồi nạp tệp đó. -->
   <script src="../../dist/character.iife.js"></script>
   <script>
     // 1. Gieo hạt TRƯỚC khi dựng bất cứ timeline nào — chớp mắt và khẩu hình dùng số ngẫu nhiên.
@@ -37,7 +37,7 @@
 
     // 3. Mỗi nhân vật MỘT chuỗi động tác. sequence() lo vị trí giữa các bước và khung 0.
     const dienBacSi = VGCharacter.sequence(bacSi, [
-      'enter', 'wave',
+      ['enter', 'right'], ['walk', 4, -230], 'wave',     // vào từ mép phải rồi đi tới chỗ đứng
       ['explain', 'Chào bạn, hôm nay mình khám định kỳ cho bé nhé.', 3.2],
       ['point', { x: 40, y: 330 }],
       'thumbsUp', ['idle', 1.6],

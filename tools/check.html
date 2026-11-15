@@ -264,6 +264,45 @@ try {
     plain.svg.remove(); tuned.svg.remove();
   }
 
+  // ── Tay đang cầm đồ: không xoè ra dưới đồ vật; động tác một tay tự dùng tay rảnh ──
+  {
+    const host = document.getElementById('san');
+    const holder = L.createCharacter(host, { id: 'barista', config: null }).rig;           // cốc ở tay phải
+    const shown = (side) => [...holder.svg.querySelectorAll(`[id$="-tay${side}"] > [data-tay]`)].filter((el) => el.getAttribute('opacity') === '1').map((el) => el.dataset.tay).join();
+    const rest = { L: holder.state.upperArmL, R: holder.state.upperArmR };
+    for (const name of ['wave', 'thumbsUp']) {
+      const t = holder[name](); t.progress(0.45); holder.render();
+      if (Math.abs(holder.state.upperArmR - rest.R) > 1 || Math.abs(holder.state.upperArmL - rest.L) < 5) hong(name, 'uses the hand that holds an item although the other hand is free');
+      t.kill(); holder.reset();
+    }
+    for (const name of ['present', 'shrug', 'explain']) {
+      const t = holder[name](); t.progress(0.45); holder.render();
+      if (shown('R') !== 'nam') hong(name, `the hand holding an item opens (shape ${shown('R')})`);
+      t.kill(); holder.reset();
+    }
+    const stowed = holder.hideItem('R'); stowed.progress(1); const wave = holder.wave(); wave.progress(0.45); holder.render();
+    if (Math.abs(holder.state.upperArmR - rest.R) < 5) hong('wave', 'does not go back to the right hand once the item is put away');
+    wave.kill(); stowed.kill(); holder.svg.remove();
+    // Bắt đầu cảnh ĐÃ NGỒI SẴN, đã quay sẵn: đặt trạng thái trước khi dựng sequence, và nó giữ suốt.
+    {
+      const seated = L.createCharacter(host, { id: 'granny' }).rig;
+      seated.state.seat = 1; seated.state.facing = -0.55;
+      const line = L.sequence(seated, [['speak', 'xin chao', 1], ['nod']]);
+      for (const time of [0, 0.9, line.duration()]) { line.time(time); if (Math.abs(seated.state.seat - 1) > 1e-3) hong('initial stance', `seat set before sequence() is ${seated.state.seat} at ${time}s`); }
+      if (Math.abs(seated.state.facing + 0.55) > 1e-3) hong('initial stance', 'facing set before sequence() is not kept at the end');
+      line.time(0.9); if (Math.abs(seated.state.facing) > L.RigSVG.GESTURE_TURN + 1e-3) hong('speak', 'the body does not open toward the viewer for the gesture while turned');
+      line.kill(); seated.svg.remove();
+    }
+    // face(target) phải tính cả quãng nhân vật đã đi: A đi sang bên phải của B rồi quay về phía B = quay TRÁI.
+    const hostA = document.createElement('div'), hostB = document.createElement('div');
+    hostA.style.cssText = 'position:fixed;left:0;top:0;height:300px'; hostB.style.cssText = 'position:fixed;left:150px;top:0;height:300px'; document.body.append(hostA, hostB);
+    const a = L.createCharacter(hostA, { id: 'vet' }).rig, b = L.createCharacter(hostB, { id: 'nurse' }).rig;
+    const moved = L.sequence(a, [['walk', 4, 320], ['face', b]]); moved.time(moved.duration());
+    if (!(a.state.facing < 0)) hong('face', `after walking past the other character, face(rig) turns the wrong way (facing ${a.state.facing})`);
+    if (!moved.data.steps[1].target || moved.data.rig !== a) hong('sequence', 'data.rig / the face target are not recorded for tools/peek.sh');
+    moved.kill(); hostA.remove(); hostB.remove();
+  }
+
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
   {
     const load = (url) => new Promise((resolve) => {

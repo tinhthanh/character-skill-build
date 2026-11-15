@@ -1,6 +1,6 @@
 // Office clerk — a long-sleeved SHIRT and a clipboard.
 //   · `kit.outfits.shirt`    collar, placket, buttons, chest pocket
-//   · `heldItemL`            clipboard in the left hand (the drawing is mirrored for the left)
+//   · `heldItemL`            clipboard in the screen-left hand (the L drawing is mirrored)
 //   · keeps the doctor's glasses and hair; `shoulderAccessories` cleared so no stethoscope
 export default {
   id: 'clerk',

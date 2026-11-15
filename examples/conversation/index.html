@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HyperFrames example — a conversation in a cafe</title>
+<style>
+  html, body { margin: 0; background: #0b1218; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: system-ui, sans-serif; }
+  #wall { position: absolute; inset: 0; background: linear-gradient(165deg, #46362e 0%, #1b1512 72%); }
+  #floor { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; background: #2a201b; }
+  /* The chair is ordinary HTML BEHIND the seated character: `sitDown` draws no furniture. */
+  #chair { position: absolute; left: 1215px; bottom: 96px; width: 250px; height: 330px; background: #7a553c; border-radius: 22px 22px 6px 6px; box-shadow: inset 0 -150px 0 #5f412d; }
+  /* Give each character a HEIGHT; the width follows the rig's own aspect ratio. */
+  #barista { position: absolute; left: -60px; bottom: 96px; height: 760px; }   /* near the edge: her entrance starts off-frame */
+  #granny { position: absolute; left: 1150px; bottom: 96px; height: 700px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="cafe-conversation" data-start="0" data-duration="19" data-width="1920" data-height="1080">
+  <div id="wall" class="clip" data-start="0" data-duration="19" data-track-index="0"></div>
+  <div id="floor" class="clip" data-start="0" data-duration="19" data-track-index="1"></div>
+  <div id="chair" class="clip" data-start="0" data-duration="19" data-track-index="2"></div>
+  <div id="granny" class="clip" data-start="0" data-duration="19" data-track-index="3"></div>
+  <div id="barista" class="clip" data-start="0" data-duration="19" data-track-index="4"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <!-- In a real project: copy dist/character.slim.js next to index.html and load that. -->
+  <script src="../../dist/character.iife.js"></script>
+  <script>
+    VGCharacter.seed(11);
+    const barista = VGCharacter.createCharacter(document.getElementById('barista'), { id: 'barista' }).rig;
+    const granny = VGCharacter.createCharacter(document.getElementById('granny'), { id: 'granny' }).rig;
+
+    // A conversation = two sequences whose speaking steps TAKE TURNS. Numbers are pauses (seconds)
+    // that wait for the other character's line; `sh tools/peek.sh` prints every step's start and
+    // end and warns when two characters speak at once or one faces away from the other.
+    //
+    // Stance holds until changed: a seated character plays every action seated, and after
+    // `face(other)` every action plays turned toward them (hand gestures open the body to the
+    // viewer for a moment, then return).
+    //
+    // Granny is ALREADY SEATED in the first frame: set the stance on the rig before building
+    // her sequence. (`sitDown` is for sitting down on camera.)
+    granny.state.seat = 1;
+    const baristaLine = VGCharacter.sequence(barista, [
+      ['enter', 'left'],
+      ['walk', 4, 250],                     // from the edge to her mark (frame units, see references/hyperframes.md)
+      ['face', granny],
+      ['explain', 'Good morning! One flat white, as always?', 2.6],
+      3.3,                                  // granny answers
+      'nod',
+      ['speak', 'Coming right up.', 1.4],
+      ['face', 'front'],
+      'thumbsUp',                           // the right hand holds the cup, so this uses the left
+    ]);
+    const grannyLine = VGCharacter.sequence(granny, [
+      ['idle', 5.1],
+      ['face', barista],
+      3.3,                                  // the barista greets her
+      ['speak', 'Yes please, dear. And a biscuit.', 2.4],
+      'nod',
+      2.0,                                  // the barista replies
+      'standUp',
+    ]);
+
+    const tl = gsap.timeline({ paused: true });
+    tl.add(baristaLine.paused(false), 0);
+    tl.add(grannyLine.paused(false), 0);
+    window.__timelines = window.__timelines || {};
+    window.__timelines['cafe-conversation'] = tl;
+  </script>
+</div>
+</body>
+</html>

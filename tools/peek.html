@@ -67,6 +67,39 @@ try {
     if (speech[a].who !== speech[b].who && overlap > 0.15)
       info.warnings.push(`"${speech[a].who}" and "${speech[b].who}" speak at the same time for ${overlap.toFixed(1)}s (around ${Math.max(speech[a].start, speech[b].start).toFixed(1)}s)`);
   }
+  // Nhân vật mở đầu bằng `enter` phải ở NGOÀI khung lúc bắt đầu; host đặt gần mép quá thì cái đầu
+  // (to hơn thân nhiều) đã ló vào khung từ khung hình đầu tiên.
+  for (const child of probe.timeline.getChildren(true, false, true).filter((item) => item.data && item.data.type === 'character-sequence' && item.data.rig)) {
+    const first = child.data.steps[0];
+    if (!first || first.name !== 'enter' || !child.data.rig.el || !child.data.rig.el.dau) continue;
+    seek(probe, child.startTime() + first.start + 0.001);
+    const head = child.data.rig.el.dau.getBoundingClientRect(), stage = probe.root.getBoundingClientRect();
+    const inside = Math.min(head.right, stage.right) - Math.max(head.left, stage.left);
+    // Cần dời bao xa: tới khi cả cái đầu ra khỏi mép mà nhân vật bước vào từ đó.
+    const fromLeft = (head.left + head.right) / 2 < (stage.left + stage.right) / 2;
+    const move = Math.ceil((fromLeft ? head.right - stage.left : stage.right - head.left) + 20);
+    if (inside > 4) info.warnings.push(`"${child.data.character}" starts its entrance with ${Math.round(inside)}px of its head already inside the frame at ${(child.startTime() + first.start).toFixed(1)}s — move its host ${move}px toward the ${fromLeft ? 'left' : 'right'} edge and walk to the mark after 'enter', or cover the start`);
+  }
+  // `face(target)` chọn bên trái / phải LÚC DỰNG timeline. Nếu về sau người kia (hoặc chính mình) đi sang
+  // phía bên kia thì nhân vật đang quay lưng lại người mình nói chuyện — soát từng quãng giữ hướng.
+  for (const child of probe.timeline.getChildren(true, false, true).filter((item) => item.data && item.data.type === 'character-sequence' && item.data.rig)) {
+    const { rig, steps, character } = child.data, base = child.startTime();
+    steps.forEach((step, index) => {
+      if (step.name !== 'face' || !step.target) return;
+      const next = steps.slice(index + 1).find((later) => later.name === 'face' || later.name === 'exit' || later.name === 'walkAway');
+      const from = base + step.start + step.duration, to = Math.min(next ? base + next.start : base + child.duration(), probe.declared || Infinity);
+      const who = step.target.publicId ? `"${step.target.publicId}"` : `#${step.target.id || 'element'}`;
+      for (let time = from; time <= to; time += 0.25) {
+        seek(probe, time);
+        const facing = rig.state.facing, box = step.target.getBoundingClientRect ? step.target.getBoundingClientRect() : null;
+        const gap = (typeof step.target.centerX === 'function' ? step.target.centerX() : box.left + box.width / 2) - rig.centerX();
+        if (facing && Math.abs(gap) > 20 && Math.sign(gap) !== Math.sign(facing)) {
+          info.warnings.push(`"${character}" turned to face ${who} at ${(base + step.start).toFixed(1)}s, but at ${time.toFixed(1)}s ${who} is on the other side — add another face step after the move`);
+          break;
+        }
+      }
+    });
+  }
   for (const clip of probe.doc.querySelectorAll('.clip[data-start]')) {
     const end = +clip.dataset.start + +clip.dataset.duration;
     if (end > probe.declared + 0.01) info.warnings.push(`clip #${clip.id || clip.tagName.toLowerCase()} ends at ${end}s, after data-duration`);
@@ -76,7 +109,8 @@ try {
   // Thời điểm cần xem: do người gọi đưa, hoặc 8 điểm rải đều.
   const total = probe.declared || timelineDuration;
   const times = (query.get('t') || '').split(',').map(Number).filter((n) => Number.isFinite(n) && query.get('t'));
-  if (!times.length) for (let i = 0; i < 8; i++) times.push(+(total * (i + 0.5) / 8).toFixed(2));
+  // Mặc định: khung 0 (để thấy cảnh mở đầu) rồi 7 điểm rải đều.
+  if (!times.length) { times.push(0); for (let i = 0; i < 7; i++) times.push(+(total * (i + 1) / 7.5).toFixed(2)); }
   info.times = times;
 
   const scale = tileWidth / probe.width, tileHeight = Math.round(probe.height * scale);

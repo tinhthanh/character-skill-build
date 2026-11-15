@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.0
+
+An independent agent trial of 0.5.2 produced most of the fixes and documentation changes below.
+
+Added
+- A hand that holds an item keeps its grip: actions that would open or point that hand
+  (`present`, `shrug`, `explain`…) leave it closed around the item instead of showing the item
+  stuck to an open palm.
+- `wave(hand)` and `thumbsUp(hand)` take `'L'`, `'R'` or `'auto'` (default): the right hand,
+  unless it holds an item and the left does not.
+- `rig.centerX()`: the character's centre on screen in px, including the distance walked.
+- `examples/conversation/`: two characters taking turns — one seated from the first frame,
+  each facing the other.
+- Docs: starting a scene already seated or turned; seated heights for counters; L / R are
+  screen sides; every option of `kit.parts.*`; adding to an outfit's `accessories`.
+- `tools/peek.sh` warns when a character that did `face(other)` later has `other` on the
+  opposite side (someone walked past).
+- `tools/peek.sh` also warns when an `enter` starts with the head already inside the frame,
+  and its default frames now include 0 s.
+
+Fixed
+- Hand gestures while turned (`face` then `wave`, `present`, `explain`…) drew the raised arm as
+  a flat spike. Arm actions now open the body to at most 0.2 for their duration and return to
+  the held facing.
+- Both examples started with the entering character already visible mid-frame; they now enter
+  from outside the frame and walk to their mark. `examples/hyperframes` is 17 s.
+- `face(rig)` / `face(element)` ignored the distance a character had walked and could turn it
+  the wrong way after `walk` with a distance.
+
 ## 0.5.2
 
 Fixed

@@ -2,7 +2,7 @@
 //   · `kit.outfits.tee`      a plain T-shirt instead of a medical outfit
 //   · `skirt: { kind: 'apron' }` + `kit.parts.apronBib`   the apron: the rig draws the part below
 //     the hips (it follows the legs and the turn), the bib is drawn on the torso
-//   · `heldItemR`            a paper cup in the right hand; `hideItem('R')` puts it away
+//   · `heldItemR`            a paper cup in the screen-right hand (L / R are screen sides); `hideItem('R')` puts it away
 export default {
   id: 'barista',
   base: 'nurse',

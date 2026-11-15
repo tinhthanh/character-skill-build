@@ -1,4 +1,4 @@
-/* VGCharacter v0.5.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.6.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -415,6 +415,7 @@ class RigSVG {
     this.mau = this.nv.mau = m;
   }
   #dungLai() {
+    this.holds = { L: !!String(this.nv.heldItemL(this.id, this.mau, this.nv) || '').trim(), R: !!String(this.nv.heldItemR(this.id, this.mau, this.nv) || '').trim() };
     const khung = this.svg && this.svg.getAttribute('viewBox');   // trang chỉnh có thể đang zoom vào mặt
     this.host.innerHTML = this.#dungSVG();
     this.svg = this.host.querySelector('svg');
@@ -813,7 +814,8 @@ class RigSVG {
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${tL.cang * cF - sF * nL.cang})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${-tR.cang * cF - sF * nR.cang})`);
     for (const ben of ['L', 'R']) {
-      const chon = s['tay' + ben];
+      const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
+      const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s['tay' + ben];
       const bat = Math.abs(s['bat' + ben]), cang = Math.abs(s['cang' + ben]), vung = Math.abs(s['vung' + ben]);
       const xoe = chon !== 'mo' ? 1 : clamp(Math.max(bat - 30, cang - 44) / 22, 0, 1)   // chỉ xoè khi giơ tay cao hoặc gập cẳng tay lên; vung tay khi đi vẫn thả lỏng;
       const dangXoe = xoe >= 0.5;
@@ -1066,36 +1068,53 @@ class RigSVG {
     }
     return t;
   }
-  wave() {
+  static GESTURE_TURN = 0.2;
+  #openUp(t) {
+    const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
+    if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
+  }
+  #freeHand(hand = 'auto') {
+    if (hand === 'L' || hand === 'R') return hand;
+    const busy = (side) => this.holds[side] && this.s['item' + side] > 0.5;
+    return busy('R') && !busy('L') ? 'L' : 'R';
+  }
+  wave(hand = 'auto') {
     const t = this.tl(), s = this.s;
-    t.set(s, { tayR: 'mo' }, 0);
-    t.to(s, { batR: -4, cangR: 22, duration: 0.12, ease: 'power1.in' }, 0);      // lấy đà
-    t.to(s, { batR: 148, cangR: 18, vai: -3, than: -3, dau: -6, nhinX: 1.5,
+    this.#openUp(t);
+    const side = this.#freeHand(hand), m = side === 'L' ? -1 : 1;                 // m lật các nghiêng thân / đầu
+    const handK = 'tay' + side, upperK = 'bat' + side, foreK = 'cang' + side;
+    t.set(s, { [handK]: 'mo' }, 0);
+    t.to(s, { [upperK]: -4, [foreK]: 22, duration: 0.12, ease: 'power1.in' }, 0);      // lấy đà
+    t.to(s, { [upperK]: 148, [foreK]: 18, vai: -3, than: -3 * m, dau: -6 * m, nhinX: 1.5 * m,
               cuoi: 1, mieng: 0.15, mayL: 0.5, mayR: 0.5,
               duration: 0.45, ease: 'back.out(1.4)' }, 0.12);
     for (let i = 0; i < 4; i++) {                                                // vẫy 4 nhịp
-      t.to(s, { cangR: i % 2 ? 6 : 46, dau: i % 2 ? -6 : -9, duration: 0.22, ease: 'sine.inOut' }, 0.57 + i * 0.22);
+      t.to(s, { [foreK]: i % 2 ? 6 : 46, dau: (i % 2 ? -6 : -9) * m, duration: 0.22, ease: 'sine.inOut' }, 0.57 + i * 0.22);
     }
-    t.to(s, { cangR: 18, duration: 0.2, ease: 'sine.inOut' }, 1.45);
+    t.to(s, { [foreK]: 18, duration: 0.2, ease: 'sine.inOut' }, 1.45);
     this.#chop(t, 0.95);
     this.#khep(t, 0.55, 1.7);
     return t;
   }
-  thumbsUp() {
+  thumbsUp(hand = 'auto') {
     const t = this.tl(), s = this.s;
-    t.set(s, { tayR: 'nam' }, 0);
-    t.to(s, { batR: -2, cangR: -30, duration: 0.15, ease: 'power1.in' }, 0);
-    t.to(s, { batR: 22, cangR: -140, than: -2, dau: -5, cuoi: 1, mieng: 0.12, mayL: 0.6, mayR: 0.6,
+    this.#openUp(t);
+    const side = this.#freeHand(hand), m = side === 'L' ? -1 : 1;
+    const handK = 'tay' + side, upperK = 'bat' + side, foreK = 'cang' + side;
+    t.set(s, { [handK]: 'nam' }, 0);
+    t.to(s, { [upperK]: -2, [foreK]: -30, duration: 0.15, ease: 'power1.in' }, 0);
+    t.to(s, { [upperK]: 22, [foreK]: -140, than: -2 * m, dau: -5 * m, cuoi: 1, mieng: 0.12, mayL: 0.6, mayR: 0.6,
               duration: 0.4, ease: 'back.out(1.6)' }, 0.15);
-    t.set(s, { tayR: 'cai' }, 0.38);
-    t.to(s, { dauY: 4, cangR: -146, duration: 0.15, ease: 'power2.out' }, 0.65)   // gật nhẹ kèm nhấn tay
-     .to(s, { dauY: 0, cangR: -140, duration: 0.3, ease: 'power2.inOut' }, 0.8);
+    t.set(s, { [handK]: 'cai' }, 0.38);
+    t.to(s, { dauY: 4, [foreK]: -146, duration: 0.15, ease: 'power2.out' }, 0.65)   // gật nhẹ kèm nhấn tay
+     .to(s, { dauY: 0, [foreK]: -140, duration: 0.3, ease: 'power2.inOut' }, 0.8);
     this.#chop(t, 1.15);
     this.#khep(t, 0.5, 1.5);
     return t;
   }
   point(muc = null) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     let tx = 380, ty = 165;
     if (muc && typeof muc.x === 'number' && typeof muc.y === 'number' && !(muc instanceof Element)) {
       tx = muc.x - s.x; ty = muc.y - s.y - DOI_Y;      // toạ độ viewBox trực tiếp
@@ -1126,6 +1145,7 @@ class RigSVG {
   }
   present() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
     t.to(s, { batL: 8, batR: 8, cangL: -75, cangR: -75, dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
     t.to(s, { batL: 62, batR: 72, cangL: -22, cangR: -26, than: 2, dau: 6, dauX: 3,
@@ -1161,6 +1181,7 @@ class RigSVG {
   }
   shrug() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
     t.to(s, { vai: 2, batL: 4, batR: 4, duration: 0.15, ease: 'power1.in' }, 0);    // hạ vai lấy đà
     t.to(s, { vai: -9, batL: 38, batR: 38, cangL: 112, cangR: 112, dau: 7, dauX: 2,
@@ -1248,11 +1269,16 @@ class RigSVG {
     this.#khep(t, 0.4, 0.4 + hold);
     return t;
   }
+  centerX() {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+    return frame.left + frame.width / 2 + this.s.x * scale;
+  }
   face(target = 'right', amount = 0.55) {
     let side = target === 'left' ? -1 : target === 'front' ? 0 : 1;
     if (target && typeof target === 'object') {
-      const box = (el) => el.getBoundingClientRect(), other = box(target.svg || target), mine = box(this.svg);
-      const dx = (other.left + other.width / 2) - (mine.left + mine.width / 2);
+      const box = target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+      const dx = (typeof target.centerX === 'function' ? target.centerX() : box.left + box.width / 2) - this.centerX();
       side = Math.abs(dx) < 1 ? 0 : dx < 0 ? -1 : 1;
     }
     const t = this.tl(), s = this.s, to = side * clamp(amount, 0, 1);
@@ -1344,6 +1370,7 @@ class RigSVG {
   }
   speak(text = null, dur = 2) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     t.set(s, { tayR: 'mo' }, 0);
     t.to(s, { mayL: 0.5, mayR: 0.5, cuoi: 0.5, nhinX: 0.8, duration: 0.2 }, 0);
@@ -1398,6 +1425,7 @@ class RigSVG {
   }
   explain(text = null, dur = 2.4) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     const NEN = { batL: 10, batR: 16, cangL: -60, cangR: -72 };
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0);
@@ -1414,6 +1442,7 @@ class RigSVG {
   }
   speakCues(cue, dur = null, { cuChi = true } = {}) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
     const D = dur || (cue && cue.metadata && cue.metadata.duration)
                   || (ds.length ? ds[ds.length - 1].end : 2);
@@ -1462,6 +1491,7 @@ class RigSVG {
   }
   worry() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
     t.to(s, { batR: 28, cangR: -122, batL: 10, cangL: -58,
               than: 2, vai: -2, dau: 5, dauY: 2.5, nhinY: 0.8, nhinX: -0.4,
@@ -2754,7 +2784,7 @@ const { dangKyDau, KIT } = __m['runtime/characters.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.5.2';
+const VERSION = '0.6.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -2948,7 +2978,9 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
     child.progress(1); endState = snapshot();
     child.progress(0).paused(false);
     source.add(child, at);
-    steps.push({ name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) });
+    const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0];
+    steps.push(entry);
     at += child.duration() + gap;
   }
   const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
@@ -2966,7 +2998,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
-  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps };
+  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps, rig };
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }

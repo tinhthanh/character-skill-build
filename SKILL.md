@@ -90,9 +90,11 @@ export default {
 ## Use a character in HyperFrames
 
 Full rules, staging recipes and a runnable example:
-[references/hyperframes.md](references/hyperframes.md) and `examples/hyperframes/index.html`.
+[references/hyperframes.md](references/hyperframes.md), `examples/hyperframes/index.html` and, for two characters talking,
+`examples/conversation/index.html`.
 
 ```html
+<!-- inside the root: <div data-composition-id="my-composition" data-start="0" data-duration="10" data-width="1920" data-height="1080"> -->
 <div id="presenter" class="clip" data-start="0" data-duration="10" data-track-index="2"
      style="position:absolute; right:300px; bottom:90px; height:760px"></div>
 
@@ -174,7 +176,7 @@ dist/                 character.iife.js (commented) · character.slim.js (use th
 studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
                       describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture)
-examples/hyperframes/ a complete composition with a vet and a dog
+examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated)
 references/           slots.md · actions.md · hyperframes.md
 ```
 

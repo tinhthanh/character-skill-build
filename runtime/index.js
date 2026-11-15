@@ -18,7 +18,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.5.2';
+export const VERSION = '0.6.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -314,7 +314,10 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
     child.progress(1); endState = snapshot();
     child.progress(0).paused(false);
     source.add(child, at);
-    steps.push({ name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) });
+    const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    // `face` về phía một nhân vật / phần tử: ghi lại đích để tools/peek.sh soát xem về sau nó có còn ở phía ấy không.
+    if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0];
+    steps.push(entry);
     at += child.duration() + gap;
   }
 
@@ -345,7 +348,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
-  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps };
+  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps, rig };
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }

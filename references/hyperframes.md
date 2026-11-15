@@ -99,8 +99,9 @@ tall host therefore moves 1.62 px per unit.
 starts 270 units to the left of it. Two ways to use that:
 
 - *Host at the mark.* Put the host where the character should end up. The entrance is only
-  hidden if the mark is within 270 units (0.57 × host height) of the left edge, or something
-  covers the start.
+  hidden if the mark is within about 0.4 × host height of the left edge (270 units to the
+  character's centre, minus half the width of the head, which is the widest part), or
+  something covers the start. `tools/peek.sh` warns when the head starts inside the frame.
 - *Host at the edge, then walk.* Put the host so its centre is near the left edge, and follow
   `enter` with a walk to the mark:
 
@@ -113,6 +114,17 @@ starts 270 units to the left of it. Two ways to use that:
 
 **Enter from the right:** `['enter', 'right']` (people). Mirror the layout above.
 
+**Two characters talking.** One sequence per character, speaking steps taking turns; a bare
+number in a sequence is a pause that waits for the other's line. Start each with a stance
+(`sitDown`, `['face', otherRig]`) — it holds for everything after. For a character that is
+**already seated (or already turned) in the first frame**, set the stance on the rig before
+building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Hand gestures open
+the body toward the viewer for their duration (arms are drawn for a front view), then return
+to the held facing. Draw the chair as an
+ordinary element behind the seated character. Run `tools/peek.sh`: it prints every step's
+start and end, and warns about speech overlapping by more than 0.15 s, a character facing away
+from the one it turned to, and an `enter` that starts with the head already inside the frame. Complete example: `examples/conversation/index.html`.
+
 **Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
 the *left* of the person it should look toward, or expect to see its tail first.
 
@@ -122,7 +134,7 @@ the *left* of the person it should look toward, or expect to see its tail first.
 **Preview before rendering.** From the skill folder:
 
 ```bash
-sh tools/peek.sh /path/to/project/index.html                 # 8 frames, evenly spaced
+sh tools/peek.sh /path/to/project/index.html                 # frame 0 + 7 evenly spaced
 sh tools/peek.sh /path/to/project/index.html 0,1.5,3,6 /tmp/peek.png
 ```
 
@@ -172,8 +184,14 @@ npx hyperframes render -o out.mp4 .
 
 The library draws characters only. A scene usually needs:
 
-- **A chair for `sit`.** `sit` lowers the character as onto an unseen seat about 0.2 × host
-  height above the floor. Draw the chair as its own element behind the character's host.
+- **A chair for `sit` / `sitDown`.** Sitting lowers the whole character by about 0.11 × host
+  height (the thighs foreshorten; feet stay on the floor). Draw the chair as its own element
+  behind the character's host.
+- **Seated behind a counter or desk.** Measured from the bottom of the host, a seated
+  character's chin is at about 0.4–0.5 × host height and the top of the head at 0.7–0.85; the
+  hem of the top is at about 0.1–0.15. So a counter in front that is taller than ~0.35 × host
+  height leaves only the head showing. Either keep the counter low, or raise the character's
+  host (a taller stool) until the chest clears it, and check with `tools/peek.sh`.
 - **Flat siblings, not nested wrappers.** Keep the chair, counter, speech bubbles and the
   character hosts as direct children of the composition root. `hyperframes check` reports
   `nested_structure_needs_subcomposition` when timed clips are wrapped in an extra container.

@@ -4,7 +4,8 @@ Every action is a method on the rig that **returns a paused GSAP timeline** and 
 the rest pose (except where noted). In a composition, sequence them with
 `VGCharacter.sequence(rig, steps)` rather than adding them one by one.
 
-A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds). `sequence`
+A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds, on top of the
+0.1 s gap that separates every two steps). `sequence`
 inserts a 0.1 s gap between consecutive steps by default; change it with
 `sequence(rig, steps, { gap: 0 })`.
 
@@ -13,15 +14,15 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | Action | Arguments | What it does | ≈ seconds |
 |---|---|---|---|
 | `idle` | `(dur = 4)` | breathe, blink, glance | `dur` |
-| `wave` | — | raise the right hand and wave | 2.3 |
-| `thumbsUp` | — | fist to the chest, thumb out, small nod | 2.0 |
+| `wave` | `(hand = 'auto')` | raise a hand and wave | 2.3 |
+| `thumbsUp` | `(hand = 'auto')` | fist to the chest, thumb out, small nod | 2.0 |
 | `point` | `(target)` | point at a DOM element, or at `{ x, y }` in the rig's 400 × 470 frame; with no target, points right | 2.0 |
 | `present` | — | open both arms to present | 2.2 |
 | `nod` | — | nod twice | 1.4 |
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
-| `speak` | `(text, dur = 2)` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.5 |
-| `explain` | `(text, dur = 2.4)` | like `speak` with livelier head and hand gestures | `dur` + 0.6 |
+| `speak` | `(text, dur = 2)` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
+| `explain` | `(text, dur = 2.4)` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
 | `speakCues` | `(cues, dur, opts)` | lip-sync from timed Rhubarb mouth cues instead of an estimate | cue length |
 | `worry` | — | brows up, hands fidget | 2.1 |
 | `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` | `hold` + 0.7 |
@@ -37,8 +38,8 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |
 | `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
-| `enter` | `(from = 'left')` | walk in from off-frame, from the `'left'` or the `'right'` | 1.6–2.1 |
-| `exit` | `(to = 'right')` | walk out of frame to the `'right'` or the `'left'` — **ends hidden** | 1.6–2.0 |
+| `enter` | `(from = 'left')` | walk in from off-frame, from the `'left'` or the `'right'` | 1.6–2.15 |
+| `exit` | `(to = 'right')` | walk out of frame to the `'right'` or the `'left'` — **ends hidden** | 1.6–2.05 |
 
 For `speak` / `explain`, set `dur` to the length of the voice-over clip. Syllables are
 counted per vowel group, so Vietnamese and English text both pace correctly.
@@ -48,7 +49,11 @@ A character keeps its horizontal position after `walk` with a distance. `sit` dr
 chair; put one in the composition behind the character if the scene needs it.
 
 **Stance.** Sitting (`sitDown` / `standUp`) and facing (`face`) are *held*: every other action
-ends in the stance it started from, not standing-facing-front. So a conversation is
+ends in the stance it started from, not standing-facing-front. Actions that move the arms
+(`wave`, `thumbsUp`, `point`, `present`, `shrug`, `worry`, `speak`, `explain`) turn the body to
+at most 0.2 for their duration, because raised arms are drawn for a front view; they return
+to the held facing at the end. To start a scene already seated or turned, set
+`rig.state.seat = 1` / `rig.state.facing = ±0.55` before calling `sequence()`. So a conversation is
 
 ```js
 VGCharacter.sequence(a, [['enter', 'left'], ['face', b], ['explain', 'Hello!', 2], ['nod']]);
@@ -57,9 +62,14 @@ VGCharacter.sequence(b, [['sitDown'], ['face', a], ['speak', 'Hi.', 1.2], ['stan
 
 `sit(hold)` and `turn(direction, hold)` remain round trips. `walk` turns side-on to step and
 then returns to the held facing; `enter` always ends standing, facing front. `face(element)`
-compares positions **when the timeline is built**, so place both characters first. Build
+compares positions **when the timeline is built** (walked distance included), so if either
+character walks past the other afterwards, add another `face` step — `tools/peek.sh` warns
+when one is missing. Build
 stance-dependent timelines with `sequence()` — it gives each action the state the previous one
 left behind.
+
+`wave` and `thumbsUp` use the right hand unless it holds an item and the left is free; pass
+`'L'` or `'R'` to choose. A hand holding an item stays closed around it during every action.
 
 **Held items** are part of the stance too: `hideItem(side)` puts one away and it stays away
 until `showItem(side)`. Do not tween `rig.state.itemR` beside a `sequence()` — the sequence

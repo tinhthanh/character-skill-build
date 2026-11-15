@@ -10,7 +10,9 @@ export default { id: 'my_character', base: 'vet', define: (base, kit) => ({ ...b
 key you leave out comes from the base.
 
 In the drawing functions, `p` is the rig's id prefix (use it for every `id`), `c` is the
-resolved palette (`c.hair`, `c.top`, …) and `side` is `'L'` or `'R'` (screen left / right).
+resolved palette (`c.hair`, `c.top`, …) and `side` is `'L'` or `'R'` — **screen** left / right, i.e. `R` is the hand on the viewer's right
+(the character's own left). The same holds for `heldItemL/R`, `handL/R`, `upperArmL/R`,
+`wave('L')` and `hideItem('R')`.
 
 ## What each base already sets
 
@@ -27,10 +29,10 @@ shoulder accessories) the base actually draws.
 | `nurse` | ponytail, tie in `colors.accent` | — | — | paw-print tunic, flared sleeves | — | — | arms slightly out | — |
 | `doctor` | side parting | — | glasses, frame in `colors.accent` | long coat with lapels | `true` | stethoscope | hands clasped | `innerShirt`, `stethoscope` |
 | `receptionist` | bob | — | — | blazer (coat outline), bow tie | `true` | — | hands clasped | `innerShirt` |
-| `barista` | ponytail | — | — | T-shirt, apron (`skirt` + bib), cup in the right hand | — | — | right forearm raised | `skirt` |
+| `barista` | ponytail | — | — | T-shirt, apron (`skirt` + bib), cup in the screen-right hand | — | — | screen-right forearm raised | `skirt` |
 | `granny` | grey ponytail | — | wrinkles | shirt, long `skirt`, `stoop: 1` | `true` | — | arms down | `skirt` |
 | `grandpa` | side tufts, `backHair: 'low'` | — | wrinkles, glasses; moustache in `beard` | cardigan (plain coat), `stoop: 0.6` | `true` | — | arms down | `innerShirt` |
-| `clerk` | side parting | — | glasses | shirt, clipboard in the left hand | `true` | — | left forearm across | `buttons` |
+| `clerk` | side parting | — | glasses | shirt, clipboard in the screen-left hand | `true` | — | screen-left forearm across | `buttons` |
 
 ## Removing, replacing or borrowing a part
 
@@ -124,9 +126,9 @@ glasses stay on the eyes; it does not move when the character looks around or bl
 | `top` | `() => pathData` | Outline of the torso garment (a path `d` string), torso space. A plain straight top, drawn clockwise from the left hem: `'M -30 20 Q 0 26 30 20 L 29 -40 Q 29.5 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -29.5 -70 -29 -40 Z'`. Keep the shoulder part (from `35 -88` round to `-35 -88`) as it is so sleeves and neck meet it; change the sides and the hem. |
 | `sideShading` | `pathData` | Side shading, must lie inside `top`. Build it with `kit.sideShading([[x, y], …])` from the right-hand edge points of `top`. Opacity is `sideShadingOpacity`. |
 | `collar` | `(p, c) => svg` | Drawn over the neck. Start with `kit.shoulderPatches(c)` to cover the flare at the base of the neck. |
-| `accessories` | `(p, c, def) => svg` | Everything on the torso: pockets, buttons, badges. **Must** be wrapped in `<g id="${p}-accessories">`. |
+| `accessories` | `(p, c, def) => svg` | Everything on the torso: pockets, buttons, badges. **Must** be wrapped in `<g id="${p}-accessories">` — exactly one such group. To add to an outfit's own accessories, insert before its closing tag: `kit.outfits.shirt.accessories(p, c).replace(/<\/g>\s*$/, mine + '</g>')`. |
 | `shoulderAccessories` | `(p, c, def) => svg` | A second copy of whatever hangs over the shoulders (stethoscope, lanyard, scarf). Drawn above the sleeves, clipped to the shoulder area. |
-| `heldItemL` `heldItemR` | `(p, c, def) => svg` | An object held in that hand, in **wrist space**: (0,0) is the wrist, the palm is around (0, 10), fingers point to +y (along the forearm). Drawn over the hand and moves with it; give that hand `handL: 'fist'` in `restPose`. Ready-made: `kit.parts.cup(c)`, `kit.parts.clipboard(c)`, `kit.parts.phone(c)`. Hide/show with the actions `hideItem(side)` / `showItem(side)`. The left hand's drawing is mirrored. |
+| `heldItemL` `heldItemR` | `(p, c, def) => svg` | An object held in that hand, in **wrist space**: (0,0) is the wrist, the palm is around (0, 10), fingers point to +y (along the forearm). Drawn over the hand and moves with it; give that hand `handL: 'fist'` in `restPose`. Ready-made: `kit.parts.cup(c)`, `kit.parts.clipboard(c)`, `kit.parts.phone(c)`. Hide/show with the actions `hideItem(side)` / `showItem(side)`. The `L` drawing is mirrored, `R` is drawn as written. In the usual carrying pose (forearm folded across the body, `forearm` about −70…−100) wrist +y points sideways toward the middle of the body and slightly up, so an item that should stand upright on screen is drawn lying along ∓x and rotated — the ready-made items wrap themselves in `rotate(90)`; start from that and check the pose sheet. Sizes for scale: the fist is about 20 × 24 units, the cup 22 × 44, the clipboard 30 × 43, the phone 15 × 28. |
 | `shoes` | `(p, side, c, ankleY) => svg` | Front-view shoe, in **shin space**: x = 0 is the middle of the leg, y grows downward, the ankle is at y = `ankleY` and the sole at about `ankleY + 12`; the leg is 22 units wide. A shoe spans roughly x −12…12, y `ankleY − 6`…`ankleY + 12`; start higher (say `ankleY − 26`) for a boot. **Must** carry `id="${p}-shoe-${side}"`. `kit.closedShoes(stripeColour or null)` returns a ready-made one. |
 
 ## Number keys
@@ -194,9 +196,9 @@ drawing functions. Derived automatically when you do not set them: `brows` (from
 | `kit.outlines.<same names>` | the bare torso outlines, if you only want the shape |
 | `kit.partsOf(id)` | another character's definition, to borrow parts from |
 | `kit.parts.roundGlasses(c, { x, y, r, color })` | round glasses for `faceExtras` |
-| `kit.parts.shortBeard(c, { color, chin, mouthY })` | short beard for `beard`; lower `chin` for a short face |
-| `kit.parts.moustache(c, { color, mouthY })` | moustache for `beard` |
-| `kit.parts.wrinkles(c, { color, forehead })` | crow's feet, cheek lines and forehead lines for `faceExtras` — an age cue, with grey `hair` and `stoop` |
+| `kit.parts.shortBeard(c, { color, chin = 54, mouthY = 30, width = 43 })` | short beard for `beard`; lower `chin` for a short face, `width` = half-width at the jaw |
+| `kit.parts.moustache(c, { color, mouthY = 30, width = 17 })` | moustache for `beard`; `width` = half-width |
+| `kit.parts.wrinkles(c, { color, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true })` | crow's feet, cheek lines and forehead lines for `faceExtras` — an age cue, with grey `hair` and `stoop`. `faceExtras` is drawn **over** `hat`: with a cap or hat pass `forehead: false`, or the lines land on the hat band |
 | `kit.parts.apronBib(c, { color, top, width, waist })` | chest panel and neck straps of an apron, for inside the `accessories` group; colour `colors.skirt` |
 | `kit.parts.cup(c, { color, lid, sleeve, size })` · `clipboard(c, { color, paper })` · `phone(c, { color, screen })` | held items for `heldItemL` / `heldItemR` |
 | `kit.sideShading(points)` | side shading from an outline's edge points |

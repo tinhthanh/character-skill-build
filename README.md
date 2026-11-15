@@ -33,7 +33,7 @@ folder.
 python3 tools/serve.py                          # http://127.0.0.1:8300/studio/
 sh tools/check.sh                               # every character × every action, headless → PASS / FAIL
 sh tools/shot.sh receptionist /tmp/sheet.png    # pose sheet for one character
-sh tools/peek.sh examples/hyperframes/index.html   # timings + contact sheet of a composition
+sh tools/peek.sh examples/conversation/index.html  # timings + contact sheet of a composition
 ```
 
 ## A character in a dozen lines
@@ -84,7 +84,7 @@ loaded from a CDN by the pages here and by HyperFrames compositions. No Node, no
   Vietnamese internal names and comments, and the studio UI is in Vietnamese;
   `runtime/schema.js` is the dictionary between the two.
 - Verified with the HyperFrames CLI 0.9.52: `examples/hyperframes/index.html` passes
-  `hyperframes lint` and `hyperframes check` with no errors and renders to a 15 s, 1920 × 1080,
+  `hyperframes lint` and `hyperframes check` with no errors and renders to a 17 s, 1920 × 1080,
   30 fps MP4 on parallel workers.
 - See `CHANGELOG.md` for what changed between versions.
 - Licensed under the MIT License (`LICENSE`). GSAP is loaded from a CDN and is not part of this

@@ -754,6 +754,8 @@ export class RigSVG {
   // còn nguyên — chỉ các phần tử là mới. Mọi thứ đã chỉnh bằng `doi*` cũng
   // còn, vì chúng đều ghi vào `nv` và markup dựng lại từ `nv`.
   #dungLai() {
+    // Tay nào có đồ vật (hàm vẽ trả về thứ gì đó) — để bàn tay giữ dáng nắm và động tác một tay chọn tay rảnh.
+    this.holds = { L: !!String(this.nv.heldItemL(this.id, this.mau, this.nv) || '').trim(), R: !!String(this.nv.heldItemR(this.id, this.mau, this.nv) || '').trim() };
     const khung = this.svg && this.svg.getAttribute('viewBox');   // trang chỉnh có thể đang zoom vào mặt
     this.host.innerHTML = this.#dungSVG();
     this.svg = this.host.querySelector('svg');
@@ -1314,7 +1316,10 @@ export class RigSVG {
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${-tR.cang * cF - sF * nR.cang})`);
 
     for (const ben of ['L', 'R']) {
-      const chon = s['tay' + ben];
+      // Tay ĐANG CẦM ĐỒ thì không buông: động tác nào đòi xoè tay hay chỉ trỏ bằng tay ấy, bàn tay
+      // vẫn giữ dáng nắm của tư thế nghỉ — nếu không cái cốc sẽ dính lơ lửng vào lòng bàn tay xoè.
+      const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
+      const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s['tay' + ben];
       // Buông thõng → lòng bàn tay úp vào đùi, nhìn từ trước chỉ thấy cạnh tay (hẹp ~60%),
       // ngón hơi hướng vào thân. Tay càng giơ lên / vung xa thì bàn tay càng xoè phẳng ra.
       const bat = Math.abs(s['bat' + ben]), cang = Math.abs(s['cang' + ben]), vung = Math.abs(s['vung' + ben]);
@@ -1799,31 +1804,59 @@ export class RigSVG {
    * và nó vốn KHÔNG thuộc nhóm "di chuyển ngang": đo thì `wave` dịch ngang 0,
    * chỉ giơ tay và nghiêng người.
    */
-  wave() {
+  /**
+   * MỞ NGƯỜI ra phía khán giả cho một cử chỉ tay. Cánh tay vẽ theo mặt TRƯỚC; quay nghiêng quá
+   * ~0.25 thì tay giơ lên bị ép dẹt thành một vệt (dáng nghiêng chỉ hợp với tay buông / vung khi
+   * bước). Nên cử chỉ nào cũng bớt quay về tối đa GESTURE_TURN trong lúc diễn — vẫn hơi hướng về
+   * người đối diện — rồi `#khep` đưa về đúng hướng đang giữ.
+   */
+  static GESTURE_TURN = 0.2;
+  #openUp(t) {
+    const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
+    if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
+  }
+
+  /**
+   * Chọn tay cho động tác MỘT TAY. `hand`: 'L' | 'R' để chỉ định; 'auto' (mặc định) lấy tay phải,
+   * trừ khi tay phải đang cầm đồ mà tay trái thì không — khi ấy dùng tay trái.
+   */
+  #freeHand(hand = 'auto') {
+    if (hand === 'L' || hand === 'R') return hand;
+    const busy = (side) => this.holds[side] && this.s['item' + side] > 0.5;
+    return busy('R') && !busy('L') ? 'L' : 'R';
+  }
+
+  wave(hand = 'auto') {
     const t = this.tl(), s = this.s;
-    t.set(s, { tayR: 'mo' }, 0);
-    t.to(s, { batR: -4, cangR: 22, duration: 0.12, ease: 'power1.in' }, 0);      // lấy đà
-    t.to(s, { batR: 148, cangR: 18, vai: -3, than: -3, dau: -6, nhinX: 1.5,
+    this.#openUp(t);
+    const side = this.#freeHand(hand), m = side === 'L' ? -1 : 1;                 // m lật các nghiêng thân / đầu
+    const handK = 'tay' + side, upperK = 'bat' + side, foreK = 'cang' + side;
+    t.set(s, { [handK]: 'mo' }, 0);
+    t.to(s, { [upperK]: -4, [foreK]: 22, duration: 0.12, ease: 'power1.in' }, 0);      // lấy đà
+    t.to(s, { [upperK]: 148, [foreK]: 18, vai: -3, than: -3 * m, dau: -6 * m, nhinX: 1.5 * m,
               cuoi: 1, mieng: 0.15, mayL: 0.5, mayR: 0.5,
               duration: 0.45, ease: 'back.out(1.4)' }, 0.12);
     for (let i = 0; i < 4; i++) {                                                // vẫy 4 nhịp
-      t.to(s, { cangR: i % 2 ? 6 : 46, dau: i % 2 ? -6 : -9, duration: 0.22, ease: 'sine.inOut' }, 0.57 + i * 0.22);
+      t.to(s, { [foreK]: i % 2 ? 6 : 46, dau: (i % 2 ? -6 : -9) * m, duration: 0.22, ease: 'sine.inOut' }, 0.57 + i * 0.22);
     }
-    t.to(s, { cangR: 18, duration: 0.2, ease: 'sine.inOut' }, 1.45);
+    t.to(s, { [foreK]: 18, duration: 0.2, ease: 'sine.inOut' }, 1.45);
     this.#chop(t, 0.95);
     this.#khep(t, 0.55, 1.7);
     return t;
   }
 
-  thumbsUp() {
+  thumbsUp(hand = 'auto') {
     const t = this.tl(), s = this.s;
-    t.set(s, { tayR: 'nam' }, 0);
-    t.to(s, { batR: -2, cangR: -30, duration: 0.15, ease: 'power1.in' }, 0);
-    t.to(s, { batR: 22, cangR: -140, than: -2, dau: -5, cuoi: 1, mieng: 0.12, mayL: 0.6, mayR: 0.6,
+    this.#openUp(t);
+    const side = this.#freeHand(hand), m = side === 'L' ? -1 : 1;
+    const handK = 'tay' + side, upperK = 'bat' + side, foreK = 'cang' + side;
+    t.set(s, { [handK]: 'nam' }, 0);
+    t.to(s, { [upperK]: -2, [foreK]: -30, duration: 0.15, ease: 'power1.in' }, 0);
+    t.to(s, { [upperK]: 22, [foreK]: -140, than: -2 * m, dau: -5 * m, cuoi: 1, mieng: 0.12, mayL: 0.6, mayR: 0.6,
               duration: 0.4, ease: 'back.out(1.6)' }, 0.15);
-    t.set(s, { tayR: 'cai' }, 0.38);
-    t.to(s, { dauY: 4, cangR: -146, duration: 0.15, ease: 'power2.out' }, 0.65)   // gật nhẹ kèm nhấn tay
-     .to(s, { dauY: 0, cangR: -140, duration: 0.3, ease: 'power2.inOut' }, 0.8);
+    t.set(s, { [handK]: 'cai' }, 0.38);
+    t.to(s, { dauY: 4, [foreK]: -146, duration: 0.15, ease: 'power2.out' }, 0.65)   // gật nhẹ kèm nhấn tay
+     .to(s, { dauY: 0, [foreK]: -140, duration: 0.3, ease: 'power2.inOut' }, 0.8);
     this.#chop(t, 1.15);
     this.#khep(t, 0.5, 1.5);
     return t;
@@ -1832,6 +1865,7 @@ export class RigSVG {
   // Chỉ vào phần tử DOM (hoặc {left,top,width,height}); không có mục tiêu thì chỉ sang phải.
   point(muc = null) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     let tx = 380, ty = 165;
     if (muc && typeof muc.x === 'number' && typeof muc.y === 'number' && !(muc instanceof Element)) {
       tx = muc.x - s.x; ty = muc.y - s.y - DOI_Y;      // toạ độ viewBox trực tiếp
@@ -1864,6 +1898,7 @@ export class RigSVG {
 
   present() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
     t.to(s, { batL: 8, batR: 8, cangL: -75, cangR: -75, dauY: 1, duration: 0.25, ease: 'power2.in' }, 0); // gom trước ngực
     t.to(s, { batL: 62, batR: 72, cangL: -22, cangR: -26, than: 2, dau: 6, dauX: 3,
@@ -1902,6 +1937,7 @@ export class RigSVG {
 
   shrug() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
     t.to(s, { vai: 2, batL: 4, batR: 4, duration: 0.15, ease: 'power1.in' }, 0);    // hạ vai lấy đà
     t.to(s, { vai: -9, batL: 38, batR: 38, cangL: 112, cangR: 112, dau: 7, dauX: 2,
@@ -2019,6 +2055,16 @@ export class RigSVG {
   }
 
   /**
+   * Hoành độ TÂM nhân vật trên màn hình (px), tính cả quãng đã `walk` / `enter` — khung SVG thì
+   * đứng yên, nhân vật dịch chuyển bên trong nó.
+   */
+  centerX() {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+    return frame.left + frame.width / 2 + this.s.x * scale;
+  }
+
+  /**
    * QUAY MẶT về một phía và GIỮ hướng đó cho các động tác sau.
    *   face('left') · face('right') · face('front')        theo tên
    *   face(element) · face(otherRig)                      quay về phía phần tử / nhân vật ấy
@@ -2028,8 +2074,8 @@ export class RigSVG {
     let side = target === 'left' ? -1 : target === 'front' ? 0 : 1;
     if (target && typeof target === 'object') {
       // Phần tử DOM hoặc một rig khác: so tâm của nó với tâm của mình trên màn hình.
-      const box = (el) => el.getBoundingClientRect(), other = box(target.svg || target), mine = box(this.svg);
-      const dx = (other.left + other.width / 2) - (mine.left + mine.width / 2);
+      const box = target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+      const dx = (typeof target.centerX === 'function' ? target.centerX() : box.left + box.width / 2) - this.centerX();
       side = Math.abs(dx) < 1 ? 0 : dx < 0 ? -1 : 1;
     }
     const t = this.tl(), s = this.s, to = side * clamp(amount, 0, 1);
@@ -2169,6 +2215,7 @@ export class RigSVG {
 
   speak(text = null, dur = 2) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     t.set(s, { tayR: 'mo' }, 0);
     t.to(s, { mayL: 0.5, mayR: 0.5, cuoi: 0.5, nhinX: 0.8, duration: 0.2 }, 0);
@@ -2290,6 +2337,7 @@ export class RigSVG {
    */
   explain(text = null, dur = 2.4) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     // Nền THẤP và LỆCH: tay trái buông gần thõng, tay phải hé hơn một chút.
     // Trái phải khác nhau ngay từ nền thì cái nâng của tay phải mới nổi lên —
@@ -2337,6 +2385,7 @@ export class RigSVG {
    */
   speakCues(cue, dur = null, { cuChi = true } = {}) {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
     const D = dur || (cue && cue.metadata && cue.metadata.duration)
                   || (ds.length ? ds[ds.length - 1].end : 2);
@@ -2447,6 +2496,7 @@ export class RigSVG {
    */
   worry() {
     const t = this.tl(), s = this.s;
+    this.#openUp(t);
     // Tay phải lên ngực bằng `cang` (gập khuỷu) — đo thì bàn tay từ y 320 lên
     // 285, tức vừa chạm dưới túi ngực. Tay trái buông thấp cho lệch hẳn.
     t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
