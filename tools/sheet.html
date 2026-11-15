@@ -41,13 +41,12 @@ if (pet) {
   for (const [action, progress, ...args] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
                                              ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],
                                              ['express', 0.5, 'happy'], ['express', 0.5, 'sad'], ['express', 0.5, 'surprised'], ['express', 0.5, 'angry'], ['turn', 0.5, 'left']])
-  ;
-  // Thế đứng giữ nguyên: nói khi đang ngồi, và quay mặt về một phía rồi gật.
+
+    panel(action === 'express' ? `express: ${args[0]}` : action === 'turn' ? `turn: ${args[0]}` : action, mid(action, progress, ...args));
+  // Thế đứng giữ nguyên: nói khi đang ngồi, và quay mặt về một phía rồi vẫy.
   const held = (steps, time) => (rig) => { const t = sequence(rig, steps); t.time(time); };
   panel('sitDown → explain', held([['sitDown'], ['explain', 'xin chào bạn nhé', 2.4]], 2));
   panel('face left → wave', held([['face', 'left'], ['wave']], 1.2));
-  for (const [action, progress, ...args] of [])
-    panel(action === 'express' ? `express: ${args[0]}` : action === 'turn' ? `turn: ${args[0]}` : action, mid(action, progress, ...args));
 }
 document.title = 'DONE';
 </script>

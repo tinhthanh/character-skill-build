@@ -19,7 +19,7 @@ Vietnamese.
 
 | Kind | Built in | Customisable |
 |---|---|---|
-| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`, `receptionist` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
+| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`; samples `receptionist`, `barista`, `granny`, `grandpa`, `clerk` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
 | Pets | `dog`, `shiba`, `cat`, `orange_cat`, `black_cat` | body shape (seven dials) and colours |
 
 To see them: `python3 tools/serve.py` then open `http://127.0.0.1:8300/studio/`.
@@ -48,7 +48,8 @@ still break mid-action, and some failures are silent (see [Pitfalls](#pitfalls))
    [references/slots.md](references/slots.md) **before** drawing any SVG: it has the
    coordinate systems, the element ids the rig requires, what each base already carries and
    how to remove it. `sh tools/describe.sh <base>` prints a base's current numbers and
-   colours. `characters/receptionist.js` is a complete worked example.
+   colours. `characters/receptionist.js` is a complete worked example; `barista.js`, `granny.js`,
+   `grandpa.js` and `clerk.js` show aprons, skirts, age cues and held items.
 4. **Run the automated check.** `sh tools/check.sh` rebuilds the bundle and runs every
    action of every character in headless Chrome. It must print `PASS`. It catches thrown
    errors, `NaN` attributes, duplicate ids, missing required elements, actions that do not
@@ -167,12 +168,12 @@ and non-hex colours. These still fail without an error:
 SKILL.md              this file
 runtime/              the library (ES modules): index.js (public API), schema.js (public ↔ internal
                       names), parts.js, characters.js, rig-svg.js (people), rig-thu.js (pets)
-characters/           custom characters: _template.js, receptionist.js (example), index.js (registry)
+characters/           custom characters: _template.js, samples (receptionist, barista, granny, grandpa, clerk), index.js (registry)
 configs/              per-character tuned numbers written by the studio (<id>.json), baked into dist
 dist/                 character.iife.js (commented) · character.slim.js (use this one) — generated
 studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
-                      describe.sh (a character's current values) · peek.sh (composition preview)
+                      describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture)
 examples/hyperframes/ a complete composition with a vet and a dog
 references/           slots.md · actions.md · hyperframes.md
 ```

@@ -10,7 +10,7 @@ export default {
   base: 'vet',                   // vet | surgeon | nurse | doctor | default | <another custom id>
   define: (base, kit) => ({
     ...base,
-    // ...kit.outfits.scrubs,    // (optional) take a whole outfit: scrubs | pawTunic | coat | plainCoat
+    // ...kit.outfits.scrubs,    // (optional) take a whole outfit: scrubs | pawTunic | coat | plainCoat | tee | shirt
     name: 'Display name',
 
     // ── proportions (a line you delete falls back to the base) ──

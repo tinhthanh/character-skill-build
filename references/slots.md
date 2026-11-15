@@ -27,6 +27,10 @@ shoulder accessories) the base actually draws.
 | `nurse` | ponytail, tie in `colors.accent` | — | — | paw-print tunic, flared sleeves | — | — | arms slightly out | — |
 | `doctor` | side parting | — | glasses, frame in `colors.accent` | long coat with lapels | `true` | stethoscope | hands clasped | `innerShirt`, `stethoscope` |
 | `receptionist` | bob | — | — | blazer (coat outline), bow tie | `true` | — | hands clasped | `innerShirt` |
+| `barista` | ponytail | — | — | T-shirt, apron (`skirt` + bib), cup in the right hand | — | — | right forearm raised | `skirt` |
+| `granny` | grey ponytail | — | wrinkles | shirt, long `skirt`, `stoop: 1` | `true` | — | arms down | `skirt` |
+| `grandpa` | side tufts, `backHair: 'low'` | — | wrinkles, glasses; moustache in `beard` | cardigan (plain coat), `stoop: 0.6` | `true` | — | arms down | `innerShirt` |
+| `clerk` | side parting | — | glasses | shirt, clipboard in the left hand | `true` | — | left forearm across | `buttons` |
 
 ## Removing, replacing or borrowing a part
 

@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Gallery</title>
+<!-- Mọi nhân vật đã đăng ký, đứng cạnh nhau ở tư thế nghỉ — nguồn của docs/characters.png:
+       sh tools/gallery.sh [file.png] -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<body style="margin:0;background:#1d3a4b;display:flex;flex-wrap:wrap;font:13px system-ui;color:#cfe">
+<script type="module">
+import { createCharacter, createPet, list, seed } from '../runtime/index.js';
+seed(1);
+const { people, pets } = list();
+const cell = (label, build) => {
+  const box = document.createElement('div'); box.style.cssText = 'width:280px;height:250px;position:relative;overflow:hidden';
+  const host = document.createElement('div'); host.style.cssText = 'width:100%;height:222px'; box.appendChild(host); document.body.appendChild(box);
+  build(host).rig.render();
+  const caption = document.createElement('span'); caption.textContent = label; caption.style.cssText = 'position:absolute;left:0;right:0;bottom:4px;text-align:center'; box.appendChild(caption);
+};
+for (const id of Object.keys(people)) cell(id, (host) => createCharacter(host, { id }));
+for (const species of Object.keys(pets)) cell(species, (host) => createPet(host, { species }));
+document.title = 'DONE';
+</script>

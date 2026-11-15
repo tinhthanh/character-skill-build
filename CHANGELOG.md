@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1
+
+Added
+- Sample characters in `characters/`, each showing a different part of the vocabulary:
+  `barista` (T-shirt, apron, cup), `granny` (grey hair, wrinkles, stoop, long skirt),
+  `grandpa` (bald crown, moustache, glasses, cardigan), `clerk` (shirt, clipboard). They are
+  registered, so they can be used as `id` or as a `base`.
+- `tools/gallery.sh`: one picture of every registered character (`docs/characters.png`).
+
+Fixed
+- The pose sheet (`tools/shot.sh`) lost its action panels in 0.5.0; they are back, and the
+  picture is tall enough to show the two stance panels.
+
 ## 0.5.0
 
 Added

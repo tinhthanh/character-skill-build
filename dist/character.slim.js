@@ -1,4 +1,4 @@
-/* VGCharacter v0.5.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.5.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2634,9 +2634,117 @@ const __default = {
 };
 return { default: __default };
 })();
+__m['characters/barista.js'] = (function () {
+const __default = {
+  id: 'barista',
+  base: 'nurse',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.tee,
+    name: 'Barista',
+    colors: {
+      ...base.colors,
+      hair: '#4a2f22', hairHighlight: '#7a5038',
+      top: '#f2ede4', topShadow: '#d9d2c4', lineStroke: '#8d8474',
+      trousers: '#3b3f4a', shoes: '#f4f4f2', skirt: '#5b7a4a', accent: '#c8643c',
+    },
+    skirt: { kind: 'apron', length: 0.9, flare: 2 },
+    accessories: (p, c) => `
+      <g id="${p}-accessories">${kit.parts.apronBib(c)}
+      </g>`,
+    heldItemR: (p, c) => kit.parts.cup(c),
+    restPose: { ...base.restPose, handR: 'fist', upperArmR: 20, forearmR: -80, smile: 0.9 },
+  }),
+};
+return { default: __default };
+})();
+__m['characters/granny.js'] = (function () {
+const __default = {
+  id: 'granny',
+  base: 'nurse',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.shirt,
+    name: 'Granny',
+    stoop: 1,
+    colors: {
+      ...base.colors,
+      hair: '#cfd3d8', hairHighlight: '#eef0f2', brows: '#a9adb3',
+      top: '#b9a3c9', topShadow: '#9c86ad', lineStroke: '#6a557a',
+      skirt: '#6d5a7d', trousers: base.colors.skin, shoes: '#f4f4f2', accent: '#d6457a',
+    },
+    skirt: { kind: 'skirt', length: 1.45, flare: 6 },
+    faceExtras: (p, c) => kit.parts.wrinkles(c),
+    restPose: { ...base.restPose, upperArmL: 8, upperArmR: 8, smile: 0.7 },
+  }),
+};
+return { default: __default };
+})();
+__m['characters/grandpa.js'] = (function () {
+const __default = {
+  id: 'grandpa',
+  base: 'surgeon',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.plainCoat,
+    name: 'Grandpa',
+    hat: () => '',
+    backHair: 'low',
+    stoop: 0.6,
+    neckDrop: 14,
+    restPose: { upperArmL: 10, upperArmR: 10, forearmL: -13, forearmR: -13, smile: 0.5 },
+    colors: {
+      ...base.colors,
+      hair: '#f2f2ee', hairHighlight: '#ffffff', brows: '#d9d9d2',
+      top: '#d9a521', topShadow: '#b5851a', lineStroke: '#7a5a10', innerShirt: '#fbfbf8',
+      trousers: '#8a8f98', shoes: '#4a3a30', accent: '#5a4a3a',
+    },
+    hair: (p, c) => `
+      <g id="${p}-hair-front" fill="${c.hair}" stroke="#b9bcc0" stroke-width="0.8">
+        <path d="M -50 -22 Q -60 -12 -58 6 Q -57 18 -50 22 Q -46 6 -47 -8 Q -46 -18 -50 -22 Z"/>
+        <path d="M 50 -22 Q 60 -12 58 6 Q 57 18 50 22 Q 46 6 47 -8 Q 46 -18 50 -22 Z"/>
+      </g>`,
+    faceExtras: (p, c) => `${kit.parts.wrinkles(c)}${kit.parts.roundGlasses(c, { r: 13 })}`,
+    beard: (p, c) => kit.parts.moustache(c, { width: 21 }),
+    accessories: (p, c) => `
+      <g id="${p}-accessories">
+        <path d="M 0 -62 V 40" stroke="${c.lineStroke}" stroke-width="1.2"/>
+        ${[-48, -30, -12, 6, 24].map((y) => `<circle cx="4" cy="${y}" r="2.4" fill="#6b4a1e" stroke="${c.lineStroke}" stroke-width="0.8"/>`).join('')}
+        ${[-24, -18, -12, -6, 0, 6, 12, 18, 24].map((x) => `<path d="M ${x} 33 V 40" stroke="${c.lineStroke}" stroke-width="0.9" opacity=".6"/>`).join('')}
+        <path d="M -27 33 H 27" stroke="${c.lineStroke}" stroke-width="1" opacity=".7"/>
+        <path d="M -24 4 H -9 V 18 H -24 Z M 9 4 H 24 V 18 H 9 Z" fill="none" stroke="${c.lineStroke}" stroke-width="1.1" stroke-linejoin="round"/>
+      </g>`,
+    shoulderAccessories: () => '',
+  }),
+};
+return { default: __default };
+})();
+__m['characters/clerk.js'] = (function () {
+const __default = {
+  id: 'clerk',
+  base: 'doctor',
+  define: (base, kit) => ({
+    ...base,
+    ...kit.outfits.shirt,
+    name: 'Office clerk',
+    colors: {
+      ...base.colors,
+      top: '#dfe9f5', topShadow: '#c2d2e6', lineStroke: '#6f86a6', buttons: '#ffffff',
+      trousers: '#39445a', shoes: '#22262e',
+    },
+    heldItemL: (p, c) => kit.parts.clipboard(c),
+    restPose: { ...base.restPose, handL: 'fist', upperArmL: 14, forearmL: -70, upperArmR: 8, forearmR: -10 },
+  }),
+};
+return { default: __default };
+})();
 __m['characters/index.js'] = (function () {
 const receptionist = __m['characters/receptionist.js'].default;
-const __default = [receptionist];
+const barista = __m['characters/barista.js'].default;
+const granny = __m['characters/granny.js'].default;
+const grandpa = __m['characters/grandpa.js'].default;
+const clerk = __m['characters/clerk.js'].default;
+const __default = [receptionist, barista, granny, grandpa, clerk];
 return { default: __default };
 })();
 __m['runtime/index.js'] = (function () {
@@ -2646,7 +2754,7 @@ const { dangKyDau, KIT } = __m['runtime/characters.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

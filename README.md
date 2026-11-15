@@ -3,7 +3,7 @@
 An agent skill for **building custom 2D characters** and **reusing them in
 [HyperFrames](https://github.com/heygen-com/hyperframes) videos**.
 
-![Six people, a dog and a cat built with the rig](docs/characters.png)
+![Ten people and five pets built with the rig](docs/characters.png)
 
 Characters are 100% SVG, animated with GSAP. A character is a small JavaScript definition
 on top of a shared skeleton, so every new character can already wave, talk, point, sit,
