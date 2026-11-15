@@ -328,6 +328,30 @@ try {
       if (Math.abs(full.state.upperArmR - full.NGHI.batR) < 5) hong('wave', "wave('R') must use that hand even when both are full");
       chosen.kill(); full.svg.remove(); free.svg.remove();
     }
+    // CỬ CHỈ KHI NÓI: tay đi từ tư thế nghỉ của chính nhân vật — không giật trong một khung hình ở đầu câu, không
+    // quất nhanh quá 20° mỗi khung; tay đang cầm đồ đứng yên; tay kia có diễn.
+    {
+      const gestureCues = { metadata: { duration: 6 }, mouthCues: [{ start: 0, end: 1.6, value: 'C' }, { start: 1.6, end: 2.0, value: 'X' }, { start: 2.0, end: 3.8, value: 'D' }, { start: 3.8, end: 4.2, value: 'X' }, { start: 4.2, end: 6, value: 'B' }] };
+      const arms = ['upperArmL', 'forearmL', 'upperArmR', 'forearmR'];
+      for (const id of ['boy', 'vet', 'clerk', 'barista']) for (const [label, step] of [['speakCues', ['speakCues', gestureCues]], ['explain', ['explain', 'mot hai ba bon nam sau bay tam chin muoi muoi mot muoi hai', 6]]]) {
+        L.seed(11); const actor = L.createCharacter(host, { id }).rig, rest = Object.fromEntries(arms.map((k) => [k, actor.state[k]]));
+        const line = L.sequence(actor, [['idle', 0.5], step]), begin = line.data.steps[1].start;
+        let previous = null, biggest = 0, when = 0, moved = { L: 0, R: 0 };
+        for (let time = 0; time <= line.duration(); time += 1 / 60) {
+          line.time(time); const now = arms.map((k) => actor.state[k]);
+          if (previous) now.forEach((value, n) => { const jump = Math.abs(value - previous[n]); if (jump > biggest) { biggest = jump; when = time; } });
+          arms.forEach((k) => { moved[k.slice(-1)] = Math.max(moved[k.slice(-1)], Math.abs(actor.state[k] - rest[k])); });
+          previous = now;
+        }
+        if (biggest > 20) hong(`${label} gestures`, `${id}: an arm joint moves ${biggest.toFixed(0)}° in one frame at ${(when - begin).toFixed(2)}s into the line`);
+        line.time(begin + 0.05); const off = Math.max(...arms.map((k) => Math.abs(actor.state[k] - rest[k])));
+        if (off > 8) hong(`${label} gestures`, `${id}: the arms are ${off.toFixed(0)}° away from the character's rest pose right as the line starts`);
+        for (const side of ['L', 'R']) if (actor.holds[side] && moved[side] > 1.5) hong(`${label} gestures`, `${id}: the arm holding an item moves ${moved[side].toFixed(0)}°`);
+        const free = ['L', 'R'].filter((side) => !actor.holds[side]);
+        if (label === 'speakCues' && !free.some((side) => moved[side] > 25)) hong(`${label} gestures`, `${id}: no arm gesture during a six-second line`);
+        line.kill(); actor.svg.remove();
+      }
+    }
     // Reo mừng: nhún lên rồi về đúng mặt đất; đang ngồi thì không nhún; tay cầm đồ thì đứng yên.
     {
       const happy = L.createCharacter(host, { id: 'barista' }).rig, rest = happy.NGHI.batR;

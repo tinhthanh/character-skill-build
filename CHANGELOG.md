@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.18.0
+
+Arm gestures while speaking (`speakCues`, `explain`) were rebuilt after an audit of the film.
+
+Fixed
+- The arms snapped into a generic "hands at the belly" pose in a single frame when a line
+  started (a boy with his arms down jumped 60° in one frame).
+- The "open hand" gesture raised the elbow sideways with the forearm hanging down — it read
+  as a chicken wing. Gestures now open the forearm outward so the hand faces the listener.
+- Arms froze for up to 1.4 s while a gesture was held. The forearm now drifts a few degrees
+  and the upper arm breathes during the hold.
+- Gestures overlapped when cues were close together, making an arm jump mid-gesture
+  (`explain` moved a joint 57° in one frame). Gestures are spaced so their phases never overlap.
+
+Changed
+- Gestures start from and return to the character's own rest pose (clasped hands, arms down,
+  one arm carrying an item…) instead of one pose for everyone.
+- A hand holding an item does not gesture; the other hand does. With both hands full only the
+  head and torso move.
+- The stroke takes longer the further the arm travels, without overshoot; torso, shoulders
+  and head lean into the gesture.
+
 ## 0.17.0
 
 From a 2 min 41 s film made by an agent from a 25-beat script (three scenes, four voices).

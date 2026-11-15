@@ -48,6 +48,11 @@ words: `['explain', 'Oh no, I forgot again.', 2.2, { mood: 'worried' }]`,
 `['speakCues', cues, null, { mood: 'sad' }]`. Without it, lines are spoken brightly, with a
 slight smile.
 
+**Gestures.** `explain` and `speakCues` add arm gestures on the breaks between phrases. They
+start from and return to the character's own rest pose, so a character with clasped hands
+gestures differently from one whose arms hang; a hand holding an item stays still and the
+other one gestures. `['speakCues', cues, null, { cuChi: false }]` keeps the arms still.
+
 For `speak` / `explain`, set `dur` to the length of the voice-over clip. Syllables are
 counted per vowel group, so Vietnamese and English text both pace correctly.
 

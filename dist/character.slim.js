@@ -1,4 +1,4 @@
-/* VGCharacter v0.17.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.18.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1481,33 +1481,61 @@ class RigSVG {
     return t;
   }
   #cuChi(t, moc, D) {
-    const s = this.s;
+    const s = this.s, N = this.NGHI;
     if (!moc.length) return t;
-    const CB = { batL: 18, cangL: -70, batR: 24, cangR: -78 };
-    const DICH = [
-      { batR: 56, cangR: -54, batL: 22, cangL: -72 },   // mở sang phải
-      { batR: 40, cangR: -98, batL: 20, cangL: -74 },   // đưa lên ngực
-      { batR: 50, cangR: -62, batL: 46, cangL: -60 },   // mở cả hai tay
-      { batR: 34, cangR: -70, batL: 44, cangL: -58 },   // nhường sang trái
+    const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
+    const free = ['R', 'L'].filter((side) => !busy(side));
+    if (!free.length) return t;
+    const lead = free[0], other = free[1] || null;                    // tay chủ đạo (phải, nếu rảnh) và tay phụ
+    const key = (side, joint) => (joint ? 'cang' : 'bat') + side;
+    const base = (side) => [N[key(side, 0)], N[key(side, 1)]];
+    const POSES = [
+      { lead: [14, 58], other: null },             // mở một tay ngang hông
+      { lead: [12, 74], other: null },             // đưa tay sang bên
+      { lead: [30, 62], other: null },             // đưa bàn tay ra phía trước-bên (cẳng tay quá ~75° thì bàn tay lật nghiêng, trông như cái que)
+      { lead: [22, -112], other: null },           // đặt tay lên ngực
+      { lead: [16, 50], other: [16, 50] },         // mở cả hai tay
+      { lead: [18, 66], other: [12, 40] },         // hai tay, tay chủ đạo cao hơn
     ];
-    t.set(s, CB, 0);
-    let k = Math.floor(ngau() * DICH.length);
-    moc.forEach((a, i) => {
-      let m = k; while (m === k && DICH.length > 1) m = Math.floor(ngau() * DICH.length);
-      k = m;
-      const h = DICH[k];
-      const sau = i + 1 < moc.length ? moc[i + 1] : D;
-      const giu = clamp((sau - a) - 1.05, 0.35, 1.6);
-      const tNhan = a + 0.18, tBuong = tNhan + 0.26 + giu;
-      if (tBuong + 0.55 > sau + 0.35) return;            // không đủ chỗ thì bỏ nhịp này
-      t.to(s, { than: -1.5 + nhieu(-2.2, 2.2), duration: 0.34, ease: 'sine.inOut' }, a + 0.10);
-      t.to(s, { batR: CB.batR - 5, cangR: CB.cangR - 4, duration: 0.18, ease: 'sine.in' }, a);
-      t.to(s, { batR: h.batR, cangR: h.cangR, duration: 0.26, ease: 'back.out(1.5)' }, tNhan)
-       .to(s, { batL: h.batL, cangL: h.cangL, duration: 0.34, ease: 'back.out(1.1)' }, tNhan + 0.07);
-      t.to(s, { dauY: nhieu(1.4, 3.0), duration: 0.26, ease: 'power2.out' }, tNhan)
-       .to(s, { dauY: 0, duration: 0.5, ease: 'sine.inOut' }, tNhan + 0.30);
-      t.to(s, { batR: CB.batR, cangR: CB.cangR, duration: 0.55, ease: 'power2.inOut' }, tBuong)
-       .to(s, { batL: CB.batL, cangL: CB.cangL, duration: 0.62, ease: 'power2.inOut' }, tBuong + 0.06);
+    const anchors = [];
+    for (const a of moc) if (!anchors.length || a - anchors[anchors.length - 1] >= 2.1) anchors.push(a);
+    let last = -1;
+    anchors.forEach((a, i) => {
+      let pick = last; while (pick === last && POSES.length > 1) pick = Math.floor(ngau() * POSES.length);
+      last = pick;
+      const pose = POSES[pick];
+      const next = i + 1 < anchors.length ? anchors[i + 1] : D;
+      const travel = Math.max(Math.abs(pose.lead[1] - N[key(lead, 1)]), other && pose.other ? Math.abs(pose.other[1] - N[key(other, 1)]) : 0);
+      const longest = clamp(travel / 300, 0.36, 0.62) + 0.17;                 // + nhịp trễ của tay phụ và của cẳng tay
+      const hold = clamp((next - a) - 0.16 - longest - 0.85, 0.25, 1.5);
+      const stroke = a + 0.16, release = stroke + longest + hold;
+      if (release + 0.8 > next) return;                   // không đủ chỗ cho cả bốn pha thì bỏ nhịp này
+      const arms = [[lead, pose.lead]];
+      if (other && pose.other) arms.push([other, pose.other]);
+      const side = lead === 'R' ? -1 : 1;                 // thân và đầu ngả nhẹ VỀ PHÍA tay đang diễn
+      t.to(s, { than: N.than + side * nhieu(1.2, 2.4), vai: N.vai - nhieu(1.5, 3), dauY: nhieu(1.2, 2.6), duration: 0.4, ease: 'sine.out' }, stroke - 0.04)
+       .to(s, { than: N.than, vai: N.vai, dauY: N.dauY, duration: 0.7, ease: 'sine.inOut' }, release);
+      arms.forEach(([arm, [upper, fore]], n) => {
+        const [upper0, fore0] = base(arm), lag = n * 0.08;         // tay phụ đi sau tay chủ đạo một nhịp
+        const jitterU = nhieu(-3, 3), jitterF = nhieu(-6, 6);      // mỗi lần diễn một dáng hơi khác đi
+        const reach = clamp(Math.abs(fore - fore0) / 300, 0.36, 0.62);
+        t.set(s, { ['tay' + arm]: 'mo' }, a + lag);
+        t.to(s, { [key(arm, 0)]: upper0 - 2, [key(arm, 1)]: fore0 - Math.sign(fore - fore0) * 5, duration: 0.16, ease: 'sine.in' }, a + lag)
+         .to(s, { [key(arm, 0)]: upper + jitterU, duration: reach, ease: 'power2.out' }, stroke + lag)
+         .to(s, { [key(arm, 1)]: fore + jitterF, duration: reach + 0.06, ease: 'power2.out' }, stroke + lag + 0.03);       // cẳng tay tới sau bắp tay
+        const drift = release - (stroke + lag + reach + 0.1) - 0.05;
+        if (drift > 0.3) {
+          t.to(s, { [key(arm, 1)]: fore + jitterF + nhieu(4, 8) * (ngau() < 0.5 ? -1 : 1), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.1);
+          t.to(s, { [key(arm, 0)]: upper + jitterU + nhieu(1.5, 3), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.04);
+        }
+        t.to(s, { [key(arm, 0)]: upper0, duration: 0.6, ease: 'sine.inOut' }, release + lag)
+         .to(s, { [key(arm, 1)]: fore0, duration: 0.66, ease: 'sine.inOut' }, release + lag + 0.05);
+        t.set(s, { ['tay' + arm]: N['tay' + arm] }, release + lag + 0.5);
+      });
+      if (other && !pose.other) {
+        const [upper0, fore0] = base(other);
+        t.to(s, { [key(other, 1)]: fore0 + nhieu(3, 7), [key(other, 0)]: upper0 + nhieu(1, 3), duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + 0.1);
+      }
     });
     return t;
   }
@@ -1515,10 +1543,7 @@ class RigSVG {
     const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.45, 0.5);
     this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
-    const NEN = { batL: 10, batR: 16, cangL: -60, cangR: -72 };
-    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0);
-    t.to(s, { ...NEN, than: -1.5, ...tone.start, nhinX: 0.8,
-              duration: 0.35, ease: 'power2.out' }, 0);
+    t.to(s, { ...tone.start, nhinX: 0.8, duration: 0.35, ease: 'power2.out' }, 0);
     this.blinkTo = tone.eyes;
     this.#khauHinh(t, soAm, nhip, tone.corner);
     const BUOC = 5, moc = [];
@@ -1538,10 +1563,7 @@ class RigSVG {
     const D = dur || (cue && cue.metadata && cue.metadata.duration)
                   || (ds.length ? ds[ds.length - 1].end : 2);
     if (!ds.length) return this.explain(null, D);
-    const NEN = { batL: 20, batR: 28, cangL: -70, cangR: -80 };
-    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0);
-    t.to(s, { ...NEN, than: -1.5, ...tone.start, nhinX: 0.6,
-              duration: 0.3, ease: 'power2.out' }, 0);
+    t.to(s, { ...tone.start, nhinX: 0.6, duration: 0.3, ease: 'power2.out' }, 0);
     this.#troi(t, 'tho', 0, 1, D, 0.9, 2.2);
     this.#troi(t, 'dau', -3.4, 3.4, D, 1.0, 2.6);
     this.#troi(t, 'dauX', -4, 4, D, 0.9, 2.4);
@@ -3185,7 +3207,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.17.0';
+const VERSION = '0.18.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
