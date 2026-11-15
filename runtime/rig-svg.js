@@ -338,7 +338,7 @@ const tron = (a, b, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 /* ---------------------------------------------------------------- NHÂN VẬT
@@ -426,6 +426,11 @@ const NV_MAC_DINH = {
   // là tóc; nhân vật đội mũ trùm đầu thì khai tên màu mũ, không thì quay nghiêng
   // là một búi tóc đen thò ra sau mũ.
   mauSoSau: 'toc',
+  // Tóc phía SAU ĐẦU do rig tự sinh (khối sọ sau và mảng tóc gáy lộ ra khi quay):
+  //   'full'  phủ cả đầu (mặc định)        'low'   chỉ từ ngang tai trở xuống — hói đỉnh
+  //   'none'  không có — đầu trọc
+  // Không có núm này thì đầu hói vẽ đẹp lúc nhìn thẳng, quay nghiêng là mọc lại tóc kín đầu.
+  backHair: 'full',
   damSuon: 0.45,     // độ đậm mảng tối hai bên sườn áo
   // Khuôn mặt: bảy tham số của `veKhuonMat`, không phải đường vẽ tay. Bộ số
   // dưới đây DÒ RA từ chính đường cũ (`M -44 0 A 44 44 …`) bằng tìm kiếm lưới:
@@ -665,7 +670,7 @@ export class RigSVG {
 
   constructor(host, nhanVat = 'default') {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
-    if (!nv) throw new Error(`[RigSVG] không có nhân vật "${nhanVat}"`);
+    if (!nv) throw new Error(`[character] no character "${nhanVat}"`);
     this.host = host;
     this.nv = { ...NV_MAC_DINH, ...nv };
     // Giữ riêng phần màu nhân vật ĐÃ KHAI, tách khỏi phần rig tự suy. `doiMau`
@@ -911,6 +916,7 @@ export class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
   <g id="${p}-goc">
@@ -939,7 +945,8 @@ export class RigSVG {
         <g id="${p}-dau"${V}>
           <g transform="translate(0 -62)">
             <g id="${p}-veTay">
-            <g id="${p}-tocLung" fill="${this.#backSkullColor()}"><ellipse id="${p}-tocLungE"/></g>
+            <g id="${p}-tocLung"><ellipse id="${p}-tocLungE" fill="${this.nv.backHair === 'full' ? this.#backSkullColor() : this.mau.da}"/>
+              ${this.nv.backHair === 'low' ? `<g clip-path="url(#${p}-lowHairClip)"><ellipse id="${p}-tocLungLow" fill="${this.mau.toc}"/></g>` : ''}</g>
             <path id="${p}-khuon" d="${this.nv.dau(this.mau, this.nv)}" fill="${this.mau.da}"/>
             <g id="${p}-tocG">${this.nv.toc(p, this.mau)}
             </g>
@@ -988,7 +995,7 @@ export class RigSVG {
     this.el = {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
-      tocLungE: q('tocLungE'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
+      tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
@@ -1017,7 +1024,11 @@ export class RigSVG {
     const s = this.s, e = this.el;
     // co dãn quanh điểm chạm đất (200,428) để thu nhỏ = lùi xa, phóng to = tiến gần
     const doiChan = this.hangChan();
-    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
+    // Ngồi (`seat`) hạ cả người xuống đúng bằng phần đùi rút đi (xem chỗ vẽ chân bên dưới).
+    // Tính ngay ở đây chứ không để động tác tween `y`: `y` còn là "nhảy lên" và "lùi ra xa",
+    // gộp chung thì bóng đổ tụt theo người xuống dưới bàn chân.
+    const seatDrop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * clamp(s.seat, 0, 1);
+    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + seatDrop + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
     e.goc.setAttribute('opacity', s.mo);
     // bóng thu lại khi nhấc người lên
     const nhac = clamp(-s.y / 40, 0, 1);
@@ -1027,7 +1038,7 @@ export class RigSVG {
     // Ở đây chỉ còn phép co riêng của bóng quanh chính tâm bóng, và KÉO NGƯỢC
     // `doiChan`: `goc` hạ cả người xuống chừng ấy để bàn chân chạm nền, tức
     // trong hệ của `goc` bàn chân nằm ở 428 − doiChan chứ không phải 428.
-    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);
+    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan - seatDrop / (s.co || 1)}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);   // trừ seatDrop: bóng nằm lại dưới bàn chân
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
 
     // nhacL/R: gối đưa về phía người xem → chân ngắn lại (rút gọn phối cảnh), hơi xoè ra
@@ -1118,14 +1129,21 @@ export class RigSVG {
     e.tocLungE.setAttribute('cy', -K.cao * 0.22);
     e.tocLungE.setAttribute('rx', K.rong - 1);
     e.tocLungE.setAttribute('ry', K.cao * 0.78 - 1);
+    // Hói đỉnh: thêm một khối tóc cùng hình, cắt từ ĐƯỜNG CHÂN TÓC trở xuống.
+    const hairline = -K.cao * 0.3;
+    e.lowHairClipR.setAttribute('y', hairline);
+    if (e.tocLungLow) for (const a of ['cx', 'cy', 'rx', 'ry']) e.tocLungLow.setAttribute(a, e.tocLungE.getAttribute(a));
     // Tóc gáy: mảng tóc phủ phần da sau đường chân tóc. Mép của nó TRƯỢT từ ngoài viền
     // mặt vào tới sau vành tai (cắt theo viền mặt nên nhìn thẳng không lộ gì): từ đỉnh
     // đầu vòng xuống thái dương, nhọn thành tóc mai ngay trước tai, rồi lẩn ra sau tai.
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
     e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
-    e.tocGayP.setAttribute('d', k < 0.001 ? '' :
-      `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`
-      + ` L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
+    // Mép trên của mảng tóc gáy: đỉnh đầu (tóc đủ), hoặc đường chân tóc (hói đỉnh); trọc thì không vẽ.
+    const napeTop = nv.backHair === 'low'
+      ? `M ${xN} ${hairline} L ${X(tai + 13)} ${hairline} Q ${X(tai + 10)} ${(hairline - 5) / 2} ${X(tai + 7)} -5`
+      : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
+    e.tocGayP.setAttribute('d', k < 0.001 || nv.backHair === 'none' ? '' :
+      `${napeTop} L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
     e.suon.setAttribute('opacity', 0.45 * (1 - ah));           // vệt tối sườn chỉ hợp khi nhìn thẳng
     // Tai phía gáy trôi vào trong (nằm đè mép tóc gáy) và lộ vành tai; tai phía mặt
     // trượt vào sau má — cùng màu da nên tự khuất, không cần làm mờ.
@@ -1561,7 +1579,8 @@ export class RigSVG {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
-    t.set(this.s, { tayL: 'mo', tayR: 'mo' }, `>-${d * 0.5}`);
+    // Bàn tay về hình dạng NGHỈ của nhân vật (mặc định thả lỏng, nhưng có thể là nắm tay).
+    t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
     return t;
   }
 
@@ -1695,12 +1714,16 @@ export class RigSVG {
       t.to(s, { tho: 1, duration: d * 0.45, ease: 'sine.inOut' }, a)
        .to(s, { tho: 0, duration: d * 0.55, ease: 'sine.inOut' }, a + d * 0.45);
     }
-    t.to(s, { than: 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+    t.to(s, { than: this.NGHI.than + 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
     for (let b = nhieu(0.6, 1.2); b < dur - 0.3; b += nhieu(1.6, 3.6)) this.#chop(t, b);
     if (dur > 2.5) {                                   // liếc mắt một cái
       const a = dur * 0.4;
-      t.to(s, { nhinX: 2.6, nhinY: -0.6, dau: 1.5, duration: 0.25, ease: 'power2.out' }, a)
-       .to(s, { nhinX: 0, nhinY: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
+      // Liếc rồi trả về ĐÚNG tư thế nghỉ của nhân vật, không phải về 0: nhân vật nghỉ ở dáng
+      // nghiêng đầu (restPose.headTilt) mà idle trả đầu về 0 thì cứ sau một lần liếc là đầu
+      // bật thẳng — và động tác không còn khép về nghỉ.
+      const N = this.NGHI;
+      t.to(s, { nhinX: N.nhinX + 2.6, nhinY: N.nhinY - 0.6, dau: N.dau + 1.5, duration: 0.25, ease: 'power2.out' }, a)
+       .to(s, { nhinX: N.nhinX, nhinY: N.nhinY, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
     }
     return t;
   }
@@ -1909,7 +1932,7 @@ export class RigSVG {
    */
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
-    if (!face) throw new Error(`[RigSVG] không có biểu cảm "${name}" (có: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
+    if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
     if (name !== 'surprised' && hold > 0.8) this.#chop(t, into + hold * 0.5);      // ngạc nhiên thì không chớp mắt
@@ -1935,10 +1958,9 @@ export class RigSVG {
    * bằng phần đùi vừa rút, nên bàn chân vẫn nằm trên mặt đất. Composition tự vẽ ghế nếu cần.
    */
   sit(hold = 2) {
-    const t = this.tl(), s = this.s, nv = this.nv;
-    // Đùi rút 72% khi ngồi hẳn; thân hạ xuống đúng bằng phần đùi vừa rút, bàn chân ở lại mặt đất.
-    const drop = DAI.dui * nv.daiDui * nv.coChan * 0.72;
-    t.to(s, { seat: 1, y: drop, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
+    const t = this.tl(), s = this.s;
+    // Chỉ cần đẩy `seat`: apDung tự rút đùi và hạ thân, bàn chân và bóng ở lại mặt đất.
+    t.to(s, { seat: 1, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.to(s, { batL: 14, batR: 14, cangL: -38, cangR: -38, cuoi: 0.6, duration: 0.4, ease: 'power2.out' }, 0.15);   // hai tay đặt lên đùi
     for (let a = 0.6; a < 0.45 + hold - 0.3; a += 2.4) this.#chop(t, a + 0.5);
     this.#khep(t, 0.5, 0.45 + hold);

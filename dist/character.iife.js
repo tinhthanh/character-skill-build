@@ -1,4 +1,4 @@
-/* VGCharacter v0.3.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.4.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -345,7 +345,7 @@ const tron = (a, b, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 /* ---------------------------------------------------------------- NHÂN VẬT
@@ -433,6 +433,11 @@ const NV_MAC_DINH = {
   // là tóc; nhân vật đội mũ trùm đầu thì khai tên màu mũ, không thì quay nghiêng
   // là một búi tóc đen thò ra sau mũ.
   mauSoSau: 'toc',
+  // Tóc phía SAU ĐẦU do rig tự sinh (khối sọ sau và mảng tóc gáy lộ ra khi quay):
+  //   'full'  phủ cả đầu (mặc định)        'low'   chỉ từ ngang tai trở xuống — hói đỉnh
+  //   'none'  không có — đầu trọc
+  // Không có núm này thì đầu hói vẽ đẹp lúc nhìn thẳng, quay nghiêng là mọc lại tóc kín đầu.
+  backHair: 'full',
   damSuon: 0.45,     // độ đậm mảng tối hai bên sườn áo
   // Khuôn mặt: bảy tham số của `veKhuonMat`, không phải đường vẽ tay. Bộ số
   // dưới đây DÒ RA từ chính đường cũ (`M -44 0 A 44 44 …`) bằng tìm kiếm lưới:
@@ -672,7 +677,7 @@ class RigSVG {
 
   constructor(host, nhanVat = 'default') {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
-    if (!nv) throw new Error(`[RigSVG] không có nhân vật "${nhanVat}"`);
+    if (!nv) throw new Error(`[character] no character "${nhanVat}"`);
     this.host = host;
     this.nv = { ...NV_MAC_DINH, ...nv };
     // Giữ riêng phần màu nhân vật ĐÃ KHAI, tách khỏi phần rig tự suy. `doiMau`
@@ -918,6 +923,7 @@ class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
   <g id="${p}-goc">
@@ -946,7 +952,8 @@ class RigSVG {
         <g id="${p}-dau"${V}>
           <g transform="translate(0 -62)">
             <g id="${p}-veTay">
-            <g id="${p}-tocLung" fill="${this.#backSkullColor()}"><ellipse id="${p}-tocLungE"/></g>
+            <g id="${p}-tocLung"><ellipse id="${p}-tocLungE" fill="${this.nv.backHair === 'full' ? this.#backSkullColor() : this.mau.da}"/>
+              ${this.nv.backHair === 'low' ? `<g clip-path="url(#${p}-lowHairClip)"><ellipse id="${p}-tocLungLow" fill="${this.mau.toc}"/></g>` : ''}</g>
             <path id="${p}-khuon" d="${this.nv.dau(this.mau, this.nv)}" fill="${this.mau.da}"/>
             <g id="${p}-tocG">${this.nv.toc(p, this.mau)}
             </g>
@@ -995,7 +1002,7 @@ class RigSVG {
     this.el = {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
-      tocLungE: q('tocLungE'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
+      tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
@@ -1024,7 +1031,11 @@ class RigSVG {
     const s = this.s, e = this.el;
     // co dãn quanh điểm chạm đất (200,428) để thu nhỏ = lùi xa, phóng to = tiến gần
     const doiChan = this.hangChan();
-    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
+    // Ngồi (`seat`) hạ cả người xuống đúng bằng phần đùi rút đi (xem chỗ vẽ chân bên dưới).
+    // Tính ngay ở đây chứ không để động tác tween `y`: `y` còn là "nhảy lên" và "lùi ra xa",
+    // gộp chung thì bóng đổ tụt theo người xuống dưới bàn chân.
+    const seatDrop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * clamp(s.seat, 0, 1);
+    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + seatDrop + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
     e.goc.setAttribute('opacity', s.mo);
     // bóng thu lại khi nhấc người lên
     const nhac = clamp(-s.y / 40, 0, 1);
@@ -1034,7 +1045,7 @@ class RigSVG {
     // Ở đây chỉ còn phép co riêng của bóng quanh chính tâm bóng, và KÉO NGƯỢC
     // `doiChan`: `goc` hạ cả người xuống chừng ấy để bàn chân chạm nền, tức
     // trong hệ của `goc` bàn chân nằm ở 428 − doiChan chứ không phải 428.
-    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);
+    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan - seatDrop / (s.co || 1)}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);   // trừ seatDrop: bóng nằm lại dưới bàn chân
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
 
     // nhacL/R: gối đưa về phía người xem → chân ngắn lại (rút gọn phối cảnh), hơi xoè ra
@@ -1125,14 +1136,21 @@ class RigSVG {
     e.tocLungE.setAttribute('cy', -K.cao * 0.22);
     e.tocLungE.setAttribute('rx', K.rong - 1);
     e.tocLungE.setAttribute('ry', K.cao * 0.78 - 1);
+    // Hói đỉnh: thêm một khối tóc cùng hình, cắt từ ĐƯỜNG CHÂN TÓC trở xuống.
+    const hairline = -K.cao * 0.3;
+    e.lowHairClipR.setAttribute('y', hairline);
+    if (e.tocLungLow) for (const a of ['cx', 'cy', 'rx', 'ry']) e.tocLungLow.setAttribute(a, e.tocLungE.getAttribute(a));
     // Tóc gáy: mảng tóc phủ phần da sau đường chân tóc. Mép của nó TRƯỢT từ ngoài viền
     // mặt vào tới sau vành tai (cắt theo viền mặt nên nhìn thẳng không lộ gì): từ đỉnh
     // đầu vòng xuống thái dương, nhọn thành tóc mai ngay trước tai, rồi lẩn ra sau tai.
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
     e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
-    e.tocGayP.setAttribute('d', k < 0.001 ? '' :
-      `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`
-      + ` L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
+    // Mép trên của mảng tóc gáy: đỉnh đầu (tóc đủ), hoặc đường chân tóc (hói đỉnh); trọc thì không vẽ.
+    const napeTop = nv.backHair === 'low'
+      ? `M ${xN} ${hairline} L ${X(tai + 13)} ${hairline} Q ${X(tai + 10)} ${(hairline - 5) / 2} ${X(tai + 7)} -5`
+      : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
+    e.tocGayP.setAttribute('d', k < 0.001 || nv.backHair === 'none' ? '' :
+      `${napeTop} L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
     e.suon.setAttribute('opacity', 0.45 * (1 - ah));           // vệt tối sườn chỉ hợp khi nhìn thẳng
     // Tai phía gáy trôi vào trong (nằm đè mép tóc gáy) và lộ vành tai; tai phía mặt
     // trượt vào sau má — cùng màu da nên tự khuất, không cần làm mờ.
@@ -1568,7 +1586,8 @@ class RigSVG {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
-    t.set(this.s, { tayL: 'mo', tayR: 'mo' }, `>-${d * 0.5}`);
+    // Bàn tay về hình dạng NGHỈ của nhân vật (mặc định thả lỏng, nhưng có thể là nắm tay).
+    t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
     return t;
   }
 
@@ -1702,12 +1721,16 @@ class RigSVG {
       t.to(s, { tho: 1, duration: d * 0.45, ease: 'sine.inOut' }, a)
        .to(s, { tho: 0, duration: d * 0.55, ease: 'sine.inOut' }, a + d * 0.45);
     }
-    t.to(s, { than: 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+    t.to(s, { than: this.NGHI.than + 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
     for (let b = nhieu(0.6, 1.2); b < dur - 0.3; b += nhieu(1.6, 3.6)) this.#chop(t, b);
     if (dur > 2.5) {                                   // liếc mắt một cái
       const a = dur * 0.4;
-      t.to(s, { nhinX: 2.6, nhinY: -0.6, dau: 1.5, duration: 0.25, ease: 'power2.out' }, a)
-       .to(s, { nhinX: 0, nhinY: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
+      // Liếc rồi trả về ĐÚNG tư thế nghỉ của nhân vật, không phải về 0: nhân vật nghỉ ở dáng
+      // nghiêng đầu (restPose.headTilt) mà idle trả đầu về 0 thì cứ sau một lần liếc là đầu
+      // bật thẳng — và động tác không còn khép về nghỉ.
+      const N = this.NGHI;
+      t.to(s, { nhinX: N.nhinX + 2.6, nhinY: N.nhinY - 0.6, dau: N.dau + 1.5, duration: 0.25, ease: 'power2.out' }, a)
+       .to(s, { nhinX: N.nhinX, nhinY: N.nhinY, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
     }
     return t;
   }
@@ -1916,7 +1939,7 @@ class RigSVG {
    */
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
-    if (!face) throw new Error(`[RigSVG] không có biểu cảm "${name}" (có: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
+    if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
     if (name !== 'surprised' && hold > 0.8) this.#chop(t, into + hold * 0.5);      // ngạc nhiên thì không chớp mắt
@@ -1942,10 +1965,9 @@ class RigSVG {
    * bằng phần đùi vừa rút, nên bàn chân vẫn nằm trên mặt đất. Composition tự vẽ ghế nếu cần.
    */
   sit(hold = 2) {
-    const t = this.tl(), s = this.s, nv = this.nv;
-    // Đùi rút 72% khi ngồi hẳn; thân hạ xuống đúng bằng phần đùi vừa rút, bàn chân ở lại mặt đất.
-    const drop = DAI.dui * nv.daiDui * nv.coChan * 0.72;
-    t.to(s, { seat: 1, y: drop, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
+    const t = this.tl(), s = this.s;
+    // Chỉ cần đẩy `seat`: apDung tự rút đùi và hạ thân, bàn chân và bóng ở lại mặt đất.
+    t.to(s, { seat: 1, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.to(s, { batL: 14, batR: 14, cangL: -38, cangR: -38, cuoi: 0.6, duration: 0.4, ease: 'power2.out' }, 0.15);   // hai tay đặt lên đùi
     for (let a = 0.6; a < 0.45 + hold - 0.3; a += 2.4) this.#chop(t, a + 0.5);
     this.#khep(t, 0.5, 0.45 + hold);
@@ -2402,7 +2424,7 @@ const chinhSang = (c, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 const NGHI = Object.freeze({
@@ -2584,7 +2606,7 @@ class RigThu {
 
   constructor(host, loai = 'dog') {
     const nv = typeof loai === 'string' ? LOAI[loai] : loai;
-    if (!nv) throw new Error(`[RigThu] không có loài "${loai}" (có: ${Object.keys(LOAI).join(', ')})`);
+    if (!nv) throw new Error(`[character] no species "${loai}" (available: ${Object.keys(LOAI).join(', ')})`);
     this.host = host;
     this.base = nv;                               // hình thể gốc của giống — setShape tính lại từ đây
     this.shape = { ...DEFAULT_SHAPE };
@@ -2816,8 +2838,8 @@ class RigThu {
    */
   setShape(changes = {}) {
     for (const [key, value] of Object.entries(changes)) {
-      if (!(key in SHAPE_RANGE)) throw new Error(`[RigThu] không có núm hình dáng "${key}" (có: ${Object.keys(SHAPE_RANGE).join(', ')})`);
-      if (!Number.isFinite(value)) throw new Error(`[RigThu] ${key}: ${JSON.stringify(value)} phải là số`);
+      if (!(key in SHAPE_RANGE)) throw new Error(`[character] no shape dial "${key}" (available: ${Object.keys(SHAPE_RANGE).join(', ')})`);
+      if (!Number.isFinite(value)) throw new Error(`[character] shape.${key}: ${JSON.stringify(value)} must be a number`);
       this.shape[key] = clamp(value, SHAPE_RANGE[key][0], SHAPE_RANGE[key][1]);
     }
     const palette = this.nv.mau;
@@ -2941,10 +2963,11 @@ class RigThu {
     } else this.#vay(t, 0, Math.max(2, Math.floor(dur / 0.55)), 7, dur / Math.max(2, Math.floor(dur / 0.55)));
     if (dur > 2.4) {                                      // giật tai một cái, liếc mắt
       const a = dur * 0.45, tai = ngau() < 0.5 ? 'taiL' : 'taiR';
-      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: 0, duration: 0.2 }, a + 0.1);
-      t.to(s, { nhinX: 2, dau: 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
+      const N = this.NGHI;                                  // mọi thứ trả về tư thế nghỉ của con vật, không về 0
+      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: N[tai], duration: 0.2 }, a + 0.1);
+      t.to(s, { nhinX: N.nhinX + 2, dau: N.dau + 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: N.nhinX, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
     }
-    t.to(s, { duoi: 0, duoiCong: 0, duration: 0.2 }, dur - 0.2);
+    t.to(s, { duoi: this.NGHI.duoi, duoiCong: this.NGHI.duoiCong, duration: 0.2 }, dur - 0.2);
     return t;
   }
 
@@ -3544,7 +3567,7 @@ const DEFINITION_KEYS = {
   top: 'ao', sideShading: 'suon', sideShadingOpacity: 'damSuon', collar: 'coAo',
   accessories: 'phuKien', shoulderAccessories: 'phuKienTren', shoes: 'giay',
   // công tắc
-  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
+  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
   outlineWidth: 'vienRong',
   // tỉ lệ
   headSize: 'coDau', neckDrop: 'dauLech', torsoScale: 'coThan', legScale: 'coChan',
@@ -3703,6 +3726,7 @@ function definitionToPublic(definition) {
     else if (key === 'nghi') out[k] = stateToPublic(value);
     else if (key === 'khuon') out[k] = renameKeys(value, INTERNAL.faceShape);
     else if (key === 'may') out[k] = renameKeys(value, INTERNAL.brows);
+    else if (key === 'mauSoSau') out[k] = INTERNAL.colors[value] || value;      // tên màu cũng đổi sang tên công khai
     else out[k] = value;
   }
   return out;
@@ -3741,21 +3765,22 @@ return { DEFINITION_KEYS, FACE_SHAPE_KEYS, BROW_KEYS, COLOR_KEYS, PERSON_STATE_K
 
 /* ───── characters/receptionist.js ───── */
 __m['characters/receptionist.js'] = (function () {
-// Lễ tân — nhân vật tuỳ chỉnh MẪU: đầu của điều dưỡng (đổi tóc), áo vest dài tay.
+// Receptionist — the worked EXAMPLE of a custom character: the nurse's head with new hair,
+// and a long-sleeved blazer.
 //
-// Đây là ví dụ đầy đủ của một nhân vật tuỳ chỉnh:
-//   1. chọn `base` — nhân vật có sẵn gần với thứ cần làm nhất (ở đây lấy khuôn mặt, mắt,
-//      tỉ lệ thân của `nurse`);
-//   2. trải một BỘ ĐỒ dựng sẵn từ `kit.outfits` rồi ghi đè chi tiết;
-//   3. ghi đè tóc, màu, dáng nghỉ.
+// The three moves every custom character makes:
+//   1. pick `base` — the built-in closest to what you need (here: the face, eyes and body
+//      proportions of `nurse`);
+//   2. spread a ready-made OUTFIT from `kit.outfits`, then override its details;
+//   3. override hair, colours and rest pose.
 const __default = {
   id: 'receptionist',
   base: 'nurse',
   define: (base, kit) => ({
     ...base,
-    ...kit.outfits.coat,                       // thân áo dài tay có ve — dùng làm áo vest
-    name: 'Lễ tân — vest xanh',
-    // Tay đan trước bụng: dáng đón khách.
+    ...kit.outfits.coat,                       // long-sleeved top with lapels, used as a blazer
+    name: 'Receptionist',
+    // Hands clasped at the belly: a welcoming pose.
     restPose: { upperArmL: 17, upperArmR: 17, forearmL: -92, forearmR: -92, smile: 1, mouthOpen: 0.4, browL: 0.2, browR: 0.2 },
     colors: {
       ...base.colors,
@@ -3763,19 +3788,19 @@ const __default = {
       top: '#2f4b7c', topShadow: '#223a63', lineStroke: '#16233d', innerShirt: '#f6f7f9',
       trousers: '#2f4b7c', shoes: '#22262e', accent: '#d6453d',
     },
-    // Tóc bob ngang cằm. Mọi mảng tóc thấy được khi nhìn thẳng nằm trong nhóm `hair-front`.
+    // Chin-length bob. Every hair shape visible from the front lives in the `hair-front` group.
     hair: (p, c) => `
               <g id="${p}-hair-front" fill="${c.hair}">
                 <path d="M -53 31 Q -64 -34 -28 -61 Q 0 -75 28 -61 Q 64 -34 53 31 Q 45 36 40 27 Q 46 -8 31 -25 Q 12 -39 -4 -33 Q -29 -30 -40 -14 Q -45 6 -40 27 Q -45 36 -53 31 Z"/>
                 <path d="M -28 -52 Q -4 -63 20 -54" stroke="${c.hairHighlight}" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".8"/>
                 <path d="M -48 4 Q -50 -18 -38 -36" stroke="${c.hairHighlight}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".6"/>
               </g>`,
-    // Ve áo của bộ coat + một chiếc nơ cổ.
+    // The coat's lapels, plus a bow tie.
     collar: (p, c) => `${kit.outfits.coat.collar(p, c)}
         <path d="M 0 -96.500 l -9.500 -4.500 v 9 z M 0 -96.500 l 9.500 -4.500 v 9 z" fill="${c.accent}" stroke="${c.lineStroke}" stroke-width="0.900" stroke-linejoin="round"/>
         <circle cx="0" cy="-96.500" r="2.300" fill="${c.accent}" stroke="${c.lineStroke}" stroke-width="0.900"/>`,
-    // Thân áo vest: đường khép vạt, hai cúc vàng, bảng tên, khăn túi ngực. KHÔNG ống nghe.
-    // Phải bọc trong <g id="${p}-accessories"> — rig co nhóm này theo thân áo.
+    // Blazer details: front seam, two gold buttons, name tag, pocket square. NO stethoscope.
+    // Must be wrapped in <g id="${p}-accessories"> — the rig scales this group with the torso.
     accessories: (p, c) => `
       <g id="${p}-accessories">
         <path d="M 0 -67 V 40" stroke="${c.lineStroke}" stroke-width="1.200"/>
@@ -3795,9 +3820,9 @@ return { default: __default };
 
 /* ───── characters/index.js ───── */
 __m['characters/index.js'] = (function () {
-// Danh sách nhân vật TUỲ CHỈNH. Thêm nhân vật mới = thêm một tệp trong thư mục này (chép từ
-// `_template.js`) rồi thêm nó vào mảng dưới đây. Thứ tự có ý nghĩa: nhân vật có `base` là
-// một nhân vật tuỳ chỉnh khác thì phải đứng SAU nhân vật ấy.
+// The list of CUSTOM characters. To add one: create a file in this folder (copy `_template.js`)
+// and add it to the array below. Order matters: a character whose `base` is another custom
+// character must come AFTER it.
 const receptionist = __m['characters/receptionist.js'].default;
 
 const __default = [receptionist];
@@ -3826,7 +3851,7 @@ const { roundGlasses, shortBeard, moustache } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -3881,7 +3906,7 @@ const kit = {
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
   parts: { roundGlasses, shortBeard, moustache },
   partsOf(id) {
-    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): không có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
   },
 };
@@ -3891,7 +3916,7 @@ const kit = {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && v !== undefined && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 /**
@@ -3906,30 +3931,30 @@ function assertColors(palette, where) {
 function validateConfig(config, kind = 'person') {
   const problems = [];
   if (config === null || config === undefined) return problems;
-  if (typeof config !== 'object' || Array.isArray(config)) return ['config phải là một object'];
+  if (typeof config !== 'object' || Array.isArray(config)) return ['config must be an object'];
   const pet = kind === 'pet';
   const numberGroups = pet ? { shape: PET_SHAPE_KEYS } : Object.fromEntries(Object.entries(CONFIG_GROUPS).map(([g, [, table]]) => [g, Object.keys(table)]));
   const stateKeys = pet ? PET_STATE_KEYS : PERSON_STATE_KEYS;
   const allowed = [...Object.keys(numberGroups), ...(pet ? [] : ['restPose']), 'colors'];
   for (const [group, value] of Object.entries(config)) {
-    if (!allowed.includes(group)) { problems.push(`nhóm lạ "${group}" (hợp lệ: ${allowed.join(', ')})`); continue; }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" phải là một object`); continue; }
+    if (!allowed.includes(group)) { problems.push(`unknown group "${group}" (valid: ${allowed.join(', ')})`); continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" must be an object`); continue; }
     for (const [key, v] of Object.entries(value)) {
       if (group === 'colors') {
-        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} không phải mã hex (#rgb / #rrggbb)`);
+        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} is not a hex colour (#rgb / #rrggbb)`);
       } else if (group === 'restPose') {
-        if (!(key in stateKeys)) problems.push(`restPose.${key}: không có khoá trạng thái này`);
-        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là một trong ${Object.keys(HAND_SHAPES).join(', ')}`); }
-        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là số`);
-      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: khoá lạ (hợp lệ: ${numberGroups[group].join(', ')})`);
-      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} phải là số`);
+        if (!(key in stateKeys)) problems.push(`restPose.${key}: no such state key`);
+        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be one of ${Object.keys(HAND_SHAPES).join(', ')}`); }
+        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be a number`);
+      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: unknown key (valid: ${numberGroups[group].join(', ')})`);
+      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} must be a number`);
     }
   }
   return problems;
 }
 function assertConfig(config, kind, who) {
   const problems = validateConfig(config, kind);
-  if (problems.length) throw new Error(`[character] config của "${who}" không hợp lệ:\n  - ${problems.join('\n  - ')}`);
+  if (problems.length) throw new Error(`[character] invalid config for "${who}":\n  - ${problems.join('\n  - ')}`);
 }
 
 /* ─────────────────────────────────────────────────────────────── đăng ký */
@@ -3941,20 +3966,22 @@ function assertConfig(config, kind, who) {
  *   define  (base, kit) => object định nghĩa, khoá tiếng Anh (bảng khoá: references/slots.md)
  */
 function registerCharacter({ id, base = 'vet', define }) {
-  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] id không hợp lệ: "${id}"`);
+  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] invalid id "${id}" (use lowercase letters, digits and underscores)`);
   const baseDefinition = RigSVG.NHAN_VAT[base];
-  if (!baseDefinition) throw new Error(`[character] "${id}" dựa trên "${base}" nhưng chưa có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (!baseDefinition) throw new Error(`[character] "${id}" is based on "${base}", which is not registered (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   // Trùng id thì DỪNG, không ghi đè: hai tệp nhân vật cùng một id là nhân vật đăng ký trước
   // biến mất không dấu vết, và composition nào đang dùng nó bỗng ra một người khác.
-  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" đã có nhân vật "${RigSVG.NHAN_VAT[id].ten || id}" — đặt id khác`);
-  if (typeof define !== 'function') throw new Error(`[character] "${id}": thiếu hàm define(base, kit)`);
+  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" is already registered — choose another id`);
+  if (typeof define !== 'function') throw new Error(`[character] "${id}": missing define(base, kit) function`);
   const written = define(definitionToPublic(baseDefinition), kit);
-  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() phải trả về một object`);
+  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() must return an object`);
   const definition = definitionToInternal(written);
-  if (definition.mau) assertColors(definition.mau, `nhân vật "${id}"`);
+  if (definition.mau) assertColors(definition.mau, `character "${id}" colors`);
+  if (definition.backHair !== undefined && !['full', 'low', 'none'].includes(definition.backHair))
+    throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor trỏ tới màu không có trong colors`);
+    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }
@@ -3991,7 +4018,7 @@ function applyInternalPersonConfig(rig, c) {
 function applyConfig(rig, config) {
   if (!config) return rig;
   const pet = rig instanceof RigThu;
-  assertConfig(config, pet ? 'pet' : 'person', rig.nv.ten || 'nhân vật');
+  assertConfig(config, pet ? 'pet' : 'person', rig.publicId || 'character');
   const internal = configToInternal(config, pet);
   if (!pet) applyInternalPersonConfig(rig, internal);
   else {
@@ -4008,11 +4035,12 @@ function applyConfig(rig, config) {
  *   config  object bộ số. Bỏ trống → dùng bộ số đã nướng vào bản dựng (nếu có); `null` → không dùng
  */
 function createCharacter(host, { id = 'vet', config } = {}) {
-  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] không có nhân vật "${id}" (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
   host.style.aspectRatio = `${RigSVG.KHUNG.w}/${RigSVG.KHUNG.h}`;
   const rig = new RigSVG(host, id);
+  rig.publicId = id;
   applyConfig(rig, config);
   return { rig, id };
 }
@@ -4023,11 +4051,12 @@ function createCharacter(host, { id = 'vet', config } = {}) {
  *   config   { shape: {…}, colors: {…} } — quy tắc mặc định như createCharacter
  */
 function createPet(host, { species = 'dog', config } = {}) {
-  if (!RigThu.LOAI[species]) throw new Error(`[character] không có giống "${species}" (có: ${Object.keys(RigThu.LOAI).join(', ')})`);
+  if (!RigThu.LOAI[species]) throw new Error(`[character] no species "${species}" (available: ${Object.keys(RigThu.LOAI).join(', ')})`);
   if (config === undefined) config = bakedConfigs[species] || null;
   assertConfig(config, 'pet', species);
   host.style.aspectRatio = `${RigThu.KHUNG.w}/${RigThu.KHUNG.h}`;
   const rig = new RigThu(host, species);
+  rig.publicId = species;
   applyConfig(rig, config);
   return { rig, id: species };
 }
@@ -4035,11 +4064,19 @@ function createPet(host, { species = 'dog', config } = {}) {
 /** Gieo hạt cho MỌI thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). Bắt buộc khi dựng video. */
 function seed(value) { RigSVG.gieo(value); RigThu.gieo(value); }
 
+// Tên hiển thị TIẾNG ANH của các nhân vật và giống có sẵn. Tên trong hai bộ rig là tiếng Việt
+// (studio dùng); phía công khai trả về tên ở đây, nhân vật tuỳ chỉnh thì trả `name` nó tự khai.
+const BUILT_IN_NAMES = {
+  default: 'Default (plain adult)', vet: 'Veterinarian', surgeon: 'Surgeon', nurse: 'Nurse', doctor: 'Doctor with glasses',
+  dog: 'Dog (golden puppy)', shiba: 'Dog (shiba)', cat: 'Cat (grey tabby)', orange_cat: 'Cat (orange tabby)', black_cat: 'Cat (black)',
+};
+const displayName = (id, definition) => BUILT_IN_NAMES[id] || definition.ten || id;
+
 /** Liệt kê nhân vật đang có và động tác của từng loại. */
 function list() {
   return {
-    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, v.ten])),
-    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, v.ten])),
+    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
+    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
     personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG],
     petActions: { ...RigThu.DONG_TAC },
     expressions: Object.keys(RigSVG.EXPRESSIONS),
@@ -4056,41 +4093,70 @@ function list() {
  * Mỗi mục là tên động tác, hoặc [tên, ...tham số], hoặc một SỐ (nghỉ thêm chừng ấy giây).
  * Thời điểm từng bước nằm ở `timeline.data.steps`.
  *
- * Vì sao không tự `add` từng timeline: vài động tác đọc vị trí nhân vật LÚC DỰNG (`walk` có
- * quãng đường, `point`). Dựng tất cả từ tư thế ban đầu thì động tác sau một lần đi sẽ xuất
- * phát sai chỗ. Hàm này đẩy nhân vật tới cuối từng bước trước khi dựng bước kế.
+ * Vì sao không tự `add` từng timeline: (1) vài động tác đọc vị trí nhân vật LÚC DỰNG (`walk`
+ * có quãng đường, `point`) — hàm này đẩy nhân vật tới cuối từng bước trước khi dựng bước kế;
+ * (2) timeline trả về đã được LẤY MẪU SẴN nên tua tới đâu, theo chiều nào, cũng ra đúng một
+ * trạng thái (xem chú thích trong thân hàm).
+ *
+ * `gap`: giây nghỉ chèn giữa hai bước (mặc định 0.1). `sampleRate`: số mẫu mỗi giây (60).
  */
-function sequence(rig, stepList, { gap = 0.1 } = {}) {
-  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => rig.apDung() });
+function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
+  const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
-  const snapshot = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
+  const snapshot = () => keys.map((k) => rig.s[k]);
+  const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
   for (const step of stepList) {
     if (typeof step === 'number') { at += step; continue; }
     const [name, ...args] = Array.isArray(step) ? step : [step];
-    if (typeof rig[name] !== 'function') throw new Error(`[character] không có động tác "${name}" (có: ${rig.actions.join(', ')})`);
+    if (typeof rig[name] !== 'function') throw new Error(`[character] no action "${name}" (available: ${rig.actions.join(', ')})`);
     // Dựng nháp một lần để biết động tác này BẮT ĐẦU từ trạng thái nào. Vài động tác mở đầu
     // bằng `set` (enter đặt nhân vật ra ngoài khung), mà GSAP KHÔNG vẽ `set` khi đầu phát nằm
-    // đúng ở thời điểm 0 — tua về khung 0 thì nhân vật đứng giữa khung thay vì ở ngoài. Nên
-    // đặt sẵn trạng thái ấy vào rig TRƯỚC khi dựng bản thật: lúc đó `set` không còn đổi gì,
-    // và giá trị GSAP ghi nhớ để lùi về chính là trạng thái đúng.
-    Object.assign(rig.s, endState);
+    // đúng ở thời điểm 0. Đặt sẵn trạng thái ấy vào rig TRƯỚC khi dựng bản thật.
+    restore(endState);
     const draft = rig[name](...args);
     draft.progress(1e-6); const startState = snapshot(); draft.kill();
-    Object.assign(rig.s, startState);
+    restore(startState);
     if (!firstFrame) firstFrame = startState;
     const child = rig[name](...args);
     child.progress(1); endState = snapshot();
     child.progress(0).paused(false);
-    timeline.add(child, at);
+    source.add(child, at);
     steps.push({ name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) });
     at += child.duration() + gap;
   }
-  timeline.data = { type: 'character-sequence', character: rig.nv.ten || rig.nv.loai || '', steps };
-  Object.assign(rig.s, firstFrame || endState);       // rig nằm sẵn ở đúng khung 0 của chuỗi
-  timeline.progress(0);
-  rig.apDung();
+
+  // LẤY MẪU SẴN. Timeline nguồn (các động tác nối nhau) chỉ chắc chắn đúng khi chạy TUẦN TỰ từ
+  // đầu: nó gồm hàng trăm tween cùng ghi vào một object trạng thái, vài `set` tức thời và vài
+  // tween gối đầu nhau, nên tua tới cùng một thời điểm từ phía trước và từ phía sau có thể ra
+  // hai trạng thái khác nhau (đo được: enter / walkForward ở giữa chuỗi lệch tới cả vị trí lẫn
+  // độ mờ). Bộ dựng video thì tua thẳng tới từng khung, có khi song song, có khi tua ngược.
+  // Nên ở đây chạy timeline nguồn ĐÚNG MỘT LẦN theo chiều thuận, ghi lại trạng thái từng khung,
+  // rồi trả về một timeline chỉ có MỘT tween phát lại các khung ấy — trạng thái ở thời điểm t
+  // khi đó là một phép tra bảng, không còn phụ thuộc đường đi tới t.
+  const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
+  if (firstFrame) restore(firstFrame);
+  const frames = [];
+  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  source.kill();
+
+  const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
+  const show = (position) => {
+    const p = Math.min(count - 1, Math.max(0, position)), lo = Math.floor(p), hi = Math.min(count - 1, lo + 1), mix = p - lo;
+    const a = frames[lo], b = frames[hi];
+    // Số thì nội suy giữa hai khung mẫu; chuỗi (hình bàn tay) lấy của khung trước.
+    keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
+    rig.apDung();
+  };
+  // Phát lại qua SETTER của thuộc tính đang tween: GSAP ghi thuộc tính ở mọi lần vẽ, kể cả khi
+  // bị tua bằng seek() (tắt callback) và khi tua ngược.
+  const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
+  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
+  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps };
+  show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
 

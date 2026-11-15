@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0
+
+Fixed
+- `restPose.headTilt` and `restPose.handL` / `handR` are honoured: `idle` no longer returns the
+  head to upright and actions return hands to the character's own rest shape.
+- `sit` keeps the ground shadow under the feet.
+- `sequence()` returns a pre-sampled timeline. Seeking to a time from before and from after
+  now gives the same state for every action (previously `enter`, `walkForward` and `walkAway`
+  placed mid-sequence could differ in position and opacity).
+- `tools/shot.sh` applies `configs/<id>.json` (`--no-config` to skip it).
+
+Added
+- `backHair: 'full' | 'low' | 'none'` for bald or balding heads.
+- `tools/describe.sh <id>`: a character's current definition in the public schema, as JSON.
+- `tools/peek.sh` warns when two characters speak at the same time.
+- A GitHub Actions workflow that runs `tools/check.sh`.
+
+Changed
+- Error messages, tool output, pose-sheet labels and the character template are in English;
+  check failures name keys by their public names. `list()` returns English display names.
+- Pose-sheet expression panels are labelled with the expression.
+- `tools/doc-kq.py` is now `tools/check_report.py`; tools take `PORT=` instead of `CONG=`.
+
 ## 0.3.0
 
 **Breaking: the public API, the definition schema and the config schema are now English.**

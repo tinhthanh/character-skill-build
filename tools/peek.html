@@ -26,9 +26,9 @@ async function loadComposition(frame) {
   await wait(150);
   const win = frame.contentWindow, doc = win.document;
   const root = doc.querySelector('[data-composition-id]');
-  if (!root) throw new Error('không thấy phần tử gốc có data-composition-id');
+  if (!root) throw new Error('no root element with data-composition-id');
   const id = root.dataset.compositionId, timeline = (win.__timelines || {})[id];
-  if (!timeline) throw new Error(`không có window.__timelines["${id}"] — khoá phải trùng data-composition-id, và timeline phải dựng đồng bộ`);
+  if (!timeline) throw new Error(`window.__timelines["${id}"] is missing — the key must equal data-composition-id and the timeline must be built synchronously`);
   return { win, doc, root, id, timeline, width: +root.dataset.width || 1920, height: +root.dataset.height || 1080, declared: +root.dataset.duration || 0 };
 }
 
@@ -43,7 +43,7 @@ function seek(comp, time) {
 }
 
 try {
-  if (!src) throw new Error('thiếu tham số ?src=');
+  if (!src) throw new Error('missing ?src= parameter');
   const probeFrame = document.createElement('iframe');
   probeFrame.style.cssText = 'position:absolute;left:-99999px;width:10px;height:10px';
   document.body.appendChild(probeFrame);
@@ -51,18 +51,25 @@ try {
   const timelineDuration = +probe.timeline.duration().toFixed(3);
   Object.assign(info, { composition: probe.id, width: probe.width, height: probe.height, declaredDuration: probe.declared, timelineDuration });
   if (timelineDuration > probe.declared + 0.01)
-    info.warnings.push(`timeline dài ${timelineDuration}s nhưng data-duration là ${probe.declared}s — phần sau ${probe.declared}s sẽ bị cắt`);
+    info.warnings.push(`the timeline is ${timelineDuration}s long but data-duration is ${probe.declared}s — everything after ${probe.declared}s is cut`);
 
   // Các chuỗi nhân vật (kichBan gắn sẵn nhãn vào timeline con).
   info.sequences = probe.timeline.getChildren(true, false, true).filter((child) => child.data && child.data.type === 'character-sequence').map((child) => {
     const start = +child.startTime().toFixed(3), end = +(child.startTime() + child.duration()).toFixed(3);
-    if (end > probe.declared + 0.01) info.warnings.push(`chuỗi của "${child.data.character}" kết thúc ở ${end}s, sau data-duration ${probe.declared}s`);
+    if (end > probe.declared + 0.01) info.warnings.push(`the sequence of "${child.data.character}" ends at ${end}s, after data-duration ${probe.declared}s`);
     return { character: child.data.character, start, end,
              steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2) })) };
   });
+  // Hai nhân vật NÓI chồng lên nhau: gần như luôn là lỗi dàn cảnh, mà nhìn ảnh tĩnh không thấy.
+  const speech = info.sequences.flatMap((seq) => seq.steps.filter((step) => ['speak', 'explain', 'speakCues'].includes(step.name)).map((step) => ({ ...step, who: seq.character })));
+  for (let a = 0; a < speech.length; a++) for (let b = a + 1; b < speech.length; b++) {
+    const overlap = Math.min(speech[a].end, speech[b].end) - Math.max(speech[a].start, speech[b].start);
+    if (speech[a].who !== speech[b].who && overlap > 0.15)
+      info.warnings.push(`"${speech[a].who}" and "${speech[b].who}" speak at the same time for ${overlap.toFixed(1)}s (around ${Math.max(speech[a].start, speech[b].start).toFixed(1)}s)`);
+  }
   for (const clip of probe.doc.querySelectorAll('.clip[data-start]')) {
     const end = +clip.dataset.start + +clip.dataset.duration;
-    if (end > probe.declared + 0.01) info.warnings.push(`clip #${clip.id || clip.tagName.toLowerCase()} kết thúc ở ${end}s, sau data-duration`);
+    if (end > probe.declared + 0.01) info.warnings.push(`clip #${clip.id || clip.tagName.toLowerCase()} ends at ${end}s, after data-duration`);
   }
   probeFrame.remove();
 

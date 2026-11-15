@@ -1,36 +1,47 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Bảng tư thế</title>
-<!-- Bảng tư thế của MỘT nhân vật, để soát bằng mắt:  tools/sheet.html?nv=<id>
-     Hàng 1: đứng yên (toàn thân, cận ngực, cận mặt). Hàng 2–3: giữa các động tác. -->
+<title>Pose sheet</title>
+<!-- Bảng tư thế của MỘT nhân vật, để soát bằng mắt:  tools/sheet.html?nv=<id>[&config=0]
+     Hàng 1: đứng yên (toàn thân, cận ngực, cận mặt, hai góc xoay). Các hàng sau: giữa từng động tác.
+     Mặc định áp configs/<id>.json nếu có (đúng nhân vật mà bundle sẽ dựng); &config=0 để bỏ qua. -->
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
 <body style="margin:0;background:#1d3a4b;display:flex;flex-wrap:wrap;font:12px system-ui;color:#cfe">
 <script type="module">
-import { RigSVG, RigThu, seed } from '../runtime/index.js';
+import { RigThu, createCharacter, createPet, seed } from '../runtime/index.js';
 import { khungMat } from '../studio/params.js';
 seed(1);
-const nv = new URLSearchParams(location.search).get('nv') || 'vet', thu = nv in RigThu.LOAI;
-const o = (nhan, fn, khung) => {
-  const hop = document.createElement('div'); hop.style.cssText = 'width:256px;height:300px;outline:1px solid #345;overflow:hidden;position:relative';
-  const d = document.createElement('div'); d.style.cssText = 'width:100%;height:100%'; hop.appendChild(d); document.body.appendChild(hop);
-  const r = thu ? new RigThu(d, nv) : new RigSVG(d, nv);
-  if (fn) fn(r); r.apDung(); if (khung) r.svg.setAttribute('viewBox', khung(r));
-  const l = document.createElement('span'); l.textContent = nhan; l.style.cssText = 'position:absolute;left:5px;top:3px'; hop.appendChild(l);
+const query = new URLSearchParams(location.search);
+const id = query.get('nv') || 'vet', pet = id in RigThu.LOAI;
+
+// Bộ số đã lưu cho nhân vật này (nếu có và không bị tắt).
+let config = null;
+if (query.get('config') !== '0') {
+  try { const response = await fetch(`../configs/${id}.json`, { cache: 'no-store' }); if (response.ok) config = await response.json(); } catch (error) { /* không có tệp */ }
+}
+
+const panel = (label, pose, viewBox) => {
+  const box = document.createElement('div'); box.style.cssText = 'width:256px;height:300px;outline:1px solid #345;overflow:hidden;position:relative';
+  const host = document.createElement('div'); host.style.cssText = 'width:100%;height:100%'; box.appendChild(host); document.body.appendChild(box);
+  const rig = (pet ? createPet(host, { species: id, config }) : createCharacter(host, { id, config })).rig;
+  if (pose) pose(rig); rig.render(); if (viewBox) rig.svg.setAttribute('viewBox', viewBox(rig));
+  const caption = document.createElement('span'); caption.textContent = label; caption.style.cssText = 'position:absolute;left:5px;top:3px'; box.appendChild(caption);
 };
-const giua = (m, p = 0.45, ...ts) => (r) => { r[m](...ts).progress(p); };
-if (thu) {
-  o('nghỉ'); o('cận mặt', null, (r) => r.khungMat(70));
-  for (const m of RigThu.DONG_TAC[RigThu.LOAI[nv].loai].slice(1)) o(m, giua(m, 0.5));
+const mid = (action, progress = 0.45, ...args) => (rig) => { rig[action](...args).progress(progress); };
+const tag = config ? ' (config)' : '';
+if (pet) {
+  panel('rest' + tag); panel('face', null, (rig) => rig.khungMat(70));
+  for (const action of RigThu.DONG_TAC[RigThu.LOAI[id].loai].slice(1)) panel(action, mid(action, 0.5));
 } else {
   // Khung cận TÍNH từ tỉ lệ của chính nhân vật (cỡ đầu, cỡ thân, độ dài chân), không đặt cứng:
   // khung cứng hợp với nhân vật chibi thì cắt mất cằm hoặc tay của nhân vật ít chibi hơn.
-  const faceBox = (r) => khungMat(r, 80);
-  const chestBox = (r) => { const cy = 262 - 52 * r.nv.coThan + 30 + r.hangChan(), half = 82 * r.nv.coThan; return `${200 - half} ${cy - half * 1.05} ${half * 2} ${half * 2.35}`; };
-  o('nghỉ'); o('cận ngực', null, chestBox); o('cận mặt', null, faceBox);
-  o('nghiêng 50%', (r) => { r.s.huong = 0.5; }); o('nghiêng 100%', (r) => { r.s.huong = 1; });
-  for (const [m, p, ...ts] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
-                               ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],
-                               ['express', 0.5, 'happy'], ['express', 0.5, 'sad'], ['express', 0.5, 'surprised'], ['express', 0.5, 'angry'], ['turn', 0.5, 'left']]) o(m, giua(m, p, ...ts));
+  const faceBox = (rig) => khungMat(rig, 80);
+  const chestBox = (rig) => { const cy = 262 - 52 * rig.nv.coThan + 30 + rig.hangChan(), half = 82 * rig.nv.coThan; return `${200 - half} ${cy - half * 1.05} ${half * 2} ${half * 2.35}`; };
+  panel('rest' + tag); panel('chest close-up', null, chestBox); panel('face close-up', null, faceBox);
+  panel('turned 50%', (rig) => { rig.state.facing = 0.5; }); panel('turned 100%', (rig) => { rig.state.facing = 1; });
+  for (const [action, progress, ...args] of [['wave', 0.4], ['thumbsUp', 0.45], ['present', 0.4], ['explain', 0.45, 'xin chào bạn nhé', 2.4], ['shrug', 0.4],
+                                             ['walk', 0.5], ['march', 0.3], ['point', 0.5, { x: 40, y: 230 }], ['worry', 0.5], ['sit', 0.5],
+                                             ['express', 0.5, 'happy'], ['express', 0.5, 'sad'], ['express', 0.5, 'surprised'], ['express', 0.5, 'angry'], ['turn', 0.5, 'left']])
+    panel(action === 'express' ? `express: ${args[0]}` : action === 'turn' ? `turn: ${args[0]}` : action, mid(action, progress, ...args));
 }
-document.title = 'XONG';
+document.title = 'DONE';
 </script>

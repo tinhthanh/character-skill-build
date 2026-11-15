@@ -1,0 +1,19 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Chrome có sẵn trên runner ubuntu-latest; tools/chrome.sh tự tìm google-chrome.
+      - name: Every character × every action
+        run: sh tools/check.sh
+      - name: dist/ is committed up to date
+        run: git diff --exit-code -- dist

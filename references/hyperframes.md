@@ -127,8 +127,9 @@ sh tools/peek.sh /path/to/project/index.html 0,1.5,3,6 /tmp/peek.png
 ```
 
 It prints the composition's declared and actual duration, the start and end of every step of
-every character sequence, and warnings for anything that runs past `data-duration`; then it
-saves one contact-sheet image of the requested frames. Use it to fit the script to the planned
+every character sequence, and warnings for anything that runs past `data-duration` or for two
+characters speaking at the same time; then it saves one contact-sheet image of the requested
+frames. Use it to fit the script to the planned
 length and to check staging, instead of rendering.
 
 ## Lip-sync to a voice-over
@@ -155,7 +156,8 @@ npx hyperframes render -o out.mp4 .
 - `lint` reads the bundle's source too. It rejects `querySelector` calls with interpolated
   template literals, so keep custom drawing code free of them (the library builds selectors by
   string concatenation for this reason).
-- `check` reports warnings that are not defects of the composition. Expect, per character:
+- `check` may report warnings that are not defects of the composition. Depending on the
+  poses it samples, per character:
   - `off_pivot_rotation` on arm parts (`#rig1-batR`, `#rig1-cangL`) or a pet's head
     (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
     joint. Several can appear. (Element ids inside the SVG use the rigs' internal names.)
@@ -166,18 +168,30 @@ npx hyperframes render -o out.mp4 .
 - After rendering, scrub the first two seconds of any `enter`: the character must walk in and
   stop, not snap back. `tools/check.sh` guards this, but it is the failure worth a look.
 
+## Things the composition has to provide
+
+The library draws characters only. A scene usually needs:
+
+- **A chair for `sit`.** `sit` lowers the character as onto an unseen seat about 0.2 × host
+  height above the floor. Draw the chair as its own element behind the character's host.
+- **Flat siblings, not nested wrappers.** Keep the chair, counter, speech bubbles and the
+  character hosts as direct children of the composition root. `hyperframes check` reports
+  `nested_structure_needs_subcomposition` when timed clips are wrapped in an extra container.
+- **Speech bubbles or captions.** `speak` and `explain` move the mouth; they do not show text.
+
 ## How it stays deterministic
 
 - All randomness goes through one seeded generator.
-- State is a function of timeline time: walking is driven by a tweened phase with a property
-  setter, not by callbacks, so seeking backwards restores position and pose.
+- `sequence()` plays its actions forward once while building, records the character's state
+  60 times a second, and returns a timeline with a single tween that looks the state up. A
+  frame therefore depends only on its time, never on where the playhead came from.
 - The rig redraws from its state object on every write, so it renders correctly whether the
   renderer seeks with `totalTime(t, false)` or with `seek(t)` (which suppresses GSAP callbacks).
 - Rig timelines use `lazy: false`. GSAP normally defers a tween's first write to the end of
   the tick; when a renderer jumps straight to a frame, a later tween would otherwise record
   its start value before an earlier one has written, and the character snaps to a stale
   position.
-- `tools/check.sh` asserts these: same seed gives the same timeline, seeking to one time by
-  two different paths gives the same state, frame 0 of a sequence that starts with `enter`
-  has the character off-frame, and no frame-to-frame position jump in a sequence built on a
-  fresh page.
+- `tools/check.sh` asserts these: same seed gives the same timeline; for every action placed
+  mid-sequence, seeking to a time from before and from after gives the same state; frame 0 of
+  a sequence that starts with `enter` has the character off-frame; and no frame-to-frame
+  position jump in a sequence built on a fresh page.

@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>describing…</title>
+<!-- In ra ĐỊNH NGHĨA HIỆN TẠI của một nhân vật theo lược đồ công khai: tools/describe.sh <id>
+     Dùng để biết nhân vật gốc đang có những số nào trước khi ghi đè hoặc viết config. -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<div id="host" style="width:400px;height:470px"></div><pre id="out"></pre>
+<script type="module">
+const out = { ok: true };
+try {
+  const { RigSVG, RigThu, kit, list } = await import('../runtime/index.js');
+  const { DEFINITION_KEYS } = await import('../runtime/schema.js');
+  const id = new URLSearchParams(location.search).get('nv') || 'vet';
+  if (id in RigThu.LOAI) {
+    const rig = new RigThu(document.getElementById('host'), id);
+    const { COLOR_KEYS } = await import('../runtime/schema.js');
+    const names = Object.fromEntries(Object.entries(COLOR_KEYS).map(([pub, internal]) => [internal, pub]));
+    Object.assign(out, { id, kind: 'pet', name: list().pets[id], actions: rig.actions, shape: rig.shape,
+      shapeRange: RigThu.SHAPE_RANGE, colors: Object.fromEntries(Object.entries(rig.mauKhai).map(([k, v]) => [names[k] || k, v])) });
+  } else if (id in RigSVG.NHAN_VAT) {
+    const definition = kit.partsOf(id);
+    // Bảng màu đầy đủ (khoá nội bộ + bí danh công khai) lấy từ một rig thật: các hàm vẽ của
+    // nhân vật có sẵn đọc khoá nội bộ, đưa cho chúng bảng màu công khai là chúng ném lỗi.
+    const palette = new RigSVG(document.getElementById('host'), id).mau;
+    const numbers = {}, other = {};
+    for (const [key, value] of Object.entries(definition)) {
+      // Chỉ in khoá thuộc lược đồ CÔNG KHAI; bỏ hàm vẽ, các nhóm in riêng, và chuỗi đường vẽ dài.
+      if (!(key in DEFINITION_KEYS) || ['colors', 'restPose', 'faceShape', 'brows', 'name', 'sideShading'].includes(key) || typeof value === 'function') continue;
+      if (typeof value === 'number') numbers[key] = value;
+      else if (value !== null && typeof value !== 'object' && key.length < 24) other[key] = value;
+    }
+    // Các slot "có thể rỗng": chỉ báo là có khi nhân vật thật sự vẽ gì đó ở đó.
+    const draws = (key) => { try { return String(definition[key]('p', palette, definition) || '').trim() !== ''; } catch (error) { return true; } };
+    Object.assign(out, { id, kind: 'person', name: list().people[id],
+      inheritedParts: { hat: draws('hat'), faceExtras: draws('faceExtras'), beard: draws('beard'), shoulderAccessories: draws('shoulderAccessories') },
+      switches: other, numbers, faceShape: definition.faceShape, brows: definition.brows, restPose: definition.restPose, colors: definition.colors });
+  } else { out.ok = false; out.error = `no character or species "${id}" (people: ${Object.keys(RigSVG.NHAN_VAT).join(', ')}; pets: ${Object.keys(RigThu.LOAI).join(', ')})`; }
+} catch (error) { out.ok = false; out.error = String(error && error.message || error); }
+document.getElementById('out').textContent = JSON.stringify(out);
+document.title = 'DONE';
+</script>

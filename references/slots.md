@@ -14,7 +14,10 @@ resolved palette (`c.hair`, `c.top`, …) and `side` is `'L'` or `'R'` (screen l
 
 ## What each base already sets
 
-Know what you inherit before you override. "—" means none / off.
+Know what you inherit before you override. "—" means none / off. For the exact numbers,
+colours and rest pose a base carries right now, run `sh tools/describe.sh <id>`: it prints the
+definition in this schema as JSON, including which optional parts (hat, face extras, beard,
+shoulder accessories) the base actually draws.
 
 | Base | Hair | `hat` | `faceExtras` | Top | `longSleeves` | `shoulderAccessories` | Rest pose | Extra colours |
 |---|---|---|---|---|---|---|---|---|
@@ -32,6 +35,7 @@ You cannot delete a key, only override it.
 | To remove | Override |
 |---|---|
 | a hat | `hat: () => ''` — the back of the head falls back to the hair colour by itself |
+| hair behind the head | `backHair: 'low'` (bald on top, hair from the ears down) or `'none'` (bald). Without it, a bald-on-top `hair` drawing still grows a full head of hair when the character turns |
 | glasses or other face extras | `faceExtras: () => ''` |
 | a beard | `beard: () => ''` |
 | a stethoscope / lanyard | `shoulderAccessories: () => ''` **and** an `accessories` that does not draw it. For the coat, spread `kit.outfits.plainCoat` instead of `kit.outfits.coat` — same coat, no stethoscope |
@@ -84,10 +88,10 @@ The frame (`viewBox`) is 400 × 470; the ground is at y = 428 and the character 
 
 Back to front. Later items cover earlier ones.
 
-1. back-of-skull hair mass — generated; hair colour, or the `backSkullColor` colour while a hat is drawn
+1. back-of-skull hair mass — generated according to `backHair`; hair colour, or the `backSkullColor` colour while a hat is drawn
 2. face skin (`faceShape`)
 3. `hair`
-4. nape hair — generated when the head turns, clipped to the face outline
+4. nape hair — generated when the head turns (according to `backHair`), clipped to the face outline
 5. ears
 6. `hat`
 7. cheek blush
@@ -113,12 +117,12 @@ glasses stay on the eyes; it does not move when the character looks around or bl
 | `nose` | `(c) => svg` | |
 | `faceExtras` | `(p, c) => svg` | Glasses, freckles. Head space. `kit.parts.roundGlasses(c)` is ready-made. |
 | `beard` | `(p, c) => svg` | Beard and moustache. Head space. `kit.parts.shortBeard(c)`, `kit.parts.moustache(c)`. |
-| `top` | `() => pathData` | Outline of the torso garment (a path `d` string). |
+| `top` | `() => pathData` | Outline of the torso garment (a path `d` string), torso space. A plain straight top, drawn clockwise from the left hem: `'M -30 20 Q 0 26 30 20 L 29 -40 Q 29.5 -70 35 -88 Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88 Q -29.5 -70 -29 -40 Z'`. Keep the shoulder part (from `35 -88` round to `-35 -88`) as it is so sleeves and neck meet it; change the sides and the hem. |
 | `sideShading` | `pathData` | Side shading, must lie inside `top`. Build it with `kit.sideShading([[x, y], …])` from the right-hand edge points of `top`. Opacity is `sideShadingOpacity`. |
 | `collar` | `(p, c) => svg` | Drawn over the neck. Start with `kit.shoulderPatches(c)` to cover the flare at the base of the neck. |
 | `accessories` | `(p, c, def) => svg` | Everything on the torso: pockets, buttons, badges. **Must** be wrapped in `<g id="${p}-accessories">`. |
 | `shoulderAccessories` | `(p, c, def) => svg` | A second copy of whatever hangs over the shoulders (stethoscope, lanyard, scarf). Drawn above the sleeves, clipped to the shoulder area. |
-| `shoes` | `(p, side, c, ankleY) => svg` | Front-view shoe. **Must** carry `id="${p}-shoe-${side}"`. `kit.closedShoes(stripeColour or null)` returns a ready-made one. |
+| `shoes` | `(p, side, c, ankleY) => svg` | Front-view shoe, in **shin space**: x = 0 is the middle of the leg, y grows downward, the ankle is at y = `ankleY` and the sole at about `ankleY + 12`; the leg is 22 units wide. A shoe spans roughly x −12…12, y `ankleY − 6`…`ankleY + 12`; start higher (say `ankleY − 26`) for a boot. **Must** carry `id="${p}-shoe-${side}"`. `kit.closedShoes(stripeColour or null)` returns a ready-made one. |
 
 ## Number keys
 
@@ -137,7 +141,8 @@ glasses stay on the eyes; it does not move when the character looks around or bl
 
 ## Rest pose
 
-`restPose` takes any state key. The common ones:
+`restPose` takes any state key. Every action returns to it, so a tilted head or a fist set
+here survives a wave or a walk. The common ones:
 
 | Key | Meaning |
 |---|---|
@@ -149,8 +154,11 @@ glasses stay on the eyes; it does not move when the character looks around or bl
 | `headTilt` | degrees |
 | `handL` `handR` | `'relaxed'` · `'fist'` · `'thumb'` · `'point'` |
 
+| `lean` | degrees the torso leans **sideways** (not forward; there is no forward stoop) |
+
 Arms down ≈ `upperArm 10, forearm −13`; hands clasped at the belly ≈ `upperArm 17…19,
-forearm −92…−97` (shorter forearms need a deeper fold).
+forearm −92…−97` (shorter forearms need a deeper fold); a hand on the hip ≈ `upperArm 34,
+forearm −78` with `hand: 'fist'` (elbow out, fist at the waist).
 
 ## Palette (`colors`)
 
@@ -192,7 +200,11 @@ Spreading an outfit sets `top`, `sideShading`, `collar`, `accessories`,
 ## Configs
 
 A config is the same numbers grouped for the studio, stored as `configs/<id>.json` and baked
-into the bundle. Groups for people: `proportions`, `arms` (plus `restUpperArm`,
+into the bundle. Values are **absolute replacements** for the definition's values, not
+multipliers of them: `{ "proportions": { "headSize": 1.4 } }` sets the head size to 1.4
+whatever the definition says. Only the keys present are changed. `tools/describe.sh <id>`
+shows the values a config would be replacing, and `tools/shot.sh <id>` renders the character
+with its config applied (`--no-config` for the bare definition). Groups for people: `proportions`, `arms` (plus `restUpperArm`,
 `restForearm`), `sleeves`, `legs`, `faceShape`, `brows`, `browPosition`, `features`
 (`eyeSpacing`, `eyeY`, `eyeSize`, `noseOffsetY`, `noseSize`, `mouthY`, `mouthWidth`),
 `restPose`, `colors`. `VGCharacter.validateConfig(config)` lists what is wrong with one.

@@ -57,7 +57,7 @@ const chinhSang = (c, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 const NGHI = Object.freeze({
@@ -239,7 +239,7 @@ export class RigThu {
 
   constructor(host, loai = 'dog') {
     const nv = typeof loai === 'string' ? LOAI[loai] : loai;
-    if (!nv) throw new Error(`[RigThu] không có loài "${loai}" (có: ${Object.keys(LOAI).join(', ')})`);
+    if (!nv) throw new Error(`[character] no species "${loai}" (available: ${Object.keys(LOAI).join(', ')})`);
     this.host = host;
     this.base = nv;                               // hình thể gốc của giống — setShape tính lại từ đây
     this.shape = { ...DEFAULT_SHAPE };
@@ -471,8 +471,8 @@ export class RigThu {
    */
   setShape(changes = {}) {
     for (const [key, value] of Object.entries(changes)) {
-      if (!(key in SHAPE_RANGE)) throw new Error(`[RigThu] không có núm hình dáng "${key}" (có: ${Object.keys(SHAPE_RANGE).join(', ')})`);
-      if (!Number.isFinite(value)) throw new Error(`[RigThu] ${key}: ${JSON.stringify(value)} phải là số`);
+      if (!(key in SHAPE_RANGE)) throw new Error(`[character] no shape dial "${key}" (available: ${Object.keys(SHAPE_RANGE).join(', ')})`);
+      if (!Number.isFinite(value)) throw new Error(`[character] shape.${key}: ${JSON.stringify(value)} must be a number`);
       this.shape[key] = clamp(value, SHAPE_RANGE[key][0], SHAPE_RANGE[key][1]);
     }
     const palette = this.nv.mau;
@@ -596,10 +596,11 @@ export class RigThu {
     } else this.#vay(t, 0, Math.max(2, Math.floor(dur / 0.55)), 7, dur / Math.max(2, Math.floor(dur / 0.55)));
     if (dur > 2.4) {                                      // giật tai một cái, liếc mắt
       const a = dur * 0.45, tai = ngau() < 0.5 ? 'taiL' : 'taiR';
-      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: 0, duration: 0.2 }, a + 0.1);
-      t.to(s, { nhinX: 2, dau: 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
+      const N = this.NGHI;                                  // mọi thứ trả về tư thế nghỉ của con vật, không về 0
+      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: N[tai], duration: 0.2 }, a + 0.1);
+      t.to(s, { nhinX: N.nhinX + 2, dau: N.dau + 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: N.nhinX, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
     }
-    t.to(s, { duoi: 0, duoiCong: 0, duration: 0.2 }, dur - 0.2);
+    t.to(s, { duoi: this.NGHI.duoi, duoiCong: this.NGHI.duoiCong, duration: 0.2 }, dur - 0.2);
     return t;
   }
 

@@ -4,10 +4,10 @@ import html, json, re, sys
 
 matches = re.findall(r'<pre id="info">(.*?)</pre>', sys.stdin.read(), re.S)
 if not matches or not matches[-1].strip():
-    print('peek: trang xem trước không trả kết quả (composition không nạp được?)', file=sys.stderr); sys.exit(1)
+    print('peek: the preview page returned nothing (did the composition fail to load?)', file=sys.stderr); sys.exit(1)
 info = json.loads(html.unescape(matches[-1]))
 if not info.get('ok'):
-    print('peek: ' + info.get('error', 'lỗi không rõ'), file=sys.stderr); sys.exit(1)
+    print('peek: ' + info.get('error', 'unknown error'), file=sys.stderr); sys.exit(1)
 if '--size' in sys.argv:
     print(f"{info['sheet']['width']},{info['sheet']['height']}"); sys.exit(0)
 
@@ -18,7 +18,7 @@ for seq in info.get('sequences', []):
     for step in seq['steps']:
         print(f"    {step['start']:6.2f} – {step['end']:6.2f}  {step['name']}")
 if not info.get('sequences'):
-    print('\n  (không có chuỗi kichBan nào trong timeline)')
+    print('\n  (no character sequences in the timeline)')
 for warning in info.get('warnings', []):
     print(f"\n  ⚠ {warning}")
-print('\nkhung đã chụp: ' + ', '.join(f"{t:g}s" for t in info['times']))
+print('\nframes captured: ' + ', '.join(f"{t:g}s" for t in info['times']))

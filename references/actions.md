@@ -4,7 +4,9 @@ Every action is a method on the rig that **returns a paused GSAP timeline** and 
 the rest pose (except where noted). In a composition, sequence them with
 `VGCharacter.sequence(rig, steps)` rather than adding them one by one.
 
-A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds).
+A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds). `sequence`
+inserts a 0.1 s gap between consecutive steps by default; change it with
+`sequence(rig, steps, { gap: 0 })`.
 
 ## People — `VGCharacter.createCharacter(host, { id, config }).rig`
 
@@ -30,7 +32,7 @@ A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds).
 | `stepInPlace` | `(steps = 6)` | steps on the spot, arms still | 2.9 |
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |
-| `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units | 2.4 |
+| `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
 | `enter` | `(from = 'left')` | walk in from off-frame, from the `'left'` or the `'right'` | 1.6–2.1 |
 | `exit` | `(to = 'right')` | walk out of frame to the `'right'` or the `'left'` — **ends hidden** | 1.6–2.0 |
 
@@ -93,7 +95,7 @@ end of every step.
 |---|---|
 | `VGCharacter.createCharacter(host, { id, config })` | build a person; returns `{ rig, id }`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
-| `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps` |
+| `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps`. The result is pre-sampled, so seeking to any time, in any order, gives the same frame |
 | `VGCharacter.seed(n)` | fix all randomness; `null` restores `Math.random` |
 | `VGCharacter.list()` | ids, action names, expression names, baked config ids |
 | `VGCharacter.validateConfig(config, kind)` | list a config's problems (`kind`: `'person'` or `'pet'`) |

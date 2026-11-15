@@ -40,9 +40,9 @@ def load(module):
             load(target)
             if what.startswith('{'): lines.append(f"const {what} = __m['{target}'];")
             elif re.match(r'^[A-Za-z_$][\w$]*$', what): lines.append(f"const {what} = __m['{target}'].default;")
-            else: sys.exit(f'[build] {module}: không hiểu dạng import: {line}')
+            else: sys.exit(f'[build] {module}: unsupported import form: {line}')
             continue
-        if line.startswith('import '): sys.exit(f'[build] {module}: không hiểu dạng import: {line}')
+        if line.startswith('import '): sys.exit(f'[build] {module}: unsupported import form: {line}')
         m = re.match(r'^export\s+(?:async\s+)?(?:function\*?|class|const|let)\s+([A-Za-z_$][\w$]*)', line)
         if m:
             exports.append(m.group(1)); lines.append(re.sub(r'^export\s+', '', line)); continue
@@ -52,7 +52,7 @@ def load(module):
         m = re.match(r'^export\s+\{(.+?)\};\s*$', line)
         if m:
             exports += [x.strip() for x in m.group(1).split(',') if x.strip()]; continue
-        if line.startswith('export '): sys.exit(f'[build] {module}: không hiểu dạng export: {line}')
+        if line.startswith('export '): sys.exit(f'[build] {module}: unsupported export form: {line}')
         lines.append(line)
     code[module] = '\n'.join(lines) + '\nreturn { ' + ', '.join(exports) + ' };'
     order.append(module)
@@ -69,7 +69,7 @@ for path in sorted(glob.glob(os.path.join(ROOT, 'configs', '*.json'))):
     try:
         with open(path, encoding='utf-8') as f: baked[os.path.splitext(os.path.basename(path))[0]] = json.load(f)
     except Exception as error:
-        sys.exit(f'[build] configs/{os.path.basename(path)} không phải JSON hợp lệ: {error}')
+        sys.exit(f'[build] configs/{os.path.basename(path)} is not valid JSON: {error}')
 
 out = [f'/* {GLOBAL_NAME} v{version} — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */',
        f'var {GLOBAL_NAME} = (function () {{', "'use strict';", 'const __m = {};']
@@ -100,4 +100,4 @@ os.makedirs(os.path.join(ROOT, 'dist'), exist_ok=True)
 for name, text in (('character.iife.js', full), ('character.slim.js', slim(full))):
     with open(os.path.join(ROOT, 'dist', name), 'w', encoding='utf-8') as f: f.write(text)
 size = lambda name: os.path.getsize(os.path.join(ROOT, 'dist', name)) // 1024
-print(f"[build] v{version} · {len(order)} module · {len(baked)} config → dist/character.iife.js ({size('character.iife.js')} KB), dist/character.slim.js ({size('character.slim.js')} KB)")
+print(f"[build] v{version} · {len(order)} modules · {len(baked)} baked configs → dist/character.iife.js ({size('character.iife.js')} KB), dist/character.slim.js ({size('character.slim.js')} KB)")

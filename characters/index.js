@@ -1,6 +1,6 @@
-// Danh sách nhân vật TUỲ CHỈNH. Thêm nhân vật mới = thêm một tệp trong thư mục này (chép từ
-// `_template.js`) rồi thêm nó vào mảng dưới đây. Thứ tự có ý nghĩa: nhân vật có `base` là
-// một nhân vật tuỳ chỉnh khác thì phải đứng SAU nhân vật ấy.
+// The list of CUSTOM characters. To add one: create a file in this folder (copy `_template.js`)
+// and add it to the array below. Order matters: a character whose `base` is another custom
+// character must come AFTER it.
 import receptionist from './receptionist.js';
 
 export default [receptionist];

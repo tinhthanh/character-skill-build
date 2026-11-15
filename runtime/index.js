@@ -18,7 +18,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -73,7 +73,7 @@ export const kit = {
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
   parts: { roundGlasses, shortBeard, moustache },
   partsOf(id) {
-    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): không có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
   },
 };
@@ -83,7 +83,7 @@ export const kit = {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && v !== undefined && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 
 /**
@@ -98,30 +98,30 @@ function assertColors(palette, where) {
 export function validateConfig(config, kind = 'person') {
   const problems = [];
   if (config === null || config === undefined) return problems;
-  if (typeof config !== 'object' || Array.isArray(config)) return ['config phải là một object'];
+  if (typeof config !== 'object' || Array.isArray(config)) return ['config must be an object'];
   const pet = kind === 'pet';
   const numberGroups = pet ? { shape: PET_SHAPE_KEYS } : Object.fromEntries(Object.entries(CONFIG_GROUPS).map(([g, [, table]]) => [g, Object.keys(table)]));
   const stateKeys = pet ? PET_STATE_KEYS : PERSON_STATE_KEYS;
   const allowed = [...Object.keys(numberGroups), ...(pet ? [] : ['restPose']), 'colors'];
   for (const [group, value] of Object.entries(config)) {
-    if (!allowed.includes(group)) { problems.push(`nhóm lạ "${group}" (hợp lệ: ${allowed.join(', ')})`); continue; }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" phải là một object`); continue; }
+    if (!allowed.includes(group)) { problems.push(`unknown group "${group}" (valid: ${allowed.join(', ')})`); continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" must be an object`); continue; }
     for (const [key, v] of Object.entries(value)) {
       if (group === 'colors') {
-        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} không phải mã hex (#rgb / #rrggbb)`);
+        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} is not a hex colour (#rgb / #rrggbb)`);
       } else if (group === 'restPose') {
-        if (!(key in stateKeys)) problems.push(`restPose.${key}: không có khoá trạng thái này`);
-        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là một trong ${Object.keys(HAND_SHAPES).join(', ')}`); }
-        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là số`);
-      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: khoá lạ (hợp lệ: ${numberGroups[group].join(', ')})`);
-      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} phải là số`);
+        if (!(key in stateKeys)) problems.push(`restPose.${key}: no such state key`);
+        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be one of ${Object.keys(HAND_SHAPES).join(', ')}`); }
+        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be a number`);
+      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: unknown key (valid: ${numberGroups[group].join(', ')})`);
+      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} must be a number`);
     }
   }
   return problems;
 }
 function assertConfig(config, kind, who) {
   const problems = validateConfig(config, kind);
-  if (problems.length) throw new Error(`[character] config của "${who}" không hợp lệ:\n  - ${problems.join('\n  - ')}`);
+  if (problems.length) throw new Error(`[character] invalid config for "${who}":\n  - ${problems.join('\n  - ')}`);
 }
 
 /* ─────────────────────────────────────────────────────────────── đăng ký */
@@ -133,20 +133,22 @@ function assertConfig(config, kind, who) {
  *   define  (base, kit) => object định nghĩa, khoá tiếng Anh (bảng khoá: references/slots.md)
  */
 export function registerCharacter({ id, base = 'vet', define }) {
-  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] id không hợp lệ: "${id}"`);
+  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] invalid id "${id}" (use lowercase letters, digits and underscores)`);
   const baseDefinition = RigSVG.NHAN_VAT[base];
-  if (!baseDefinition) throw new Error(`[character] "${id}" dựa trên "${base}" nhưng chưa có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (!baseDefinition) throw new Error(`[character] "${id}" is based on "${base}", which is not registered (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   // Trùng id thì DỪNG, không ghi đè: hai tệp nhân vật cùng một id là nhân vật đăng ký trước
   // biến mất không dấu vết, và composition nào đang dùng nó bỗng ra một người khác.
-  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" đã có nhân vật "${RigSVG.NHAN_VAT[id].ten || id}" — đặt id khác`);
-  if (typeof define !== 'function') throw new Error(`[character] "${id}": thiếu hàm define(base, kit)`);
+  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" is already registered — choose another id`);
+  if (typeof define !== 'function') throw new Error(`[character] "${id}": missing define(base, kit) function`);
   const written = define(definitionToPublic(baseDefinition), kit);
-  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() phải trả về một object`);
+  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() must return an object`);
   const definition = definitionToInternal(written);
-  if (definition.mau) assertColors(definition.mau, `nhân vật "${id}"`);
+  if (definition.mau) assertColors(definition.mau, `character "${id}" colors`);
+  if (definition.backHair !== undefined && !['full', 'low', 'none'].includes(definition.backHair))
+    throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor trỏ tới màu không có trong colors`);
+    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }
@@ -183,7 +185,7 @@ function applyInternalPersonConfig(rig, c) {
 export function applyConfig(rig, config) {
   if (!config) return rig;
   const pet = rig instanceof RigThu;
-  assertConfig(config, pet ? 'pet' : 'person', rig.nv.ten || 'nhân vật');
+  assertConfig(config, pet ? 'pet' : 'person', rig.publicId || 'character');
   const internal = configToInternal(config, pet);
   if (!pet) applyInternalPersonConfig(rig, internal);
   else {
@@ -200,11 +202,12 @@ export function applyConfig(rig, config) {
  *   config  object bộ số. Bỏ trống → dùng bộ số đã nướng vào bản dựng (nếu có); `null` → không dùng
  */
 export function createCharacter(host, { id = 'vet', config } = {}) {
-  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] không có nhân vật "${id}" (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
   host.style.aspectRatio = `${RigSVG.KHUNG.w}/${RigSVG.KHUNG.h}`;
   const rig = new RigSVG(host, id);
+  rig.publicId = id;
   applyConfig(rig, config);
   return { rig, id };
 }
@@ -215,11 +218,12 @@ export function createCharacter(host, { id = 'vet', config } = {}) {
  *   config   { shape: {…}, colors: {…} } — quy tắc mặc định như createCharacter
  */
 export function createPet(host, { species = 'dog', config } = {}) {
-  if (!RigThu.LOAI[species]) throw new Error(`[character] không có giống "${species}" (có: ${Object.keys(RigThu.LOAI).join(', ')})`);
+  if (!RigThu.LOAI[species]) throw new Error(`[character] no species "${species}" (available: ${Object.keys(RigThu.LOAI).join(', ')})`);
   if (config === undefined) config = bakedConfigs[species] || null;
   assertConfig(config, 'pet', species);
   host.style.aspectRatio = `${RigThu.KHUNG.w}/${RigThu.KHUNG.h}`;
   const rig = new RigThu(host, species);
+  rig.publicId = species;
   applyConfig(rig, config);
   return { rig, id: species };
 }
@@ -227,11 +231,19 @@ export function createPet(host, { species = 'dog', config } = {}) {
 /** Gieo hạt cho MỌI thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). Bắt buộc khi dựng video. */
 export function seed(value) { RigSVG.gieo(value); RigThu.gieo(value); }
 
+// Tên hiển thị TIẾNG ANH của các nhân vật và giống có sẵn. Tên trong hai bộ rig là tiếng Việt
+// (studio dùng); phía công khai trả về tên ở đây, nhân vật tuỳ chỉnh thì trả `name` nó tự khai.
+const BUILT_IN_NAMES = {
+  default: 'Default (plain adult)', vet: 'Veterinarian', surgeon: 'Surgeon', nurse: 'Nurse', doctor: 'Doctor with glasses',
+  dog: 'Dog (golden puppy)', shiba: 'Dog (shiba)', cat: 'Cat (grey tabby)', orange_cat: 'Cat (orange tabby)', black_cat: 'Cat (black)',
+};
+const displayName = (id, definition) => BUILT_IN_NAMES[id] || definition.ten || id;
+
 /** Liệt kê nhân vật đang có và động tác của từng loại. */
 export function list() {
   return {
-    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, v.ten])),
-    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, v.ten])),
+    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
+    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
     personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG],
     petActions: { ...RigThu.DONG_TAC },
     expressions: Object.keys(RigSVG.EXPRESSIONS),
@@ -248,41 +260,70 @@ export function list() {
  * Mỗi mục là tên động tác, hoặc [tên, ...tham số], hoặc một SỐ (nghỉ thêm chừng ấy giây).
  * Thời điểm từng bước nằm ở `timeline.data.steps`.
  *
- * Vì sao không tự `add` từng timeline: vài động tác đọc vị trí nhân vật LÚC DỰNG (`walk` có
- * quãng đường, `point`). Dựng tất cả từ tư thế ban đầu thì động tác sau một lần đi sẽ xuất
- * phát sai chỗ. Hàm này đẩy nhân vật tới cuối từng bước trước khi dựng bước kế.
+ * Vì sao không tự `add` từng timeline: (1) vài động tác đọc vị trí nhân vật LÚC DỰNG (`walk`
+ * có quãng đường, `point`) — hàm này đẩy nhân vật tới cuối từng bước trước khi dựng bước kế;
+ * (2) timeline trả về đã được LẤY MẪU SẴN nên tua tới đâu, theo chiều nào, cũng ra đúng một
+ * trạng thái (xem chú thích trong thân hàm).
+ *
+ * `gap`: giây nghỉ chèn giữa hai bước (mặc định 0.1). `sampleRate`: số mẫu mỗi giây (60).
  */
-export function sequence(rig, stepList, { gap = 0.1 } = {}) {
-  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => rig.apDung() });
+export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
+  const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
-  const snapshot = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
+  const snapshot = () => keys.map((k) => rig.s[k]);
+  const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
   for (const step of stepList) {
     if (typeof step === 'number') { at += step; continue; }
     const [name, ...args] = Array.isArray(step) ? step : [step];
-    if (typeof rig[name] !== 'function') throw new Error(`[character] không có động tác "${name}" (có: ${rig.actions.join(', ')})`);
+    if (typeof rig[name] !== 'function') throw new Error(`[character] no action "${name}" (available: ${rig.actions.join(', ')})`);
     // Dựng nháp một lần để biết động tác này BẮT ĐẦU từ trạng thái nào. Vài động tác mở đầu
     // bằng `set` (enter đặt nhân vật ra ngoài khung), mà GSAP KHÔNG vẽ `set` khi đầu phát nằm
-    // đúng ở thời điểm 0 — tua về khung 0 thì nhân vật đứng giữa khung thay vì ở ngoài. Nên
-    // đặt sẵn trạng thái ấy vào rig TRƯỚC khi dựng bản thật: lúc đó `set` không còn đổi gì,
-    // và giá trị GSAP ghi nhớ để lùi về chính là trạng thái đúng.
-    Object.assign(rig.s, endState);
+    // đúng ở thời điểm 0. Đặt sẵn trạng thái ấy vào rig TRƯỚC khi dựng bản thật.
+    restore(endState);
     const draft = rig[name](...args);
     draft.progress(1e-6); const startState = snapshot(); draft.kill();
-    Object.assign(rig.s, startState);
+    restore(startState);
     if (!firstFrame) firstFrame = startState;
     const child = rig[name](...args);
     child.progress(1); endState = snapshot();
     child.progress(0).paused(false);
-    timeline.add(child, at);
+    source.add(child, at);
     steps.push({ name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) });
     at += child.duration() + gap;
   }
-  timeline.data = { type: 'character-sequence', character: rig.nv.ten || rig.nv.loai || '', steps };
-  Object.assign(rig.s, firstFrame || endState);       // rig nằm sẵn ở đúng khung 0 của chuỗi
-  timeline.progress(0);
-  rig.apDung();
+
+  // LẤY MẪU SẴN. Timeline nguồn (các động tác nối nhau) chỉ chắc chắn đúng khi chạy TUẦN TỰ từ
+  // đầu: nó gồm hàng trăm tween cùng ghi vào một object trạng thái, vài `set` tức thời và vài
+  // tween gối đầu nhau, nên tua tới cùng một thời điểm từ phía trước và từ phía sau có thể ra
+  // hai trạng thái khác nhau (đo được: enter / walkForward ở giữa chuỗi lệch tới cả vị trí lẫn
+  // độ mờ). Bộ dựng video thì tua thẳng tới từng khung, có khi song song, có khi tua ngược.
+  // Nên ở đây chạy timeline nguồn ĐÚNG MỘT LẦN theo chiều thuận, ghi lại trạng thái từng khung,
+  // rồi trả về một timeline chỉ có MỘT tween phát lại các khung ấy — trạng thái ở thời điểm t
+  // khi đó là một phép tra bảng, không còn phụ thuộc đường đi tới t.
+  const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
+  if (firstFrame) restore(firstFrame);
+  const frames = [];
+  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  source.kill();
+
+  const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
+  const show = (position) => {
+    const p = Math.min(count - 1, Math.max(0, position)), lo = Math.floor(p), hi = Math.min(count - 1, lo + 1), mix = p - lo;
+    const a = frames[lo], b = frames[hi];
+    // Số thì nội suy giữa hai khung mẫu; chuỗi (hình bàn tay) lấy của khung trước.
+    keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
+    rig.apDung();
+  };
+  // Phát lại qua SETTER của thuộc tính đang tween: GSAP ghi thuộc tính ở mọi lần vẽ, kể cả khi
+  // bị tua bằng seek() (tắt callback) và khi tua ngược.
+  const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
+  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
+  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps };
+  show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
 

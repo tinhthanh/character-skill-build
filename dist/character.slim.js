@@ -1,4 +1,4 @@
-/* VGCharacter v0.3.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.4.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -177,7 +177,7 @@ const tron = (a, b, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 const NV_MAC_DINH = {
   ten: 'Mặc định',
@@ -227,6 +227,7 @@ const NV_MAC_DINH = {
   boGocTayAo: 0,     // bán kính bo góc TRONG của gấu tay áo (0 = góc nhọn như cũ)
   tayDai: false,
   mauSoSau: 'toc',
+  backHair: 'full',
   damSuon: 0.45,     // độ đậm mảng tối hai bên sườn áo
   khuon: { rong: 44, cao: 44, cam: 51, yRong: 0, tranVuong: -0.06, hamVuong: -0.08, rongTran: 1.06, rongCam: 1.1 },
   dau: (m, nv) => veKhuonMat(nv.khuon),
@@ -370,7 +371,7 @@ class RigSVG {
   static dangKy(ten, dinhNghia) { RigSVG.NHAN_VAT[ten] = { ...NV_MAC_DINH, ...dinhNghia }; return RigSVG.NHAN_VAT[ten]; }
   constructor(host, nhanVat = 'default') {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
-    if (!nv) throw new Error(`[RigSVG] không có nhân vật "${nhanVat}"`);
+    if (!nv) throw new Error(`[character] no character "${nhanVat}"`);
     this.host = host;
     this.nv = { ...NV_MAC_DINH, ...nv };
     this.mauKhai = { ...(nv.mau || {}) };
@@ -535,6 +536,7 @@ class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
   <g id="${p}-goc">
@@ -563,7 +565,8 @@ class RigSVG {
         <g id="${p}-dau"${V}>
           <g transform="translate(0 -62)">
             <g id="${p}-veTay">
-            <g id="${p}-tocLung" fill="${this.#backSkullColor()}"><ellipse id="${p}-tocLungE"/></g>
+            <g id="${p}-tocLung"><ellipse id="${p}-tocLungE" fill="${this.nv.backHair === 'full' ? this.#backSkullColor() : this.mau.da}"/>
+              ${this.nv.backHair === 'low' ? `<g clip-path="url(#${p}-lowHairClip)"><ellipse id="${p}-tocLungLow" fill="${this.mau.toc}"/></g>` : ''}</g>
             <path id="${p}-khuon" d="${this.nv.dau(this.mau, this.nv)}" fill="${this.mau.da}"/>
             <g id="${p}-tocG">${this.nv.toc(p, this.mau)}
             </g>
@@ -609,7 +612,7 @@ class RigSVG {
     this.el = {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
-      tocLungE: q('tocLungE'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
+      tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
@@ -634,10 +637,11 @@ class RigSVG {
   apDung() {
     const s = this.s, e = this.el;
     const doiChan = this.hangChan();
-    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
+    const seatDrop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * clamp(s.seat, 0, 1);
+    e.goc.setAttribute('transform', `translate(${s.x} ${s.y + seatDrop + DOI_Y + doiChan}) translate(200 428) scale(${s.co}) translate(-200 -428)`);
     e.goc.setAttribute('opacity', s.mo);
     const nhac = clamp(-s.y / 40, 0, 1);
-    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);
+    e.bong.setAttribute('transform', `translate(200 ${428 - doiChan - seatDrop / (s.co || 1)}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);   // trừ seatDrop: bóng nằm lại dưới bàn chân
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
     const h = s.huong, ah = Math.abs(h);
     const { daiDui, daiOng, dayChan, cachChan, coBanChan } = this.nv;
@@ -693,11 +697,16 @@ class RigSVG {
     e.tocLungE.setAttribute('cy', -K.cao * 0.22);
     e.tocLungE.setAttribute('rx', K.rong - 1);
     e.tocLungE.setAttribute('ry', K.cao * 0.78 - 1);
+    const hairline = -K.cao * 0.3;
+    e.lowHairClipR.setAttribute('y', hairline);
+    if (e.tocLungLow) for (const a of ['cx', 'cy', 'rx', 'ry']) e.tocLungLow.setAttribute(a, e.tocLungE.getAttribute(a));
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
     e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
-    e.tocGayP.setAttribute('d', k < 0.001 ? '' :
-      `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`
-      + ` L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
+    const napeTop = nv.backHair === 'low'
+      ? `M ${xN} ${hairline} L ${X(tai + 13)} ${hairline} Q ${X(tai + 10)} ${(hairline - 5) / 2} ${X(tai + 7)} -5`
+      : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
+    e.tocGayP.setAttribute('d', k < 0.001 || nv.backHair === 'none' ? '' :
+      `${napeTop} L ${X(tai)} 3 Q ${X(tai - 1)} ${K.cam * 0.3} ${xN} ${K.cam * 0.6} Z`);
     e.suon.setAttribute('opacity', 0.45 * (1 - ah));           // vệt tối sườn chỉ hợp khi nhìn thẳng
     const w4 = beRongTaiY(K, 4);
     for (const [ben, dau] of [['L', -1], ['R', 1]]) {
@@ -922,7 +931,7 @@ class RigSVG {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
-    t.set(this.s, { tayL: 'mo', tayR: 'mo' }, `>-${d * 0.5}`);
+    t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
     return t;
   }
   #chop(t, at) {
@@ -1008,12 +1017,13 @@ class RigSVG {
       t.to(s, { tho: 1, duration: d * 0.45, ease: 'sine.inOut' }, a)
        .to(s, { tho: 0, duration: d * 0.55, ease: 'sine.inOut' }, a + d * 0.45);
     }
-    t.to(s, { than: 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+    t.to(s, { than: this.NGHI.than + 1.2, duration: dur / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
     for (let b = nhieu(0.6, 1.2); b < dur - 0.3; b += nhieu(1.6, 3.6)) this.#chop(t, b);
     if (dur > 2.5) {                                   // liếc mắt một cái
       const a = dur * 0.4;
-      t.to(s, { nhinX: 2.6, nhinY: -0.6, dau: 1.5, duration: 0.25, ease: 'power2.out' }, a)
-       .to(s, { nhinX: 0, nhinY: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
+      const N = this.NGHI;
+      t.to(s, { nhinX: N.nhinX + 2.6, nhinY: N.nhinY - 0.6, dau: N.dau + 1.5, duration: 0.25, ease: 'power2.out' }, a)
+       .to(s, { nhinX: N.nhinX, nhinY: N.nhinY, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.1);
     }
     return t;
   }
@@ -1185,7 +1195,7 @@ class RigSVG {
   };
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
-    if (!face) throw new Error(`[RigSVG] không có biểu cảm "${name}" (có: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
+    if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
     if (name !== 'surprised' && hold > 0.8) this.#chop(t, into + hold * 0.5);      // ngạc nhiên thì không chớp mắt
@@ -1200,9 +1210,8 @@ class RigSVG {
     return t;
   }
   sit(hold = 2) {
-    const t = this.tl(), s = this.s, nv = this.nv;
-    const drop = DAI.dui * nv.daiDui * nv.coChan * 0.72;
-    t.to(s, { seat: 1, y: drop, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
+    const t = this.tl(), s = this.s;
+    t.to(s, { seat: 1, than: 0, dauY: 1.5, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.to(s, { batL: 14, batR: 14, cangL: -38, cangR: -38, cuoi: 0.6, duration: 0.4, ease: 'power2.out' }, 0.15);   // hai tay đặt lên đùi
     for (let a = 0.6; a < 0.45 + hold - 0.3; a += 2.4) this.#chop(t, a + 0.5);
     this.#khep(t, 0.5, 0.45 + hold);
@@ -1420,7 +1429,7 @@ const chinhSang = (c, k) => {
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 const NGHI = Object.freeze({
   x: 0, y: 0, mo: 1, co: 1, huong: 1,
@@ -1568,7 +1577,7 @@ class RigThu {
   }
   constructor(host, loai = 'dog') {
     const nv = typeof loai === 'string' ? LOAI[loai] : loai;
-    if (!nv) throw new Error(`[RigThu] không có loài "${loai}" (có: ${Object.keys(LOAI).join(', ')})`);
+    if (!nv) throw new Error(`[character] no species "${loai}" (available: ${Object.keys(LOAI).join(', ')})`);
     this.host = host;
     this.base = nv;                               // hình thể gốc của giống — setShape tính lại từ đây
     this.shape = { ...DEFAULT_SHAPE };
@@ -1756,8 +1765,8 @@ class RigThu {
   }
   setShape(changes = {}) {
     for (const [key, value] of Object.entries(changes)) {
-      if (!(key in SHAPE_RANGE)) throw new Error(`[RigThu] không có núm hình dáng "${key}" (có: ${Object.keys(SHAPE_RANGE).join(', ')})`);
-      if (!Number.isFinite(value)) throw new Error(`[RigThu] ${key}: ${JSON.stringify(value)} phải là số`);
+      if (!(key in SHAPE_RANGE)) throw new Error(`[character] no shape dial "${key}" (available: ${Object.keys(SHAPE_RANGE).join(', ')})`);
+      if (!Number.isFinite(value)) throw new Error(`[character] shape.${key}: ${JSON.stringify(value)} must be a number`);
       this.shape[key] = clamp(value, SHAPE_RANGE[key][0], SHAPE_RANGE[key][1]);
     }
     const palette = this.nv.mau;
@@ -1850,10 +1859,11 @@ class RigThu {
     } else this.#vay(t, 0, Math.max(2, Math.floor(dur / 0.55)), 7, dur / Math.max(2, Math.floor(dur / 0.55)));
     if (dur > 2.4) {                                      // giật tai một cái, liếc mắt
       const a = dur * 0.45, tai = ngau() < 0.5 ? 'taiL' : 'taiR';
-      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: 0, duration: 0.2 }, a + 0.1);
-      t.to(s, { nhinX: 2, dau: 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: 0, dau: 0, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
+      const N = this.NGHI;                                  // mọi thứ trả về tư thế nghỉ của con vật, không về 0
+      t.to(s, { [tai]: 0.9, duration: 0.08 }, a).to(s, { [tai]: N[tai], duration: 0.2 }, a + 0.1);
+      t.to(s, { nhinX: N.nhinX + 2, dau: N.dau + 3, duration: 0.25, ease: 'power2.out' }, a + 0.4).to(s, { nhinX: N.nhinX, dau: N.dau, duration: 0.35, ease: 'power2.inOut' }, a + 1.3);
     }
-    t.to(s, { duoi: 0, duoiCong: 0, duration: 0.2 }, dur - 0.2);
+    t.to(s, { duoi: this.NGHI.duoi, duoiCong: this.NGHI.duoiCong, duration: 0.2 }, dur - 0.2);
     return t;
   }
   tiltHead() {
@@ -2293,7 +2303,7 @@ const DEFINITION_KEYS = {
   hair: 'toc', hat: 'mu', eye: 'mat', nose: 'mui', faceExtras: 'net', beard: 'beard',
   top: 'ao', sideShading: 'suon', sideShadingOpacity: 'damSuon', collar: 'coAo',
   accessories: 'phuKien', shoulderAccessories: 'phuKienTren', shoes: 'giay',
-  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
+  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
   outlineWidth: 'vienRong',
   headSize: 'coDau', neckDrop: 'dauLech', torsoScale: 'coThan', legScale: 'coChan',
   upperArmLength: 'daiCanhTay', forearmLength: 'daiCangTay', armThickness: 'dayTay', handSize: 'coBanTay',
@@ -2410,6 +2420,7 @@ function definitionToPublic(definition) {
     else if (key === 'nghi') out[k] = stateToPublic(value);
     else if (key === 'khuon') out[k] = renameKeys(value, INTERNAL.faceShape);
     else if (key === 'may') out[k] = renameKeys(value, INTERNAL.brows);
+    else if (key === 'mauSoSau') out[k] = INTERNAL.colors[value] || value;      // tên màu cũng đổi sang tên công khai
     else out[k] = value;
   }
   return out;
@@ -2446,8 +2457,8 @@ const __default = {
   base: 'nurse',
   define: (base, kit) => ({
     ...base,
-    ...kit.outfits.coat,                       // thân áo dài tay có ve — dùng làm áo vest
-    name: 'Lễ tân — vest xanh',
+    ...kit.outfits.coat,                       // long-sleeved top with lapels, used as a blazer
+    name: 'Receptionist',
     restPose: { upperArmL: 17, upperArmR: 17, forearmL: -92, forearmR: -92, smile: 1, mouthOpen: 0.4, browL: 0.2, browR: 0.2 },
     colors: {
       ...base.colors,
@@ -2491,7 +2502,7 @@ const { dangKyDau, KIT } = __m['runtime/characters.js'];
 const { roundGlasses, shortBeard, moustache } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -2525,56 +2536,58 @@ const kit = {
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
   parts: { roundGlasses, shortBeard, moustache },
   partsOf(id) {
-    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): không có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+    if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
   },
 };
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 function assertColors(palette, where) {
   const bad = Object.entries(palette).filter(([, v]) => v !== null && v !== undefined && !(typeof v === 'string' && HEX_COLOR.test(v)));
-  if (bad.length) throw new Error(`[character] ${where}: màu phải là mã hex (#rgb / #rrggbb) — sai ở ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
+  if (bad.length) throw new Error(`[character] ${where}: colours must be hex (#rgb / #rrggbb) — invalid: ${bad.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}`);
 }
 function validateConfig(config, kind = 'person') {
   const problems = [];
   if (config === null || config === undefined) return problems;
-  if (typeof config !== 'object' || Array.isArray(config)) return ['config phải là một object'];
+  if (typeof config !== 'object' || Array.isArray(config)) return ['config must be an object'];
   const pet = kind === 'pet';
   const numberGroups = pet ? { shape: PET_SHAPE_KEYS } : Object.fromEntries(Object.entries(CONFIG_GROUPS).map(([g, [, table]]) => [g, Object.keys(table)]));
   const stateKeys = pet ? PET_STATE_KEYS : PERSON_STATE_KEYS;
   const allowed = [...Object.keys(numberGroups), ...(pet ? [] : ['restPose']), 'colors'];
   for (const [group, value] of Object.entries(config)) {
-    if (!allowed.includes(group)) { problems.push(`nhóm lạ "${group}" (hợp lệ: ${allowed.join(', ')})`); continue; }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" phải là một object`); continue; }
+    if (!allowed.includes(group)) { problems.push(`unknown group "${group}" (valid: ${allowed.join(', ')})`); continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { problems.push(`"${group}" must be an object`); continue; }
     for (const [key, v] of Object.entries(value)) {
       if (group === 'colors') {
-        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} không phải mã hex (#rgb / #rrggbb)`);
+        if (!(typeof v === 'string' && HEX_COLOR.test(v))) problems.push(`colors.${key}: ${JSON.stringify(v)} is not a hex colour (#rgb / #rrggbb)`);
       } else if (group === 'restPose') {
-        if (!(key in stateKeys)) problems.push(`restPose.${key}: không có khoá trạng thái này`);
-        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là một trong ${Object.keys(HAND_SHAPES).join(', ')}`); }
-        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} phải là số`);
-      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: khoá lạ (hợp lệ: ${numberGroups[group].join(', ')})`);
-      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} phải là số`);
+        if (!(key in stateKeys)) problems.push(`restPose.${key}: no such state key`);
+        else if (key === 'handL' || key === 'handR') { if (!(v in HAND_SHAPES)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be one of ${Object.keys(HAND_SHAPES).join(', ')}`); }
+        else if (!Number.isFinite(v)) problems.push(`restPose.${key}: ${JSON.stringify(v)} must be a number`);
+      } else if (!numberGroups[group].includes(key)) problems.push(`${group}.${key}: unknown key (valid: ${numberGroups[group].join(', ')})`);
+      else if (!Number.isFinite(v)) problems.push(`${group}.${key}: ${JSON.stringify(v)} must be a number`);
     }
   }
   return problems;
 }
 function assertConfig(config, kind, who) {
   const problems = validateConfig(config, kind);
-  if (problems.length) throw new Error(`[character] config của "${who}" không hợp lệ:\n  - ${problems.join('\n  - ')}`);
+  if (problems.length) throw new Error(`[character] invalid config for "${who}":\n  - ${problems.join('\n  - ')}`);
 }
 function registerCharacter({ id, base = 'vet', define }) {
-  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] id không hợp lệ: "${id}"`);
+  if (!/^[a-z][a-z0-9_]*$/.test(id || '')) throw new Error(`[character] invalid id "${id}" (use lowercase letters, digits and underscores)`);
   const baseDefinition = RigSVG.NHAN_VAT[base];
-  if (!baseDefinition) throw new Error(`[character] "${id}" dựa trên "${base}" nhưng chưa có nhân vật ấy (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
-  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" đã có nhân vật "${RigSVG.NHAN_VAT[id].ten || id}" — đặt id khác`);
-  if (typeof define !== 'function') throw new Error(`[character] "${id}": thiếu hàm define(base, kit)`);
+  if (!baseDefinition) throw new Error(`[character] "${id}" is based on "${base}", which is not registered (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (RigSVG.NHAN_VAT[id]) throw new Error(`[character] id "${id}" is already registered — choose another id`);
+  if (typeof define !== 'function') throw new Error(`[character] "${id}": missing define(base, kit) function`);
   const written = define(definitionToPublic(baseDefinition), kit);
-  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() phải trả về một object`);
+  if (!written || typeof written !== 'object') throw new Error(`[character] "${id}": define() must return an object`);
   const definition = definitionToInternal(written);
-  if (definition.mau) assertColors(definition.mau, `nhân vật "${id}"`);
+  if (definition.mau) assertColors(definition.mau, `character "${id}" colors`);
+  if (definition.backHair !== undefined && !['full', 'low', 'none'].includes(definition.backHair))
+    throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
-    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor trỏ tới màu không có trong colors`);
+    if (!(definition.mauSoSau in (definition.mau || {}))) throw new Error(`[character] "${id}": backSkullColor names a colour that is not in colors`);
   }
   return RigSVG.dangKy(id, definition);
 }
@@ -2598,7 +2611,7 @@ function applyInternalPersonConfig(rig, c) {
 function applyConfig(rig, config) {
   if (!config) return rig;
   const pet = rig instanceof RigThu;
-  assertConfig(config, pet ? 'pet' : 'person', rig.nv.ten || 'nhân vật');
+  assertConfig(config, pet ? 'pet' : 'person', rig.publicId || 'character');
   const internal = configToInternal(config, pet);
   if (!pet) applyInternalPersonConfig(rig, internal);
   else {
@@ -2609,59 +2622,81 @@ function applyConfig(rig, config) {
   return rig;
 }
 function createCharacter(host, { id = 'vet', config } = {}) {
-  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] không có nhân vật "${id}" (có: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
+  if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
   host.style.aspectRatio = `${RigSVG.KHUNG.w}/${RigSVG.KHUNG.h}`;
   const rig = new RigSVG(host, id);
+  rig.publicId = id;
   applyConfig(rig, config);
   return { rig, id };
 }
 function createPet(host, { species = 'dog', config } = {}) {
-  if (!RigThu.LOAI[species]) throw new Error(`[character] không có giống "${species}" (có: ${Object.keys(RigThu.LOAI).join(', ')})`);
+  if (!RigThu.LOAI[species]) throw new Error(`[character] no species "${species}" (available: ${Object.keys(RigThu.LOAI).join(', ')})`);
   if (config === undefined) config = bakedConfigs[species] || null;
   assertConfig(config, 'pet', species);
   host.style.aspectRatio = `${RigThu.KHUNG.w}/${RigThu.KHUNG.h}`;
   const rig = new RigThu(host, species);
+  rig.publicId = species;
   applyConfig(rig, config);
   return { rig, id: species };
 }
 function seed(value) { RigSVG.gieo(value); RigThu.gieo(value); }
+const BUILT_IN_NAMES = {
+  default: 'Default (plain adult)', vet: 'Veterinarian', surgeon: 'Surgeon', nurse: 'Nurse', doctor: 'Doctor with glasses',
+  dog: 'Dog (golden puppy)', shiba: 'Dog (shiba)', cat: 'Cat (grey tabby)', orange_cat: 'Cat (orange tabby)', black_cat: 'Cat (black)',
+};
+const displayName = (id, definition) => BUILT_IN_NAMES[id] || definition.ten || id;
 function list() {
   return {
-    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, v.ten])),
-    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, v.ten])),
+    people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
+    pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
     personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG],
     petActions: { ...RigThu.DONG_TAC },
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     bakedConfigs: Object.keys(bakedConfigs),
   };
 }
-function sequence(rig, stepList, { gap = 0.1 } = {}) {
-  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => rig.apDung() });
-  const snapshot = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
+function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
+  const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  const keys = Object.keys(rig.NGHI);
+  const snapshot = () => keys.map((k) => rig.s[k]);
+  const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
   for (const step of stepList) {
     if (typeof step === 'number') { at += step; continue; }
     const [name, ...args] = Array.isArray(step) ? step : [step];
-    if (typeof rig[name] !== 'function') throw new Error(`[character] không có động tác "${name}" (có: ${rig.actions.join(', ')})`);
-    Object.assign(rig.s, endState);
+    if (typeof rig[name] !== 'function') throw new Error(`[character] no action "${name}" (available: ${rig.actions.join(', ')})`);
+    restore(endState);
     const draft = rig[name](...args);
     draft.progress(1e-6); const startState = snapshot(); draft.kill();
-    Object.assign(rig.s, startState);
+    restore(startState);
     if (!firstFrame) firstFrame = startState;
     const child = rig[name](...args);
     child.progress(1); endState = snapshot();
     child.progress(0).paused(false);
-    timeline.add(child, at);
+    source.add(child, at);
     steps.push({ name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) });
     at += child.duration() + gap;
   }
-  timeline.data = { type: 'character-sequence', character: rig.nv.ten || rig.nv.loai || '', steps };
-  Object.assign(rig.s, firstFrame || endState);       // rig nằm sẵn ở đúng khung 0 của chuỗi
-  timeline.progress(0);
-  rig.apDung();
+  const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
+  if (firstFrame) restore(firstFrame);
+  const frames = [];
+  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  source.kill();
+  const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
+  const show = (position) => {
+    const p = Math.min(count - 1, Math.max(0, position)), lo = Math.floor(p), hi = Math.min(count - 1, lo + 1), mix = p - lo;
+    const a = frames[lo], b = frames[hi];
+    keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
+    rig.apDung();
+  };
+  const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
+  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
+  timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps };
+  show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
 dangKyDau(RigSVG, 'vet');

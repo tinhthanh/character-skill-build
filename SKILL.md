@@ -10,9 +10,10 @@ single-file build that drops into a [HyperFrames](https://github.com/heygen-com/
 composition. A character is a small JS definition on top of a shared skeleton, so a new
 character gets all 22 actions (wave, talk, walk, sit, react…) for free.
 
-Everything you write — definitions, configs, API calls — uses English names. The two rig
-files underneath keep Vietnamese internal names and comments; you should not need to read
-them.
+Everything you write and read while using the skill is English: definitions, configs, API
+calls, error messages and tool output. Two things are not, and you should not need either:
+the two rig files keep Vietnamese internal names and comments, and the studio's UI is
+Vietnamese.
 
 ## What you can build
 
@@ -46,14 +47,16 @@ still break mid-action, and some failures are silent (see [Pitfalls](#pitfalls))
    it to the array in `characters/index.js`. Override only what changes. Read
    [references/slots.md](references/slots.md) **before** drawing any SVG: it has the
    coordinate systems, the element ids the rig requires, what each base already carries and
-   how to remove it. `characters/receptionist.js` is a complete worked example.
+   how to remove it. `sh tools/describe.sh <base>` prints a base's current numbers and
+   colours. `characters/receptionist.js` is a complete worked example.
 4. **Run the automated check.** `sh tools/check.sh` rebuilds the bundle and runs every
    action of every character in headless Chrome. It must print `PASS`. It catches thrown
    errors, `NaN` attributes, duplicate ids, missing required elements, actions that do not
    return to rest, invalid files in `configs/`, and a stale bundle.
 5. **Look at it.** `sh tools/shot.sh <id> out.png`, then open the PNG. It is a pose sheet:
-   rest, close-ups, half and full turn, and fifteen mid-action frames including sitting and
-   four expressions. Check that nothing is covered that should be visible, that the outfit
+   rest, close-ups, half and full turn, and fifteen labelled mid-action frames including
+   sitting and four expressions. It applies `configs/<id>.json` when there is one
+   (`--no-config` shows the bare definition). Check that nothing is covered that should be visible, that the outfit
    still reads when the arms move and when the character turns sideways, and that the hands
    land where the rest pose intends. Fix and repeat from step 4.
 6. **Fine-tune numbers in the studio (optional).** Open
@@ -140,6 +143,8 @@ and non-hex colours. These still fail without an error:
   not want. `references/slots.md` lists what each base sets and how to remove it.
 - **Things draped over the shoulders go in `shoulderAccessories` as well as `accessories`.**
   Sleeves are drawn after the torso and would cover a stethoscope or lanyard.
+- **A bald head needs `backHair`.** The rig generates hair behind the skull when the head
+  turns; `backHair: 'low'` or `'none'` turns it down or off.
 - **Always spread the base palette:** `colors: { ...base.colors, top: '#…' }`. A bare
   `colors: { top }` drops skin, hair and every other colour.
 - **Long sleeves need `longSleeves: true`.** Otherwise the forearm is drawn in skin colour.
@@ -159,7 +164,8 @@ characters/           custom characters: _template.js, receptionist.js (example)
 configs/              per-character tuned numbers written by the studio (<id>.json), baked into dist
 dist/                 character.iife.js (commented) · character.slim.js (use this one) — generated
 studio/               visual editor (Vietnamese UI)
-tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) · peek.sh (composition preview)
+tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
+                      describe.sh (a character's current values) · peek.sh (composition preview)
 examples/hyperframes/ a complete composition with a vet and a dog
 references/           slots.md · actions.md · hyperframes.md
 ```

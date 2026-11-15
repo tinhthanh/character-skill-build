@@ -1,29 +1,30 @@
 #!/bin/sh
-# XEM TRƯỚC một composition HyperFrames mà không cần render.
-#   tools/peek.sh <index.html> [t1,t2,...] [ảnh.png]
-#   tools/peek.sh examples/hyperframes/index.html                 → 8 khung rải đều
-#   tools/peek.sh ~/video/index.html 0,1.5,3,6 /tmp/peek.png      → đúng các giây ấy
-# In ra thời lượng từng bước của mỗi chuỗi nhân vật và cảnh báo vượt data-duration,
-# rồi lưu một ảnh ghép các khung. Composition nằm ở đâu cũng được.
+# PREVIEW a HyperFrames composition without rendering it.
+#   tools/peek.sh <index.html> [t1,t2,...] [image.png]
+#   tools/peek.sh examples/hyperframes/index.html                 → 8 evenly spaced frames
+#   tools/peek.sh ~/video/index.html 0,1.5,3,6 peek.png           → exactly those seconds
+# Prints the timing of every step of every character sequence, warns about overruns and
+# overlapping speech, then saves one contact sheet. The composition can live anywhere.
 set -e
-FILE="${1:?thiếu đường dẫn composition (.html)}"; TIMES="${2:-}"; OUT="${3:-peek.png}"
-[ -f "$FILE" ] || { echo "peek: không có tệp $FILE" >&2; exit 1; }
+FILE="${1:?usage: tools/peek.sh <index.html> [t1,t2,...] [image.png]}"; TIMES="${2:-}"; OUT="${3:-peek.png}"
+[ -f "$FILE" ] || { echo "peek: no such file: $FILE" >&2; exit 1; }
 DIR="$(cd "$(dirname "$FILE")" && pwd)"; NAME="$(basename "$FILE")"
 case "$OUT" in /*) ;; *) OUT="$(pwd)/$OUT" ;; esac
 cd "$(dirname "$0")/.."
 CHROME_BIN="$(sh tools/chrome.sh)"
-PORT="${CONG:-8393}"
+PORT="${PORT:-8393}"
+# Tệp tạm nằm trong thư mục tạm riêng (theo TMPDIR nếu có), dọn khi thoát.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/peek.XXXXXX")"
 python3 tools/serve.py "$PORT" "--mount=$DIR" >/dev/null 2>&1 &
-SRV=$!; trap 'kill $SRV 2>/dev/null' EXIT
+SRV=$!; trap 'kill $SRV 2>/dev/null; wait $SRV 2>/dev/null; rm -rf "$WORK"' EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/peek.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
 URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES"
-"$CHROME_BIN" --headless=new --disable-gpu --window-size=1200,800 --virtual-time-budget=20000 --enable-logging=stderr --v=0 --dump-dom "$URL" 2>/tmp/peek-log.$$ > /tmp/peek-dom.$$
-python3 tools/peek_report.py < /tmp/peek-dom.$$ || {
+"$CHROME_BIN" --headless=new --disable-gpu --window-size=1200,800 --virtual-time-budget=20000 --enable-logging=stderr --v=0 --dump-dom "$URL" 2>"$WORK/log" > "$WORK/dom"
+python3 tools/peek_report.py < "$WORK/dom" || {
   # Composition không dựng được timeline thường là do script của nó ném lỗi — in lỗi ấy ra,
   # nếu không người dùng chỉ thấy "không có timeline" mà không biết vì sao.
-  grep -E "Uncaught|CONSOLE.*[Ee]rror" /tmp/peek-log.$$ | sed -E 's/^.*CONSOLE[^"]*"/  lỗi trong trang: "/' | head -3 >&2
-  rm -f /tmp/peek-dom.$$ /tmp/peek-log.$$; exit 1; }
-rm -f /tmp/peek-log.$$
-SIZE="$(python3 tools/peek_report.py --size < /tmp/peek-dom.$$)"; rm -f /tmp/peek-dom.$$
+  grep -E "Uncaught|CONSOLE.*[Ee]rror" "$WORK/log" | sed -E 's/^.*CONSOLE[^"]*"/  page error: "/' | head -3 >&2
+  exit 1; }
+SIZE="$(python3 tools/peek_report.py --size < "$WORK/dom")"
 "$CHROME_BIN" --headless=new --disable-gpu --hide-scrollbars "--window-size=$SIZE" --virtual-time-budget=20000 "--screenshot=$OUT" "$URL" >/dev/null 2>&1
-echo "ảnh: $OUT"
+echo "image: $OUT"

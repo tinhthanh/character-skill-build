@@ -15,7 +15,7 @@ export const DEFINITION_KEYS = {
   top: 'ao', sideShading: 'suon', sideShadingOpacity: 'damSuon', collar: 'coAo',
   accessories: 'phuKien', shoulderAccessories: 'phuKienTren', shoes: 'giay',
   // công tắc
-  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
+  longSleeves: 'tayDai', backSkullColor: 'mauSoSau', backHair: 'backHair', badgeText: 'huyHieu', extrasFollowEyes: 'netTheoMat',
   outlineWidth: 'vienRong',
   // tỉ lệ
   headSize: 'coDau', neckDrop: 'dauLech', torsoScale: 'coThan', legScale: 'coChan',
@@ -174,6 +174,7 @@ export function definitionToPublic(definition) {
     else if (key === 'nghi') out[k] = stateToPublic(value);
     else if (key === 'khuon') out[k] = renameKeys(value, INTERNAL.faceShape);
     else if (key === 'may') out[k] = renameKeys(value, INTERNAL.brows);
+    else if (key === 'mauSoSau') out[k] = INTERNAL.colors[value] || value;      // tên màu cũng đổi sang tên công khai
     else out[k] = value;
   }
   return out;

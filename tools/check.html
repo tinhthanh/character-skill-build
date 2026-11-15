@@ -10,10 +10,15 @@
 <script type="module">
 const ra = { ok: true, loi: [], nhanVat: {}, banDung: {} };
 const hong = (cho, chu) => { ra.ok = false; ra.loi.push(`${cho}: ${chu}`); };
-window.addEventListener('error', (e) => hong('trang', e.message));
+window.addEventListener('error', (e) => hong('page', e.message));
 try {
   const L = await import('../runtime/index.js');
   const { RigSVG, RigThu } = L;
+  const S = await import('../runtime/schema.js');
+  // Thông báo lỗi dùng TÊN CÔNG KHAI: người viết nhân vật khai `headTilt`, không biết `dau` là gì.
+  const stateNames = Object.fromEntries([...Object.entries(S.PET_STATE_KEYS), ...Object.entries(S.PERSON_STATE_KEYS)].map(([pub, internal]) => [internal, pub]));
+  const publicKey = (key) => stateNames[key] || key;
+  const REQUIRED = Object.fromEntries(S.REQUIRED_IDS.map(([pub, internal]) => [internal, pub]));
   // Danh sách nhân vật, chụp TRƯỚC khi các phép thử đăng ký nhân vật tạm. Bỏ `bakedConfigs` ra:
   // bộ số chỉ được nướng vào bản dựng, mã nguồn dạng module không có — so riêng ở dưới.
   const listOf = (lib) => { const { bakedConfigs, ...rest } = lib.list(); return JSON.stringify(rest); };
@@ -22,22 +27,22 @@ try {
   const trungId = (svg) => { const m = {}; svg.querySelectorAll('[id]').forEach((e) => { m[e.id] = (m[e.id] || 0) + 1; }); return Object.keys(m).filter((k) => m[k] > 1); };
   const quet = (rig, ten, dsDongTac, duocLech) => {
     const o = ra.nhanVat[ten] = { dongTac: dsDongTac.length };
-    const t0 = trungId(rig.svg); if (t0.length) hong(ten, 'id trùng: ' + t0.join(','));
-    if (xau(rig.svg)) hong(ten, 'thuộc tính hỏng ở tư thế nghỉ');
+    const t0 = trungId(rig.svg); if (t0.length) hong(ten, 'duplicate element ids: ' + t0.join(','));
+    if (xau(rig.svg)) hong(ten, 'broken SVG attributes (NaN / undefined) at rest');
     for (const m of dsDongTac) {
       rig.datNghi();
       let t;
       try { t = m === 'point' ? rig.point({ x: 60, y: 80 }) : (m === 'speak' || m === 'explain') ? rig[m]('Xin chào, rất vui được gặp bạn!', 2.4) : rig[m](); }
-      catch (e) { hong(`${ten}.${m}`, 'ném lỗi lúc dựng: ' + e.message); continue; }
+      catch (e) { hong(`${ten}.${m}`, 'threw while building: ' + e.message); continue; }
       let n = 0;
       for (let i = 0; i <= 60; i++) { t.progress(i / 60); rig.apDung(); n += xau(rig.svg); }
-      if (n) hong(`${ten}.${m}`, `${n} thuộc tính NaN/undefined`);
+      if (n) hong(`${ten}.${m}`, `${n} NaN/undefined attributes during the action`);
       const lech = Object.keys(rig.NGHI).filter((q) => (typeof rig.NGHI[q] === 'number' ? Math.abs(rig.s[q] - rig.NGHI[q]) > 1e-3 : rig.s[q] !== rig.NGHI[q]));
-      if (lech.length && !duocLech.includes(m)) hong(`${ten}.${m}`, 'không khép về tư thế nghỉ: ' + lech.join(','));
+      if (lech.length && !duocLech.includes(m)) hong(`${ten}.${m}`, 'does not return to the rest pose: ' + lech.map(publicKey).join(', '));
       t.kill();
     }
     // Slot bắt buộc
-    for (const id of o.canCo || []) if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(ten, `thiếu phần tử #…-${id}`);
+    for (const id of o.canCo || []) if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(ten, `missing element #…-${id}`);
   };
   // Không DỊCH CHUYỂN TỨC THỜI: dựng một chuỗi rồi đi từng khung 1/30 s — không khung nào được
   // nhảy xa. Chạy ĐẦU TIÊN, trên trang còn sạch: lỗi này (tween ghi nhớ sai giá trị đầu do cơ
@@ -49,20 +54,20 @@ try {
     let truoc = null;
     for (let k = 0; k <= Math.ceil(t.duration() * 30); k++) {
       t.totalTime(k / 30, false);
-      if (truoc !== null && Math.abs(rig.s.x - truoc) > 16) { hong('sequence', `${ten}: nhảy vị trí giữa hai khung liền nhau — khung ${k}: x ${truoc.toFixed(0)} → ${rig.s.x.toFixed(0)}`); break; }
+      if (truoc !== null && Math.abs(rig.s.x - truoc) > 16) { hong('sequence', `${ten}: position jumps between two consecutive frames — frame ${k}: x ${truoc.toFixed(0)} → ${rig.s.x.toFixed(0)}`); break; }
       truoc = rig.s.x;
     }
-    if (rig.tl().vars.defaults.lazy !== false) hong(ten, 'timeline của rig phải có defaults.lazy = false');
+    if (rig.tl().vars.defaults.lazy !== false) hong(ten, 'rig timelines must have defaults.lazy = false');
   }
 
   for (const k of Object.keys(RigSVG.NHAN_VAT)) {
     const rig = new RigSVG(document.getElementById('san'), k);
     for (const id of ['tocTruoc', 'matL', 'matR', 'nguoiL', 'nguoiR', 'banL', 'banR'])
-      if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(k, `thiếu phần tử bắt buộc #<p>-${id} (xem references/slots.md)`);
+      if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(k, `missing required element id "\${p}-${REQUIRED[id]}" (see references/slots.md)`);
     quet(rig, k, [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG], ['walkAway', 'exit']);
     // đổi màu + bộ số không được làm hỏng
-    try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.applyConfig(rig, { proportions: { headSize: 1.2 }, faceShape: { halfWidth: 44 } }); if (xau(rig.svg)) hong(k, 'hỏng sau doiMau/napBoSo'); }
-    catch (e) { hong(k, 'doiMau/applyConfig ném lỗi: ' + e.message); }
+    try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.applyConfig(rig, { proportions: { headSize: 1.2 }, faceShape: { halfWidth: 44 } }); if (xau(rig.svg)) hong(k, 'broken SVG attributes after setColors / applyConfig'); }
+    catch (e) { hong(k, 'setColors / applyConfig threw: ' + e.message); }
   }
   for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC, ['exit']); }
 
@@ -70,41 +75,41 @@ try {
   { const rig = new RigSVG(document.getElementById('san'), 'vet');
     const dau = (t) => JSON.stringify(t.getChildren(true, true, false).map((c) => [c.startTime().toFixed(3), c.duration().toFixed(3)]));
     L.seed(3); const a = dau(rig.explain('một hai ba bốn', 2)); L.seed(3); const b = dau(rig.explain('một hai ba bốn', 2)); L.seed(null);
-    if (a !== b) hong('seed', 'cùng hạt mà hai timeline khác nhau'); }
+    if (a !== b) hong('seed', 'the same seed produced two different timelines'); }
 
   // sequence(): khung 0 phải đúng trạng thái đầu của bước đầu; tua tới đâu cũng ra đúng một trạng thái.
   { const rig = new RigSVG(document.getElementById('san'), 'surgeon');
     const t = L.sequence(rig, ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']);
     t.seek(0); rig.apDung(); const x0 = rig.s.x;
-    if (Math.abs(x0 + 270) > 2) hong('sequence', `khung 0: x = ${x0.toFixed(1)}, đáng ra −270 (enter)`);
+    if (Math.abs(x0 + 270) > 2) hong('sequence', `frame 0: x = ${x0.toFixed(1)}, expected −270 (enter)`);
     const chup = (tg) => { t.seek(tg); rig.apDung(); return JSON.stringify(Object.keys(rig.NGHI).map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k]))); };
     const tg = t.duration() * 0.63, a = chup(tg); chup(0.2); chup(t.duration()); const b = chup(tg);
-    if (a !== b) hong('sequence', 'tua tới cùng một thời điểm theo hai đường ra hai trạng thái');
+    if (a !== b) hong('sequence', 'seeking to one time by two paths gives two states');
     t.seek(t.duration()); rig.apDung();
-    if (Math.abs(rig.s.x - 100) > 1) hong('sequence', `cuối chuỗi x = ${rig.s.x.toFixed(1)}, đáng ra 100`);
+    if (Math.abs(rig.s.x - 100) > 1) hong('sequence', `end of sequence: x = ${rig.s.x.toFixed(1)}, expected 100`);
     // Tua bằng seek() — GSAP tắt mọi callback — hình vẫn phải đổi theo (rig tự vẽ lại ở microtask).
     const hinh = () => rig.el.goc.getAttribute('transform') + rig.el.batR.getAttribute('transform');
     t.totalTime(1.0, false); const dung = hinh();
     t.totalTime(3.0, false); t.seek(1.0); await Promise.resolve();
-    if (hinh() !== dung) hong('sequence', 'seek() (tắt callback) không vẽ lại hình');
+    if (hinh() !== dung) hong('sequence', 'seek() (callbacks suppressed) does not redraw');
     ra.kichBan = { dai: +t.duration().toFixed(2) }; }
 
   // ── Các lớp CHẶN LỖI IM LẶNG phải còn hoạt động ──
-  { const expectThrow = (label, fn) => { try { fn(); hong('chặn lỗi', `${label}: đáng ra phải ném lỗi`); } catch (e) { /* đúng */ } };
+  { const expectThrow = (label, fn) => { try { fn(); hong('guards', `${label}: should have thrown`); } catch (e) { /* đúng */ } };
     const host = document.getElementById('san');
     const problems = L.validateConfig({ proportionz: { headSize: 2 }, faceShape: { halfWidth: 'wide', crownHeight: 50 }, colors: { top: 'green' }, restPose: { upperArmL: 'x' } });
-    if (problems.length !== 4) hong('chặn lỗi', `validateConfig phải bắt 4 lỗi, bắt được ${problems.length}: ${problems.join(' | ')}`);
-    if (L.validateConfig({ proportions: { headSize: 1.2 }, colors: { top: '#2f9e8f' }, restPose: { smile: 1, handL: 'fist' } }).length) hong('chặn lỗi', 'validateConfig báo lỗi trên một config hợp lệ');
-    if (L.validateConfig({ shape: { legLength: 0.8 }, colors: { fur: '#333333' } }, 'pet').length) hong('chặn lỗi', 'validateConfig báo lỗi trên config thú hợp lệ');
-    expectThrow('createCharacter với config sai kiểu', () => L.createCharacter(host, { id: 'surgeon', config: { faceShape: { halfWidth: 'wide' } } }));
-    expectThrow('createPet với giống lạ', () => L.createPet(host, { species: 'rabbit' }));
-    expectThrow('setColors với tên màu', () => new RigSVG(host, 'default').setColors({ top: 'red' }));
-    expectThrow('đăng ký trùng id', () => L.registerCharacter({ id: 'surgeon', define: (base) => ({ ...base }) }));
-    expectThrow('backSkullColor trỏ màu không có', () => L.registerCharacter({ id: 'check_tmp_1', define: (base) => ({ ...base, backSkullColor: 'missing' }) }));
+    if (problems.length !== 4) hong('guards', `validateConfig should report 4 problems, reported ${problems.length}: ${problems.join(' | ')}`);
+    if (L.validateConfig({ proportions: { headSize: 1.2 }, colors: { top: '#2f9e8f' }, restPose: { smile: 1, handL: 'fist' } }).length) hong('guards', 'validateConfig rejects a valid config');
+    if (L.validateConfig({ shape: { legLength: 0.8 }, colors: { fur: '#333333' } }, 'pet').length) hong('guards', 'validateConfig rejects a valid pet config');
+    expectThrow('createCharacter with a wrongly typed config', () => L.createCharacter(host, { id: 'surgeon', config: { faceShape: { halfWidth: 'wide' } } }));
+    expectThrow('createPet with an unknown species', () => L.createPet(host, { species: 'rabbit' }));
+    expectThrow('setColors with a colour name', () => new RigSVG(host, 'default').setColors({ top: 'red' }));
+    expectThrow('registering a duplicate id', () => L.registerCharacter({ id: 'surgeon', define: (base) => ({ ...base }) }));
+    expectThrow('backSkullColor naming a missing colour', () => L.registerCharacter({ id: 'check_tmp_1', define: (base) => ({ ...base, backSkullColor: 'missing' }) }));
     // Bỏ mũ mà quên đặt lại mauSoSau: sọ sau vẫn phải ra màu tóc.
     const noHat = new RigSVG(host, { ...RigSVG.NHAN_VAT.surgeon, mu: () => '' });
-    const fill = noHat.svg.querySelector('#' + noHat.id + '-tocLung').getAttribute('fill');
-    if (fill !== noHat.mau.toc) hong('chặn lỗi', `bỏ mũ nhưng sọ sau vẫn mang màu ${fill}, đáng ra là màu tóc ${noHat.mau.toc}`);
+    const fill = noHat.svg.querySelector('#' + noHat.id + '-tocLungE').getAttribute('fill');
+    if (fill !== noHat.mau.toc) hong('guards', `hat removed but the back of the head is ${fill}, expected the hair colour ${noHat.mau.toc}`);
   }
 
   // ── Mọi tệp trong configs/ phải hợp lệ (studio ghi ra, nhưng người cũng sửa tay) ──
@@ -115,14 +120,58 @@ try {
     // Bản dựng phải nướng ĐÚNG các tệp đang có trong configs/ — không thiếu, không thừa.
     const baked = (window[L.GLOBAL_NAME] ? window[L.GLOBAL_NAME].list().bakedConfigs : []).slice().sort().join(',');
     const onDisk = files.map((f) => f.replace(/\.json$/, '')).sort().join(',');
-    if (baked !== onDisk) hong('dist', `bộ số nướng trong bản dựng [${baked}] khác configs/ [${onDisk}] — chạy: python3 tools/build.py`);
+    if (baked !== onDisk) hong('dist', `configs baked into the bundle [${baked}] differ from configs/ [${onDisk}] — run: python3 tools/build.py`);
     for (const file of files) {
       const id = file.replace(/\.json$/, ''), kind = id in RigThu.LOAI ? 'pet' : 'person';
-      if (kind === 'person' && !(id in RigSVG.NHAN_VAT)) { hong(`configs/${file}`, 'không có nhân vật nào mang id này'); continue; }
-      let config; try { config = await (await fetch('../configs/' + file, { cache: 'no-store' })).json(); } catch (e) { hong(`configs/${file}`, 'không phải JSON hợp lệ'); continue; }
+      if (kind === 'person' && !(id in RigSVG.NHAN_VAT)) { hong(`configs/${file}`, 'no character has this id'); continue; }
+      let config; try { config = await (await fetch('../configs/' + file, { cache: 'no-store' })).json(); } catch (e) { hong(`configs/${file}`, 'not valid JSON'); continue; }
       for (const problem of L.validateConfig(config, kind)) hong(`configs/${file}`, problem);
     }
-  } catch (e) { hong('configs', 'không đọc được danh sách: ' + e.message); }
+  } catch (e) { hong('configs', 'cannot list the folder: ' + e.message); }
+
+  // ── MỌI động tác, đặt GIỮA một chuỗi: tua tới cùng một thời điểm từ phía trước và từ phía
+  //    sau phải ra đúng một trạng thái. (Trước khi sequence() lấy mẫu sẵn, enter / walkForward /
+  //    walkAway ở giữa chuỗi lệch cả vị trí lẫn độ mờ; phép thử cũ chỉ thử enter ở ĐẦU chuỗi.)
+  { const sweep = (rig, label) => {
+      const keys = Object.keys(rig.NGHI), read = () => JSON.stringify(keys.map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k])));
+      for (const name of rig.actions) {
+        if (name === 'idle') continue;
+        L.seed(3); rig.reset();
+        const step = name === 'point' ? [name, { x: 60, y: 80 }] : (name === 'speak' || name === 'explain') ? [name, 'xin chào bạn nhé một hai ba', 2.4] : name;
+        const t = L.sequence(rig, ['idle', step, 'idle']), D = t.duration();
+        let differ = 0;
+        for (let n = 1; n < 30; n++) { const at = D * n / 30; t.totalTime(0, false); t.totalTime(at, false); const a = read(); t.totalTime(D, false); t.totalTime(at, false); if (read() !== a) differ++; }
+        if (differ) hong('sequence', `${label}.${name}: seeking to the same time from before and from after gives different states at ${differ}/29 sample points`);
+        t.kill();
+      }
+    };
+    sweep(new RigSVG(document.getElementById('san'), 'vet'), 'vet');
+    sweep(new RigThu(document.getElementById('san2'), 'dog'), 'dog');
+    sweep(new RigThu(document.getElementById('san2'), 'cat'), 'cat');
+    L.seed(null);
+  }
+
+  // ── Tư thế nghỉ tuỳ chỉnh (nghiêng đầu, nắm tay) phải được mọi động tác tôn trọng ──
+  { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
+    const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
+    for (const name of rig.actions) {
+      if (['walkAway', 'exit'].includes(name)) continue;
+      rig.reset();
+      const t = name === 'point' ? rig.point({ x: 60, y: 80 }) : rig[name](); t.progress(1); rig.apDung();
+      if (Math.abs(rig.state.headTilt - 4) > 1e-3 || rig.state.handR !== 'fist') hong('restPose', `${name}: ends with headTilt ${rig.state.headTilt}, handR ${rig.state.handR} instead of the character's rest pose (4, fist)`);
+      t.kill();
+    }
+    // Ngồi: bóng phải ở lại dưới bàn chân.
+    rig.reset(); const box = (el) => el.getBoundingClientRect(); const foot = box(rig.el.banL).bottom, shadow = box(rig.el.bong).top;
+    const t = rig.sit(1); t.progress(0.5); rig.apDung();
+    if (Math.abs(box(rig.el.banL).bottom - foot) > 1.5) hong('sit', 'feet leave the ground while sitting');
+    if (Math.abs(box(rig.el.bong).top - shadow) > 1.5) hong('sit', 'the ground shadow moves away from the feet while sitting');
+    t.kill();
+    // Hói: không còn tóc phía sau khi quay.
+    L.registerCharacter({ id: 'check_tmp_4', base: 'surgeon', define: (base) => ({ ...base, hat: () => '', backHair: 'none' }) });
+    const bald = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_4' }).rig; bald.state.facing = 1; bald.render();
+    if (bald.el.tocGayP.getAttribute('d') !== '' || bald.el.tocLungE.getAttribute('fill') !== bald.mau.da) hong('backHair', "backHair: 'none' still draws hair behind the head");
+  }
 
   // ── LƯỢC ĐỒ CÔNG KHAI: tên tiếng Anh phải tới được đúng chỗ trong rig ──
   { const host = document.getElementById('san');
@@ -134,7 +183,7 @@ try {
       hair: (p, c) => `<g id="${p}-hair-front" fill="${c.hair}"><circle r="40"/></g>`,
     }) });
     const rig = L.createCharacter(host, { id: 'check_tmp_2' }).rig;
-    const expect = (label, got, want) => { if (got !== want) hong('lược đồ', `${label}: được ${JSON.stringify(got)}, đáng ra ${JSON.stringify(want)}`); };
+    const expect = (label, got, want) => { if (got !== want) hong('schema', `${label}: got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`); };
     expect('headSize → coDau', rig.nv.coDau, 1.11);
     expect('longSleeves → tayDai', rig.nv.tayDai, true);
     expect('colors.top → mau.ao', rig.mau.ao, '#123456');
@@ -152,34 +201,34 @@ try {
     const pet = L.createPet(document.getElementById('san2'), { species: 'shiba', config: { shape: { legLength: 0.7, headSize: 1.2 }, colors: { fur: '#445566' } } }).rig;
     expect('pet shape.legLength', pet.shape.legLength, 0.7);
     expect('pet colors.fur → mau.long', pet.mau.long, '#445566');
-    if (xau(pet.svg)) hong('lược đồ', 'thú hỏng sau khi áp shape');
+    if (xau(pet.svg)) hong('schema', 'pet has broken attributes after applying a shape');
   }
 
   // ── Bản SLIM phải chạy ra cùng kết quả với bản đầy đủ ──
   try {
     const slimSource = await (await fetch('../dist/character.slim.js', { cache: 'no-store' })).text();
     const Slim = new Function(slimSource + '\nreturn VGCharacter;')();
-    if (listOf(Slim) !== listAtStart) hong('dist', 'character.slim.js lệch với mã nguồn — chạy: python3 tools/build.py');
+    if (listOf(Slim) !== listAtStart) hong('dist', 'character.slim.js is out of date — run: python3 tools/build.py');
     const a = document.createElement('div'), b = document.createElement('div'); document.body.append(a, b);
     const strip = (svg) => svg.innerHTML.replace(/rig\d+|thu\d+/g, 'ID');
     const markup = (lib, host) => strip(lib.createCharacter(host, { id: 'doctor', config: null }).rig.svg);
-    if (markup(Slim, a) !== markup(L, b)) hong('dist', 'bản slim vẽ ra khác bản đầy đủ');
+    if (markup(Slim, a) !== markup(L, b)) hong('dist', 'the slim bundle renders differently from the full one');
     a.remove(); b.remove();
-  } catch (e) { hong('dist', 'bản slim không chạy: ' + e.message); }
+  } catch (e) { hong('dist', 'the slim bundle does not run: ' + e.message); }
 
   // Bản dựng IIFE phải tươi: cùng danh sách nhân vật với mã nguồn.
   const G = window[L.GLOBAL_NAME];
-  if (!G) hong('dist', 'không nạp được dist/character.iife.js — chạy: python3 tools/build.py');
+  if (!G) hong('dist', 'dist/character.iife.js failed to load — run: python3 tools/build.py');
   else {
     const a = listOf(G), b = listAtStart;
     ra.banDung.khop = a === b;
-    if (a !== b) hong('dist', 'dist/character.iife.js đã cũ so với mã nguồn — chạy: python3 tools/build.py');
+    if (a !== b) hong('dist', 'dist/character.iife.js is out of date — run: python3 tools/build.py');
     const h = document.createElement('div'); document.body.appendChild(h);
-    try { const { rig } = G.createCharacter(h, { id: 'vet', config: { colors: { top: '#2f9e8f' } } }); if (rig.mau.ao !== '#2f9e8f') hong('dist', 'createCharacter không nhận config'); }
-    catch (e) { hong('dist', 'createCharacter ném lỗi: ' + e.message); }
+    try { const { rig } = G.createCharacter(h, { id: 'vet', config: { colors: { top: '#2f9e8f' } } }); if (rig.mau.ao !== '#2f9e8f') hong('dist', 'createCharacter ignored the config'); }
+    catch (e) { hong('dist', 'createCharacter threw: ' + e.message); }
     h.remove();
   }
-} catch (e) { hong('kiểm', e.stack || String(e)); }
+} catch (e) { hong('check', e.stack || String(e)); }
 document.getElementById('kq').textContent = JSON.stringify(ra);
 document.title = ra.ok ? 'PASS' : 'FAIL';
 </script>
