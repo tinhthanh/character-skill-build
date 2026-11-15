@@ -36,6 +36,13 @@ export default {
 
     // backHair: 'low',                                              // bald on top ('none' = fully bald)
 
+    // ── lower garment, posture, something in the hand ──
+    // skirt: { kind: 'skirt', length: 1, flare: 4 },                // or kind: 'apron' (+ kit.parts.apronBib(c) in accessories); colour: colors.skirt
+    // stoop: 0.6,                                                   // 0…1, a bent back (an age cue, with kit.parts.wrinkles(c) in faceExtras)
+    // heldItemR: (p, c) => kit.parts.cup(c),                        // cup | clipboard | phone, or your own SVG in wrist space
+    // …and close that hand around it:  restPose: { ...base.restPose, handR: 'fist', upperArmR: 20, forearmR: -80 }
+    //    (L / R are SCREEN sides: R is the hand on the viewer's right)
+
     // ── your own drawings (SVG strings) — read references/slots.md before writing them ──
     // hair: (p, c) => `<g id="${p}-hair-front" fill="${c.hair}">…</g>`,
     // collar: (p, c) => `…`,

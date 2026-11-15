@@ -10,6 +10,23 @@ on top of a shared skeleton, so every new character can already wave, talk, poin
 react, walk in, walk out and a dozen other things. Dogs and cats come with their own
 actions (wag, bark, beg; meow, stretch, hiss…), five breeds and adjustable body shape.
 
+What a definition can say, beyond face, hair and colours:
+
+- **Clothes** — ready-made outfits (`scrubs`, `pawTunic`, `coat`, `plainCoat`, `tee`, `shirt`),
+  a `skirt` or apron that follows the legs, glasses, beards, wrinkles.
+- **Things in the hand** — `heldItemL` / `heldItemR` (cup, clipboard, phone, or your own SVG);
+  the hand keeps its grip and one-handed gestures switch to the free hand.
+- **Posture** — `stoop` for a bent back, `backHair` for bald heads, one-armed rest poses.
+
+And what a scene can do with them:
+
+- **Hold a stance** — `sitDown`, `standUp`, `face(otherCharacter)`: a character speaks,
+  nods and waves while seated or turned toward someone. Pets do the same.
+- **Furniture** — `createProp(host, 'chair' | 'stool' | 'table' | 'counter', { for: rig })`
+  draws props that line up with a seated character.
+- **Conversations** — one sequence per character, lines taking turns;
+  `examples/conversation/` is a complete two-person scene.
+
 - **`SKILL.md`** — instructions an AI agent follows to create a character from a brief,
   verify it, and place it in a composition.
 - **`runtime/`** — the library (ES modules) with an English API.
@@ -34,6 +51,8 @@ python3 tools/serve.py                          # http://127.0.0.1:8300/studio/
 sh tools/check.sh                               # every character × every action, headless → PASS / FAIL
 sh tools/shot.sh receptionist /tmp/sheet.png    # pose sheet for one character
 sh tools/peek.sh examples/conversation/index.html  # timings + contact sheet of a composition
+sh tools/gallery.sh /tmp/all.png                # every registered character in one picture
+sh tools/lint-examples.sh                       # hyperframes lint on every example (needs Node)
 ```
 
 ## A character in a dozen lines
@@ -76,16 +95,18 @@ export default {
 ## Requirements
 
 Python 3 for the tools. Chrome or Chromium for `check.sh` / `shot.sh` / `peek.sh`. GSAP 3 is
-loaded from a CDN by the pages here and by HyperFrames compositions. No Node, no bundler.
+loaded from a CDN by the pages here and by HyperFrames compositions. No Node and no bundler
+are needed to build or check characters; only `tools/lint-examples.sh` (and HyperFrames
+itself) uses Node.
 
 ## Notes
 
 - The public API, the definition and config schemas are English. The two rig files keep
   Vietnamese internal names and comments, and the studio UI is in Vietnamese;
   `runtime/schema.js` is the dictionary between the two.
-- Verified with the HyperFrames CLI 0.9.52: `examples/hyperframes/index.html` passes
-  `hyperframes lint` and `hyperframes check` with no errors and renders to a 17 s, 1920 × 1080,
-  30 fps MP4 on parallel workers.
+- Verified with the HyperFrames CLI 0.9.52: both examples pass `hyperframes lint` (run in CI
+  on every push) and render to 1920 × 1080 MP4s — `examples/hyperframes` 17 s,
+  `examples/conversation` 19 s.
 - See `CHANGELOG.md` for what changed between versions.
 - Licensed under the MIT License (`LICENSE`). GSAP is loaded from a CDN and is not part of this
   repository; it has its own licence.
@@ -98,6 +119,10 @@ Skill hướng dẫn AI agent **tạo nhân vật 2D tuỳ chỉnh** (SVG thuầ
 **dùng lại nhân vật trong video HyperFrames**. Mỗi nhân vật là một tệp định nghĩa nhỏ trong
 `characters/`, thừa hưởng bộ xương và 22 động tác có sẵn. Kèm chó, mèo (năm giống) với bộ
 động tác riêng và hình dáng chỉnh được.
+
+Nhân vật mặc được váy / tạp dề, cầm đồ vật (cốc, bìa hồ sơ, điện thoại), có dáng còng; trong
+cảnh thì ngồi xuống, quay về phía nhau và nói chuyện luân phiên (`sitDown`, `face`), có sẵn
+ghế, bàn, quầy (`createProp`). Ví dụ hai người nói chuyện: `examples/conversation/`.
 
 ```bash
 python3 tools/serve.py        # mở studio: http://127.0.0.1:8300/studio/

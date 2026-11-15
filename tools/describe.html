@@ -32,7 +32,9 @@ try {
     // Các slot "có thể rỗng": chỉ báo là có khi nhân vật thật sự vẽ gì đó ở đó.
     const draws = (key) => { try { return String(definition[key]('p', palette, definition) || '').trim() !== ''; } catch (error) { return true; } };
     Object.assign(out, { id, kind: 'person', name: list().people[id],
-      inheritedParts: { hat: draws('hat'), faceExtras: draws('faceExtras'), beard: draws('beard'), shoulderAccessories: draws('shoulderAccessories') },
+      inheritedParts: { hat: draws('hat'), faceExtras: draws('faceExtras'), beard: draws('beard'), shoulderAccessories: draws('shoulderAccessories'),
+                        heldItemL: draws('heldItemL'), heldItemR: draws('heldItemR') },
+      skirt: definition.skirt || null,
       switches: other, numbers, faceShape: definition.faceShape, brows: definition.brows, restPose: definition.restPose, colors: definition.colors });
   } else { out.ok = false; out.error = `no character or species "${id}" (people: ${Object.keys(RigSVG.NHAN_VAT).join(', ')}; pets: ${Object.keys(RigThu.LOAI).join(', ')})`; }
 } catch (error) { out.ok = false; out.error = String(error && error.message || error); }

@@ -17,3 +17,9 @@ jobs:
         run: sh tools/check.sh
       - name: dist/ is committed up to date
         run: git diff --exit-code -- dist
+      # Hợp đồng HyperFrames: mỗi ví dụ phải qua `hyperframes lint`. Node có sẵn trên runner.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Examples pass hyperframes lint
+        run: sh tools/lint-examples.sh

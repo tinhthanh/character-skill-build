@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1
+
+Fixed
+- The last frame of a `sequence()` stopped a fraction short of the final state (a pet ending
+  a walk faced 0.998 instead of 1). The end of a sequence is now exact.
+
+Added
+- `tools/lint-examples.sh` runs `hyperframes lint` on every example; CI runs it on each push.
+- `tools/describe.sh` reports a character's `skirt` and whether it holds items.
+- README and `characters/_template.js` cover skirts, posture, held items, stance and props.
+
 ## 0.7.0
 
 Added

@@ -181,7 +181,8 @@ configs/              per-character tuned numbers written by the studio (<id>.js
 dist/                 character.iife.js (commented) · character.slim.js (use this one) — generated
 studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
-                      describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture)
+                      describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture) ·
+                      lint-examples.sh (hyperframes lint on the examples; needs Node)
 examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated)
 references/           slots.md · actions.md · hyperframes.md
 ```

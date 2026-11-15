@@ -19,7 +19,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.7.0';
+export const VERSION = '0.7.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -339,8 +339,13 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   source.kill();
 
   const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
+  const lastPosition = duration * sampleRate;       // vị trí (tính bằng khung) của giây cuối cùng
   const show = (position) => {
-    const p = Math.min(count - 1, Math.max(0, position)), lo = Math.floor(p), hi = Math.min(count - 1, lo + 1), mix = p - lo;
+    const p = Math.min(count - 1, Math.max(0, position)), lo = Math.min(count - 2, Math.floor(p)), hi = lo + 1;
+    // Khung CUỐI được chụp đúng ở `duration`, tức sớm hơn một nhịp mẫu trọn vẹn — khoảng cuối
+    // ngắn hơn các khoảng khác. Chia theo độ dài thật của nó, nếu không thì ở đúng giây cuối
+    // chuỗi vẫn còn thiếu một chút mới tới trạng thái kết thúc.
+    const span = hi === count - 1 ? Math.max(1e-9, lastPosition - lo) : 1, mix = Math.min(1, (p - lo) / span);
     const a = frames[lo], b = frames[hi];
     // Số thì nội suy giữa hai khung mẫu; chuỗi (hình bàn tay) lấy của khung trước.
     keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
@@ -350,7 +355,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   // bị tua bằng seek() (tắt callback) và khi tua ngược.
   const playhead = { _frame: 0, get frame() { return this._frame; }, set frame(v) { this._frame = v; show(v); } };
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
-  timeline.to(playhead, { frame: (count - 1) * (duration * sampleRate) / (count - 1), duration, ease: 'none' }, 0);
+  timeline.to(playhead, { frame: lastPosition, duration, ease: 'none' }, 0);
   timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps, rig };
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
