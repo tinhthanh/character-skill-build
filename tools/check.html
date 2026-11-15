@@ -639,6 +639,49 @@ try {
       talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill();
       L.shot(scene2, null, 'wide').progress(1); stage2.remove();
     }
+    // Con vật đứng cạnh người nói, đầu nó bị mép DƯỚI của cận ngực cắt ngang: máy quay siết lại thành cận mặt (con vật
+    // nằm hẳn dưới khung, người nói vẫn to) thay vì nới ra ôm cả hai.
+    {
+      const stage3 = document.createElement('div'); stage3.setAttribute('data-composition-id', 'check-tight');
+      stage3.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
+      const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage3.appendChild(d); return d; };
+      const h1 = mk('tight-a', 'left:470px;bottom:40px;width:340px;height:400px'), h2 = mk('tight-d', 'left:660px;bottom:40px;width:218px;height:180px');
+      document.body.appendChild(stage3);
+      const p1 = L.createCharacter(h1, { id: 'vet' }).rig, pet = L.createPet(h2, { species: 'dog' }).rig, scene3 = ['#tight-a', '#tight-d'];
+      const zoomNow = () => new DOMMatrix(getComputedStyle(h1).transform).a;
+      const seen = (rig) => { const frame = stage3.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); const x = Math.min(frame.right, head.right) - Math.max(frame.left, head.left), y = Math.min(frame.bottom, head.bottom) - Math.max(frame.top, head.top); return x > 0 && y > 0 ? (x * y) / (head.width * head.height) : 0; };
+      const cutNow = (rig) => seen(rig) > 0.08 && seen(rig) < 0.92;
+      const plain = L.shot(scene3, p1, 'chest'); plain.progress(1); const chestZoom = zoomNow(), wasCut = seen(pet) > 0.01 && seen(pet) < 0.92; plain.kill();
+      if (!wasCut) hong('shot tighten', `test setup: the pet's head should be cut by a plain chest shot (${Math.round(seen(pet) * 100)}% shows)`);
+      const careful = L.shot(scene3, p1, 'chest', { avoid: [p1, pet] }); careful.progress(1);
+      if (zoomNow() < chestZoom) hong('shot tighten', `with a pet cut by the bottom edge the shot should tighten, not widen (zoom ${zoomNow().toFixed(2)}, plain chest ${chestZoom.toFixed(2)})`);
+      if (cutNow(pet)) hong('shot tighten', 'the pet is still cut by the frame edge');
+      if (seen(p1) < 0.92) hong('shot tighten', 'the subject is cut by the tightened shot');
+      careful.kill(); L.shot(scene3, null, 'wide').progress(1); stage3.remove();
+    }
+    // PHỤ ĐỀ tránh đầu nhân vật: hộp chữ đè lên đầu con chó thì dời theo chiều dọc tới chỗ trống; `avoid: false` thì để yên.
+    {
+      const stage4 = document.createElement('div'); stage4.setAttribute('data-composition-id', 'check-captions');
+      stage4.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
+      const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage4.appendChild(d); return d; };
+      const h1 = mk('cap-a', 'left:120px;bottom:40px;width:340px;height:400px'), h2 = mk('cap-d', 'left:620px;bottom:40px;width:300px;height:248px');
+      const text = mk('cap-text', 'left:480px;top:520px;width:520px;padding:10px;font:600 26px/1.25 sans-serif;text-align:center;background:#000;color:#fff');
+      document.body.appendChild(stage4);
+      const p1 = L.createCharacter(h1, { id: 'vet' }).rig, pet = L.createPet(h2, { species: 'dog' }).rig;
+      const talk = L.conversation([[p1, ['explain', 'Xin chao cac ban, hom nay minh kham dinh ky cho be.', 3]], [pet, 'wagTail']]);
+      const covers = (options) => {
+        const words = L.captions(talk, text, options), reel = gsap.timeline({ paused: true }); talk.addTo(reel, 0); reel.add(words.paused(false), 0); reel.time(1.5);
+        const box = text.getBoundingClientRect(), head = pet.el.dau.getBoundingClientRect(), frame = stage4.getBoundingClientRect();
+        const hit = head.right > box.left && head.left < box.right && head.bottom > box.top && head.top < box.bottom, inside = box.top >= frame.top && box.bottom <= frame.bottom;
+        words.kill(); reel.kill(); text.style.transform = '';
+        return { hit, inside };
+      };
+      const plain = covers({ avoid: false }), moved = covers({});
+      if (!plain.hit) hong('captions avoid', 'test setup: the caption should cover the dog\'s head when left alone');
+      if (moved.hit) hong('captions avoid', 'the caption still covers a character\'s head');
+      if (!moved.inside) hong('captions avoid', 'the caption was moved out of the frame');
+      talk.sequences.forEach((item) => item.kill()); stage4.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

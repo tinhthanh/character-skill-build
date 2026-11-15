@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.31.0
+
+Added
+- **Captions keep off the characters' heads.** With a `conversation()` as the source,
+  `captions()` measures where every visible head is during each line (camera included) and
+  moves the caption up or down to the nearest free place inside the safe area. If there is
+  none it stays where it is. `captions(talk, element, { avoid: false })` turns this off.
+
+Changed
+- **The camera keeps a real close-up when a pet stands beside the speaker.** Since 0.30.0 a
+  pet cut by the bottom edge of a chest shot was brought into the frame, which turned the
+  close-up into a group shot. The camera now first tries a tighter face shot, which leaves
+  the pet below the frame, and widens only if that does not work.
+
 ## 0.30.0
 
 Fixed

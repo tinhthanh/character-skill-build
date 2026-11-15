@@ -1,4 +1,4 @@
-/* VGCharacter v0.30.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.31.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5108,7 +5108,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.30.0';
+const VERSION = '0.31.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5538,7 +5538,6 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
     const rigs = [].concat(subject || []);
     if (!rigs.length || rigs.some((rig) => !rig || typeof rig.shotBox !== 'function')) throw new Error(`[character] shot(scene, subject, "${kind}"): subject must be a rig (createCharacter / createPet …).rig, or an array of rigs`);
     const sequences = [].concat(given || []);
-    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
     // Hộp ngắm của một rig trong toạ độ KHUNG HÌNH, ở thời điểm của cảnh quay (và nó có đang hiện không).
     const boxAt = (rig, index, boxKind) => {
       const actions = time === undefined ? null : sequences[index] || (sequences.length === 1 && rigs.length === 1 ? sequences[0] : null) || rig.lastSequence || null;
@@ -5552,15 +5551,18 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
       const originX = host.x + (hostWidth - size.w * unit) / 2, originY = host.y + (hostHeight - size.h * unit) / 2;
       return { left: originX + box.x * unit, right: originX + (box.x + box.width) * unit, top: originY + box.y * unit, bottom: originY + (box.y + box.height) * unit, shown };
     };
+    // Tính khung cho một CỠ CẢNH: đích phóng + những người đứng cạnh bị mép khung cắt mà không đẩy ra được.
+    const frameFor = (shotKind) => {
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
     rigs.forEach((rig, index) => {
-      const box = boxAt(rig, index, kind);
+      const box = boxAt(rig, index, shotKind);
       left = Math.min(left, box.left); right = Math.max(right, box.right); top = Math.min(top, box.top); bottom = Math.max(bottom, box.bottom);
     });
     // Vừa cả chiều cao lẫn bề ngang của vùng ngắm (hai nhân vật đứng xa nhau thì bề ngang quyết định).
     const scale = Math.max(1, Math.min(8, fill * frameHeight / (bottom - top), (rigs.length > 1 ? 0.9 : 1.6) * frameWidth / (right - left)));
     // Canh vùng ngắm vào giữa khung, nhưng không để lộ ra ngoài mép cảnh.
     const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
-    target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight * centerY - (top + bottom) / 2 * scale, frameHeight), scale };
+    const target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight * centerY - (top + bottom) / 2 * scale, frameHeight), scale };
     // NGƯỜI ĐỨNG CẠNH: một cái đầu (hay con vật) bị mép khung cắt ngang trông như lỗi dựng hình. Với mỗi rig trong
     // `avoid`: nếu nó nằm LƯNG CHỪNG trong khung thì đẩy khung sang cho nó ra hẳn; đẩy không được (chủ thể sẽ bị
     // cắt, hoặc chạm mép cảnh) thì đưa luôn nó vào khung — thành cảnh hai người.
@@ -5583,6 +5585,14 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
       const keepsSubject = left * scale + shifted >= 0 && right * scale + shifted <= frameWidth;
       if (keepsSubject && !partly(shifted)) target.x = shifted; else crowded.push(other);
     }
+    return { target, crowded };
+    };
+    let framed = frameFor(kind);
+    // Có người đứng sát bị mép cắt: thử SIẾT khung lại (cận mặt) trước khi nới ra. Cận mặt hẹp hơn nên người bên cạnh
+    // nằm hẳn ngoài khung, và người nói vẫn có một cận cảnh thật — nới ra ôm cả hai thì người nói chỉ còn cao nửa khung.
+    if (framed.crowded.length && kind === 'chest' && rigs.length === 1) { const tighter = frameFor('face'); if (!tighter.crowded.length) framed = tighter; }
+    target = framed.target;
+    const crowded = framed.crowded;
     // Gộp xong thì XÉT LẠI những rig còn lại với khung mới (rộng hơn): bản trước không xét lại, nên con chó đứng cạnh
     // vẫn bị cắt nửa cái đầu ở góc khung hai người.
     if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame, avoid });
@@ -5624,7 +5634,7 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
  * Trả về một timeline (paused). Chữ và độ mờ là HÀM CỦA THỜI GIAN (một tween, tra bảng) nên tua
  * tới đâu cũng ra đúng một khung hình. `timeline.data.lines` giữ danh sách câu.
  */
-function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0 } = {}) {
+function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0, avoid = true } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -5682,6 +5692,35 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
       line.y = host.y + (line.rig.host.offsetHeight - size.h * unit) / 2 + box.y * unit - offsetY;
     }
   }
+  // TRÁNH ĐẦU NHÂN VẬT (`avoid`, chỉ khi nguồn là một `conversation()`): hộp chữ nằm ở một chỗ cố định trong khung
+  // hình, còn nhân vật thì di chuyển và máy quay thì phóng — có câu hộp chữ đè đúng lên một cái đầu. Với từng câu:
+  // tua các chuỗi động tác và máy quay tới ba thời điểm của câu ấy, đo các cái đầu đang hiện, rồi dời hộp chữ theo
+  // chiều DỌC tới chỗ gần nhất không đè lên cái đầu nào (trong vùng an toàn 6–94% chiều cao khung). Không có chỗ thì để yên.
+  if (avoid && !follow && source && Array.isArray(source.sequences)) {
+    const root = element.closest('[data-composition-id]') || element.offsetParent || element.parentElement;
+    const actors = source.sequences.map((item) => item && item.data && item.data.rig).filter((rig) => rig && rig.el && rig.el.dau);
+    const reels = [...source.sequences, source.camera].filter(Boolean), before = reels.map((reel) => reel.time());
+    const wasText = slot.textContent, wasOpacity = element.style.opacity, wasTransform = element.style.transform;
+    element.style.transform = '';
+    for (const line of lines) {
+      slot.textContent = label(line);
+      const frame = root.getBoundingClientRect(), box = element.getBoundingClientRect(), ratio = frame.height / (root.offsetHeight || frame.height) || 1;
+      const heads = [];
+      for (const time of [line.start + 0.15, (line.start + line.end) / 2, line.end - 0.1]) {
+        reels.forEach((reel) => reel.time(Math.max(0, Math.min(time, reel.duration()))));
+        for (const rig of actors) { if (rig.s.mo < 0.5) continue; const head = rig.el.dau.getBoundingClientRect(); if (head.width > 0 && head.right > frame.left && head.left < frame.right) heads.push(head); }
+      }
+      const pad = 6 * ratio, hits = (shift) => heads.some((head) => head.right > box.left - pad && head.left < box.right + pad && head.bottom > box.top + shift - pad && head.top < box.bottom + shift + pad);
+      if (!hits(0)) continue;
+      const step = frame.height * 0.02, low = frame.top + frame.height * 0.06, high = frame.bottom - frame.height * 0.06;
+      for (let n = 1; n <= 22 && line.shift === undefined; n++) for (const shift of [n * step, -n * step]) {
+        if (box.top + shift < low || box.bottom + shift > high || hits(shift)) continue;
+        line.shift = shift / ratio; break;
+      }
+    }
+    reels.forEach((reel, index) => reel.time(before[index]));
+    slot.textContent = wasText; element.style.opacity = wasOpacity; element.style.transform = wasTransform;
+  }
   const total = lines[lines.length - 1].end + hold + fade;
   let shown = null;
   const show = (time) => {
@@ -5692,6 +5731,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
       if (line) {
         slot.textContent = label(line);
         if (follow && line.x !== undefined) { element.style.left = `${line.x.toFixed(1)}px`; element.style.top = `${line.y.toFixed(1)}px`; element.style.transform = 'translate(-50%, -100%)'; }
+        else if (!follow && avoid) element.style.transform = line.shift ? `translateY(${line.shift.toFixed(1)}px)` : '';
       }
     }
     const opacity = !line ? 0 : Math.max(0, Math.min(1, (time - (line.start - fade)) / fade, (line.end + hold + fade - time) / fade));
