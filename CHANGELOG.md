@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.20.0
+
+From an outside review of a film chaining all 80 actions.
+
+Fixed
+- **`explain` could show no gesture at all.** A character resting with clasped hands could
+  draw the "hand on chest" pose, 15° away from its rest pose, and a 4–5 s line had room for
+  only that one gesture. Poses too close to the rest pose are skipped, and gestures are now
+  placed from every syllable instead of every fifth.
+- **Pets ran out backwards.** After `face('left')`, `exit` still ran right, tail first. Pets
+  now turn toward the way they run, start from where they stand, and accept
+  `exit('left')` / `enter('right')`.
+- **Gestures behind the back.** Facing left, `wave`, `thumbsUp` and speech gestures used the
+  right arm — opening away from the person faced. They use the arm on the facing side.
+- **Held items.** The arm holding an item no longer swings while walking (the cup rocked like
+  a pendulum). After `hideItem` the arm relaxes instead of gripping thin air; `showItem`
+  brings the holding pose back.
+
 ## 0.19.0
 
 Added

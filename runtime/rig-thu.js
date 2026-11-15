@@ -574,12 +574,12 @@ export class RigThu {
     return t;
   }
 
-  /** Chạy VÀO khung từ bên trái rồi dừng ở giữa. */
-  enter() {
-    const t = this.tl(), s = this.s;
-    t.set(s, { x: -300, mo: 1, ngoi: 0, huong: 1, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
-    const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300, x0: -300, A: 16, cao: 11 });
-    this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: 1 });      // vào xong: về dáng nghỉ của giống, đầu quay phải
+  /** Chạy VÀO khung rồi dừng ở giữa. `from`: 'left' (mặc định, chạy sang phải) hoặc 'right'. */
+  enter(from = 'left') {
+    const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
+    t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
+    const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
+    this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
     return t;
   }
 
@@ -628,13 +628,16 @@ export class RigThu {
     return this.#khep(this.tl(), 0.3, 0, { huong: side });
   }
 
-  /** Chạy RA khỏi khung về bên phải và ẩn đi. */
-  exit() {
-    const t = this.tl(), s = this.s;
+  /** Chạy RA khỏi khung và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. */
+  exit(to = 'right') {
+    const t = this.tl(), s = this.s, dir = to === 'left' ? -1 : 1, x0 = s.x;
     let at = this.#dung(t, 0);
-    at = this.#di(t, at, 6, 0.36, { ra: false, quang: 320, x0: 0, A: 16, cao: 11 });
+    // Đang quay đầu về phía kia thì QUAY LẠI rồi mới chạy: bản trước cứ thế chạy sang phải — con vật đã
+    // `face('left')` là đi giật lùi ra khỏi khung. Xuất phát từ chỗ đang đứng (`x0`), không phải từ giữa.
+    if ((s.huong < 0 ? -1 : 1) !== dir) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
+    at = this.#di(t, at, 6, 0.36, { ra: false, quang: dir * 320 - x0, x0, A: 16, cao: 11 });
     t.to(s, { mo: 0, duration: 0.2 }, at - 0.2);
-    this.#khep(t, 0.2, at, { x: 320, mo: 0 });
+    this.#khep(t, 0.2, at, { x: 320 * dir, mo: 0, huong: dir });
     return t;
   }
 

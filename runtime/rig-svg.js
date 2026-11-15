@@ -1704,6 +1704,12 @@ export class RigSVG {
     return gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => this.apDung(), onComplete: () => this.apDung() });
   }
 
+  // Góc nghỉ [bắp, cẳng] của một tay. Tay cầm đồ mà đồ đang được cất thì nghỉ ở dáng buông chung, không ở dáng giữ đồ.
+  #restArm(side, shown = this.s['item' + side]) {
+    if (this.holds[side] && shown <= 0.5) return [NGHI['bat' + side], NGHI['cang' + side]];
+    return [this.NGHI['bat' + side], this.NGHI['cang' + side]];
+  }
+
   // Khép về tư thế nghỉ, bàn tay đổi về 'mo' ở nửa sau đoạn khép.
   #khep(t, d = 0.5, at = '>', giu = {}) {
     // VỊ TRÍ `x` KHÔNG thuộc tư thế nghỉ: nhân vật đã đi tới đâu thì đứng lại ở đó.
@@ -1719,9 +1725,17 @@ export class RigSVG {
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     so.seat = this.s.seat; so.huong = this.s.huong;
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
-    t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
+    // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
+    // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
+    const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
+    for (const side of ['L', 'R']) {
+      if (!this.holds[side] || target['item' + side] > 0.5) continue;
+      const [upper, fore] = this.#restArm(side, target['item' + side]);
+      target['bat' + side] = upper; target['cang' + side] = fore; hands['tay' + side] = 'mo';
+    }
+    t.to(this.s, { ...target, duration: d, ease: 'power2.inOut' }, at);
     // Bàn tay về hình dạng NGHỈ của nhân vật (mặc định thả lỏng, nhưng có thể là nắm tay).
-    t.set(this.s, { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR }, `>-${d * 0.5}`);
+    t.set(this.s, hands, `>-${d * 0.5}`);
     return t;
   }
 
@@ -1834,6 +1848,8 @@ export class RigSVG {
         // `than`/`dau` pha từ tư thế nghỉ: chỉ phần LỆCH do dáng đi mới soi gương.
         o.than = N.than - (a.than - N.than); o.dau = N.dau - (a.dau - N.dau);
       }
+      // Tay đang CẦM ĐỒ không đánh theo nhịp bước: cái cốc gắn vào bàn tay, tay vung là cốc lắc như con lắc.
+      for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) o['vung' + side] *= 0.15;
       Object.assign(s, o);
       if (x) s.x = x(b);
     };
@@ -1894,6 +1910,10 @@ export class RigSVG {
   #freeHand(hand = 'auto') {
     if (hand === 'L' || hand === 'R') return hand;
     const busy = (side) => this.holds[side] && this.s['item' + side] > 0.5;
+    // Đang quay mặt về một phía thì diễn bằng tay Ở PHÍA ĐÓ — tay đưa về phía người đối diện. Dùng tay kia là
+    // vẫy và mở tay ra sau lưng mình.
+    const toward = this.s.huong < -0.1 ? 'L' : this.s.huong > 0.1 ? 'R' : null;
+    if (toward && !busy(toward)) return toward;
     return busy('R') && !busy('L') ? 'L' : 'R';
   }
 
@@ -2432,15 +2452,16 @@ export class RigSVG {
     //
     // Tay đang cầm đồ thì không diễn; tay còn lại diễn thay. Cả hai tay đều bận thì chỉ còn đầu và thân.
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
-    const free = ['R', 'L'].filter((side) => !busy(side));
+    // Đang quay mặt sang trái thì tay chủ đạo là tay trái (xem `#freeHand`).
+    const free = (s.huong < -0.1 ? ['L', 'R'] : ['R', 'L']).filter((side) => !busy(side));
     if (!free.length) return t;
     const lead = free[0], other = free[1] || null;                    // tay chủ đạo (phải, nếu rảnh) và tay phụ
     // Các DÁNG ĐÍCH — góc của tay chủ đạo [bắp, cẳng] và của tay phụ (null = tay phụ chỉ nhích theo).
     // Cẳng tay DƯƠNG là mở ra ngoài: bàn tay đưa sang bên, lòng bàn tay hướng về người nghe. Bản trước dùng cẳng
     // tay âm với bắp tay nâng cao — khuỷu chĩa ngang, bàn tay rủ xuống — trông như cánh gà.
     const key = (side, joint) => (joint ? 'cang' : 'bat') + side;
-    const base = (side) => [N[key(side, 0)], N[key(side, 1)]];
-    const POSES = [
+    const base = (side) => this.#restArm(side);
+    const ALL_POSES = [
       { lead: [14, 58], other: null },             // mở một tay ngang hông
       { lead: [12, 74], other: null },             // đưa tay sang bên
       { lead: [30, 62], other: null },             // đưa bàn tay ra phía trước-bên (cẳng tay quá ~75° thì bàn tay lật nghiêng, trông như cái que)
@@ -2448,6 +2469,9 @@ export class RigSVG {
       { lead: [16, 50], other: [16, 50] },         // mở cả hai tay
       { lead: [18, 66], other: [12, 40] },         // hai tay, tay chủ đạo cao hơn
     ];
+    // Dáng nào gần trùng tư thế nghỉ của nhân vật thì bỏ: người nghỉ ở dáng đan tay (cẳng −97°) mà "đặt tay lên
+    // ngực" (−112°) là cánh tay nhích 15° — cả câu nói không thấy một cử chỉ nào.
+    const POSES = ALL_POSES.filter((pose) => Math.abs(pose.lead[1] - base(lead)[1]) >= 45);
     // Một cử chỉ trọn vẹn (lấy đà → đưa tay → giữ → về nền) cần gần hai giây. Mốc nào sát mốc trước quá thì bỏ:
     // hai cử chỉ gối lên nhau là hai tween cùng giành một khớp, và cánh tay nhảy cóc giữa chừng.
     const anchors = [];
@@ -2465,12 +2489,13 @@ export class RigSVG {
     const occupied = [];                                              // các quãng một cử chỉ lớn đang chiếm tay
     let last = -1;
     anchors.forEach((a, i) => {
+      if (!POSES.length) return;
       let pick = last; while (pick === last && POSES.length > 1) pick = Math.floor(ngau() * POSES.length);
       last = pick;
       const pose = POSES[pick];
       const next = i + 1 < anchors.length ? anchors[i + 1] : D;
       // Thời gian đưa tay dài nhất trong các tay tham gia (đường đi càng dài càng lâu, xem bên dưới).
-      const travel = Math.max(Math.abs(pose.lead[1] - N[key(lead, 1)]), other && pose.other ? Math.abs(pose.other[1] - N[key(other, 1)]) : 0);
+      const travel = Math.max(Math.abs(pose.lead[1] - base(lead)[1]), other && pose.other ? Math.abs(pose.other[1] - base(other)[1]) : 0);
       const longest = clamp(travel / 300, 0.36, 0.62) + 0.17;                 // + nhịp trễ của tay phụ và của cẳng tay
       const hold = clamp((next - a) - 0.16 - longest - 0.85, 0.25, 1.5);
       const stroke = a + 0.16, release = stroke + longest + hold;
@@ -2506,7 +2531,7 @@ export class RigSVG {
         // 4. VỀ NỀN: chậm hơn lúc đưa ra, cẳng tay về sau.
         t.to(s, { [key(arm, 0)]: upper0, duration: 0.6, ease: 'sine.inOut' }, release + lag)
          .to(s, { [key(arm, 1)]: fore0, duration: 0.66, ease: 'sine.inOut' }, release + lag + 0.05);
-        t.set(s, { ['tay' + arm]: N['tay' + arm] }, release + lag + 0.5);
+        t.set(s, { ['tay' + arm]: this.holds[arm] ? 'mo' : N['tay' + arm] }, release + lag + 0.5);
       });
       // Tay phụ không diễn trong dáng này: nhích nhẹ theo nhịp, để không là một khúc gỗ bên cạnh tay đang diễn.
       if (other && !pose.other) {
@@ -2517,8 +2542,8 @@ export class RigSVG {
     // Nhịp rơi vào lúc tay đang ở NỀN: nhấn nhẹ cả tay chủ đạo lẫn tay phụ, kèm một cái gật rất nhỏ.
     for (const b of spaced) {
       if (b < 0.25 || b + 0.36 > D - 0.1 || occupied.some(([from, to]) => b + 0.36 > from && b < to)) continue;
-      pulse(lead, N[key(lead, 1)], b, nhieu(4, 7));
-      if (other) pulse(other, N[key(other, 1)], b + 0.03, nhieu(2, 4));
+      pulse(lead, base(lead)[1], b, nhieu(4, 7));
+      if (other) pulse(other, base(other)[1], b + 0.03, nhieu(2, 4));
       t.to(s, { dauY: N.dauY + nhieu(1, 1.8), duration: 0.12, ease: 'power2.out' }, b).to(s, { dauY: N.dauY, duration: 0.24, ease: 'sine.inOut' }, b + 0.12);
     }
     return t;
@@ -2564,8 +2589,10 @@ export class RigSVG {
     this.#khauHinh(t, soAm, nhip, tone.corner);
 
     // Bỏ nhịp nào rơi vào 0.5s cuối: đang vung dở thì bị `#khep` giật về nghỉ.
-    const BUOC = 5, moc = [];
-    for (let i = 1; i < soAm && i * nhip <= dur - 0.5; i += BUOC) moc.push(i * nhip);
+    // Mọi âm tiết đều là ứng viên; `#cuChi` tự giãn các cử chỉ cách nhau đủ xa. Bản trước chỉ lấy âm thứ 1, 6,
+    // 11…: câu 4,5 s rơi mất hai trong ba mốc (một quá sát mốc trước, một quá sát cuối câu) và chỉ còn một cử chỉ.
+    const moc = [];
+    for (let i = 1; i < soAm && i * nhip <= dur - 0.5; i++) moc.push(i * nhip);
     // Không có tiếng thật: nhịp nhấn ước theo âm tiết — cứ ba âm tiết một lần nhấn.
     const stress = [];
     for (let i = 1; i < soAm; i += 3) stress.push(i * nhip);

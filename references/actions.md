@@ -86,6 +86,9 @@ left behind.
 (head tilt, smile, two nods) of the same length. A hand holding an item stays closed around it
 during every action.
 
+While the character faces left or right, one-handed actions (`wave`, `thumbsUp`) and speech
+gestures use the arm on that side, so the hand goes toward whoever it is facing.
+
 **Held items** are part of the stance too: `hideItem(side)` puts one away and it stays away
 until `showItem(side)`. Do not tween `rig.state.itemR` beside a `sequence()` — the sequence
 owns the whole state and overwrites it.
@@ -109,8 +112,8 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `givePaw` | — | sit and offer a front paw | 1.9 |
 | `sniff` | — | nose to the ground | 1.8 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
-| `enter` | — | run in from the left, stop at centre | 2.6 |
-| `exit` | — | run out to the right — **ends hidden** | 2.4 |
+| `enter` | `(from = 'left')` | run in from the `'left'` or the `'right'`, stop at centre | 2.6 |
+| `exit` | `(to = 'right')` | turn that way and run out to the `'right'` or the `'left'` — **ends hidden** | 2.4 |
 
 **Cats** (`cat`, `orange_cat`, `black_cat`) rest **sitting**; actions that need them standing
 stand them up first:
@@ -127,8 +130,8 @@ stand them up first:
 | `tiltHead` | — | tilt one way, then the other | 2.3 |
 | `pounce` | — | crouch, wiggle, leap | 2.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
-| `enter` | — | run in from the left, stop at centre | 2.6 |
-| `exit` | — | run out to the right — **ends hidden** | 2.7 |
+| `enter` | `(from = 'left')` | run in from the `'left'` or the `'right'`, stop at centre | 2.6 |
+| `exit` | `(to = 'right')` | turn that way and run out to the `'right'` or the `'left'` — **ends hidden** | 2.7 |
 
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything

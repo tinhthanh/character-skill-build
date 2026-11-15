@@ -362,6 +362,47 @@ try {
         line.kill(); actor.svg.remove();
       }
     }
+    // Câu nói ngắn vẫn phải THẤY cử chỉ, với mọi hạt giống: nhân vật nghỉ ở dáng đan tay từng bốc trúng dáng "tay lên
+    // ngực" (lệch 15°) và đứng im cả câu.
+    for (let seedNo = 1; seedNo <= 8; seedNo++) {
+      L.seed(seedNo); const actor = L.createCharacter(host, { id: 'vet' }).rig, rest = actor.state.forearmR;
+      const line = L.sequence(actor, [['explain', 'Xin chào các bạn, hôm nay mình khám định kỳ cho bé nhé.', 4]]); let moved = 0;
+      for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); moved = Math.max(moved, Math.abs(actor.state.forearmR - rest)); }
+      if (moved < 40) hong('explain gestures', `seed ${seedNo}: the forearm moves only ${moved.toFixed(0)}° in a four-second line`);
+      line.kill(); actor.svg.remove();
+    }
+    // Đang quay mặt sang trái thì vẫy và diễn bằng tay TRÁI (tay ở phía người đối diện); quay phải thì tay phải.
+    for (const [facing, near, far] of [['left', 'L', 'R'], ['right', 'R', 'L']]) for (const step of ['wave', ['explain', 'mot hai ba bon nam sau bay tam', 4]]) {
+      L.seed(5); const actor = L.createCharacter(host, { id: 'boy' }).rig, rest = { L: actor.state.forearmL, R: actor.state.forearmR };
+      const line = L.sequence(actor, [['face', facing], step]), begin = line.data.steps[1].start, moved = { L: 0, R: 0 };
+      for (let time = begin; time <= line.duration(); time += 1 / 30) { line.time(time); for (const side of ['L', 'R']) moved[side] = Math.max(moved[side], Math.abs(actor.state['forearm' + side] - rest[side])); }
+      if (moved[near] < 30 || moved[near] <= moved[far]) hong('facing gestures', `${Array.isArray(step) ? step[0] : step} while facing ${facing}: arm ${near} moves ${moved[near].toFixed(0)}°, arm ${far} ${moved[far].toFixed(0)}°`);
+      line.kill(); actor.svg.remove();
+    }
+    // Cất đồ rồi thì tay buông lỏng (không nắm vào không khí); lấy ra lại thì về dáng giữ đồ. Đi thì tay cầm đồ gần như không vung.
+    {
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', hold = actor.NGHI['cang' + side];
+      const line = L.sequence(actor, [['hideItem', side], ['idle', 0.5], ['showItem', side], ['walk', 4, 120]]), steps = line.data.steps;
+      line.time(steps[1].start + 0.3);
+      if (Math.abs(actor.s['cang' + side] - RigSVG.NGHI['cang' + side]) > 1 || actor.s['tay' + side] !== 'mo') hong('hideItem', `the empty hand keeps its holding pose (forearm ${actor.s['cang' + side].toFixed(0)}°, hand ${actor.s['tay' + side]})`);
+      line.time(steps[3].start - 0.01);
+      if (Math.abs(actor.s['cang' + side] - hold) > 1) hong('showItem', 'the arm does not come back to its holding pose');
+      let swing = 0, other = 0, away = side === 'R' ? 'L' : 'R';
+      for (let time = steps[3].start; time <= line.duration(); time += 1 / 30) { line.time(time); swing = Math.max(swing, Math.abs(actor.s['vung' + side])); other = Math.max(other, Math.abs(actor.s['vung' + away])); }
+      if (!(swing < other * 0.25)) hong('walk', `the arm holding an item swings (${swing.toFixed(2)} against ${other.toFixed(2)} for the free arm)`);
+      line.kill(); actor.svg.remove();
+    }
+    // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
+    for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
+      const pet = L.createPet(host, { species: 'dog' }).rig;
+      const line = L.sequence(pet, [['walk', 4, 60], ['face', 'left'], to ? ['exit', to] : 'exit']), last = line.data.steps[2];
+      line.time(last.start + 0.01); const from = pet.s.x;
+      line.time(last.start + last.duration / 2);
+      if (Math.sign(pet.s.huong) !== dir) hong('pet exit', `runs ${dir > 0 ? 'right' : 'left'} while facing the other way`);
+      if ((pet.s.x - from) * dir <= 0) hong('pet exit', `does not move ${dir > 0 ? 'right' : 'left'}`);
+      if (Math.abs(from - 60) > 2) hong('pet exit', `starts from x ${from.toFixed(0)} instead of where the pet stands (60)`);
+      line.kill(); pet.svg.remove();
+    }
     // Vẫy tay: không quất (dưới 20° mỗi khung, kể cả từ dáng đan tay), biên độ nhỏ dần, dài đúng 2,25 s.
     for (const id of ['vet', 'boy']) {
       const waver = L.createCharacter(host, { id }).rig, t = waver.wave(); let before = null, biggest = 0; const peaks = [];
