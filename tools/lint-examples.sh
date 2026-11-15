@@ -1,6 +1,10 @@
 #!/bin/sh
 # Run `hyperframes lint` on every example composition — the contract this library exists for.
-#   tools/lint-examples.sh
+#   tools/lint-examples.sh             lint only (fast, static)
+#   tools/lint-examples.sh --check     also `hyperframes check`: loads each example in a browser and
+#                                      samples it for runtime, layout and motion problems (slower)
+# With --check, errors fail; so do warnings, except the few known false positives listed in
+# references/hyperframes.md (a limb rotating about its joint, "the film is silent").
 # Needs Node (npx). Each example is copied to a temporary project together with the built
 # bundle, because HyperFrames only accepts files inside the project folder and the examples
 # load ../../dist/. Telemetry is off. Set HYPERFRAMES_VERSION to try another CLI version.
@@ -11,6 +15,9 @@ VERSION="${HYPERFRAMES_VERSION:-0.9.52}"
 export HYPERFRAMES_NO_TELEMETRY=1 DO_NOT_TRACK=1
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/lint-examples.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
+CHECK=0; [ "${1:-}" = "--check" ] && CHECK=1
+# Cảnh báo của `check` đã biết là báo nhầm với thư viện này (xem references/hyperframes.md).
+KNOWN="rotation_pivot_drift off_pivot_rotation gsap_tween_tail film_silent"
 failed=0
 for example in examples/*/index.html; do
   name="$(basename "$(dirname "$example")")"
@@ -23,6 +30,21 @@ for example in examples/*/index.html; do
     echo "  ✓ $name  $(grep -E '[0-9]+ errors?' "$WORK/$name.log" | tail -1 | sed 's/^[^0-9]*//')"
   else
     echo "  ✗ $name"; sed 's/^/      /' "$WORK/$name.log" | tail -15; failed=1
+  fi
+  if [ "$CHECK" = 1 ]; then
+    (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" check > "$WORK/$name.check" 2>&1) || true
+    grep -q "^Runtime" "$WORK/$name.check" || { echo "  ✗ $name  check did not run:"; sed 's/^/      /' "$WORK/$name.check" | tail -8; failed=1; continue; }
+    # Lỗi (✗) luôn tính; cảnh báo (⚠) tính nếu mã của nó không nằm trong danh sách đã biết.
+    bad="$(KNOWN="$KNOWN" python3 - "$WORK/$name.check" <<'PY'
+import os, re, sys
+known = set(os.environ['KNOWN'].split())
+for line in open(sys.argv[1], encoding='utf-8', errors='replace'):
+    found = re.match(r'\s+([✗⚠])\s+(?:t=[\d.,\s]+s\s+)?([a-z_]+)', line)
+    if found and (found.group(1) == '✗' or found.group(2) not in known):
+        print(line.rstrip()[:240])
+PY
+)"
+    if [ -n "$bad" ]; then echo "  ✗ $name  check:"; echo "$bad" | sed 's/^/    /'; failed=1; else echo "  ✓ $name  check (no errors, no unexpected warnings)"; fi
   fi
 done
 [ "$failed" = 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }

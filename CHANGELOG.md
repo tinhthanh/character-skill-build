@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.0
+
+Added
+- `VGCharacter.captions(source, element, options)`: the words of each spoken line shown while
+  it is spoken — a fixed caption, or a speech bubble above the speaker (`follow: true`). The
+  words come from the `speak` / `explain` steps, from `['speakCues', cues, null, { text }]`,
+  or from cues made with `tools/cues.py --text`.
+- `conversation(turns, { camera })`: an automatic camera that cuts to whoever speaks and
+  returns to the wide shot; `{ turn: […], shot }` overrides one turn.
+- Sequence steps that speak carry `text` and `speech` (the audible length).
+- `tools/lint-examples.sh --check` also runs `hyperframes check` and fails on errors and on
+  warnings outside the documented false positives; CI runs it.
+- `examples/conversation` uses the automatic camera and captions.
+
+Fixed
+- Camera shots made `hyperframes check` warn `panel_out_of_canvas` on the zoomed scene
+  elements; `shot()` now marks them `data-layout-allow-overflow`.
+
 ## 0.10.0
 
 Added

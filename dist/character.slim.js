@@ -1,4 +1,4 @@
-/* VGCharacter v0.10.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.11.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1492,7 +1492,7 @@ class RigSVG {
     this.#khep(t, 0.5, dur + 0.05);
     return t;
   }
-  speakCues(cue, dur = null, { cuChi = true } = {}) {
+  speakCues(cue, dur = null, { cuChi = true } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
     const t = this.tl(), s = this.s;
     this.#openUp(t);
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
@@ -3144,7 +3144,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.10.0';
+const VERSION = '0.11.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3324,6 +3324,8 @@ function list() {
     bakedConfigs: Object.keys(bakedConfigs),
   };
 }
+const SPEECH_STEPS = ['speak', 'explain', 'speakCues'];
+const SPEECH_SETTLE = 0.55;
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
@@ -3346,6 +3348,11 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
     if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0];
+    if (SPEECH_STEPS.includes(name)) {
+      const text = name === 'speakCues' ? (args[2] && args[2].text) || (args[0] && args[0].metadata && args[0].metadata.text) : args[0];
+      if (typeof text === 'string' && text.trim()) entry.text = text.trim();
+      entry.speech = Math.max(0, entry.duration - SPEECH_SETTLE);          // tiếng nói ngắn hơn bước đúng quãng "về chỗ"
+    }
     steps.push(entry);
     at += child.duration() + gap;
   }
@@ -3407,12 +3414,60 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
   for (const element of elements) {
     const at = place(element);
     gsap.set(element, { transformOrigin: `${-at.x}px ${-at.y}px` });
+    if (target.scale > 1) element.setAttribute('data-layout-allow-overflow', '');
     timeline.to(element, { ...target, duration: Math.max(duration, 0.001), ease: duration > 0 ? ease : 'none' }, 0);
   }
   timeline.data = { type: 'character-shot', kind, target };
   return timeline;
 }
-function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1 } = {}) {
+function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12 } = {}) {
+  if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
+  const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
+  let lines;
+  if (Array.isArray(source)) lines = source.map((line) => ({ ...line }));
+  else if (source && Array.isArray(source.turns)) lines = source.turns.flatMap((turn) => fromSteps(turn.steps, turn.rig));
+  else if (source && source.data && source.data.type === 'character-sequence') lines = fromSteps(source.data.steps, source.data.rig);
+  else throw new Error('[character] captions(source, …): source must be a conversation(), a sequence(), or an array of { start, end, text }');
+  lines = lines.filter((line) => line && typeof line.text === 'string' && line.end > line.start).sort((a, b) => a.start - b.start);
+  if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
+  const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;
+  const slot = element.querySelector('[data-caption-text]') || element;
+  if (follow) {
+    const root = element.closest('[data-composition-id]') || element.offsetParent || element.parentElement;
+    const place = (node) => { let x = 0, y = 0; for (let n = node; n && n !== root; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y }; };
+    for (const line of lines) {
+      if (!line.rig || typeof line.rig.shotBox !== 'function') continue;
+      const actions = line.rig.lastSequence, before = actions ? actions.time() : 0;
+      if (actions) actions.time(Math.min((line.start + line.end) / 2, actions.duration()));
+      const box = line.rig.shotBox('face');
+      if (actions) actions.time(before);
+      const size = line.rig.constructor.KHUNG, host = place(line.rig.host), unit = Math.min(line.rig.host.offsetWidth / size.w, line.rig.host.offsetHeight / size.h);
+      line.x = host.x + (line.rig.host.offsetWidth - size.w * unit) / 2 + (box.x + box.width / 2) * unit;
+      line.y = host.y + (line.rig.host.offsetHeight - size.h * unit) / 2 + box.y * unit - offsetY;
+    }
+  }
+  const total = lines[lines.length - 1].end + hold + fade;
+  let shown = null;
+  const show = (time) => {
+    const line = [...lines].reverse().find((item) => time >= item.start - fade && time <= item.end + hold + fade) || null;
+    if (line !== shown) {
+      shown = line;
+      if (line) {
+        slot.textContent = label(line);
+        if (follow && line.x !== undefined) { element.style.left = `${line.x.toFixed(1)}px`; element.style.top = `${line.y.toFixed(1)}px`; element.style.transform = 'translate(-50%, -100%)'; }
+      }
+    }
+    const opacity = !line ? 0 : Math.max(0, Math.min(1, (time - (line.start - fade)) / fade, (line.end + hold + fade - time) / fade));
+    element.style.opacity = opacity.toFixed(3);
+  };
+  const playhead = { _time: 0, get time() { return this._time; }, set time(value) { this._time = value; show(value); } };
+  const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
+  timeline.to(playhead, { time: total, duration: total, ease: 'none' }, 0);
+  timeline.data = { type: 'character-captions', lines: lines.map(({ start, end, text, rig }) => ({ start, end, text, character: rig ? rig.publicId || '' : '' })) };
+  show(0);
+  return timeline;
+}
+function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null } = {}) {
   if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
   const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
   const part = (rig) => { if (!cast.has(rig)) cast.set(rig, { steps: [], end: 0, used: false }); return cast.get(rig); };
@@ -3420,6 +3475,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1 } = 
   const turns = [];
   let clock = 0;
   turnList.forEach((entry, index) => {
+    const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;
+    if (entry && !Array.isArray(entry) && Array.isArray(entry.turn)) entry = entry.turn;
     const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
     const begin = clock;
     let finish = begin;
@@ -3440,21 +3497,49 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1 } = 
       const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
       mine.end = measured.duration; mine.used = true;
       finish = Math.max(finish, mine.end);
-      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real });
+      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: override });
     }
     clock = finish + gap;
   });
   const sequences = [...cast.entries()].map(([rig, mine]) => sequence(rig, mine.steps, { gap: stepGap }));
   const rigs = [...cast.keys()];
+  const duration = Math.max(...sequences.map((item) => item.duration()));
+  let cameraTimeline = null;
+  if (camera) {
+    const setup = Array.isArray(camera) || typeof camera === 'string' || camera.nodeType ? { scene: camera } : camera;
+    const { scene, kind = 'chest', duration: move = 0.6, lead = 0.25, wide = true } = setup;
+    cameraTimeline = gsap.timeline({ paused: true });
+    let aimed = null, lastWords = 0;                              // đang ngắm ai / gì; lời cuối cùng kết thúc lúc nào
+    for (const turn of turns) {
+      const spoken = turn.steps.filter((step) => SPEECH_STEPS.includes(step.name));
+      const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
+      if (spoken.length) lastWords = Math.max(lastWords, until);
+      if (turn.shot === false || (!spoken.length && turn.shot === undefined)) continue;
+      const choice = turn.shot === undefined ? {} : typeof turn.shot === 'string' ? { kind: turn.shot } : Array.isArray(turn.shot) || (turn.shot && turn.shot.shotBox) ? { subject: turn.shot } : turn.shot;
+      const shotKind = choice.kind || kind, subject = choice.subject || turn.rig;
+      const key = shotKind === 'wide' ? 'wide' : [].concat(subject).map((rig) => rigs.indexOf(rig)).join('+') + ':' + shotKind;
+      if (key !== aimed) {
+        const at = Math.max(0, from - lead);
+        cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move }).paused(false), at);
+        aimed = key;
+      }
+      lastWords = Math.max(lastWords, until);
+    }
+    if (wide && aimed && aimed !== 'wide') cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), lastWords + 0.3);
+  }
   return {
-    sequences, turns, duration: Math.max(...sequences.map((item) => item.duration())),
+    sequences, turns, duration, camera: cameraTimeline,
     of: (rig) => sequences[rigs.indexOf(rig)] || null,
-    addTo(timeline, at = 0) { for (const item of sequences) timeline.add(item.paused(false), at); return timeline; },
+    addTo(timeline, at = 0) {
+      for (const item of sequences) timeline.add(item.paused(false), at);
+      if (cameraTimeline) timeline.add(cameraTimeline.paused(false), at);
+      return timeline;
+    },
   };
 }
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, conversation, RigSVG, RigThu, createProp };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

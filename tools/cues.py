@@ -220,7 +220,8 @@ def main():
     parser.add_argument('--method', choices=['auto', 'rhubarb', 'spectral', 'amplitude'], default='auto')
     parser.add_argument('--js', action='store_true', help='write a plain script that sets window.VOICE_CUES["<name>"]')
     parser.add_argument('--name', help='key used with --js (default: the audio file name without extension)')
-    parser.add_argument('--dialog', help='text file with the spoken words (improves Rhubarb)')
+    parser.add_argument('--dialog', help='text file with the spoken words (improves Rhubarb; also stored as the caption text)')
+    parser.add_argument('--text', help='the spoken words, stored in the cues so captions() can show them')
     args = parser.parse_args()
     if not os.path.isfile(args.audio):
         fail(f'no such file: {args.audio}')
@@ -237,6 +238,9 @@ def main():
 
     name = args.name or os.path.splitext(os.path.basename(args.audio))[0]
     data = {'metadata': {'soundFile': os.path.basename(args.audio), 'duration': round(duration, 2), 'method': method}, 'mouthCues': cues}
+    words = args.text or (open(args.dialog, encoding='utf-8').read() if args.dialog else '')
+    if words.strip():
+        data['metadata']['text'] = ' '.join(words.split())
     base = os.path.splitext(args.audio)[0]
     output = args.output or (base + ('.cues.js' if args.js else '.cues.json'))
     with open(output, 'w', encoding='utf-8') as f:

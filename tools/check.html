@@ -494,6 +494,55 @@ try {
       push.kill();
     }
     L.shot(scene, null, 'wide').progress(1);
+    if (!stage.querySelector('#tk-wall').hasAttribute('data-layout-allow-overflow')) hong('shot', 'zoomed scene elements are not marked data-layout-allow-overflow (hyperframes check will warn)');
+
+    // Phụ đề: đúng lời, đúng lúc; tắt giữa hai câu; tua ngược vẫn đúng.
+    const caption = document.createElement('div'); caption.style.cssText = 'position:absolute;left:0;top:0'; caption.innerHTML = '<b data-caption-text></b>'; stage.appendChild(caption);
+    const words = L.captions(talk, caption), slot = caption.querySelector('[data-caption-text]');
+    const lineA = turns[2].steps[0], lineB = turns[3].steps[0];
+    if (lineA.text !== 'xin chao ba' || Math.abs(lineA.speech - 2) > 0.01) hong('captions', `the explain step carries text ${JSON.stringify(lineA.text)} and speech ${lineA.speech}, expected "xin chao ba" and 2`);
+    words.time(lineA.start + 1); if (slot.textContent !== 'xin chao ba' || +caption.style.opacity < 0.99) hong('captions', `during the first line the caption shows ${JSON.stringify(slot.textContent)} at opacity ${caption.style.opacity}`);
+    words.time(lineB.start + 0.6); if (slot.textContent !== 'chao chau' || +caption.style.opacity < 0.99) hong('captions', `during the second line the caption shows ${JSON.stringify(slot.textContent)}`);
+    words.time(lineA.start + 1); if (slot.textContent !== 'xin chao ba') hong('captions', 'seeking backwards does not restore the earlier line');
+    words.time(lineA.start - 1); if (+caption.style.opacity > 0.01) hong('captions', 'the caption is visible before anyone speaks');
+    words.time(words.duration()); if (+caption.style.opacity > 0.01) hong('captions', 'the caption is still visible at the end');
+    if (words.data.lines.length !== 2) hong('captions', `expected 2 lines, got ${words.data.lines.length}`);
+    // Lời của speakCues lấy từ { text } hoặc từ metadata của bộ cue.
+    const cued = L.sequence(a, [['speakCues', { metadata: { duration: 1, text: 'tu metadata' }, mouthCues: [{ start: 0, end: 1, value: 'C' }] }], ['speakCues', { mouthCues: [{ start: 0, end: 1, value: 'C' }] }, null, { text: 'tu tuy chon' }]]);
+    if (cued.data.steps[0].text !== 'tu metadata' || cued.data.steps[1].text !== 'tu tuy chon') hong('captions', `speakCues text is not picked up (${cued.data.steps.map((step) => step.text)})`);
+    cued.kill();
+    try { L.captions(L.sequence(a, ['wave', 'nod']), caption); hong('captions', 'a source without spoken text should throw'); } catch (error) { /* đúng */ }
+    // Bong bóng: nằm phía trên đầu người nói, và đổi chỗ khi đổi người nói.
+    const bubble = document.createElement('div'); bubble.style.cssText = 'position:absolute;width:200px;height:60px'; stage.appendChild(bubble);
+    const said = L.captions(talk, bubble, { follow: true });
+    const over = (rig, time) => { said.time(time); rig.lastSequence.time(time); const head = rig.el.dau.getBoundingClientRect(), box = bubble.getBoundingClientRect();
+      return Math.abs((box.left + box.right) / 2 - (head.left + head.right) / 2) < 60 && box.bottom <= head.top + 30; };
+    if (!over(a, lineA.start + 1)) hong('captions', 'follow: the bubble is not above the first speaker');
+    if (!over(b, lineB.start + 0.6)) hong('captions', 'follow: the bubble does not move to the second speaker');
+    caption.remove(); bubble.remove();
+
+    // Máy quay tự động: cắt vào người đang nói, về toàn cảnh sau câu cuối; lượt có `shot` thì theo lượt ấy.
+    a.reset(); b.reset(); b.state.seat = 1;
+    const directed = L.conversation([
+      [a, ['face', b]],
+      [a, ['explain', 'mot', 1.5]],
+      [b, ['speak', 'hai', 1.2]],
+      { turn: [a, ['speak', 'ba', 1]], shot: [a, b] },
+      { turn: [b, ['speak', 'bon', 1]], shot: false },
+    ], { camera: scene });
+    const film = gsap.timeline({ paused: true }); directed.addTo(film, 0);
+    const wall = stage.querySelector('#tk-wall'), zoom = () => wall.getBoundingClientRect().width / 1920;
+    const centred = (rig) => { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); return Math.abs((head.left + head.right) / 2 - frame.left - 960) < 120; };
+    const spoken = directed.turns.filter((turn) => turn.steps.some((step) => step.text)).map((turn) => turn.steps.find((step) => step.text));
+    film.time(0.2); if (zoom() > 1.01) hong('camera', 'the camera is zoomed before anyone speaks');
+    film.time(spoken[0].start + 1); if (zoom() < 1.3 || !centred(a)) hong('camera', `first line: zoom ${zoom().toFixed(2)}, speaker centred: ${centred(a)}`);
+    film.time(spoken[1].start + 0.9); if (zoom() < 1.3 || !centred(b)) hong('camera', `second line: the camera did not cut to the second speaker (zoom ${zoom().toFixed(2)})`);
+    film.time(spoken[2].start + 0.8); const two = zoom();
+    film.time(spoken[3].start + 0.8); if (Math.abs(zoom() - two) > 1e-3) hong('camera', 'a turn with shot: false must leave the camera where it was');
+    if (centred(a) || centred(b)) { /* khung hai người: không ai ở chính giữa — chỉ cần cả hai trong khung */ }
+    for (const rig of [a, b]) { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); if (head.left < frame.left - 2 || head.right > frame.right + 2) hong('camera', `shot: [a, b] does not keep "${rig.publicId}" in frame`); }
+    film.time(film.duration()); if (zoom() > 1.01) hong('camera', 'the camera does not return to the wide shot after the last line');
+    if (!directed.camera) hong('camera', 'conversation(…, { camera }) does not expose the camera timeline');
     stage.remove();
   }
 

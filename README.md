@@ -26,7 +26,8 @@ And what a scene can do with them:
   nods and waves while seated or turned toward someone. Pets do the same.
 - **Furniture** — `createProp(host, 'chair' | 'stool' | 'table' | 'counter', { for: rig })`
   draws props that line up with a seated character.
-- **Conversations** — `conversation([[rig, ...steps], …])` chains turns and times them;
+- **Conversations** — `conversation([[rig, ...steps], …], { camera })` chains turns, times them
+  and cuts to whoever speaks; `captions(talk, element)` shows the words;
   `examples/conversation/` is a complete two-person scene.
 - **Voice and camera** — `tools/cues.py voice.wav` turns a voice file into mouth cues for
   `speakCues` (Rhubarb when installed, a built-in spectral method otherwise); `shot(scene, rig,
@@ -57,7 +58,7 @@ sh tools/check.sh                               # every character × every actio
 sh tools/shot.sh receptionist /tmp/sheet.png    # pose sheet for one character
 sh tools/peek.sh examples/conversation/index.html  # timings + contact sheet of a composition
 sh tools/gallery.sh /tmp/all.png                # every registered character in one picture
-sh tools/lint-examples.sh                       # hyperframes lint on every example (needs Node)
+sh tools/lint-examples.sh --check               # hyperframes lint + check on every example (needs Node)
 ```
 
 ## A character in a dozen lines
@@ -109,8 +110,8 @@ itself) uses Node.
 - The public API, the definition and config schemas are English. The two rig files keep
   Vietnamese internal names and comments, and the studio UI is in Vietnamese;
   `runtime/schema.js` is the dictionary between the two.
-- Verified with the HyperFrames CLI 0.9.52: both examples pass `hyperframes lint` (run in CI
-  on every push) and render to 1920 × 1080 MP4s — `examples/hyperframes` 17 s,
+- Verified with the HyperFrames CLI 0.9.52: all examples pass `hyperframes lint` and
+  `hyperframes check` (run in CI on every push) and render to 1920 × 1080 MP4s — `examples/hyperframes` 17 s,
   `examples/conversation` 19 s.
 - See `CHANGELOG.md` for what changed between versions.
 - Licensed under the MIT License (`LICENSE`). GSAP is loaded from a CDN and is not part of this

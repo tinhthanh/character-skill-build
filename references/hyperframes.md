@@ -128,8 +128,43 @@ const talk = VGCharacter.conversation([
 talk.addTo(tl, 0);
 ```
 
-`talk.turns` lists every turn with absolute `start` / `end` and its steps (to time shots,
-captions and audio), `talk.of(rig)` is that character's sequence. (Under the hood it is still
+**Automatic camera.** Pass `camera` and the conversation directs itself — it cuts to whoever
+is speaking and returns to the wide shot after the last line:
+
+```js
+VGCharacter.conversation(turns, { camera: ['#wall', '#floor', '#chair', '#granny', '#barista'] });
+// or { camera: { scene: […], kind: 'chest', duration: 0.6, lead: 0.25, wide: true } }
+```
+
+Override one turn by writing it as `{ turn: [rig, ...steps], shot }`: `shot: 'face'` (another
+size), `shot: [a, b]` (both in frame), `shot: 'wide'`, or `shot: false` (leave the camera
+where it is). `talk.addTo(tl)` adds the camera too; it is also at `talk.camera`.
+
+**Captions and speech bubbles.** `VGCharacter.captions(source, element, options)` writes the
+words of each spoken line into `element` while it is spoken, and returns a paused timeline:
+
+```html
+<div id="caption" class="clip" data-start="0" data-duration="21" data-track-index="6"></div>
+```
+```js
+tl.add(VGCharacter.captions(talk, document.getElementById('caption')).paused(false), 0);
+```
+
+- `source` — a `conversation()`, a `sequence()`, or your own `[{ start, end, text, rig }]`.
+- The words come from the steps themselves: `['speak', 'words', 2]`, `['explain', 'words', 2.4]`,
+  and for audio `['speakCues', cues, null, { text: 'words' }]` — or make the cues with
+  `python3 tools/cues.py voice.wav --js --text "words"` and they carry the text.
+- Style the element yourself (it starts at opacity 0). If it contains a child with
+  `data-caption-text`, the words go there and the rest is yours (a frame, a bubble tail).
+- `options`: `fade` (0.15 s), `hold` (0.3 s after the line), `speaker: true` (prefix the
+  character's name), and `follow: true` for a **speech bubble** — the element is placed above
+  the speaker's head with `left` / `top` (give it `position: absolute`; `offsetY` is the gap).
+- Keep the caption or bubble **out of** the camera's `scene` list. A bubble follows where the
+  speaker stands in the un-zoomed frame, so do not combine `follow` with camera shots — use a
+  fixed caption when the camera moves.
+
+`talk.turns` lists every turn with absolute `start` / `end` and its steps (to time your own
+shots, effects and audio), `talk.of(rig)` is that character's sequence. (Under the hood it is still
 one `sequence()` per character.) Give each character a stance (`sitDown`,
 `['face', otherRig]`) — it holds for everything after. For a character that is
 **already seated (or already turned) in the first frame**, set the stance on the rig before
@@ -260,6 +295,9 @@ npx hyperframes render -o out.mp4 .
     (`#thu1-gu`, the withers): the check expects a rotating element to spin about its own
     centre, but these rotate about a joint — the knee, or the pelvis when a dog sits — so their
     centre is meant to travel.
+  - `film_silent` on a composition that has no audio.
+
+  `sh tools/lint-examples.sh --check` (run in CI) fails on anything outside this list.
   - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` (internal names for smile and right arm)
     inside `explain`: two of the library's own gesture tweens meet within a frame. Cosmetic.
 
@@ -283,7 +321,8 @@ The library draws characters only. A scene usually needs:
 - **Flat siblings, not nested wrappers.** Keep the chair, counter, speech bubbles and the
   character hosts as direct children of the composition root. `hyperframes check` reports
   `nested_structure_needs_subcomposition` when timed clips are wrapped in an extra container.
-- **Speech bubbles or captions.** `speak` and `explain` move the mouth; they do not show text.
+- **Speech bubbles or captions.** `speak` and `explain` move the mouth; they do not show text
+  by themselves — `VGCharacter.captions()` does (see Staging recipes).
 
 ## How it stays deterministic
 

@@ -13,6 +13,9 @@
   #chair { position: absolute; left: 1150px; bottom: 96px; height: 700px; }
   #table { position: absolute; left: 1420px; bottom: 96px; height: 700px; }
   /* Give each character a HEIGHT; the width follows the rig's own aspect ratio. */
+  /* Captions sit in the frame, outside the scene the camera moves. */
+  #caption { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); max-width: 1300px; padding: 18px 34px; border-radius: 18px;
+             background: rgba(12, 9, 8, 0.78); color: #fff6ea; font: 600 44px/1.25 system-ui, sans-serif; text-align: center; opacity: 0; }
   #barista { position: absolute; left: -60px; bottom: 96px; height: 760px; }   /* near the edge: her entrance starts off-frame */
   #granny { position: absolute; left: 1150px; bottom: 96px; height: 700px; }
 </style>
@@ -25,6 +28,7 @@
   <div id="granny" class="clip" data-start="0" data-duration="21" data-track-index="3"></div>
   <div id="table" class="clip" data-start="0" data-duration="21" data-track-index="4"></div>
   <div id="barista" class="clip" data-start="0" data-duration="21" data-track-index="5"></div>
+  <div id="caption" class="clip" data-start="0" data-duration="21" data-track-index="6"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
   <!-- In a real project: copy dist/character.slim.js next to index.html and load that. -->
@@ -56,16 +60,15 @@
       [barista, 'nod', ['speak', 'Coming right up.', 1.4]],
       { together: [[barista, ['face', 'front'], 'thumbsUp'],   // her right hand holds the cup, so this uses the left
                    [granny, 'standUp']] },
-    ]);
+    ], {
+      // The camera cuts to whoever is speaking and returns to the wide shot after the last line.
+      camera: { scene: ['#wall', '#floor', '#chair', '#granny', '#table', '#barista'], kind: 'chest' },
+    });
 
     const tl = gsap.timeline({ paused: true });
-    talk.addTo(tl, 0);
-    // Camera: both of them in one frame while they talk, back to the wide shot for the goodbye.
-    const scene = ['#wall', '#floor', '#chair', '#granny', '#table', '#barista'];
-    const firstLine = talk.turns.find((turn) => turn.steps.some((step) => step.name === 'explain'));
-    const goodbye = talk.turns.find((turn) => turn.steps.some((step) => step.name === 'thumbsUp'));
-    tl.add(VGCharacter.shot(scene, [barista, granny], 'chest', { time: firstLine.start + 1, duration: 0.8 }).paused(false), firstLine.start - 0.4);
-    tl.add(VGCharacter.shot(scene, null, 'wide', { duration: 0.8 }).paused(false), goodbye.start);
+    talk.addTo(tl, 0);                                  // every character's sequence, and the camera
+    // Captions: the words of each speak / explain step, shown while it is spoken.
+    tl.add(VGCharacter.captions(talk, document.getElementById('caption')).paused(false), 0);
     window.__timelines = window.__timelines || {};
     window.__timelines['cafe-conversation'] = tl;
   </script>

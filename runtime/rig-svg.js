@@ -2470,7 +2470,7 @@ export class RigSVG {
    *    vào mệnh đề mới. Chia đều thì tay rơi vào giữa từ — đó chính là cái
    *    "cứng đơ": tay vẫn động nhưng động lệch chỗ nên não đọc ra máy móc.
    */
-  speakCues(cue, dur = null, { cuChi = true } = {}) {
+  speakCues(cue, dur = null, { cuChi = true } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
     const t = this.tl(), s = this.s;
     this.#openUp(t);
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
