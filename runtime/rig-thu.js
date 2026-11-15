@@ -579,7 +579,7 @@ export class RigThu {
     const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
     t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
     const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
-    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };       // hiện suốt quãng chạy — xem `enter` trong rig-svg.js
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
     return t;

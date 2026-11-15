@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.22.0
+
+From a second outside review of the 80-action film.
+
+Fixed
+- **A cat ran in sitting.** Pets that rest seated slid into the frame in their sitting pose
+  (hidden until 0.21.0, when `enter` after `exit` became visible). They stand to run.
+- **Speech gestures stopped halfway through the line.** The last gesture of a line was
+  dropped when there was no room for it to return to rest, so a four-second `explain` moved
+  its hands for a second and a half and then stood still. The last gesture now holds to the
+  end of the line and the closing move brings the arm home.
+- **Held items stay upright.** A cup followed the forearm: tilted about 30° at rest for some
+  characters and lying sideways when the character turned or walked across the frame. Items
+  are now kept upright on screen, turning about the palm.
+
 ## 0.21.0
 
 More from the outside review of all 80 actions.

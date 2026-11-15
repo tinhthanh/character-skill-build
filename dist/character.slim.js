@@ -1,4 +1,4 @@
-/* VGCharacter v0.21.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.22.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -823,6 +823,11 @@ class RigSVG {
     e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${-tR.bat * cF - sF * nR.bat}) scale(1 ${1 - (1 - tR.co) * cF})`);
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${tL.cang * cF - sF * nL.cang})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${-tR.cang * cF - sF * nR.cang})`);
+    const armTurn = { L: tL.bat * cF - sF * nL.bat + tL.cang * cF - sF * nL.cang, R: -tR.bat * cF - sF * nR.bat - tR.cang * cF - sF * nR.cang };
+    for (const side of ['L', 'R']) if (this.holds[side]) {
+      const upright = chuanHoaGoc((side === 'L' ? -90 : 90) - armTurn[side] - s.than);
+      e['item' + side].setAttribute('transform', `rotate(${upright.toFixed(2)} 0 10)`);
+    }
     for (const ben of ['L', 'R']) {
       const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
       const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s['tay' + ben];
@@ -1450,7 +1455,7 @@ class RigSVG {
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
-    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };    // hiện dần trong 0,2 s đầu: khung rộng thì điểm xuất phát vẫn nằm trong hình
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.huong = chieu; s.seat = 0; } };    // hiện dần trong 0,2 s đầu: khung rộng thì điểm xuất phát vẫn nằm trong hình
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
@@ -1561,15 +1566,19 @@ class RigSVG {
       const travel = Math.max(Math.abs(pose.lead[1] - base(lead)[1]), other && pose.other ? Math.abs(pose.other[1] - base(other)[1]) : 0);
       const longest = clamp(travel / 300, 0.36, 0.62) + 0.17;                 // + nhịp trễ của tay phụ và của cẳng tay
       const hold = clamp((next - a) - 0.16 - longest - 0.85, 0.25, 1.5);
-      const stroke = a + 0.16, release = stroke + longest + hold;
-      if (release + 0.8 > next) return;                   // không đủ chỗ cho cả bốn pha thì bỏ nhịp này
+      const stroke = a + 0.16;
+      let release = stroke + longest + hold, handOver = false;
+      if (release + 0.8 > next) {
+        if (i + 1 < anchors.length || stroke + longest + 0.25 > D) return;
+        release = D; handOver = true;
+      }
       occupied.push([a - 0.06, release + 0.9]);
       const inHold = spaced.filter((b) => b >= stroke + longest + 0.12 && b + 0.36 <= release - 0.05);
       const arms = [[lead, pose.lead]];
       if (other && pose.other) arms.push([other, pose.other]);
       const side = lead === 'R' ? -1 : 1;                 // thân và đầu ngả nhẹ VỀ PHÍA tay đang diễn
-      t.to(s, { than: N.than + side * nhieu(1.2, 2.4), vai: N.vai - nhieu(1.5, 3), dauY: nhieu(1.2, 2.6), duration: 0.4, ease: 'sine.out' }, stroke - 0.04)
-       .to(s, { than: N.than, vai: N.vai, dauY: N.dauY, duration: 0.7, ease: 'sine.inOut' }, release);
+      t.to(s, { than: N.than + side * nhieu(1.2, 2.4), vai: N.vai - nhieu(1.5, 3), dauY: nhieu(1.2, 2.6), duration: 0.4, ease: 'sine.out' }, stroke - 0.04);
+      if (!handOver) t.to(s, { than: N.than, vai: N.vai, dauY: N.dauY, duration: 0.7, ease: 'sine.inOut' }, release);
       arms.forEach(([arm, [upper, fore]], n) => {
         const [upper0, fore0] = base(arm), lag = n * 0.08;         // tay phụ đi sau tay chủ đạo một nhịp
         const jitterU = nhieu(-3, 3), jitterF = nhieu(-6, 6);      // mỗi lần diễn một dáng hơi khác đi
@@ -1585,6 +1594,7 @@ class RigSVG {
           t.to(s, { [key(arm, 1)]: fore + jitterF + nhieu(4, 8) * (ngau() < 0.5 ? -1 : 1), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.1);
           t.to(s, { [key(arm, 0)]: upper + jitterU + nhieu(1.5, 3), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.04);
         }
+        if (handOver) return;
         t.to(s, { [key(arm, 0)]: upper0, duration: 0.6, ease: 'sine.inOut' }, release + lag)
          .to(s, { [key(arm, 1)]: fore0, duration: 0.66, ease: 'sine.inOut' }, release + lag + 0.05);
         t.set(s, { ['tay' + arm]: this.holds[arm] ? 'mo' : N['tay' + arm] }, release + lag + 0.5);
@@ -2125,7 +2135,7 @@ class RigThu {
     const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
     t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
     const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
-    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };       // hiện suốt quãng chạy — xem `enter` trong rig-svg.js
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
     return t;
@@ -3277,7 +3287,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.21.0';
+const VERSION = '0.22.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

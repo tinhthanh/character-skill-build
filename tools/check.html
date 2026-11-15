@@ -427,6 +427,39 @@ try {
       for (const name of ['surprised', 'thinking', 'angry', 'tired']) { const [far] = most(holder, name, 'cang' + side, holder.NGHI['cang' + side]); if (far > 1) hong('express', `${name}: the arm holding an item moves ${far.toFixed(0)}°`); }
       actor.svg.remove(); holder.svg.remove();
     }
+    // Mèo nghỉ ở dáng NGỒI: chạy vào khung thì phải đứng (từng trượt vào trong dáng ngồi).
+    {
+      const pet = L.createPet(host, { species: 'cat' }).rig, line = L.sequence(pet, ['exit', 'enter']), back = line.data.steps[1];
+      line.time(back.start + back.duration * 0.4);
+      if (pet.s.ngoi > 0.05) hong('pet enter', `the cat runs in sitting (seat ${pet.s.ngoi.toFixed(2)})`);
+      line.kill(); pet.svg.remove();
+    }
+    // Câu nói 4 giây: nửa SAU câu tay vẫn phải diễn (cử chỉ cuối từng bị bỏ vì không đủ chỗ cho pha về nền).
+    {
+      let quiet = 0;
+      for (let seedNo = 1; seedNo <= 8; seedNo++) {
+        L.seed(seedNo); const actor = L.createCharacter(host, { id: 'vet' }).rig, rest = actor.state.forearmR;
+        const line = L.sequence(actor, [['explain', 'Xin chào các bạn, hôm nay mình khám định kỳ cho bé nhé.', 4]]); let late = 0, biggest = 0, before = null;
+        for (let time = 0; time <= line.duration(); time += 1 / 60) { line.time(time); const now = actor.state.forearmR; if (time > 2.4 && time < 4) late = Math.max(late, Math.abs(now - rest)); if (before !== null) biggest = Math.max(biggest, Math.abs(now - before)); before = now; }
+        if (late < 30) quiet++;
+        if (biggest > 20) hong('explain gestures', `seed ${seedNo}: the forearm jumps ${biggest.toFixed(0)}° in one frame`);
+        line.time(line.duration()); if (Math.abs(actor.state.forearmR - rest) > 0.5) hong('explain gestures', `seed ${seedNo}: the arm does not return to rest after the line`);
+        line.kill(); actor.svg.remove();
+      }
+      if (quiet) hong('explain gestures', `${quiet} of 8 seeds: no gesture in the second half of a four-second line`);
+    }
+    // Đồ cầm LUÔN ĐỨNG THẲNG trên màn hình: lúc nghỉ, lúc đi ngang cả hai chiều, lúc quay mặt.
+    {
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', upright = side === 'R' ? 90 : -90;
+      const tilt = () => { actor.render(); const m = actor.el['item' + side].getScreenCTM(); let off = Math.atan2(m.b, m.a) * 180 / Math.PI - upright; off = ((off + 540) % 360) - 180; return Math.abs(off); };
+      const poses = [['at rest', null, 0], ['walking right', ['walk', 4, 120], 0.5], ['walking left', ['walk', 4, -120], 0.5], ['facing left', ['face', 'left'], 1], ['waving', ['wave'], 0.5]];
+      for (const [label, step, progress] of poses) {
+        const t = step ? actor[step[0]](...step.slice(1)) : null; if (t) t.progress(progress);
+        const off = tilt(); if (off > 8) hong('held item', `${label}: the item is tilted ${off.toFixed(0)}° from upright`);
+        if (t) t.kill(); actor.reset();
+      }
+      actor.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;
