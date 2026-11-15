@@ -1,4 +1,4 @@
-/* VGCharacter v0.5.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.5.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1502,8 +1502,10 @@ class RigSVG {
     for (const k of ['daiCanhTay', 'daiCangTay', 'dayTay', 'coBanTay'])
       if (kieu[k] !== undefined) this.nv[k] = kieu[k];
     const nghi = {};
-    if (kieu.batNghi !== undefined) nghi.batL = nghi.batR = kieu.batNghi;
-    if (kieu.cangNghi !== undefined) nghi.cangL = nghi.cangR = kieu.cangNghi;
+    // Số đưa vào là góc của tay PHẢI; tay trái giữ nguyên độ LỆCH so với tay phải mà nhân vật
+    // đã khai (một tay nâng lên cầm cốc, tay kia buông). Nhân vật đối xứng thì lệch = 0, y như cũ.
+    if (kieu.batNghi !== undefined) { nghi.batL = kieu.batNghi + (this.NGHI.batL - this.NGHI.batR); nghi.batR = kieu.batNghi; }
+    if (kieu.cangNghi !== undefined) { nghi.cangL = kieu.cangNghi + (this.NGHI.cangL - this.NGHI.cangR); nghi.cangR = kieu.cangNghi; }
     if (Object.keys(nghi).length) {
       this.nv.nghi = { ...(this.nv.nghi || {}), ...nghi };
       this.NGHI = Object.freeze({ ...this.NGHI, ...nghi });
@@ -3968,7 +3970,7 @@ function configToPublic(config, pet = false) {
   return out;
 }
 
-return { DEFINITION_KEYS, FACE_SHAPE_KEYS, BROW_KEYS, COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, REQUIRED_IDS, colorsToInternal, colorsToPublic, stateToInternal, stateToPublic, definitionToInternal, definitionToPublic, configToInternal, configToPublic };
+return { DEFINITION_KEYS, FACE_SHAPE_KEYS, BROW_KEYS, COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, REQUIRED_IDS, colorsToInternal, colorsToPublic, stateToInternal, stateToPublic, DRAWING_SLOTS, definitionToInternal, definitionToPublic, configToInternal, configToPublic };
 })();
 
 /* ───── characters/receptionist.js ───── */
@@ -4205,10 +4207,10 @@ const { RigSVG } = __m['runtime/rig-svg.js'];
 const { RigThu } = __m['runtime/rig-thu.js'];
 const { dangKyDau, KIT } = __m['runtime/characters.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
-const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal } = __m['runtime/schema.js'];
+const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.5.1';
+const VERSION = '0.5.2';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -4336,6 +4338,28 @@ function registerCharacter({ id, base = 'vet', define }) {
   if (definition.mau) assertColors(definition.mau, `character "${id}" colors`);
   if (definition.backHair !== undefined && !['full', 'low', 'none'].includes(definition.backHair))
     throw new Error(`[character] "${id}": backHair must be 'full', 'low' or 'none', got ${JSON.stringify(definition.backHair)}`);
+  // Các khoá của trang phục dưới, dáng và đồ cầm tay: khai sai thì rig vẫn vẽ ra MỘT THỨ GÌ ĐÓ
+  // (chuỗi 'apron' thành váy thường, `stoop: 5` thành 1) — nên phải báo ngay ở đây.
+  const fail = (message) => { throw new Error(`[character] "${id}": ${message}`); };
+  const { skirt, stoop } = definition;
+  if (skirt !== undefined && skirt !== null) {
+    if (typeof skirt !== 'object' || Array.isArray(skirt)) fail(`skirt must be an object like { kind: 'skirt', length: 1 } or null, got ${JSON.stringify(skirt)}`);
+    for (const key of Object.keys(skirt)) if (!['kind', 'length', 'flare'].includes(key)) fail(`skirt has an unknown key "${key}" (allowed: kind, length, flare)`);
+    if (!['skirt', 'apron'].includes(skirt.kind)) fail(`skirt.kind must be 'skirt' or 'apron', got ${JSON.stringify(skirt.kind)}`);
+    if (skirt.length !== undefined && !(typeof skirt.length === 'number' && skirt.length >= 0.2 && skirt.length <= 2)) fail(`skirt.length must be a number from 0.2 to 2 (thigh lengths; 1 = knee), got ${JSON.stringify(skirt.length)}`);
+    if (skirt.flare !== undefined && !(typeof skirt.flare === 'number' && skirt.flare >= 0 && skirt.flare <= 30)) fail(`skirt.flare must be a number from 0 to 30, got ${JSON.stringify(skirt.flare)}`);
+  }
+  if (stoop !== undefined && !(typeof stoop === 'number' && stoop >= 0 && stoop <= 1)) fail(`stoop must be a number from 0 to 1, got ${JSON.stringify(stoop)}`);
+  // Khoá vẽ phải là HÀM trả về chuỗi: quên `return` là ra chữ "undefined" trong SVG.
+  for (const internalKey of DRAWING_SLOTS) {
+    const publicKey = Object.keys(DEFINITION_KEYS).find((key) => DEFINITION_KEYS[key] === internalKey) || internalKey;
+    if (definition[internalKey] === undefined) continue;
+    if (typeof definition[internalKey] !== 'function') fail(`${publicKey} must be a function returning SVG${publicKey.startsWith('heldItem') ? ', e.g. (p, c) => kit.parts.cup(c)' : ''}; use () => '' for none — got ${JSON.stringify(definition[internalKey])}`);
+    let drawn;
+    try { drawn = internalKey === 'mat' || internalKey === 'giay' ? definition[internalKey]('check', 'L', definition.mau || {}, 0) : definition[internalKey]('check', definition.mau || {}, definition); }
+    catch (error) { continue; }                 // lỗi trong hàm vẽ sẽ hiện đầy đủ khi dựng nhân vật
+    if (typeof drawn !== 'string') fail(`${publicKey} must return a string of SVG, got ${drawn === undefined ? 'undefined (missing return?)' : typeof drawn}`);
+  }
   if (definition.mauSoSau) {
     definition.mauSoSau = COLOR_KEYS[definition.mauSoSau] || definition.mauSoSau;
     // Base `default` có bảng màu rỗng (dùng bảng mặc định của rig) — khi ấy không có gì để đối chiếu.

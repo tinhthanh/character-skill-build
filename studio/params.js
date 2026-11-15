@@ -241,7 +241,7 @@ export const NHOM = {
       cangNghi:   { min: -110, max: 20,  buoc: 0.5,  ten: 'nghỉ: cẳng °' },
     },
     dat: (r, k) => r.doiTay(k),
-    ghiChu: 'góc nghỉ áp cho cả hai tay — tay ngắn lại thì gập cẳng sâu hơn (số âm hơn) để hai bàn tay còn chạm nhau',
+    ghiChu: 'góc nghỉ là của tay phải; tay trái đi theo và giữ độ lệch riêng của nhân vật (nếu có) — tay ngắn lại thì gập cẳng sâu hơn (số âm hơn) để hai bàn tay còn chạm nhau',
   },
   tayAo: {
     ten: 'Tay áo', kieu: KIEU_TAY_AO,

@@ -218,7 +218,7 @@ multipliers of them: `{ "proportions": { "headSize": 1.4 } }` sets the head size
 whatever the definition says. Only the keys present are changed. `tools/describe.sh <id>`
 shows the values a config would be replacing, and `tools/shot.sh <id>` renders the character
 with its config applied (`--no-config` for the bare definition). Groups for people: `proportions`, `arms` (plus `restUpperArm`,
-`restForearm`), `sleeves`, `legs`, `faceShape`, `brows`, `browPosition`, `features`
+`restForearm` — the right arm's rest angles; the left arm keeps the character's own offset), `sleeves`, `legs`, `faceShape`, `brows`, `browPosition`, `features`
 (`eyeSpacing`, `eyeY`, `eyeSize`, `noseOffsetY`, `noseSize`, `mouthY`, `mouthWidth`),
 `restPose`, `colors`. `VGCharacter.validateConfig(config)` lists what is wrong with one.
 

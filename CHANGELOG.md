@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.2
+
+Fixed
+- A config with rest arm angles (`arms.restUpperArm` / `restForearm`, written by the studio)
+  set both arms to the same angle, flattening characters whose arms rest differently
+  (`barista`, `clerk`). The numbers are now the right arm's; the left arm keeps the offset the
+  character defines. Symmetric characters are unchanged.
+
+Added
+- `registerCharacter` rejects wrong values instead of drawing something else: `skirt` that is
+  not `{ kind: 'skirt' | 'apron', length, flare }` (strings, unknown or misspelt keys, values
+  out of range), `stoop` outside 0…1, and drawing keys (`hair`, `accessories`, `heldItemR`, …)
+  that are not functions or do not return a string.
+- `tools/check.sh` loads the pose sheet and the gallery and counts their panels, so a broken
+  review tool fails the check (0.5.0 shipped a pose sheet with no action panels).
+
 ## 0.5.1
 
 Added

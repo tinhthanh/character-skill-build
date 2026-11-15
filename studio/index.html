@@ -436,9 +436,13 @@ function raConfig(st) {
   const { batNghi, cangNghi, ...tay } = st.tay;
   const may = {}, viTriMay = {};
   for (const [k, v] of Object.entries(st.may)) (NHOM.may.khoaKieu.includes(k) ? may : viTriMay)[k] = v;
+  // Thanh trượt là góc tay PHẢI; tay trái giữ độ lệch mà định nghĩa nhân vật đã khai
+  // (nhân vật cầm đồ một tay). Thiếu số nào thì coi như không lệch.
+  const rest = RigSVG.NHAN_VAT[khoa].nghi || {};
+  const offset = (left, right) => (rest[left] !== undefined && rest[right] !== undefined ? rest[left] - rest[right] : 0);
   const c = {
     than: st.than, tay, tayAo: st.tayAo, chan: st.chan,
-    nghi: { ...(RigSVG.NHAN_VAT[khoa].nghi || {}), batL: batNghi, batR: batNghi, cangL: cangNghi, cangR: cangNghi, ...st.mieng },
+    nghi: { ...rest, batL: batNghi + offset('batL', 'batR'), batR: batNghi, cangL: cangNghi + offset('cangL', 'cangR'), cangR: cangNghi, ...st.mieng },
     khuon: st.mat, may, viTriMay, net: st.net,
   };
   if (Object.keys(st.mau || {}).length) c.mau = st.mau;

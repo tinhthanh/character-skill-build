@@ -1495,8 +1495,10 @@ export class RigSVG {
     for (const k of ['daiCanhTay', 'daiCangTay', 'dayTay', 'coBanTay'])
       if (kieu[k] !== undefined) this.nv[k] = kieu[k];
     const nghi = {};
-    if (kieu.batNghi !== undefined) nghi.batL = nghi.batR = kieu.batNghi;
-    if (kieu.cangNghi !== undefined) nghi.cangL = nghi.cangR = kieu.cangNghi;
+    // Số đưa vào là góc của tay PHẢI; tay trái giữ nguyên độ LỆCH so với tay phải mà nhân vật
+    // đã khai (một tay nâng lên cầm cốc, tay kia buông). Nhân vật đối xứng thì lệch = 0, y như cũ.
+    if (kieu.batNghi !== undefined) { nghi.batL = kieu.batNghi + (this.NGHI.batL - this.NGHI.batR); nghi.batR = kieu.batNghi; }
+    if (kieu.cangNghi !== undefined) { nghi.cangL = kieu.cangNghi + (this.NGHI.cangL - this.NGHI.cangR); nghi.cangR = kieu.cangNghi; }
     if (Object.keys(nghi).length) {
       this.nv.nghi = { ...(this.nv.nghi || {}), ...nghi };
       this.NGHI = Object.freeze({ ...this.NGHI, ...nghi });

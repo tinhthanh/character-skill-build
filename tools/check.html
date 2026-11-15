@@ -106,6 +106,13 @@ try {
     expectThrow('setColors with a colour name', () => new RigSVG(host, 'default').setColors({ top: 'red' }));
     expectThrow('registering a duplicate id', () => L.registerCharacter({ id: 'surgeon', define: (base) => ({ ...base }) }));
     expectThrow('backSkullColor naming a missing colour', () => L.registerCharacter({ id: 'check_tmp_1', define: (base) => ({ ...base, backSkullColor: 'missing' }) }));
+    // Khoá trang phục dưới / dáng / đồ cầm tay khai sai phải bị từ chối, không được lặng lẽ vẽ ra thứ khác.
+    for (const [label, wrong] of [['skirt as a string', { skirt: 'apron' }], ['skirt with an unknown kind', { skirt: { kind: 'dress' } }], ['skirt without kind', { skirt: { length: 1 } }],
+                                  ['skirt with a misspelt key', { skirt: { kind: 'skirt', lenght: 1 } }], ['skirt.length out of range', { skirt: { kind: 'skirt', length: 9 } }],
+                                  ['stoop out of range', { stoop: 5 }], ['stoop as a boolean', { stoop: true }], ['heldItemR as a string', { heldItemR: 'cup' }],
+                                  ['hair that is not a function', { hair: '<g/>' }], ['accessories returning nothing', { accessories: () => {} }]])
+      expectThrow(label, () => L.registerCharacter({ id: 'check_tmp_bad', define: (base) => ({ ...base, ...wrong }) }));
+    if (RigSVG.NHAN_VAT.check_tmp_bad) hong('registerCharacter', 'a rejected definition was registered anyway');
     // Bỏ mũ mà quên đặt lại mauSoSau: sọ sau vẫn phải ra màu tóc.
     const noHat = new RigSVG(host, { ...RigSVG.NHAN_VAT.surgeon, mu: () => '' });
     const fill = noHat.svg.querySelector('#' + noHat.id + '-tocLungE').getAttribute('fill');
@@ -242,6 +249,43 @@ try {
     expect('pet shape.legLength', pet.shape.legLength, 0.7);
     expect('pet colors.fur → mau.long', pet.mau.long, '#445566');
     if (xau(pet.svg)) hong('schema', 'pet has broken attributes after applying a shape');
+  }
+
+  // ── Tư thế nghỉ LỆCH hai tay (một tay cầm đồ) phải sống sót qua bộ số của studio ──
+  {
+    const host = document.getElementById('san');
+    const plain = L.createCharacter(host, { id: 'barista', config: null }).rig;
+    const gap = plain.state.upperArmL - plain.state.upperArmR, bend = plain.state.forearmL - plain.state.forearmR;
+    const tuned = L.createCharacter(host, { id: 'barista', config: { arms: { restUpperArm: 30, restForearm: -60 } } }).rig;
+    if (Math.abs(tuned.state.upperArmR - 30) > 1e-6 || Math.abs(tuned.state.forearmR + 60) > 1e-6) hong('config arms', 'restUpperArm / restForearm do not set the right arm');
+    if (Math.abs(tuned.state.upperArmL - tuned.state.upperArmR - gap) > 1e-6 || Math.abs(tuned.state.forearmL - tuned.state.forearmR - bend) > 1e-6)
+      hong('config arms', 'a config with rest arm angles flattens a character whose two arms rest differently');
+    if (!gap && !bend) hong('barista', 'expected a one-armed rest pose to test with');
+    plain.svg.remove(); tuned.svg.remove();
+  }
+
+  // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
+  {
+    const load = (url) => new Promise((resolve) => {
+      const frame = document.createElement('iframe'); frame.style.cssText = 'position:fixed;left:-3000px;width:1280px;height:1500px'; frame.src = url; document.body.appendChild(frame);
+      const started = Date.now();
+      const poll = () => { let title = ''; try { title = frame.contentDocument.title; } catch (error) { /* chưa tải xong */ }
+        if (title === 'DONE' || Date.now() - started > 8000) resolve({ frame, done: title === 'DONE' }); else setTimeout(poll, 50); };
+      poll();
+    });
+    const cells = (frame) => [...frame.contentDocument.body.children].filter((el) => el.tagName === 'DIV');
+    const names = JSON.parse(listAtStart);
+    for (const [id, expected] of [['receptionist', 22], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
+      const { frame, done } = await load(`sheet.html?nv=${id}`);
+      if (!done) hong(`sheet.html?nv=${id}`, 'the pose sheet does not finish (script error?)');
+      else if (cells(frame).length !== expected) hong(`sheet.html?nv=${id}`, `the pose sheet shows ${cells(frame).length} panels, expected ${expected}`);
+      else if (cells(frame).some((el) => !el.querySelector('svg'))) hong(`sheet.html?nv=${id}`, 'a panel is empty');
+      frame.remove();
+    }
+    const { frame, done } = await load('gallery.html'), wanted = Object.keys(names.people).length + Object.keys(names.pets).length;
+    if (!done) hong('gallery.html', 'the gallery does not finish (script error?)');
+    else if (cells(frame).length !== wanted) hong('gallery.html', `the gallery shows ${cells(frame).length} characters, expected ${wanted}`);
+    frame.remove();
   }
 
   // ── Bản SLIM phải chạy ra cùng kết quả với bản đầy đủ ──
