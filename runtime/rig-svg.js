@@ -946,6 +946,7 @@ export class RigSVG {
   </defs>
   <g id="${p}-goc">
     <ellipse id="${p}-bong" cx="200" cy="428" rx="62" ry="8" fill="#000" opacity=".28"/>
+    <g id="${p}-sauChan"></g>
     <g id="${p}-chanG" transform="translate(${HONG.x} ${HONG.y})">
       <g id="${p}-hongL" transform="translate(-14 0)">${this.#chan('L')}</g>
       <g id="${p}-hongR" transform="translate(14 0)">${this.#chan('R')}</g>
@@ -1019,7 +1020,7 @@ export class RigSVG {
     // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -1101,7 +1102,7 @@ export class RigSVG {
     // thân sớm, lúc nó còn nằm ngoài mép áo, để không "biến mất" giữa ngực.
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     for (const ben of ['L', 'R']) {
-      const tay = e['bat' + ben], cho = ben === xa ? e.sau : e.tren;
+      const tay = e['bat' + ben], cho = ben === xa ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
       if (tay.parentNode !== cho) cho.appendChild(tay);
       const mo = ben === (h > 0 ? 'R' : 'L') ? ah : 0;
       // Tối đi bằng CSS `filter`. Thuộc tính CSS ĐÈ lên thuộc tính SVG `filter="url(#…-vien)"` của
@@ -1264,6 +1265,7 @@ export class RigSVG {
     e.vaiCatR.setAttribute('height', caoCat);
     e.tren.setAttribute('transform', `translate(0 ${nhacY})`);
     e.sau.setAttribute('transform', `translate(0 ${nhacY})`);
+    e.sauChan.setAttribute('transform', `${e.than.getAttribute('transform')} translate(0 ${nhacY})`);        // lớp tay xa nằm ngoài nhóm thân nên phải mang theo phép biến đổi của thân
     e.coAo.setAttribute('transform', `translate(${h * 3} 0) scale(${1 - ah * 0.45} 1)`);   // cổ áo hẹp theo thân, lệch về phía ngực
     // CỔ cũng phải hẹp lại khi xoay — nhưng không đều: thân cổ chỉ thon đi một chút
     // (cổ người nhìn nghiêng gần bằng nhìn thẳng), còn phần CHÂN CỔ loe ra hai vai
@@ -1911,7 +1913,7 @@ export class RigSVG {
    * người đối diện — rồi `#khep` đưa về đúng hướng đang giữ.
    */
   static GESTURE_TURN = 0.2;
-  static SEAT_SPLAY = 22;               // độ xoè của mỗi đùi khi ngồi (nhìn từ trước)
+  static SEAT_SPLAY = 12;               // độ xoè của mỗi đùi khi ngồi (nhìn từ trước)
   #openUp(t) {
     const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
     if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
@@ -2212,8 +2214,11 @@ export class RigSVG {
     const standing = s.seat < 0.5, free = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
     const arm = (side, upper, fore, at, d, ease = 'power2.out') => t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, duration: d, ease }, at);
     if (name === 'happy') {                                   // nhún người một cái, vai nhấc
-      if (standing) t.to(s, { y: -7, duration: 0.16, ease: 'power2.out' }, 0.05).to(s, { y: 0, duration: 0.22, ease: 'power2.in' }, 0.21);
-      t.to(s, { vai: -4, duration: 0.2, ease: 'power2.out' }, 0.05).to(s, { vai: -1, duration: 0.4, ease: 'sine.inOut' }, 0.3);
+      // Nhún đủ cao để THẤY ở cỡ toàn thân (7 đơn vị là ba điểm ảnh trong khung 720p — không ai thấy), rồi lắc đầu một nhịp.
+      if (standing) t.to(s, { y: -15, duration: 0.18, ease: 'power2.out' }, 0.05).to(s, { y: 0, duration: 0.2, ease: 'power2.in' }, 0.23);
+      if (standing && into + hold >= 0.7) t.to(s, { y: -6, duration: 0.12, ease: 'power2.out' }, 0.43).to(s, { y: 0, duration: 0.14, ease: 'power2.in' }, 0.55);      // nhịp nảy thứ hai, chỉ khi còn kịp trước lúc khép
+      t.to(s, { vai: -5, duration: 0.2, ease: 'power2.out' }, 0.05).to(s, { vai: -1, duration: 0.4, ease: 'sine.inOut' }, 0.3);
+      if (into + hold >= 1.06) t.to(s, { dau: face.dau + 7, duration: 0.3, ease: 'sine.inOut' }, 0.45).to(s, { dau: face.dau, duration: 0.3, ease: 'sine.inOut' }, 0.75);
     } else if (name === 'surprised') {                        // giật mình: người bật lên, hai tay bung ra
       if (standing) t.to(s, { y: -5, duration: 0.12, ease: 'power2.out' }, 0).to(s, { y: 0, duration: 0.25, ease: 'power2.inOut' }, 0.12);
       for (const side of free) { t.set(s, { ['tay' + side]: 'mo' }, 0); arm(side, 26, 30, 0, into + 0.06, 'back.out(1.8)'); }

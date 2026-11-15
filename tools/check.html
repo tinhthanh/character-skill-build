@@ -460,6 +460,38 @@ try {
       }
       actor.svg.remove();
     }
+    // Quay 3/4: tay XA nằm sau cả hai chân (từng ló bàn tay ra giữa hai đùi); nhìn thẳng thì về lại lớp trên thân.
+    {
+      const actor = L.createCharacter(host, { id: 'vet' }).rig, legs = actor.el.chanG;
+      for (const [turn, far] of [[0.55, 'batR'], [-0.55, 'batL']]) {
+        actor.s.huong = turn; actor.render();
+        if (!(actor.el[far].compareDocumentPosition(legs) & Node.DOCUMENT_POSITION_FOLLOWING)) hong('far arm', `turned ${turn}: the far arm is drawn over the legs`);
+      }
+      actor.s.huong = 0; actor.render();
+      for (const arm of ['batL', 'batR']) if (!(legs.compareDocumentPosition(actor.el[arm]) & Node.DOCUMENT_POSITION_FOLLOWING)) hong('far arm', `${arm} stays behind the legs when facing front`);
+      actor.svg.remove();
+    }
+    // Thú lật hướng: giữa chừng không bị ép dẹt thành một vạch.
+    {
+      const pet = L.createPet(host, { species: 'cat' }).rig, t = pet.face('left'); let thinnest = 9;
+      const wide = pet.el.goc.getBoundingClientRect().width;
+      for (let p = 0; p <= 1; p += 0.01) { t.progress(p); pet.render(); thinnest = Math.min(thinnest, pet.el.goc.getBoundingClientRect().width / wide); }
+      if (thinnest < 0.25) hong('pet face', `the pet is squashed to ${(thinnest * 100).toFixed(0)}% of its width mid-flip`);
+      t.progress(1); if (pet.s.huong !== -1) hong('pet face', 'does not end facing left');
+      t.kill(); pet.svg.remove();
+    }
+    // Vui: cú nhún phải đủ cao để thấy ở cỡ toàn thân; `express` ngắn không được giật lúc khép.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig;
+      for (const hold of [0.2, 0.6, 1.2]) {
+        const t = actor.express('happy', hold); let top = 0, before = null, jump = 0;
+        for (let time = 0; time <= t.duration(); time += 1 / 60) { t.time(time); top = Math.min(top, actor.s.y); if (before !== null) jump = Math.max(jump, Math.abs(actor.s.y - before[0]), Math.abs(actor.s.dau - before[1])); before = [actor.s.y, actor.s.dau]; }
+        if (top > -12) hong('express', `happy (hold ${hold}): hops only ${(-top).toFixed(0)} units`);
+        if (jump > 6) hong('express', `happy (hold ${hold}): jumps ${jump.toFixed(1)} in one frame`);
+        t.kill(); actor.reset();
+      }
+      actor.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

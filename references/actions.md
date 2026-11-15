@@ -28,7 +28,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `worry` | — | brows up, hands fidget | 2.1 |
 | `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired`. The body joins in: a hop when `happy`, arms flung out when `surprised`, a hand raised to the chest when `thinking`, fists when `angry`, a sigh when `tired` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
-| `sit` | `(hold = 2)` | sit down as on an unseen chair (knees apart, shins upright), hands on the lap, stand up again — put a `createProp('chair')` behind it, a seat with nothing under it still reads oddly | `hold` + 0.95 |
+| `sit` | `(hold = 2)` | sit down as on an unseen chair (knees slightly apart, shins upright), hands on the lap, stand up again — put a `createProp('chair')` behind it, a seat with nothing under it still reads oddly | `hold` + 0.95 |
 | `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |
 | `standUp` | — | stand up from `sitDown` | 0.55 |
 | `face` | `(target = 'right', amount = 0.55)` | turn toward `'left'` / `'right'` and **stay turned**; `'front'` turns back. `target` may also be a DOM element or another rig — the character turns to whichever side it is on | 0.45 |

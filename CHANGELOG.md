@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.23.0
+
+Fixed
+- **A sliver of skin between the thighs.** Turned three-quarters, the far arm was drawn behind
+  the torso but in front of the legs, so its hand showed between the thighs. The far arm is
+  now behind both legs.
+- **Pets squashed to a line when turning round.** `face` (and walking the other way) scaled
+  the pet through zero width. It now narrows to 30% and swaps sides.
+
+Changed
+- `express('happy')` hops high enough to be seen in a full-body shot (15 units, then a small
+  second bounce and a head sway when the hold is long enough).
+- Seated knees splay less (12° instead of 22°): without a chair the wider pose read as a
+  squat. A seat still needs a `createProp('chair')` under it to read well.
+
 ## 0.22.0
 
 From a second outside review of the 80-action film.

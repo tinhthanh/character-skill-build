@@ -354,7 +354,10 @@ export class RigThu {
     const s = this.s, e = this.el, nv = this.nv, { H, S, ng } = this.#khung();
     const fx = (v) => v.toFixed(2);
     // Cả con lật theo `huong` quanh trục giữa khung; co dãn quanh điểm chạm đất.
-    e.goc.setAttribute('transform', `translate(${fx(s.x)} ${fx(s.y)}) translate(200 ${DAT}) scale(${fx(s.co * (s.huong || 1e-3))} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    // Giữa chừng cú lật KHÔNG ép con vật dẹt về 0: bề ngang chỉ co tới 30% rồi đổi bên. Co về 0 thì có một khung hình
+    // con vật là một vạch dọc mảnh như sợi chỉ.
+    const flip = (s.huong < 0 ? -1 : 1) * (RigThu.FLIP_MIN + (1 - RigThu.FLIP_MIN) * Math.min(1, Math.abs(s.huong)));
+    e.goc.setAttribute('transform', `translate(${fx(s.x)} ${fx(s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -589,6 +592,7 @@ export class RigThu {
 
   // Động tác đổi THẾ ĐỨNG và giữ nguyên cho các động tác sau.
   static STANCE = ['sitDown', 'standUp', 'face'];
+  static FLIP_MIN = 0.3;                 // bề ngang nhỏ nhất của con vật giữa một cú lật hướng
 
   /** Hoành độ TÂM con vật trên màn hình (px), tính cả quãng đã đi. */
   centerX() {
