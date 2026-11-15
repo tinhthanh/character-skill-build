@@ -1,4 +1,4 @@
-/* VGCharacter v0.12.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.13.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -171,8 +171,10 @@ function veChanMay({ dai = 10.5, day = 3, cong = 2.25, thon = 0, xech = 0 } = {}
 // là bảng ƯỚC LƯỢNG cho `speak()`/`explain()` khi không có âm thanh.
 const RHUBARB = {
   A: { mieng: 0.05, chum: 0.15, cuoi: 0.28 },   // M B P — mím
-  B: { mieng: 0.22, chum: 0.04, cuoi: 0.46 },   // K S T — hé, răng gần khít
-  C: { mieng: 0.48, chum: 0.02, cuoi: 0.60 },   // EH AE — mở vừa, kéo ngang
+  // B và C từng là 0.22 và 0.48. Soát bằng dải cận miệng (tools/peek.sh --mouth) thì hai hình này — vốn chiếm
+  // phần lớn thời gian của một câu — chỉ ra một khe hở mảnh, nhân vật trông như nói lí nhí. Nới ra.
+  B: { mieng: 0.36, chum: 0.04, cuoi: 0.46 },   // K S T — hé, răng gần khít
+  C: { mieng: 0.66, chum: 0.02, cuoi: 0.60 },   // EH AE — mở vừa, kéo ngang
   D: { mieng: 0.86, chum: 0.03, cuoi: 0.48 },   // AA — mở to
   E: { mieng: 0.42, chum: 0.45, cuoi: 0.14 },   // AO ER — tròn vừa
   F: { mieng: 0.26, chum: 0.85, cuoi: 0.00 },   // UW OW W — chúm
@@ -183,9 +185,9 @@ const RHUBARB = {
 
 const KHAU = [
   { mieng: 0.86, cuoi: 0.60, chum: 0.05 },   // AA — mở to
-  { mieng: 0.46, cuoi: 0.72, chum: 0.00 },   // EH AE — hé rộng
+  { mieng: 0.64, cuoi: 0.72, chum: 0.00 },   // EH AE — hé rộng (nới từ 0.46, cùng lý do với bảng trên)
   { mieng: 0.30, cuoi: 0.08, chum: 0.85 },   // UW OW W — chúm
-  { mieng: 0.15, cuoi: 0.45, chum: 0.10 },   // phụ âm — gần mím
+  { mieng: 0.26, cuoi: 0.45, chum: 0.10 },   // phụ âm — gần mím (nới từ 0.15)
 ];
 
 // Toạ độ tuyệt đối (viewBox): hông (200,262), vai (168|232,165), cổ (200,150), tâm đầu (200,88).
@@ -4840,7 +4842,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.12.3';
+const VERSION = '0.13.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

@@ -44,7 +44,13 @@ Scene file (every key except `characters` and `script` is optional):
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
+  script       `"mood": "happy" | "sad" | "surprised" | "angry" | "thinking"` on a turn plays that expression as
+               a beat before the turn's line or actions.
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
+               `"tabletop"` is the height of a table or counter top in frame units (150; lower it for
+               someone seated behind it — the tool tells you when a seated character would be hidden).
+  background   `"image": "room.jpg"` (relative to the scene file) fills the frame instead of the plain wall;
+               the floor strip is then drawn only if you also give `"floor"`.
   audio        paths are relative to the scene file; WAV is read directly, other formats need ffmpeg.
 
 After editing the generated index.html by hand (longer walks, other reactions…), the audio
@@ -80,9 +86,10 @@ def known(where, given, allowed):
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces')
-PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'height_units', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot')
-BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight')
+PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood')
+MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking')
+BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image')
 
 
 def fingerprint(html):
@@ -230,6 +237,11 @@ def main():
         known(where, turn, TURN_KEYS)
         who = names[turn['who']]
         steps = []
+        # `mood`: một nhịp nét mặt TRƯỚC lời nói / động tác của lượt này (ngạc nhiên rồi mới nói…).
+        if 'mood' in turn:
+            if turn['mood'] not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(turn["mood"])}')
+            if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet — pets have no "mood"; use an action such as "wagTail" or "hiss"')
+            steps.append(f"['express', {js(turn['mood'])}, 0.9]")
         if 'say' in turn:
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
@@ -245,7 +257,7 @@ def main():
                 steps.append(f"['explain', {js(words)}, {seconds}]")
         for step in turn.get('do', []):
             steps.append(step_code(step, where))
-        if not steps: fail(f'{where}: a turn needs "say" or "do"')
+        if not steps: fail(f'{where}: a turn needs "say", "do" or "mood"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
         if 'shot' in turn:
             shot = turn['shot']
@@ -289,10 +301,24 @@ def main():
         known(f'props[{index}]', prop, PROP_KEYS)
         host_height = float(prop.get('height', person_default))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
-                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'height_units', 'back') if key in prop}})
+                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
         if who.get('seated') in ('chair', 'stool'):
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
+
+    # ── người NGỒI sau một đạo cụ "front" cao quá ngực thì chỉ còn thấy cái đầu: báo trước ──
+    notes = []
+    for prop in props:
+        if not prop['front'] or prop['kind'] not in ('counter', 'table'): continue
+        unit = prop['host_height'] / PERSON[1]
+        top = (12 + float(prop['options'].get('tabletop', 150))) * unit                                   # mặt quầy cao bao nhiêu px so với sàn
+        centre = prop['left'] + prop['host_height'] * PERSON[0] / PERSON[1] / 2
+        half = float(prop['options'].get('width', 300 if prop['kind'] == 'counter' else 230)) * unit / 2
+        for who in names.values():
+            if who['_pet'] or not who.get('seated') or abs(float(who['x']) - centre) > half: continue
+            if top > 0.33 * who['_host_height']:
+                fits = max(40, round(0.28 * who['_host_height'] / unit - 12))
+                notes.append(f'"{who["name"]}" sits behind the {prop["kind"]} at x {centre:.0f}, which is taller than their chest — only the head will show. Lower it with "tabletop": {fits} (now {prop["options"].get("tabletop", 150)}), or let them stand.')
 
     # ── không ghi đè bản đã SỬA TAY ──
     target = os.path.join(out, 'index.html')
@@ -327,8 +353,17 @@ def main():
         body.append(f'  <{tag} id="{element}" class="clip" data-start="0" data-duration="__TOTAL__" data-track-index="{track[0]}"{extra}></{tag}>')
         track[0] += 1
 
-    clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
-    clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
+    # Nền: một ẢNH phủ kín khung (thì không vẽ dải sàn đè lên, trừ khi kịch bản khai màu sàn), hoặc tường + sàn màu trơn.
+    picture = scene.get('background', {}).get('image')
+    if picture:
+        source = os.path.join(base, picture)
+        if not os.path.isfile(source): fail(f'background.image not found: {picture} (looked in {base})')
+        if os.path.abspath(source) != os.path.abspath(os.path.join(out, os.path.basename(picture))): shutil.copy(source, os.path.join(out, os.path.basename(picture)))
+        clip('wall', f'position: absolute; inset: 0; background: {background["wallDark"]} url("{os.path.basename(picture)}") center / cover no-repeat;'); layers.append('#wall')
+    else:
+        clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
+    if not picture or 'floor' in scene.get('background', {}):
+        clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
     for prop in [item for item in props if not item['front']]:
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
     for who in names.values():
@@ -358,7 +393,7 @@ def main():
         make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])} }})"
         setup.append(f"    const {who['name']} = {make}.rig;")
     for prop in props:
-        options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('height_units'), 'back': prop['options'].get('back')}
+        options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
         if who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
@@ -434,6 +469,7 @@ def main():
     print(f'  {len(names)} characters · {len(script)} script entries · {len(voices)} voice lines · {total:g} s')
     for voice, line in zip(voices, timings['speech']):
         print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
+    for note in notes: print(f'  ! {note}')
     print(f'next: sh tools/peek.sh {os.path.relpath(target)}      # timings, warnings and a contact sheet')
 
 

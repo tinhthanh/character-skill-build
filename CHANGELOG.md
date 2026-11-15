@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.0
+
+Changed
+- **Mouths open wider when speaking.** The two shapes that fill most of a spoken line were
+  barely open (checked with `tools/peek.sh --mouth` on lines with and without audio). In the
+  cue table "teeth" goes from 0.22 to 0.36 and "open" from 0.48 to 0.66; in the estimated
+  table (`speak` / `explain`) the mid vowel goes from 0.46 to 0.64 and the consonant from 0.15
+  to 0.26. This changes how every spoken line looks, with Rhubarb cues too.
+- `tools/scene.py`: the prop key `height_units` is now `tabletop`.
+
+Added
+- `tools/scene.py`: `"mood"` on a turn (an expression beat before the line or actions);
+  `background.image`; a note when a seated character would be hidden behind a tall `front`
+  counter, with a `tabletop` value that fits.
+
 ## 0.12.3
 
 Added

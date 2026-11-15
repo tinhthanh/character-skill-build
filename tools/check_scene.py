@@ -34,12 +34,21 @@ with tempfile.TemporaryDirectory() as work:
         staged['characters'][1].update({'enter': 'right', 'seated': False})
         staged['props'][0]['front'] = True
         staged['script'][-1]['together'][0]['shot'] = ['vet', 'boy', 'bella']
+        # mood trên một lượt, nền là ảnh, và một người NGỒI sau quầy cao (phải có lời nhắc kèm số gợi ý).
+        staged['script'][2]['mood'] = 'surprised'
+        staged['characters'].append({'name': 'clerk', 'id': 'clerk', 'x': 250, 'seated': True})
+        import struct, zlib
+        def chunk(kind, data): return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+        png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 2, 2, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b'\x00\x20\x40\x50\x20\x40\x50' * 2)) + chunk(b'IEND', b'')
+        picture = os.path.join(os.path.dirname(example), '_check_room.png')
+        open(picture, 'wb').write(png)
+        staged['background'] = {'image': '_check_room.png'}
         staged_path = os.path.join(os.path.dirname(example), '_check_staged.json')
         try:
             json.dump(staged, open(staged_path, 'w', encoding='utf-8'))
             built = build(staged_path, os.path.join(work, 'staged'))
         finally:
-            os.remove(staged_path)
+            os.remove(staged_path); os.remove(picture)
         if built.returncode != 0:
             problems.append('a scene with two entrances, a front prop and a shot inside together does not build: ' + built.stderr.strip()[:200])
         else:
@@ -47,6 +56,10 @@ with tempfile.TemporaryDirectory() as work:
             if not re.search(r"together: \[\[vet, \['enter', \"left\"\][^\n]*\[boy, \['enter', \"right\"\]", page): problems.append('two entering characters do not enter together')
             if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
             if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
+            if "['express', \"surprised\", 0.9], ['explain'" not in page: problems.append('"mood" does not add an expression beat before the line')
+            if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
+            if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
+            if '"clerk" sits behind the counter' not in built.stdout or '"tabletop"' not in built.stdout: problems.append('no note about a seated character hidden behind a tall front counter')
             # Sửa tay làm lệch giờ → --retime đưa <audio> và tổng thời lượng về đúng.
             index = os.path.join(work, 'staged', 'index.html')
             before = re.search(r'src="voice.wav" data-start="([\d.]+)"', page).group(1)
@@ -93,6 +106,10 @@ with tempfile.TemporaryDirectory() as work:
         ('a misspelt top-level key', lambda s: s.update({'captons': False}), 'captions'),
         ('an unknown prop key', lambda s: s['props'][0].update({'colour': '#fff'}), 'color'),
         ('an unknown background key', lambda s: s['background'].update({'sky': '#fff'}), 'sky'),
+        ('an unknown mood', lambda s: s['script'][1].update({'mood': 'joyful'}), 'mood'),
+        ('a mood on a pet', lambda s: s['script'][0].update({'mood': 'happy'}), 'pet'),
+        ('a missing background image', lambda s: s['background'].update({'image': 'nope.jpg'}), 'nope.jpg'),
+        ('the old prop key', lambda s: s['props'][0].update({'height_units': 100}), 'height_units'),
         ('shot on a together entry', lambda s: s['script'][-1].update({'shot': 'wide'}), 'together'),
         ('a character that is not registered', lambda s: s['characters'].append({'name': 'extra', 'id': 'no_such_character', 'x': 900}), 'no_such_character'),
     ]
