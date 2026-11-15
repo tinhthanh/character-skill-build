@@ -25,12 +25,17 @@ cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || t
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/peek.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
 URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES&w=${PEEK_WIDTH:-480}&cols=${PEEK_COLS:-4}"
-"$CHROME_BIN" --headless=new --disable-gpu --window-size=1200,800 --virtual-time-budget=20000 --enable-logging=stderr --v=0 --dump-dom "$URL" 2>"$WORK/log" > "$WORK/dom"
+# MỘT lượt Chrome: đợi trang báo xong (title DONE / ERROR) rồi mới lấy DOM và chụp ảnh. Bản cũ
+# chụp theo ngân sách thời gian ảo nên composition nặng cho ra các ô CHƯA tua, không cảnh báo.
+rm -f "$OUT"                                   # hỏng thì không để lại ảnh cũ cho người ta xem nhầm
+CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "$URL" --wait DONE,ERROR --size 1200x800 --dump "$WORK/dom" --log "$WORK/log" \
+  --screenshot "$WORK/sheet.png" --size-js "(() => { try { const i = JSON.parse(document.getElementById('info').textContent); return i.sheet ? i.sheet.width + ',' + i.sheet.height : ''; } catch (e) { return ''; } })()" || true
+[ -f "$WORK/dom" ] || : > "$WORK/dom"
 python3 tools/peek_report.py < "$WORK/dom" || {
   # Composition không dựng được timeline thường là do script của nó ném lỗi — in lỗi ấy ra,
   # nếu không người dùng chỉ thấy "không có timeline" mà không biết vì sao.
-  grep -E "Uncaught|CONSOLE.*[Ee]rror" "$WORK/log" | sed -E 's/^.*CONSOLE[^"]*"/  page error: "/' | head -3 >&2
+  sed 's/^/  page error: /' "$WORK/log" 2>/dev/null | head -3 >&2
   exit 1; }
-SIZE="$(python3 tools/peek_report.py --size < "$WORK/dom")"
-"$CHROME_BIN" --headless=new --disable-gpu --hide-scrollbars "--window-size=$SIZE" --virtual-time-budget=20000 "--screenshot=$OUT" "$URL" >/dev/null 2>&1
+[ -f "$WORK/sheet.png" ] || { echo "peek: the contact sheet could not be captured" >&2; exit 1; }
+mv "$WORK/sheet.png" "$OUT"
 echo "image: $OUT"

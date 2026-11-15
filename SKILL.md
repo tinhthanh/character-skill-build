@@ -192,7 +192,8 @@ studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
                       describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture) ·
                       lint-examples.sh (hyperframes lint on the examples; needs Node) ·
-                      cues.py (mouth cues from a voice file)
+                      cues.py (mouth cues from a voice file) · chrome_run.py (headless Chrome
+                      runner the other tools use; waits for the page to finish)
 examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated) ·
                       voiceover/ (lip-sync to an audio file, camera shots)
 references/           slots.md · actions.md · hyperframes.md

@@ -16,5 +16,5 @@ SRV=$!
 cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || true; exit $status; }
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/check.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
-"$CHROME_BIN" --headless=new --disable-gpu --window-size=900,900 --virtual-time-budget=30000 --dump-dom "http://127.0.0.1:$PORT/tools/check.html" 2>/dev/null \
+CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/check.html" --wait PASS,FAIL --size 900x900 --timeout 180 --dump - \
   | python3 tools/check_report.py

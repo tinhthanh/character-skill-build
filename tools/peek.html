@@ -61,7 +61,10 @@ try {
              steps: child.data.steps.map((step) => ({ name: step.name, start: +(start + step.start).toFixed(2), end: +(start + step.start + step.duration).toFixed(2) })) };
   });
   // Hai nhân vật NÓI chồng lên nhau: gần như luôn là lỗi dàn cảnh, mà nhìn ảnh tĩnh không thấy.
-  const speech = info.sequences.flatMap((seq) => seq.steps.filter((step) => ['speak', 'explain', 'speakCues'].includes(step.name)).map((step) => ({ ...step, who: seq.character })));
+  // Bước nói kéo dài hơn TIẾNG NÓI 0,55 giây (miệng đã khép, tay đang về chỗ) — phần đuôi ấy không
+  // tính là "đang nói", nếu không hai câu nối sát nhau bị báo chồng oan.
+  const SETTLE = 0.55;
+  const speech = info.sequences.flatMap((seq) => seq.steps.filter((step) => ['speak', 'explain', 'speakCues'].includes(step.name)).map((step) => ({ ...step, end: Math.max(step.start, step.end - SETTLE), who: seq.character })));
   for (let a = 0; a < speech.length; a++) for (let b = a + 1; b < speech.length; b++) {
     const overlap = Math.min(speech[a].end, speech[b].end) - Math.max(speech[a].start, speech[b].start);
     if (speech[a].who !== speech[b].who && overlap > 0.15)

@@ -122,7 +122,8 @@ building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Hand ges
 the body toward the viewer for their duration (arms are drawn for a front view), then return
 to the held facing. Draw the chair as an
 ordinary element behind the seated character. Run `tools/peek.sh`: it prints every step's
-start and end, and warns about speech overlapping by more than 0.15 s, a character facing away
+start and end, and warns about speech overlapping by more than 0.15 s (the 0.55 s settling
+tail of a speaking step does not count), a character facing away
 from the one it turned to, and an `enter` that starts with the head already inside the frame. Complete example: `examples/conversation/index.html`.
 
 **Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
@@ -179,8 +180,9 @@ Two ways to move the mouth:
    const act = VGCharacter.sequence(rig, [['enter', 'left'], ['speakCues', window.VOICE_CUES.voice], 'wave']);
    ```
 
-3. Set the audio clip's `data-start` to where the `speakCues` step starts — the number
-   `tools/peek.sh` prints for it (`act.data.steps` holds the same). The step lasts the audio's
+3. Set the audio clip's `data-start` to where the `speakCues` step starts and its
+   `data-duration` to the file's length — `tools/peek.sh` prints both next to the step, ready
+   to paste (`act.data.steps` holds the same). The step lasts the audio's
    length plus about 0.55 s of settling; the mouth is closed again when the audio ends.
 
 Several lines: one audio clip and one cue script per line (`--name line2` sets the key in

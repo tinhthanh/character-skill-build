@@ -1,4 +1,4 @@
-/* VGCharacter v0.9.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.9.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -4097,7 +4097,11 @@ const pigtails = ({ tie = null } = {}) => (p, c) => group(p, c, `
 
 /** Tóc xoăn bồng. `volume`: 0.7 … 1.4. */
 const curly = ({ volume = 1 } = {}) => (p, c) => {
+  volume = Math.max(0.7, Math.min(1.4, volume));
   const r = 15 * volume, curls = [];
+  // Vệt sáng vẽ cho độ bồng 1; bồng ít hay nhiều hơn thì co giãn theo vòng lọn quanh tâm đầu,
+  // không thì tóc nhỏ lại mà vệt sáng đứng nguyên, lơ lửng phía trên.
+  const reach = (46 + r) / 61;
   // Một vòng lọn tròn ôm từ thái dương bên này qua đỉnh đầu sang bên kia…
   for (let i = 0; i <= 8; i++) {
     const a = Math.PI * (1.08 - i * 0.145);
@@ -4108,7 +4112,7 @@ const curly = ({ volume = 1 } = {}) => (p, c) => {
   return group(p, c, `
                 <path d="M -50 -4 Q -56 -54 0 -62 Q 56 -54 50 -4 Q 32 -32 0 -32 Q -32 -32 -50 -4 Z"/>
                 ${curls.join('')}
-                ${shine(c, 'M -30 -62 Q -22 -70 -12 -66', 2.6, 0.6)}${shine(c, 'M 6 -68 Q 16 -74 26 -66', 2.6, 0.6)}${shine(c, 'M -52 -28 Q -50 -38 -42 -42', 2.4, 0.5)}`);
+                <g transform="translate(0 -12) scale(${reach.toFixed(3)}) translate(0 12)">${shine(c, 'M -30 -62 Q -22 -70 -12 -66', 2.6, 0.6)}${shine(c, 'M 6 -68 Q 16 -74 26 -66', 2.6, 0.6)}${shine(c, 'M -52 -28 Q -50 -38 -42 -42', 2.4, 0.5)}</g>`);
 };
 
 /** Tóc dựng chỉa (thiếu niên, trẻ em). */
@@ -4785,7 +4789,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

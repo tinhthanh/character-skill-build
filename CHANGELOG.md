@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.1
+
+From a second independent agent trial (two characters, two voice lines, camera shots).
+
+Fixed
+- `tools/peek.sh` could capture tiles that had not been seeked yet — a contact sheet with the
+  right time labels over frame-0 pictures, no warning — and sometimes failed with "returned
+  nothing" on unchanged input. Chrome was stopped after a fixed virtual-time budget whether
+  or not the page was ready. All tools (`check`, `shot`, `gallery`, `describe`, `peek`) now run
+  through `tools/chrome_run.py`, which drives Chrome over the DevTools protocol and waits for
+  the page's own "finished" signal. A failed preview no longer leaves the previous PNG behind.
+- `kit.hair.curly({ volume })` below 1 left highlight strokes floating above the hair.
+- The overlapping-speech warning counted the 0.55 s settling tail of a speaking step.
+
+Added
+- `tools/peek.sh` prints a ready-to-paste `<audio data-start data-duration>` next to every
+  `speakCues` step.
+- Docs: ranges and defaults of the hair options; `hostScale` is read as
+  `VGCharacter.kit.bodies.<preset>.hostScale`.
+
 ## 0.9.0
 
 Added
