@@ -1,0 +1,15 @@
+{
+  "id": "cat-hello",
+  "width": 1080,
+  "height": 1920,
+  "background": { "wall": "#27566a", "wallDark": "#0e2430", "floor": "#123344" },
+  "characters": [
+    { "name": "mai", "id": "girl", "x": 360, "faces": "miu" },
+    { "name": "miu", "species": "cat", "x": 780, "enter": "left", "faces": "mai" }
+  ],
+  "script": [
+    { "who": "mai", "say": "Chào bé mèo! Hôm nay bé khoẻ không?" },
+    { "who": "miu", "do": ["meow"], "shot": ["mai", "miu"] },
+    { "who": "mai", "do": ["cheer"], "shot": "wide" }
+  ]
+}

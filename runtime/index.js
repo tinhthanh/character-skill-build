@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.12.1';
+export const VERSION = '0.12.2';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -340,7 +340,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
     // `face` về phía một nhân vật / phần tử: ghi lại đích để tools/peek.sh soát xem về sau nó có còn ở phía ấy không.
-    if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0];
+    if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0].live || args[0];
     // LỜI của bước nói — để `captions()` hiện chữ đúng giờ. `speak` / `explain` nhận lời ở tham số
     // đầu; `speakCues` lấy từ `{ text }` (tham số thứ ba) hoặc từ `metadata.text` của bộ cue.
     if (SPEECH_STEPS.includes(name)) {
@@ -408,6 +408,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
  *   subject   một rig (người hoặc thú) hay một MẢNG rig — khung ôm lấy tất cả (bỏ qua khi kind = 'wide')
  *   kind      'face' | 'chest' | 'full' | 'wide'
  *   options   duration (0.6; 0 = cắt cảnh), ease, fill (0.82 — phần khung hình mà vùng ngắm chiếm),
+ *             centerY (0.5 — vùng ngắm nằm ở đâu theo chiều dọc; khung dọc có phụ đề giữa khung thì ~0.36),
  *             time: thời điểm của cảnh quay, để ngắm đúng chỗ nhân vật ĐANG Ở lúc ấy (đã đi, đã
  *             ngồi). Tính trong chuỗi của từng nhân vật — tức cũng là giờ của composition khi các
  *             chuỗi được `add` ở 0. Không đưa thì lấy trạng thái hiện tại của rig (khung đầu).
@@ -418,7 +419,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
  * Vị trí tính MỘT LẦN lúc dựng, từ bố cục trang và hình học của rig — nên tua tới đâu cũng ra
  * cùng một khung hình. Máy quay không bám theo nhân vật đang di chuyển.
  */
-export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: given, time, frame } = {}) {
+export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, centerY = 0.5, sequence: given, time, frame } = {}) {
   const elements = [].concat(scene || []).flatMap((item) => (typeof item === 'string' ? [...document.querySelectorAll(item)] : [item])).filter((item) => item && item.nodeType === 1);
   if (!elements.length) throw new Error('[character] shot(scene, …): scene must be a selector, an element, or an array of them — and match at least one element');
   const root = frame || elements[0].closest('[data-composition-id]') || elements[0].parentElement;
@@ -454,7 +455,7 @@ export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'po
     const scale = Math.max(1, Math.min(8, fill * frameHeight / (bottom - top), (rigs.length > 1 ? 0.9 : 1.6) * frameWidth / (right - left)));
     // Canh vùng ngắm vào giữa khung, nhưng không để lộ ra ngoài mép cảnh.
     const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
-    target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight / 2 - (top + bottom) / 2 * scale, frameHeight), scale };
+    target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight * centerY - (top + bottom) / 2 * scale, frameHeight), scale };
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   for (const element of elements) {
@@ -573,9 +574,29 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
 export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, camera = null } = {}) {
   if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
   const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
-  const part = (rig) => { if (!cast.has(rig)) cast.set(rig, { steps: [], end: 0, used: false }); return cast.get(rig); };
+  // Mỗi nhân vật nhớ TRẠNG THÁI BAN ĐẦU (để lần dựng nào cũng xuất phát từ đúng chỗ ấy) và `centre`:
+  // hoành độ tâm của nó sau các lượt đã xếp — chỗ nó ĐANG ĐỨNG khi tới lượt kế tiếp.
+  const part = (rig) => {
+    if (!cast.has(rig)) { const keys = Object.keys(rig.NGHI); cast.set(rig, { steps: [], end: 0, used: false, keys, initial: keys.map((k) => rig.s[k]), centre: undefined }); }
+    return cast.get(rig);
+  };
+  const restore = (rig) => { const mine = cast.get(rig); mine.keys.forEach((k, n) => { rig.s[k] = mine.initial[n]; }); };
+  // `face(nhân vật khác)` đọc vị trí của người kia LÚC DỰNG. Mỗi nhân vật lại được dựng riêng, nên lúc
+  // ấy người kia đang nằm ở khung đầu của họ — chưa bước vào, chưa đi tới chỗ đứng. Vì thế đích của
+  // `face` được thay bằng một "mỏ neo" mang đúng chỗ người kia đứng ở thời điểm của lượt này.
+  const anchor = (target) => {
+    const known = cast.get(target), x = known && known.centre !== undefined ? known.centre : target.centerX();
+    return { centerX: () => x, publicId: target.publicId, live: target };
+  };
   // Đo một danh sách bước: dựng thử với tần số lấy mẫu thấp (nhanh), đọc giờ từng bước.
-  const measure = (rig, steps) => { const draft = sequence(rig, steps, { gap: stepGap, sampleRate: 4 }); const data = { duration: draft.duration(), steps: draft.data.steps }; draft.kill(); return data; };
+  const measure = (rig, steps) => {
+    restore(rig);
+    const draft = sequence(rig, steps, { gap: stepGap, sampleRate: 4 });
+    draft.time(draft.duration());
+    const data = { duration: draft.duration(), steps: draft.data.steps, centre: rig.centerX() };
+    draft.kill(); restore(rig);
+    return data;
+  };
   const turns = [];
   let clock = 0;
   turnList.forEach((entry, index) => {
@@ -583,14 +604,16 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
     const override = entry && !Array.isArray(entry) && 'shot' in entry ? entry.shot : undefined;
     if (entry && !Array.isArray(entry) && Array.isArray(entry.turn)) entry = entry.turn;
     const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
-    const begin = clock;
+    const begin = clock, moved = [];
     let finish = begin;
     for (let turn of parallel) {
       // Lượt bên trong `together` cũng có thể mang `shot` riêng: { turn: [rig, …], shot }.
       let own = override;
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
-      const [rig, ...steps] = turn, mine = part(rig);
+      const [rig, ...written] = turn, mine = part(rig);
+      const steps = written.map((step) => (Array.isArray(step) && step[0] === 'face' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+        ? ['face', anchor(step[1]), ...step.slice(2)] : step));
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
@@ -605,21 +628,25 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       mine.steps.push(...steps);
       const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
       mine.end = measured.duration; mine.used = true;
+      moved.push([mine, measured.centre]);
       finish = Math.max(finish, mine.end);
       turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
+    // Vị trí mới chỉ có hiệu lực SAU lượt này: các lượt diễn cùng lúc đều thấy nhau ở chỗ cũ.
+    for (const [mine, centre] of moved) mine.centre = centre;
     clock = finish + gap;
   });
-  const sequences = [...cast.entries()].map(([rig, mine]) => sequence(rig, mine.steps, { gap: stepGap }));
+  const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
   const rigs = [...cast.keys()];
   const duration = Math.max(...sequences.map((item) => item.duration()));
 
   // MÁY QUAY TỰ ĐỘNG: cắt vào người đang NÓI, về toàn cảnh khi hết lời. `camera` là danh sách phần
-  // tử cảnh (như tham số đầu của `shot`), hoặc { scene, kind = 'chest', duration = 0.6, lead = 0.25, wide = true }.
+  // tử cảnh (như tham số đầu của `shot`), hoặc { scene, kind = 'chest', duration = 0.6, lead = 0.25, wide = true, fill, centerY }.
   let cameraTimeline = null;
   if (camera) {
     const setup = Array.isArray(camera) || typeof camera === 'string' || camera.nodeType ? { scene: camera } : camera;
-    const { scene, kind = 'chest', duration: move = 0.6, lead = 0.25, wide = true } = setup;
+    const { scene, kind = 'chest', duration: move = 0.6, lead = 0.25, wide = true, fill, centerY } = setup;
+    const framing = { ...(fill !== undefined ? { fill } : {}), ...(centerY !== undefined ? { centerY } : {}) };
     cameraTimeline = gsap.timeline({ paused: true });
     let aimed = null, lastWords = 0;                              // đang ngắm ai / gì; lời cuối cùng kết thúc lúc nào
     for (const turn of turns) {
@@ -634,7 +661,7 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       const key = shotKind === 'wide' ? 'wide' : [].concat(subject).map((rig) => rigs.indexOf(rig)).join('+') + ':' + shotKind;
       if (key !== aimed) {
         const at = Math.max(0, from - lead);
-        cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move }).paused(false), at);
+        cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move, ...framing }).paused(false), at);
         aimed = key;
       }
       lastWords = Math.max(lastWords, until);

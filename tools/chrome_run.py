@@ -83,6 +83,7 @@ def main():
     parser.add_argument('--chrome', default=os.environ.get('CHROME_BIN'))
     parser.add_argument('--wait', default='DONE,ERROR', help='document.title values that mean "finished"')
     parser.add_argument('--wait-js', help='instead of --wait: a JavaScript expression that becomes truthy when the page is finished')
+    parser.add_argument('--fail-on-error', action='store_true', help='stop waiting as soon as the page throws an uncaught error')
     parser.add_argument('--eval', dest='evaluate', help='JavaScript evaluated once the page is finished; its value is printed as JSON')
     parser.add_argument('--timeout', type=float, default=120, help='seconds to wait for a --wait title')
     parser.add_argument('--dump', help='write the final DOM here ("-" for stdout)')
@@ -121,13 +122,14 @@ def main():
             call('Page.enable'); call('Runtime.enable')
             call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
             call('Page.navigate', {'url': args.url})
-            title, deadline = '', time.time() + args.timeout
+            title, deadline, crashed = '', time.time() + args.timeout, False
             while time.time() < deadline:
                 if args.wait_js:
                     if evaluate(f'!!({args.wait_js})'): title = 'ready'; break
                 else:
                     title = evaluate('document.title') or ''
                     if title in finished: break
+                if args.fail_on_error and any(event.get('method') == 'Runtime.exceptionThrown' for event in tools.events): crashed = True; break
                 time.sleep(0.05)
             ok = title == 'ready' if args.wait_js else title in finished
             if args.evaluate and ok:
@@ -158,7 +160,7 @@ def main():
                 image = call('Page.captureScreenshot', {'format': 'png'})['data']
                 with open(args.screenshot, 'wb') as f: f.write(base64.b64decode(image))
             if not ok:
-                print(f'chrome_run: the page did not finish within {args.timeout:.0f}s (title: "{title}")', file=sys.stderr)
+                print('chrome_run: the page threw an error before it finished' if crashed else f'chrome_run: the page did not finish within {args.timeout:.0f}s (title: "{title}")', file=sys.stderr)
                 for error in errors[:3]: print(f'  page error: {error}', file=sys.stderr)
             try: tools.call('Browser.close')
             except Exception: pass

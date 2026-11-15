@@ -36,7 +36,8 @@ Scene file (every key except `characters` and `script` is optional):
 
   characters   `id` = a registered person (see `VGCharacter.list()`), or `species` = a pet.
                `x` is where the character STANDS: the centre, in px from the left of the frame.
-               `height` is the host height in px (default 760 for people, 330 for pets).
+               `height` is the host height in px (default: 0.7 × the frame height for people — 760 at
+               1920×1080 — capped at 0.75 × the frame width in a vertical frame; pets 0.43 × that).
                `enter`: "left" | "right" — walks in from outside the frame to `x` before the script.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
@@ -103,7 +104,7 @@ def read_timings(folder, target):
             time.sleep(0.1)
         with tempfile.TemporaryDirectory() as work:
             log = os.path.join(work, 'log')
-            probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '45',
+            probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '45', '--fail-on-error',
                                     '--eval', 'window.__sceneTimings', '--log', log], capture_output=True, text=True)
             errors = open(log, encoding='utf-8').read().strip() if os.path.exists(log) else ''
         if probe.returncode != 0 or not probe.stdout.strip() or probe.stdout.strip() == 'null':
@@ -168,6 +169,10 @@ def main():
     scene_id = slug(scene.get('id') or os.path.splitext(os.path.basename(args.scene))[0])
     width, height = int(scene.get('width', 1920)), int(scene.get('height', 1080))
     out = os.path.abspath(args.output or os.path.join(base, scene_id))
+    # Cỡ mặc định theo KHUNG HÌNH: người cao 0,7 khung ngang (760 px ở 1920×1080), nhưng không rộng quá
+    # ba phần tư bề ngang của khung dọc; thú bằng 0,43 người.
+    person_default = round(min(0.7 * height, 0.75 * width))
+    pet_default = round(person_default * 0.43)
 
     # ── nhân vật ──
     cast = scene.get('characters')
@@ -187,7 +192,7 @@ def main():
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
         frame = PET if pet else PERSON
-        host_height = float(who.get('height', 330 if pet else 760))
+        host_height = float(who.get('height', pet_default if pet else person_default))
         host_width = host_height * frame[0] / frame[1]
         unit = host_height / frame[1]
         stand = float(who['x'])
@@ -282,7 +287,7 @@ def main():
     for index, prop in enumerate(scene.get('props', [])):
         if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter) and "x"')
         known(f'props[{index}]', prop, PROP_KEYS)
-        host_height = float(prop.get('height', 760))
+        host_height = float(prop.get('height', person_default))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
                       'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'height_units', 'back') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
@@ -312,7 +317,7 @@ def main():
         if done.returncode != 0: fail(f'could not make mouth cues for {voice["file"]}: {done.stderr.strip()}')
         voice['length'] = float(re.search(r'([\d.]+) s,', done.stdout).group(1))
 
-    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': 190}, **scene.get('background', {}))
+    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * 0.176)}, **scene.get('background', {}))
     ground = round(background['floorHeight'] * 0.5)         # bàn chân đứng ở giữa dải sàn
     layers, style, body, setup = [], [], [], []
     track = [0]
@@ -333,10 +338,18 @@ def main():
         clip(who['_element'], f'position: absolute; left: {who["_left"]:.0f}px; bottom: {ground}px; height: {who["_host_height"]:.0f}px;'); layers.append('#' + who['_element'])
     for prop in [item for item in props if item['front']]:           # "front": true — vẽ SAU nhân vật, tức che phía trước họ (đứng sau quầy)
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
+    # Phụ đề: khung ngang thì sát đáy; khung DỌC thì nhấc lên 20% — một phần năm dưới cùng của video dọc
+    # bị giao diện của TikTok / Reels / Shorts che (HyperFrames `check` gọi đó là vùng an toàn).
     captions = scene.get('captions', True) and '"say"' in json.dumps(script)        # không ai nói thì không cần phụ đề
     if captions:
-        clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; padding: 18px 34px; border-radius: 18px; '
-             f'background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(height * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;')
+        look = f'padding: 18px 34px; border-radius: 18px; box-sizing: border-box; background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(min(width, height) * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;'
+        if width >= height:
+            clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.065)}px; transform: translateX(-50%); max-width: {round(width * 0.7)}px; ' + look)
+        else:
+            # Khung DỌC: chữ phải nằm trong vùng mà giao diện TikTok / Reels / Shorts không che — theo bảng của
+            # HyperFrames là từ 15% tới 65% chiều cao, và ở nửa dưới của vùng ấy thì lùi khỏi cột nút bên phải
+            # (11%–72% bề ngang). Neo bằng `top` để ba dòng chữ vẫn nằm trọn trong vùng.
+            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {round(height * 0.52)}px; ' + look)
     for voice in voices:
         body.append(f'  <audio id="voice-{voice["key"].replace("_", "-")}" class="clip" src="{voice["file"]}" data-start="__START_{voice["key"]}__" data-duration="{voice["length"]:.2f}" data-track-index="{track[0]}" data-volume="1"></audio>')
         track[0] += 1
@@ -355,7 +368,10 @@ def main():
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
-        camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)} }}, "
+        # Khung dọc: phụ đề nằm giữa khung (vùng an toàn), nên người nói được đặt ở PHẦN TRÊN và nhỏ lại
+        # một chút — không thì chữ đè lên miệng.
+        portrait = '' if width >= height else ', fill: 0.6, centerY: 0.36'
+        camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)}{portrait} }}, "
     seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['_pet'] and who.get('seated')]
     lines = []
     for comment, code in ([('  // pets that start seated', '{ together: [' + ', '.join(seated_pets) + '] }' if len(seated_pets) > 1 else seated_pets[0])] if seated_pets else []) + turns:

@@ -45,6 +45,10 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 - Characters with `enter` walk in **together**, before the script. A prop with `"front": true`
   is drawn in front of the characters — a counter someone stands behind. `shot` goes on a turn
   (also on a turn inside `together`), not on the `together` entry itself.
+- **Vertical video:** set `"width": 1080, "height": 1920`. Default character heights and the
+  caption size follow the frame; captions sit mid-frame, inside the area that TikTok, Reels and
+  Shorts leave clear, and the camera puts the speaker above them. Keep the characters' `x`
+  within the narrower width. `examples/scene-vertical/scene.json` is a 9:16 sample.
 - Also: `props` (`kind`, `x`, `color`, `height`, `front`), `background` (`wall`, `wallDark`, `floor`,
   `floorHeight`), `camera` (`true` / `{ "kind": "face" }` / `false`), `captions`, `seed`,
   `width`, `height`, `gap`.
@@ -57,7 +61,7 @@ that file directly, and when your edits change the timing (longer walks, other r
 `python3 tools/scene.py --retime path/to/index.html`: it re-reads the timing and fixes every
 `<audio>` clip and the total duration in place. A key the tool does not know is an error, with
 the nearest valid name. `examples/scene/scene.json` is a complete
-scene file. The tool needs Chrome (it loads the result once to time the audio).
+scene file (`examples/scene-vertical/scene.json` a vertical one). The tool needs Chrome (it loads the result once to time the audio).
 
 ## Setup in a HyperFrames project
 
@@ -187,7 +191,7 @@ is speaking and returns to the wide shot after the last line:
 
 ```js
 VGCharacter.conversation(turns, { camera: ['#wall', '#floor', '#chair', '#granny', '#barista'] });
-// or { camera: { scene: […], kind: 'chest', duration: 0.6, lead: 0.25, wide: true } }
+// or { camera: { scene: […], kind: 'chest', duration: 0.6, lead: 0.25, wide: true, fill, centerY } }
 ```
 
 Override one turn by writing it as `{ turn: [rig, ...steps], shot }`: `shot: 'face'` (another
@@ -322,7 +326,8 @@ tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), speech.start + speec
 - `kind` — `'face'`, `'chest'` (top of the head to the hips), `'full'`, or `'wide'` (back to
   the whole frame). For a pet, `'chest'` and `'full'` both mean the whole animal.
 - `options` — `duration` (0.6 s; `0` is a hard cut), `ease`, `fill` (0.82: how much of the
-  frame the target takes), and `time`: the moment of the shot, so the camera aims at where
+  frame the target takes), `centerY` (0.5: where the target sits vertically — about 0.36 in a
+  vertical frame with captions mid-frame), and `time`: the moment of the shot, so the camera aims at where
   each subject is **by then** (after a walk, seated…). It is a time in the subject's own
   sequence — the same as the composition time when sequences are added at 0. Without `time`
   the camera aims at the subject's first frame. `sequence` overrides which sequence is used

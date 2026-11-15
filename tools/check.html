@@ -469,6 +469,10 @@ try {
       if (Math.abs(wall.width / 1920 - rig.host.getBoundingClientRect().height / 760) > 1e-3) hong('shot', `${kind}: scene elements are not scaled alike`);
       push.kill(); act.time(0);
     }
+    // `centerY`: vùng ngắm nằm ở một phần ba trên của khung thay vì chính giữa.
+    { const high = L.shot(scene, rig, 'chest', { sequence: act, time: speech.start + 1, fill: 0.9, centerY: 0.3 }); high.progress(1); act.time(speech.start + 1);
+      const seen = centreOf('chest'); if (Math.abs(seen.y - 0.3 * 1080) > 4) hong('shot', `centerY 0.3 puts the target at ${Math.round(seen.y)}px instead of ${Math.round(0.3 * 1080)}px`);
+      high.kill(); act.time(0); }
     const wide = L.shot(scene, null, 'wide'); wide.progress(1);
     const back = stage.querySelector('#ck-wall').getBoundingClientRect(), frame = stage.getBoundingClientRect();
     if (Math.abs(back.width - 1920) > 0.5 || Math.abs(back.left - frame.left) > 0.5) hong('shot', "'wide' does not return to the full frame");
@@ -568,6 +572,19 @@ try {
     for (const rig of [a, b]) { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); if (head.left < frame.left - 2 || head.right > frame.right + 2) hong('camera', `shot: [a, b] does not keep "${rig.publicId}" in frame`); }
     film.time(film.duration()); if (zoom() > 1.01) hong('camera', 'the camera does not return to the wide shot after the last line');
     if (!directed.camera) hong('camera', 'conversation(…, { camera }) does not expose the camera timeline');
+    // `face(người kia)` trong hội thoại phải nhìn về chỗ người kia ĐANG ĐỨNG, không phải chỗ họ xuất phát:
+    // con chó bắt đầu bên PHẢI của a rồi chạy sang bên TRÁI — a phải quay trái, chó phải quay phải.
+    a.reset(); b.reset(); dog.datNghi();
+    const crossing = L.conversation([[dog, ['walk', 4, -700]], { together: [[a, ['face', dog]], [dog, ['face', a]]] }, [a, 'nod']]);
+    crossing.of(a).time(crossing.duration); crossing.of(dog).time(crossing.duration);
+    if (!(a.state.facing < 0)) hong('conversation', `face(rig) looks at where the other character started, not where it is now (facing ${a.state.facing})`);
+    if (dog.s.huong !== 1) hong('conversation', `a pet's face(rig) inside a conversation turns the wrong way (${dog.s.huong})`);
+    const faced = crossing.of(a).data.steps.find((step) => step.name === 'face');
+    if (!faced || faced.target !== dog) hong('conversation', 'the face step no longer records the real target (tools/peek.sh needs it)');
+    // Thú đi quãng dài thì chạy lúp xúp: 600 đơn vị trong dưới 5 giây, vẫn dừng đúng chỗ.
+    dog.datNghi(); const trot = L.sequence(dog, [['walk', 4, 600]]); trot.time(trot.duration());
+    if (trot.duration() > 5 || Math.abs(dog.s.x - 600) > 1e-3) hong('pet walk', `walk(4, 600) takes ${trot.duration().toFixed(1)}s and ends at x ${dog.s.x}`);
+    trot.kill();
     stage.remove();
   }
 

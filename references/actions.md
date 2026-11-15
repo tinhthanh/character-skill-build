@@ -119,7 +119,8 @@ stand them up first:
 | `exit` | — | run out to the right — **ends hidden** | 2.7 |
 
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
-400 × 330 units.
+400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything
+over 160 units (about 155 units a second).
 
 Exact durations for a given composition: `tools/peek.sh <index.html>` prints the start and
 end of every step.

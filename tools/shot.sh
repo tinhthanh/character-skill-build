@@ -20,6 +20,6 @@ cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || t
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/sheet.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
 rm -f "$OUT"                                   # hỏng thì không để lại ảnh cũ cho người ta xem nhầm
-CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/sheet.html?nv=$ID&config=$CONFIG" --wait DONE --timeout 45 --size 1280x1500 --screenshot "$OUT" \
+CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/sheet.html?nv=$ID&config=$CONFIG" --wait DONE --timeout 45 --fail-on-error --size 1280x1500 --screenshot "$OUT" \
   || { echo "shot: the pose sheet of \"$ID\" did not render — see the page error above, or run: sh tools/check.sh" >&2; exit 1; }
 if [ "$CONFIG" = 1 ] && [ -f "configs/$ID.json" ]; then echo "$OUT (with configs/$ID.json)"; else echo "$OUT"; fi

@@ -61,8 +61,8 @@ still break mid-action, and some failures are silent (see [Pitfalls](#pitfalls))
    errors, `NaN` attributes, duplicate ids, missing required elements, actions that do not
    return to rest, invalid files in `configs/`, and a stale bundle.
 5. **Look at it.** `sh tools/shot.sh <id> out.png`, then open the PNG. It is a pose sheet:
-   rest, close-ups, half and full turn, and fifteen labelled mid-action frames including
-   sitting and four expressions. It applies `configs/<id>.json` when there is one
+   rest, close-ups, half and full turn, and sixteen labelled mid-action frames (including sitting and four
+   expressions) and two held-stance panels. It applies `configs/<id>.json` when there is one
    (`--no-config` shows the bare definition). Check that nothing is covered that should be visible, that the outfit
    still reads when the arms move and when the character turns sideways, and that the hands
    land where the rest pose intends. Fix and repeat from step 4.
@@ -204,7 +204,7 @@ tools/                serve.py · build.py · check.sh (all characters) · shot.
                       scene.py (a whole composition from a scene file) · cues.py (mouth cues from a voice file) · chrome_run.py (headless Chrome
                       runner the other tools use; waits for the page to finish)
 examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated) ·
-                      voiceover/ (lip-sync to an audio file, camera shots) · scene/ (a scene file for tools/scene.py)
+                      voiceover/ (lip-sync to an audio file, camera shots) · scene/ and scene-vertical/ (scene files for tools/scene.py)
 references/           slots.md · actions.md · hyperframes.md
 ```
 

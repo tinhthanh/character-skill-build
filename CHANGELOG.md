@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.12.2
+
+Fixed
+- Inside `conversation()`, `face(otherRig)` looked at where the other character **started**,
+  not where it stood by then — a character that had walked past was faced the wrong way.
+  Targets are now resolved to the other character's position at that turn.
+- A pet walking a long distance took close to ten seconds to cross the frame; beyond 160 units
+  it now trots.
+- `tools/scene.py` in a vertical frame: captions were sized from the frame height (four lines
+  over the speaker) and default character heights ignored the frame. Both follow the frame now;
+  vertical captions sit inside the platforms' safe area (`hyperframes check` flags text in the
+  bottom third) and the camera frames the speaker above them (`shot(…, { centerY })`).
+- `tools/scene.py`, `shot.sh` and `gallery.sh` waited out a 45 s timeout when the page threw
+  an error; they stop at once (`chrome_run.py --fail-on-error`). `tools/check.sh` is back to
+  about 15 s from 60 s.
+
+Added
+- `examples/scene-vertical/scene.json`: a 9:16 scene (a girl and a cat, Vietnamese captions).
+
 ## 0.12.1
 
 Fixed

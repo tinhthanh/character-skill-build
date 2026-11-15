@@ -15,6 +15,6 @@ SRV=$!
 cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || true; exit $status; }
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/gallery.html" || [ $i -ge 30 ]; do i=$((i+1)); sleep 0.2; done
-CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/gallery.html" --wait DONE --timeout 45 --size 1400x1000 --screenshot "$OUT" \
+CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/gallery.html" --wait DONE --timeout 45 --fail-on-error --size 1400x1000 --screenshot "$OUT" \
   || { echo "gallery: the gallery did not render — run: sh tools/check.sh" >&2; exit 1; }
 echo "$OUT"
