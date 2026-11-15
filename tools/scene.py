@@ -155,7 +155,7 @@ def js(value):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Build a HyperFrames composition from a scene description.')
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)     # --help in đủ định dạng tệp kịch bản
     parser.add_argument('scene', nargs='?')
     parser.add_argument('--retime', metavar='INDEX_HTML', help='re-time a generated composition after hand edits: fix every <audio> clip and the total duration in place')
     parser.add_argument('-o', '--output', help='output folder (default: <scene folder>/<id>)')
@@ -347,7 +347,7 @@ def main():
         if done.returncode != 0: fail(f'could not make mouth cues for {voice["file"]}: {done.stderr.strip()}')
         voice['length'] = float(re.search(r'([\d.]+) s,', done.stdout).group(1))
 
-    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * 0.176)}, **scene.get('background', {}))
+    background = dict({'wall': '#1f4a5c', 'wallDark': '#0c1c26', 'floor': '#0f2a38', 'floorHeight': round(height * (0.176 if width >= height else 0.34))}, **scene.get('background', {}))        # khung dọc: nền đứng cao hơn, vì phần đáy bị giao diện ứng dụng che
     ground = round(background['floorHeight'] * 0.5)         # bàn chân đứng ở giữa dải sàn
     layers, style, body, setup = [], [], [], []
     track = [0]
@@ -409,7 +409,7 @@ def main():
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
         # Khung dọc: phụ đề nằm giữa khung (vùng an toàn), nên người nói được đặt ở PHẦN TRÊN và nhỏ lại
         # một chút — không thì chữ đè lên miệng.
-        portrait = '' if width >= height else ', fill: 0.6, centerY: 0.36'
+        portrait = '' if width >= height else ', fill: 0.46, centerY: 0.34'
         camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)}{portrait} }}, "
     seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['_pet'] and who.get('seated')]
     lines = []

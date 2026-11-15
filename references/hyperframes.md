@@ -47,8 +47,11 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   (also on a turn inside `together`), not on the `together` entry itself.
 - **Vertical video:** set `"width": 1080, "height": 1920`. Default character heights and the
   caption size follow the frame; captions sit mid-frame, inside the area that TikTok, Reels and
-  Shorts leave clear, and the camera puts the speaker above them. Keep the characters' `x`
-  within the narrower width. `examples/scene-vertical/scene.json` is a 9:16 sample.
+  Shorts leave clear, the camera puts the speaker above them, and the floor line sits higher
+  (the bottom of a vertical video is covered by the app's controls). **Spacing:** a head is
+  about 0.45 × the character's host height wide, so in a 1080 px frame two default-size people
+  fit at `x` ≈ 300 and 780; for three, give them smaller `height`s (about 600) or put a pet
+  between two people. `examples/scene-vertical/scene.json` is a 9:16 sample.
 - `"mood"` on a turn — `happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
   `confused`, `tired`. With `say`, the whole line is spoken with that face; without it, it is
   an expression beat before the turn's actions.
@@ -202,6 +205,10 @@ VGCharacter.conversation(turns, { camera: ['#wall', '#floor', '#chair', '#granny
 // or { camera: { scene: […], kind: 'chest', duration: 0.6, lead: 0.25, wide: true, fill, centerY } }
 ```
 
+A turn without speech (a dog barks, someone cheers) keeps the current shot when its
+character is already in it, and goes back to the wide shot when it is not — so the action is
+seen.
+
 Override one turn by writing it as `{ turn: [rig, ...steps], shot }`: `shot: 'face'` (another
 size), `shot: [a, b]` (both in frame), `shot: 'wide'`, or `shot: false` (leave the camera
 where it is). `talk.addTo(tl)` adds the camera too; it is also at `talk.camera`.
@@ -250,7 +257,8 @@ the *left* of the person it should look toward, or expect to see its tail first.
 **Pet size next to a person.** Start from 0.45–0.55 × the person's host height (a cat on a
 760 px person reads well at about 400 px) and judge it in the preview.
 
-**Preview before rendering.** From the skill folder:
+**Preview before rendering.** From the skill folder (the picture is saved next to the
+composition as `peek.png`, or `peek-mouth<N>.png` with `--mouth`, unless you name a file):
 
 ```bash
 sh tools/peek.sh /path/to/project/index.html                 # frame 0 + 7 evenly spaced
@@ -371,6 +379,8 @@ npx hyperframes render -o out.mp4 .
   - `film_silent` on a composition that has no audio.
 
   `sh tools/lint-examples.sh --check` (run in CI) fails on anything outside this list.
+  `check` prints a count per section ("0 error(s), 1 warning(s)"); the warning itself is the
+  `⚠` line just above that count.
   - `gsap_tween_tail` on `cuoi`, `batR` / `cangR` (internal names for smile and right arm)
     inside `explain`: two of the library's own gesture tweens meet within a frame. Cosmetic.
 

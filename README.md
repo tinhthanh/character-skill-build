@@ -18,7 +18,8 @@ What a definition can say, beyond face, hair and colours:
   `ponytail`, `curly`, `spiky`…) and body presets (`kit.bodies.child`, `teen`, `tall`, `stocky`).
 - **Things in the hand** — `heldItemL` / `heldItemR` (cup, clipboard, phone, or your own SVG);
   the hand keeps its grip and one-handed gestures switch to the free hand.
-- **Posture** — `stoop` for a bent back, `backHair` for bald heads, one-armed rest poses.
+- **Posture** — `stoop` for a bent back, `torsoWidth` for a stocky build, `backHair` for bald
+  heads, one-armed rest poses.
 
 And what a scene can do with them:
 
@@ -29,6 +30,8 @@ And what a scene can do with them:
 - **Conversations** — `conversation([[rig, ...steps], …], { camera })` chains turns, times them
   and cuts to whoever speaks; `captions(talk, element)` shows the words;
   `examples/conversation/` is a complete two-person scene.
+- **Tone of voice** — a line can be spoken worried, sad, angry, laughing… (`{ mood }` on the
+  speaking step); nine expressions in all, and a whole-body `cheer`.
 - **Voice and camera** — `tools/cues.py voice.wav` turns a voice file into mouth cues for
   `speakCues` (Rhubarb when installed, a built-in spectral method otherwise); `shot(scene, rig,
   'face')` pushes the camera in on one character or frames several. `examples/voiceover/` shows both.
@@ -108,7 +111,8 @@ sh tools/peek.sh examples/scene/clinic-visit/index.html
 A scene file lists the characters (who, where, seated or walking in), the furniture, and the
 script — who says what (optionally with a voice file) and who does what, in order. The tool
 writes a complete HyperFrames composition: turns timed automatically, the camera on whoever
-speaks, captions, lip-sync cues and timed audio clips.
+speaks, captions, lip-sync cues and timed audio clips. Horizontal or vertical (9:16) frames;
+`tools/peek.sh … --mouth` shows a line's lip-sync frame by frame.
 
 ## Requirements
 

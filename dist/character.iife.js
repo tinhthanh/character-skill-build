@@ -1,4 +1,4 @@
-/* VGCharacter v0.14.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.14.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -4868,7 +4868,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.14.0';
+const VERSION = '0.14.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5502,12 +5502,22 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
     const framing = { ...(fill !== undefined ? { fill } : {}), ...(centerY !== undefined ? { centerY } : {}) };
     cameraTimeline = gsap.timeline({ paused: true });
     let aimed = null, lastWords = 0;                              // đang ngắm ai / gì; lời cuối cùng kết thúc lúc nào
+    let inFrame = [];                                             // các nhân vật mà cảnh quay hiện tại đang ôm
     for (const turn of turns) {
       const spoken = turn.steps.filter((step) => SPEECH_STEPS.includes(step.name));
       const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
       // Lượt `shot: false` giữ nguyên máy quay — nhưng lời của nó vẫn tính khi quyết định lúc nào về toàn cảnh.
       if (spoken.length) lastWords = Math.max(lastWords, until);
-      if (turn.shot === false || (!spoken.length && turn.shot === undefined)) continue;
+      // Lượt KHÔNG LỜI (con chó sủa, ai đó reo mừng) mà người diễn đang nằm ngoài cảnh cận hiện tại: lùi
+      // về toàn cảnh cho khán giả thấy. Người diễn đang ở trong khung thì máy quay đứng yên.
+      if (!spoken.length && turn.shot === undefined) {
+        if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
+          cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
+          aimed = 'wide'; inFrame = [];
+        }
+        continue;
+      }
+      if (turn.shot === false) continue;
       // Ghi đè: 'wide' · một cỡ cảnh · { subject, kind } · một mảng rig (đưa tất cả vào khung).
       const choice = turn.shot === undefined ? {} : typeof turn.shot === 'string' ? { kind: turn.shot } : Array.isArray(turn.shot) || (turn.shot && turn.shot.shotBox) ? { subject: turn.shot } : turn.shot;
       const shotKind = choice.kind || kind, subject = choice.subject || turn.rig;
@@ -5515,7 +5525,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       if (key !== aimed) {
         const at = Math.max(0, from - lead);
         cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move, ...framing }).paused(false), at);
-        aimed = key;
+        aimed = key; inFrame = shotKind === 'wide' ? [] : [].concat(subject);
       }
       lastWords = Math.max(lastWords, until);
     }

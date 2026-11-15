@@ -592,6 +592,15 @@ try {
     for (const rig of [a, b]) { const frame = stage.getBoundingClientRect(), head = rig.el.dau.getBoundingClientRect(); if (head.left < frame.left - 2 || head.right > frame.right + 2) hong('camera', `shot: [a, b] does not keep "${rig.publicId}" in frame`); }
     film.time(film.duration()); if (zoom() > 1.01) hong('camera', 'the camera does not return to the wide shot after the last line');
     if (!directed.camera) hong('camera', 'conversation(…, { camera }) does not expose the camera timeline');
+    // Lượt không lời: người diễn nằm NGOÀI cảnh cận thì máy quay lùi về toàn cảnh; đang ở trong khung thì đứng yên.
+    a.reset(); b.reset(); b.state.seat = 1; dog.datNghi();
+    const acted = L.conversation([[a, ['speak', 'mot', 1.2]], [a, 'nod'], [dog, 'bark'], [b, ['speak', 'hai', 1]]], { camera: scene });
+    const reel = gsap.timeline({ paused: true }); acted.addTo(reel, 0);
+    const nodTurn = acted.turns[1], barkTurn = acted.turns[2];
+    reel.time((nodTurn.start + nodTurn.end) / 2); if (zoom() < 1.3) hong('camera', 'the camera leaves the speaker while the same character nods');
+    reel.time(barkTurn.start + 0.5); if (zoom() > 1.01) hong('camera', `a silent turn by a character outside the close-up is not shown (zoom ${zoom().toFixed(2)} during the dog's bark)`);
+    reel.time(acted.turns[3].steps[0].start + 0.6); if (zoom() < 1.3) hong('camera', 'the camera does not return to the next speaker after a silent turn');
+    reel.time(0);
     // `face(người kia)` trong hội thoại phải nhìn về chỗ người kia ĐANG ĐỨNG, không phải chỗ họ xuất phát:
     // con chó bắt đầu bên PHẢI của a rồi chạy sang bên TRÁI — a phải quay trái, chó phải quay phải.
     a.reset(); b.reset(); dog.datNghi();

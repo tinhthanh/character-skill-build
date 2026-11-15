@@ -6,6 +6,8 @@
 #   PEEK_WIDTH=960 PEEK_COLS=2 tools/peek.sh index.html 4,9       → bigger frames (default 480 px wide, 4 per row)
 #   tools/peek.sh index.html "" mouth.png --mouth=2              → LIP-SYNC check: a dense strip of mouth close-ups
 #                                                                   for the 2nd spoken line, with the cue shape per frame
+# Without an image name the picture is saved next to the composition: peek.png, or
+# peek-mouth<N>.png with --mouth.
 # Prints the timing of every step of every character sequence, warns about overruns and
 # overlapping speech, then saves one contact sheet. The composition can live anywhere.
 set -e
@@ -15,9 +17,14 @@ while [ "$count" -gt 0 ]; do
   arg="$1"; shift; count=$((count - 1))
   case "$arg" in --mouth) MOUTH=1 ;; --mouth=*) MOUTH="${arg#--mouth=}" ;; *) set -- "$@" "$arg" ;; esac
 done
-FILE="${1:?usage: tools/peek.sh <index.html> [t1,t2,...] [image.png] [--mouth[=N]]}"; TIMES="${2:-}"; OUT="${3:-peek.png}"
+FILE="${1:?usage: tools/peek.sh <index.html> [t1,t2,...] [image.png] [--mouth[=N]]}"; TIMES="${2:-}"; OUT="${3:-}"
 [ -f "$FILE" ] || { echo "peek: no such file: $FILE" >&2; exit 1; }
 DIR="$(cd "$(dirname "$FILE")" && pwd)"; NAME="$(basename "$FILE")"
+# Không chỉ định tệp ảnh thì ghi CẠNH composition, mỗi kiểu xem một tên — không ghi đè lẫn nhau:
+#   peek.png (toàn cảnh) · peek-mouth<N>.png (dải cận miệng của câu N)
+if [ -z "$OUT" ]; then
+  if [ -n "$MOUTH" ]; then OUT="$DIR/peek-mouth$MOUTH.png"; else OUT="$DIR/peek.png"; fi
+fi
 case "$OUT" in /*) ;; *) OUT="$(pwd)/$OUT" ;; esac
 cd "$(dirname "$0")/.."
 CHROME_BIN="$(sh tools/chrome.sh)"

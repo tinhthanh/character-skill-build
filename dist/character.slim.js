@@ -1,4 +1,4 @@
-/* VGCharacter v0.14.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.14.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3184,7 +3184,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.14.0';
+const VERSION = '0.14.1';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3586,18 +3586,26 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
     const framing = { ...(fill !== undefined ? { fill } : {}), ...(centerY !== undefined ? { centerY } : {}) };
     cameraTimeline = gsap.timeline({ paused: true });
     let aimed = null, lastWords = 0;                              // đang ngắm ai / gì; lời cuối cùng kết thúc lúc nào
+    let inFrame = [];                                             // các nhân vật mà cảnh quay hiện tại đang ôm
     for (const turn of turns) {
       const spoken = turn.steps.filter((step) => SPEECH_STEPS.includes(step.name));
       const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
       if (spoken.length) lastWords = Math.max(lastWords, until);
-      if (turn.shot === false || (!spoken.length && turn.shot === undefined)) continue;
+      if (!spoken.length && turn.shot === undefined) {
+        if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
+          cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
+          aimed = 'wide'; inFrame = [];
+        }
+        continue;
+      }
+      if (turn.shot === false) continue;
       const choice = turn.shot === undefined ? {} : typeof turn.shot === 'string' ? { kind: turn.shot } : Array.isArray(turn.shot) || (turn.shot && turn.shot.shotBox) ? { subject: turn.shot } : turn.shot;
       const shotKind = choice.kind || kind, subject = choice.subject || turn.rig;
       const key = shotKind === 'wide' ? 'wide' : [].concat(subject).map((rig) => rigs.indexOf(rig)).join('+') + ':' + shotKind;
       if (key !== aimed) {
         const at = Math.max(0, from - lead);
         cameraTimeline.add(shot(scene, shotKind === 'wide' ? null : subject, shotKind, { time: Math.min(from + 0.5, until), duration: move, ...framing }).paused(false), at);
-        aimed = key;
+        aimed = key; inFrame = shotKind === 'wide' ? [] : [].concat(subject);
       }
       lastWords = Math.max(lastWords, until);
     }

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.14.1
+
+Changed
+- `SKILL.md` is rewritten around two jobs — make a character, make a scene — with the scene
+  file as the starting point for scenes and a "where things are" table; README and
+  `_template.js` follow. Both code samples in it are run as written.
+
+From a fourth independent agent trial (Sonnet; a vertical clinic scene rendered to MP4):
+
+Fixed
+- Automatic camera: a turn without speech by a character outside the current close-up
+  (a dog barking during someone's close-up) was not shown. The camera now returns to the wide
+  shot for it, and stays put when the character is already in frame.
+- Vertical scenes from `tools/scene.py`: close-ups were as tight as face shots and the wide
+  shot left the characters at the very bottom. Close-ups are looser and the floor sits higher.
+- `tools/peek.sh` always wrote `peek.png` in the current folder, so one preview overwrote the
+  last. Without a file name it now saves next to the composition, as `peek.png` or
+  `peek-mouth<N>.png`.
+- `tools/scene.py --help` prints the scene-file format.
+
+Added
+- Docs: spacing in a vertical frame; how silent turns are framed; where `check` shows the
+  warning it counts.
+
 ## 0.14.0
 
 Added

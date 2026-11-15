@@ -12,6 +12,7 @@ export default {
     ...base,
     // ...kit.outfits.scrubs,    // (optional) take a whole outfit: scrubs | pawTunic | coat | plainCoat | tee | shirt | dress | hoodie | suit
     // ...kit.bodies.child,      // (optional) body proportions: child | teen | adult | tall | stocky
+    // torsoWidth: 1.2,          // (optional) a wider torso, shoulders and arms (1 = default; the head keeps its shape)
     name: 'Display name',
 
     // ── proportions (a line you delete falls back to the base) ──
