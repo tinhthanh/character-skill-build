@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.11.0';
+export const VERSION = '0.12.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -473,7 +473,8 @@ export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'po
  *             (hoặc `metadata.text` do `tools/cues.py --text` ghi vào bộ cue).
  *   element   phần tử hiện chữ — kiểu dáng do composition lo. Nếu có một phần tử con mang
  *             thuộc tính `data-caption-text` thì chữ ghi vào đó (phần còn lại là khung, đuôi bong bóng…).
- *   options   fade (0.15 s hiện / ẩn) · hold (0.3 s giữ chữ sau khi dứt lời) · speaker (false; true
+ *   options   fade (0.15 s hiện / ẩn) · hold (0.3 s giữ chữ sau khi dứt lời) · readable (true: mỗi câu ở lại
+ *             đủ lâu để đọc — 0,5 s + 0,3 s mỗi từ, câu cuối ít nhất 3 s) · speaker (false; true
  *             để thêm "Tên: " phía trước) · follow (false; true = BONG BÓNG: đặt phần tử phía trên
  *             đầu người nói bằng left / top — phần tử phải `position: absolute` trong khung hình
  *             và KHÔNG nằm trong danh sách `scene` của máy quay) · offsetY (khoảng hở trên đầu, px)
@@ -481,7 +482,7 @@ export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'po
  * Trả về một timeline (paused). Chữ và độ mờ là HÀM CỦA THỜI GIAN (một tween, tra bảng) nên tua
  * tới đâu cũng ra đúng một khung hình. `timeline.data.lines` giữ danh sách câu.
  */
-export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12 } = {}) {
+export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -490,6 +491,13 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
   else if (source && source.data && source.data.type === 'character-sequence') lines = fromSteps(source.data.steps, source.data.rig);
   else throw new Error('[character] captions(source, …): source must be a conversation(), a sequence(), or an array of { start, end, text }');
   lines = lines.filter((line) => line && typeof line.text === 'string' && line.end > line.start).sort((a, b) => a.start - b.start);
+  // ĐỦ GIỜ ĐỂ ĐỌC: một câu ở lại ít nhất 0,5 s + 0,3 s mỗi từ (câu cuối của phim: ít nhất 3 s), kể cả
+  // khi tiếng nói ngắn hơn thế — nhưng không lấn sang câu kế tiếp.
+  if (readable) lines.forEach((line, index) => {
+    const words = line.text.trim().split(/\s+/).length, next = lines[index + 1];
+    const wanted = line.start + Math.max(0.5 + 0.3 * words, next ? 0 : 3);
+    line.end = Math.max(line.end, next ? Math.min(wanted, next.start - 2 * fade - hold) : wanted);
+  });
   if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
   const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;
   const slot = element.querySelector('[data-caption-text]') || element;

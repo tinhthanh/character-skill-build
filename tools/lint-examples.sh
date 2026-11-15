@@ -48,4 +48,21 @@ PY
     if [ -n "$bad" ]; then echo "  ✗ $name  check:"; echo "$bad" | sed 's/^/    /'; failed=1; else echo "  ✓ $name  check (no errors, no unexpected warnings)"; fi
   fi
 done
+# Kịch bản mẫu (examples/*/scene.json): dựng ra composition bằng tools/scene.py rồi soát như các ví dụ khác.
+for scene in examples/*/scene.json; do
+  [ -f "$scene" ] || continue
+  name="$(basename "$(dirname "$scene")")-generated"
+  if ! python3 tools/scene.py "$scene" -o "$WORK/$name" > "$WORK/$name.build" 2>&1; then echo "  ✗ $name  scene.py failed:"; sed 's/^/      /' "$WORK/$name.build" | tail -6; failed=1; continue; fi
+  if (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" lint > "$WORK/$name.log" 2>&1) && grep -q "0 errors" "$WORK/$name.log"; then
+    echo "  ✓ $name  $(grep -E '[0-9]+ errors?' "$WORK/$name.log" | tail -1 | sed 's/^[^0-9]*//')"
+  else
+    echo "  ✗ $name"; sed 's/^/      /' "$WORK/$name.log" | tail -15; failed=1
+  fi
+  if [ "$CHECK" = 1 ]; then
+    (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" check > "$WORK/$name.check" 2>&1) || true
+    grep -q "^Runtime" "$WORK/$name.check" || { echo "  ✗ $name  check did not run:"; sed 's/^/      /' "$WORK/$name.check" | tail -8; failed=1; continue; }
+    bad="$(grep -E '^[[:space:]]+(✗|⚠)' "$WORK/$name.check" | grep -vE "$(echo "$KNOWN" | tr ' ' '|')" || true)"
+    if [ -n "$bad" ]; then echo "  ✗ $name  check:"; echo "$bad" | cut -c1-240 | sed 's/^/    /'; failed=1; else echo "  ✓ $name  check (no errors, no unexpected warnings)"; fi
+  fi
+done
 [ "$failed" = 0 ] && echo "PASS" || { echo "FAIL"; exit 1; }

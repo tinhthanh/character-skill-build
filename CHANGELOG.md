@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.12.0
+
+Added
+- `tools/scene.py scene.json`: a complete HyperFrames composition from a short scene
+  description — characters and where they stand, furniture, and a script of who says or does
+  what. It writes hosts and clips, a `conversation()` with the automatic camera and captions,
+  mouth cues for every voice file, and `<audio>` clips timed by loading the result once in
+  headless Chrome. `examples/scene/scene.json` is a sample; `tools/check.sh` runs its
+  self-test and `tools/lint-examples.sh` builds, lints and checks the sample.
+- `captions(…, { readable })`: each line stays long enough to read (0.5 s + 0.3 s per word, the
+  film's last line at least 3 s) even when the speech is shorter. On by default.
+- `tools/chrome_run.py --wait-js` / `--eval`.
+
+Changed
+- Docs: "22 actions" now reads "22 actions and 5 stance actions".
+
 ## 0.11.0
 
 Added

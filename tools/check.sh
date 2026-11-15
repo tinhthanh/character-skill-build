@@ -6,6 +6,8 @@ cd "$(dirname "$0")/.."
 python3 tools/build.py >/dev/null
 # Công cụ tạo cue nhép miệng (Python thuần) có bài tự kiểm riêng.
 python3 tools/check_cues.py
+# Công cụ dựng cảnh từ kịch bản: dựng kịch bản mẫu, và kịch bản sai phải bị từ chối.
+python3 tools/check_scene.py
 CHROME_BIN="$(sh tools/chrome.sh)"
 PORT="${PORT:-8391}"
 python3 tools/serve.py "$PORT" >/dev/null 2>&1 &

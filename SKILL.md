@@ -8,7 +8,8 @@ description: Create custom 2D SVG characters (people, plus dogs and cats) on a s
 A library of **100% SVG characters driven by GSAP**, a studio to tune them, and a
 single-file build that drops into a [HyperFrames](https://github.com/heygen-com/hyperframes)
 composition. A character is a small JS definition on top of a shared skeleton, so a new
-character gets all 22 actions (wave, talk, walk, sit, react…) for free.
+character gets all 22 actions (wave, talk, walk, sit, react…) and 5 stance actions (sit down,
+stand up, face someone, put an item away, take it out) for free.
 
 Everything you write and read while using the skill is English: definitions, configs, API
 calls, error messages and tool output. Two things are not, and you should not need either:
@@ -96,6 +97,12 @@ export default {
 ```
 
 ## Use a character in HyperFrames
+
+**Fastest path — a scene file.** Describe who is in the scene and who says or does what, and
+`python3 tools/scene.py scene.json` writes the whole composition: hosts, furniture, turns
+timed by `conversation()`, the camera on whoever speaks, captions, mouth cues and timed
+`<audio>` clips for every voice file. See `references/hyperframes.md` → The short way, and
+`examples/scene/scene.json`. Write the composition by hand (below) when you need more.
 
 Full rules, staging recipes and a runnable example:
 [references/hyperframes.md](references/hyperframes.md), `examples/hyperframes/index.html` and, for two characters talking,
@@ -194,10 +201,10 @@ studio/               visual editor (Vietnamese UI)
 tools/                serve.py · build.py · check.sh (all characters) · shot.sh (pose sheet) ·
                       describe.sh (a character's current values) · peek.sh (composition preview) · gallery.sh (all characters in one picture) ·
                       lint-examples.sh (hyperframes lint, and with --check also hyperframes check, on the examples; needs Node) ·
-                      cues.py (mouth cues from a voice file) · chrome_run.py (headless Chrome
+                      scene.py (a whole composition from a scene file) · cues.py (mouth cues from a voice file) · chrome_run.py (headless Chrome
                       runner the other tools use; waits for the page to finish)
 examples/            hyperframes/ (a vet and a dog) · conversation/ (two people talking, one seated) ·
-                      voiceover/ (lip-sync to an audio file, camera shots)
+                      voiceover/ (lip-sync to an audio file, camera shots) · scene/ (a scene file for tools/scene.py)
 references/           slots.md · actions.md · hyperframes.md
 ```
 

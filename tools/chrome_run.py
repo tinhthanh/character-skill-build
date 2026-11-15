@@ -82,6 +82,8 @@ def main():
     parser.add_argument('url')
     parser.add_argument('--chrome', default=os.environ.get('CHROME_BIN'))
     parser.add_argument('--wait', default='DONE,ERROR', help='document.title values that mean "finished"')
+    parser.add_argument('--wait-js', help='instead of --wait: a JavaScript expression that becomes truthy when the page is finished')
+    parser.add_argument('--eval', dest='evaluate', help='JavaScript evaluated once the page is finished; its value is printed as JSON')
     parser.add_argument('--timeout', type=float, default=120, help='seconds to wait for a --wait title')
     parser.add_argument('--dump', help='write the final DOM here ("-" for stdout)')
     parser.add_argument('--screenshot', help='write a PNG here')
@@ -117,10 +119,15 @@ def main():
             call('Page.navigate', {'url': args.url})
             title, deadline = '', time.time() + args.timeout
             while time.time() < deadline:
-                title = evaluate('document.title') or ''
-                if title in finished: break
+                if args.wait_js:
+                    if evaluate(f'!!({args.wait_js})'): title = 'ready'; break
+                else:
+                    title = evaluate('document.title') or ''
+                    if title in finished: break
                 time.sleep(0.05)
-            ok = title in finished
+            ok = title == 'ready' if args.wait_js else title in finished
+            if args.evaluate and ok:
+                print(json.dumps(evaluate(args.evaluate)))
             # Lỗi của trang: ngoại lệ không ai bắt và console.error.
             errors = []
             for event in tools.events:

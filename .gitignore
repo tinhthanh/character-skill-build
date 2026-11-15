@@ -3,3 +3,4 @@ __pycache__/
 *.png
 !docs/*.png
 node_modules/
+examples/scene/clinic-visit/

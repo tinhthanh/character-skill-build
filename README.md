@@ -98,6 +98,18 @@ export default {
 </script>
 ```
 
+## A scene from a script
+
+```bash
+python3 tools/scene.py examples/scene/scene.json     # → examples/scene/clinic-visit/index.html
+sh tools/peek.sh examples/scene/clinic-visit/index.html
+```
+
+A scene file lists the characters (who, where, seated or walking in), the furniture, and the
+script — who says what (optionally with a voice file) and who does what, in order. The tool
+writes a complete HyperFrames composition: turns timed automatically, the camera on whoever
+speaks, captions, lip-sync cues and timed audio clips.
+
 ## Requirements
 
 Python 3 for the tools. Chrome or Chromium for `check.sh` / `shot.sh` / `peek.sh`. GSAP 3 is
@@ -123,7 +135,7 @@ itself) uses Node.
 
 Skill hướng dẫn AI agent **tạo nhân vật 2D tuỳ chỉnh** (SVG thuần, GSAP điều khiển) và
 **dùng lại nhân vật trong video HyperFrames**. Mỗi nhân vật là một tệp định nghĩa nhỏ trong
-`characters/`, thừa hưởng bộ xương và 22 động tác có sẵn. Kèm chó, mèo (năm giống) với bộ
+`characters/`, thừa hưởng bộ xương, 22 động tác và 5 động tác thế đứng có sẵn. Kèm chó, mèo (năm giống) với bộ
 động tác riêng và hình dáng chỉnh được.
 
 Nhân vật mặc được váy / tạp dề, cầm đồ vật (cốc, bìa hồ sơ, điện thoại), có dáng còng; trong

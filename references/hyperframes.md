@@ -5,6 +5,52 @@ video by seeking a paused GSAP timeline frame by frame in headless Chrome. The c
 library is built to that contract. A complete composition is in
 `examples/hyperframes/index.html`.
 
+## The short way: a scene file
+
+For a scene of characters who talk and act in turn, describe it and let the tool write the
+composition:
+
+```bash
+python3 tools/scene.py scene.json          # → <id>/index.html next to the scene file, ready for peek / lint / render
+```
+
+```json
+{
+  "id": "clinic-visit",
+  "characters": [
+    { "name": "vet",   "id": "vet",  "x": 640,  "height": 760, "enter": "left", "faces": "boy" },
+    { "name": "boy",   "id": "boy",  "x": 1380, "height": 570, "seated": "chair", "faces": "vet" },
+    { "name": "bella", "species": "dog", "x": 1050, "height": 320, "faces": "vet" }
+  ],
+  "props": [ { "kind": "counter", "x": 250, "color": "#5f7d8c" } ],
+  "script": [
+    { "who": "vet", "say": "Good morning! Bella is due for her check-up today.", "audio": "line1.wav" },
+    { "who": "boy", "say": "Thank you, doctor.", "dur": 2.2 },
+    { "who": "vet", "say": "Then let's get started.", "shot": ["vet", "bella"] },
+    { "together": [ { "who": "vet", "do": [["face", "front"], "wave"] }, { "who": "bella", "do": ["bark"] } ] }
+  ]
+}
+```
+
+- `characters` — `id` is a registered person, `species` a pet. `x` is where the character
+  **stands** (its centre, px from the left); `height` the host height in px. `enter:
+  "left" | "right"` walks it in from outside the frame to `x`; `seated: true | "chair" |
+  "stool"` starts it seated (and draws the seat); `faces` names who it looks at.
+- `script` — turns, in order. `say` speaks: with `audio` it lip-syncs to the file (cues are
+  made for you, the `<audio>` clip is added and timed), without it the mouth is estimated
+  over `dur` seconds. `do` is a list of `sequence()` steps; `"@name"` inside a step refers to
+  another character (`["face", "@boy"]`). `shot` overrides the camera for one turn
+  (`"face"`, `"wide"`, `false`, or a list of names to frame together). `{ "together": […] }`
+  runs turns at the same time.
+- Also: `props` (`kind`, `x`, `color`, `height`), `background` (`wall`, `wallDark`, `floor`,
+  `floorHeight`), `camera` (`true` / `{ "kind": "face" }` / `false`), `captions`, `seed`,
+  `width`, `height`, `gap`.
+
+The result is plain, commented HTML using the same API as the rest of this page — edit it by
+hand for anything the scene file cannot say (your own background art, extra clips, effects),
+or change the scene file and run the tool again. `examples/scene/scene.json` is a complete
+scene file. The tool needs Chrome (it loads the result once to time the audio).
+
 ## Setup in a HyperFrames project
 
 1. Copy `dist/character.slim.js` into the project (next to `index.html`, or under `assets/`).
