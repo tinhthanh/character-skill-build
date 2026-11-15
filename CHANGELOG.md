@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+Fixed
+- `tools/check.sh`, `shot.sh`, `describe.sh` and `peek.sh` exited with status 143 even on
+  success: the cleanup added in 0.4.0 let the stopped dev server's status become the script's
+  own. Exit codes are now 0 on success and 1 on failure, under `sh`, `bash` and `dash`. (This
+  is what the first CI run caught.)
+
 ## 0.4.0
 
 Fixed
