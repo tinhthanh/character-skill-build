@@ -1,4 +1,4 @@
-/* VGCharacter v0.18.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.19.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1929,14 +1929,21 @@ class RigSVG {
     const side = this.#freeHand(hand), m = side === 'L' ? -1 : 1;                 // m lật các nghiêng thân / đầu
     const handK = 'tay' + side, upperK = 'bat' + side, foreK = 'cang' + side;
     t.set(s, { [handK]: 'mo' }, 0);
-    t.to(s, { [upperK]: -4, [foreK]: 22, duration: 0.12, ease: 'power1.in' }, 0);      // lấy đà
-    t.to(s, { [upperK]: 148, [foreK]: 18, vai: -3, than: -3 * m, dau: -6 * m, nhinX: 1.5 * m,
-              cuoi: 1, mieng: 0.15, mayL: 0.5, mayR: 0.5,
-              duration: 0.45, ease: 'back.out(1.4)' }, 0.12);
-    for (let i = 0; i < 4; i++) {                                                // vẫy 4 nhịp
-      t.to(s, { [foreK]: i % 2 ? 6 : 46, dau: (i % 2 ? -6 : -9) * m, duration: 0.22, ease: 'sine.inOut' }, 0.57 + i * 0.22);
-    }
-    t.to(s, { [foreK]: 18, duration: 0.2, ease: 'sine.inOut' }, 1.45);
+    // Lấy đà NGAY TẠI tư thế nghỉ (nhích vài độ), không phải ở một dáng cố định: từ dáng đan tay mà bật về dáng
+    // ấy trong 0,12 s là cẳng tay quất gần 1.800°/giây.
+    t.to(s, { [upperK]: this.NGHI[upperK] - 4, [foreK]: this.NGHI[foreK] - 6, duration: 0.12, ease: 'sine.in' }, 0);
+    // Giơ tay: nhanh rồi chậm dần, không nảy quá đà; cẳng tay tới sau bắp tay một nhịp.
+    // Bắp tay giơ 128°, không giơ thẳng đứng: nhân vật đầu to tay ngắn (trẻ em) giơ thẳng thì bàn tay khuất sau đầu.
+    t.to(s, { [upperK]: 128, vai: -3, than: -3 * m, dau: -6 * m, nhinX: 1.5 * m, cuoi: 1, mieng: 0.15, mayL: 0.5, mayR: 0.5,
+              duration: 0.5, ease: 'power2.out' }, 0.12);
+    t.to(s, { [foreK]: 22, duration: 0.5, ease: 'power2.out' }, 0.16);
+    // Vẫy bốn nhịp, BIÊN ĐỘ NHỎ DẦN quanh một điểm giữa; bắp tay đung đưa ngược một chút, đi sau cẳng tay —
+    // vẫy đều tăm tắp giữa hai góc cố định thì giống cần gạt nước.
+    const swings = [44, 8, 38, 14];
+    swings.forEach((angle, i) => {
+      t.to(s, { [foreK]: angle, dau: (i % 2 ? -6 : -8.5) * m, duration: 0.25, ease: 'sine.inOut' }, 0.66 + i * 0.25);
+      t.to(s, { [upperK]: 128 + (i % 2 ? 3 : -3), duration: 0.25, ease: 'sine.inOut' }, 0.7 + i * 0.25);
+    });
     this.#chop(t, 0.95);
     this.#khep(t, 0.55, 1.7);
     return t;
@@ -2423,9 +2430,9 @@ class RigSVG {
    * Và THÂN DẪN TRƯỚC TAY 0.10s: người thật khởi động từ thân rồi mới tới chi.
    * Thiếu độ trễ đó thì tay như que gắn vào khối gỗ.
    */
-  #cuChi(t, moc, D) {
+  #cuChi(t, moc, D, beats = []) {
     const s = this.s, N = this.NGHI;
-    if (!moc.length) return t;
+    if (!moc.length && !beats.length) return t;
     // NỀN là TƯ THẾ NGHỈ CỦA CHÍNH NHÂN VẬT (đan tay, buông tay, một tay cầm đồ…), không phải một dáng "hai tay
     // trước bụng" chung cho mọi người. Bản trước đặt thẳng dáng chung ấy ở khung đầu của câu nói — tay GIẬT trong
     // đúng một khung hình — và ai nói cũng ra cùng một dáng. Cử chỉ nào cũng đi từ nền này và về lại nền này.
@@ -2452,6 +2459,17 @@ class RigSVG {
     // hai cử chỉ gối lên nhau là hai tween cùng giành một khớp, và cánh tay nhảy cóc giữa chừng.
     const anchors = [];
     for (const a of moc) if (!anchors.length || a - anchors[anchors.length - 1] >= 2.1) anchors.push(a);
+    // NHỊP NHỎ theo trọng âm (`beats`): một cái nhấn tay vài độ rồi về, đúng lúc người nói nhấn giọng. Nhịp chỉ
+    // được đặt vào chỗ khớp tay đang RẢNH — trong lúc giữ một dáng, hoặc lúc tay nằm ở nền giữa hai cử chỉ — để
+    // không tween nào giành khớp với tween nào.
+    const pulse = (arm, around, at, size) => {
+      const dip = (Math.abs(around) < 12 ? 1 : -Math.sign(around)) * size;
+      t.to(s, { [key(arm, 1)]: around + dip, duration: 0.12, ease: 'power2.out' }, at)
+       .to(s, { [key(arm, 1)]: around, duration: 0.22, ease: 'sine.inOut' }, at + 0.12);
+    };
+    const spaced = [];
+    for (const b of beats) if (!spaced.length || b - spaced[spaced.length - 1] >= 0.45) spaced.push(b);
+    const occupied = [];                                              // các quãng một cử chỉ lớn đang chiếm tay
     let last = -1;
     anchors.forEach((a, i) => {
       let pick = last; while (pick === last && POSES.length > 1) pick = Math.floor(ngau() * POSES.length);
@@ -2464,6 +2482,8 @@ class RigSVG {
       const hold = clamp((next - a) - 0.16 - longest - 0.85, 0.25, 1.5);
       const stroke = a + 0.16, release = stroke + longest + hold;
       if (release + 0.8 > next) return;                   // không đủ chỗ cho cả bốn pha thì bỏ nhịp này
+      occupied.push([a - 0.06, release + 0.9]);
+      const inHold = spaced.filter((b) => b >= stroke + longest + 0.12 && b + 0.36 <= release - 0.05);
 
       const arms = [[lead, pose.lead]];
       if (other && pose.other) arms.push([other, pose.other]);
@@ -2484,7 +2504,9 @@ class RigSVG {
          .to(s, { [key(arm, 1)]: fore + jitterF, duration: reach + 0.06, ease: 'power2.out' }, stroke + lag + 0.03);       // cẳng tay tới sau bắp tay
         // 3. GIỮ mà vẫn SỐNG: cẳng tay trôi vài độ, bắp tay thở theo — tay người không bao giờ đứng im tuyệt đối.
         const drift = release - (stroke + lag + reach + 0.1) - 0.05;
-        if (drift > 0.3) {
+        if (inHold.length) {
+          for (const b of inHold) pulse(arm, fore + jitterF, b + lag * 0.5, nhieu(6, 9) * (n ? 0.6 : 1));
+        } else if (drift > 0.3) {
           t.to(s, { [key(arm, 1)]: fore + jitterF + nhieu(4, 8) * (ngau() < 0.5 ? -1 : 1), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.1);
           t.to(s, { [key(arm, 0)]: upper + jitterU + nhieu(1.5, 3), duration: drift / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + lag + reach + 0.04);
         }
@@ -2499,6 +2521,13 @@ class RigSVG {
         t.to(s, { [key(other, 1)]: fore0 + nhieu(3, 7), [key(other, 0)]: upper0 + nhieu(1, 3), duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, stroke + 0.1);
       }
     });
+    // Nhịp rơi vào lúc tay đang ở NỀN: nhấn nhẹ cả tay chủ đạo lẫn tay phụ, kèm một cái gật rất nhỏ.
+    for (const b of spaced) {
+      if (b < 0.25 || b + 0.36 > D - 0.1 || occupied.some(([from, to]) => b + 0.36 > from && b < to)) continue;
+      pulse(lead, N[key(lead, 1)], b, nhieu(4, 7));
+      if (other) pulse(other, N[key(other, 1)], b + 0.03, nhieu(2, 4));
+      t.to(s, { dauY: N.dauY + nhieu(1, 1.8), duration: 0.12, ease: 'power2.out' }, b).to(s, { dauY: N.dauY, duration: 0.24, ease: 'sine.inOut' }, b + 0.12);
+    }
     return t;
   }
 
@@ -2544,7 +2573,10 @@ class RigSVG {
     // Bỏ nhịp nào rơi vào 0.5s cuối: đang vung dở thì bị `#khep` giật về nghỉ.
     const BUOC = 5, moc = [];
     for (let i = 1; i < soAm && i * nhip <= dur - 0.5; i += BUOC) moc.push(i * nhip);
-    this.#cuChi(t, moc, dur);
+    // Không có tiếng thật: nhịp nhấn ước theo âm tiết — cứ ba âm tiết một lần nhấn.
+    const stress = [];
+    for (let i = 1; i < soAm; i += 3) stress.push(i * nhip);
+    this.#cuChi(t, moc, dur, stress);
 
     if (dur > 1.2) this.#chop(t, dur * nhieu(0.4, 0.65));
     this.blinkTo = 0;
@@ -2666,7 +2698,10 @@ class RigSVG {
     // cứng vì hai cánh tay treo trong nhóm `tren`/`sau`, mà nhóm đó nhấc lên
     // hạ xuống theo hơi thở (`nhacY`) — nên tay nhô theo nhịp thở, chỉ là
     // không có cử chỉ nào.
-    if (cuChi) this.#cuChi(t, moc, D);
+    // TRỌNG ÂM lấy từ chính bộ cue: chỗ miệng mở to nhất (D), và âm tiết đầu tiên sau một quãng ngắt.
+    const stress = [];
+    ds.forEach((c, i) => { if (c.value === 'D' || (i && ds[i - 1].value === 'X' && c.value !== 'X' && c.value !== 'A')) stress.push(c.start); });
+    if (cuChi) this.#cuChi(t, moc, D, stress);
 
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
     this.blinkTo = 0;
@@ -4907,7 +4942,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.18.0';
+const VERSION = '0.19.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

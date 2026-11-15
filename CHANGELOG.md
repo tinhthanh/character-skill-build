@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.19.0
+
+Added
+- **Stress beats.** While speaking, the free arm gives a small beat on stressed syllables —
+  from the cues with audio (the widest mouth shapes and the first syllable after a pause),
+  every third syllable with `explain` — on top of the big gestures at phrase breaks. Beats
+  only land where the arm is free (during a hold, or at rest between gestures).
+
+Changed
+- `wave` is softer: it starts from the character's rest pose (from clasped hands the old
+  wind-up whipped the forearm at about 1,800°/s), raises without overshoot, swings with a
+  shrinking amplitude while the upper arm sways behind the forearm, and raises the arm to
+  128° so a short-armed character's hand is not hidden behind its head. Same length (2.25 s).
+
 ## 0.18.0
 
 Arm gestures while speaking (`speakCues`, `explain`) were rebuilt after an audit of the film.
