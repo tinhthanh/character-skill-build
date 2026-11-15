@@ -26,15 +26,15 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `explain` | `(text, dur = 2.4, { mood })` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
 | `speakCues` | `(cues, dur, { cuChi, mood })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
 | `worry` | — | brows up, hands fidget | 2.1 |
-| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired` | `hold` + 0.7 |
+| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired`. The body joins in: a hop when `happy`, arms flung out when `surprised`, a hand raised to the chest when `thinking`, fists when `angry`, a sigh when `tired` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
-| `sit` | `(hold = 2)` | sit down as on an unseen chair, hands on the lap, stand up again | `hold` + 0.95 |
+| `sit` | `(hold = 2)` | sit down as on an unseen chair (knees apart, shins upright), hands on the lap, stand up again — put a `createProp('chair')` behind it, a seat with nothing under it still reads oddly | `hold` + 0.95 |
 | `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |
 | `standUp` | — | stand up from `sitDown` | 0.55 |
 | `face` | `(target = 'right', amount = 0.55)` | turn toward `'left'` / `'right'` and **stay turned**; `'front'` turns back. `target` may also be a DOM element or another rig — the character turns to whichever side it is on | 0.45 |
 | `hideItem` `showItem` | `(side = 'R')` | put away / take out the held item of hand `'L'`, `'R'` or `'both'`; it stays that way | 0.25 |
-| `march` | `(steps = 6)` | march on the spot, arms swinging | 2.7 |
-| `stroll` | `(steps = 6)` | relaxed steps on the spot | 3.2 |
+| `march` | `(steps = 6)` | march on the spot, fists pumping in front of the chest | 2.7 |
+| `stroll` | `(steps = 6)` | slow, low steps on the spot, arms swaying loosely | 3.65 |
 | `stepInPlace` | `(steps = 6)` | steps on the spot, arms still | 2.9 |
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |

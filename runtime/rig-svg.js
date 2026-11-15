@@ -1193,11 +1193,15 @@ export class RigSVG {
     // ống chân vẫn dài nguyên. Nhóm chân co theo chiều dọc để rút đùi; ống chân là con của nhóm
     // ấy nên nhận phép co NGƯỢC lại cho khỏi ngắn theo. (Khác `nhac`, vốn rút cả chân — dùng cho
     // dậm chân, chỗ đó cả chân nhấc về phía trước.)
-    const thighSeen = 1 - clamp(s.seat, 0, 1) * 0.72, shinFix = ` scale(1 ${(1 / thighSeen).toFixed(4)})`;
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})${shinFix}`);
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})${shinFix}`);
+    // Ngồi thì hai đùi XOÈ ra, ống chân vẫn thẳng đứng: có một chỗ GẬP ở đầu gối để mắt đọc ra dáng ngồi. Chỉ rút
+    // ngắn đùi theo chiều dọc thì chân vẫn là một đường thẳng — nhìn như nhân vật lùn đi chứ không phải ngồi xuống.
+    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah);
+    // Đùi xoè thì dài thêm 1/cos để đầu gối vẫn ở đúng độ cao cũ — bàn chân không rời mặt đất.
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD), shinFix = ` scale(1 ${(1 / thighSeen).toFixed(4)})`;
+    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
 
     // ── VÁY / TẠP DỀ: một tứ giác từ eo xuống gấu, hai góc gấu BÁM theo hai đùi.
     if (e.skirt) {
@@ -1207,10 +1211,10 @@ export class RigSVG {
       // hệ toạ độ nhóm chân. Quá gối thì đi tiếp theo hướng ống chân.
       const along = (side, offset) => {
         const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
-        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * s['nhac' + side] * 6) * RAD;
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
-        const b = a + s['ong' + side] * RAD;
+        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay) * RAD;
         return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
       };
       const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
@@ -1898,6 +1902,7 @@ export class RigSVG {
    * người đối diện — rồi `#khep` đưa về đúng hướng đang giữ.
    */
   static GESTURE_TURN = 0.2;
+  static SEAT_SPLAY = 22;               // độ xoè của mỗi đùi khi ngồi (nhìn từ trước)
   #openUp(t) {
     const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
     if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
@@ -2095,7 +2100,7 @@ export class RigSVG {
   }
 
   // Một nhịp dậm chân nhìn từ phía trước: gối `ben` nhấc lên rồi đặt xuống, tay vung ngược.
-  #dam(t, at, h, ben, tay = 1, goiCao = 1) {
+  #dam(t, at, h, ben, tay = 1, goiCao = 1, arms = null) {
     const s = this.s, L = ben === 'L';
     const goi = L ? 'nhacL' : 'nhacR';
     t.to(s, { [goi]: goiCao, y: -5 * goiCao, than: (L ? 2 : -2) * goiCao, dauY: -1, duration: h * 0.5, ease: 'power2.out' }, at);
@@ -2103,6 +2108,13 @@ export class RigSVG {
     // Tay đối diện ra trước, tay cùng bên ra sau — đổi chiều mượt suốt cả nhịp, hơi trễ so với chân.
     t.to(s, { vungL: (L ? -1 : 1) * tay, vungR: (L ? 1 : -1) * tay, vai: -tay,
               duration: h * 0.9, ease: 'sine.inOut' }, at + h * 0.1);
+    // `vung` chỉ thấy khi quay nghiêng. NHÌN THẲNG thì tay đánh là cẳng tay gập lên trước ngực (tay đối diện với
+    // chân đang nhấc) rồi duỗi xuống — thiếu phần này thì march, stroll và stepInPlace trông y hệt nhau.
+    if (arms) for (const side of ['L', 'R']) {
+      if (this.holds[side] && s['item' + side] > 0.5) continue;                // tay cầm đồ đứng yên
+      const [upper, fore] = side === ben ? arms.back : arms.front;
+      t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, duration: h * 0.9, ease: 'sine.inOut' }, at + h * 0.1);
+    }
     return at + h;
   }
 
@@ -2112,17 +2124,18 @@ export class RigSVG {
     let at = 0;
     t.set(this.s, { tayL: 'nam', tayR: 'nam' }, 0);
     t.to(this.s, { cuoi: 0.6, mayL: 0.3, mayR: 0.3, duration: 0.2 }, 0);
-    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L');
+    // Đều bước: nắm tay, cẳng tay đánh cao trước ngực.
+    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 1, 1, { front: [22, -78], back: [5, -10] });
     this.#khep(t, 0.4, at);
     return t;
   }
 
   // Bước tại chỗ thong thả: gối nhấc vừa, tay chỉ đung đưa nhẹ theo quán tính.
   stroll(buoc = 6) {
-    const t = this.tl(), h = 0.46;
+    const t = this.tl(), h = 0.54;
     let at = 0;
     t.to(this.s, { cuoi: 0.45, duration: 0.25 }, 0);
-    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 0.3, 0.75);
+    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 0.3, 0.5, { front: [15, -20], back: [7, -4] });      // tay buông, đung đưa nhẹ; gối nhấc thấp, nhịp chậm
     this.#khep(t, 0.4, at);
     return t;
   }
@@ -2184,9 +2197,30 @@ export class RigSVG {
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
     if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
-    const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
+    const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32, N = this.NGHI;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
-    if (name === 'laughing') t.to(s, { dauY: face.dauY + 3.5, vai: face.vai + 2, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
+    // THÂN NGƯỜI cùng diễn: chỉ đổi nét mặt trên một thân đứng im thì nhìn như dán mặt nạ lên tượng.
+    const standing = s.seat < 0.5, free = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    const arm = (side, upper, fore, at, d, ease = 'power2.out') => t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, duration: d, ease }, at);
+    if (name === 'happy') {                                   // nhún người một cái, vai nhấc
+      if (standing) t.to(s, { y: -7, duration: 0.16, ease: 'power2.out' }, 0.05).to(s, { y: 0, duration: 0.22, ease: 'power2.in' }, 0.21);
+      t.to(s, { vai: -4, duration: 0.2, ease: 'power2.out' }, 0.05).to(s, { vai: -1, duration: 0.4, ease: 'sine.inOut' }, 0.3);
+    } else if (name === 'surprised') {                        // giật mình: người bật lên, hai tay bung ra
+      if (standing) t.to(s, { y: -5, duration: 0.12, ease: 'power2.out' }, 0).to(s, { y: 0, duration: 0.25, ease: 'power2.inOut' }, 0.12);
+      for (const side of free) { t.set(s, { ['tay' + side]: 'mo' }, 0); arm(side, 26, 30, 0, into + 0.06, 'back.out(1.8)'); }
+    } else if (name === 'thinking' && free.length) {          // đưa tay lên cằm
+      const side = this.#freeHand();
+      if (free.includes(side)) { t.set(s, { ['tay' + side]: 'mo' }, 0.05); arm(side, 34, -146, 0.05, 0.45, 'power2.inOut'); }
+    } else if (name === 'angry') {                            // nắm tay, tay gồng xuống
+      for (const side of free) { t.set(s, { ['tay' + side]: 'nam' }, 0.1); arm(side, 16, -8, 0, 0.3); }
+      t.to(s, { vai: -3, duration: 0.3, ease: 'power2.out' }, 0);
+    } else if (name === 'tired') {                            // thở dài: phồng ngực rồi xệ vai
+      t.to(s, { tho: 1, duration: 0.45, ease: 'sine.inOut' }, 0).to(s, { tho: 0, vai: face.vai + 2, dauY: face.dauY + 2, duration: 0.6, ease: 'sine.inOut' }, 0.45);
+      for (const side of free) arm(side, N['bat' + side] - 3, Math.abs(N['cang' + side]) > 40 ? N['cang' + side] : -6, 0.4, 0.6, 'sine.inOut');
+    } else if (name === 'sad') {
+      t.to(s, { than: N.than + 1.5, duration: 0.5, ease: 'sine.inOut' }, 0);
+    }
+    if (name === 'laughing') t.to(s, { dauY: face.dauY + 4.5, vai: face.vai + 3.5, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
     else if (name !== 'surprised' && hold > 0.8) { this.blinkTo = face.matY || 0; this.#chop(t, into + hold * 0.5); this.blinkTo = 0; }      // ngạc nhiên thì không chớp mắt
     this.#khep(t, 0.4, into + hold);
     return t;
@@ -2307,6 +2341,11 @@ export class RigSVG {
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
+    // HIỆN suốt quãng đi. `set` ở trên không đủ: `sequence()` đặt sẵn trạng thái đầu của động tác vào rig trước khi
+    // dựng nó, nên GSAP thấy `mo` đã là 1, không ghi gì — nhân vật vừa `exit` (mo 0) bước vào trong vô hình rồi hiện
+    // phụt ra ở giữa khung. Ghi qua setter thì khung nào cũng ghi.
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };    // hiện dần trong 0,2 s đầu: khung rộng thì điểm xuất phát vẫn nằm trong hình
+    t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
   }

@@ -392,6 +392,41 @@ try {
       if (!(swing < other * 0.25)) hong('walk', `the arm holding an item swings (${swing.toFixed(2)} against ${other.toFixed(2)} for the free arm)`);
       line.kill(); actor.svg.remove();
     }
+    // Vừa `exit` xong mà `enter` lại: phải THẤY nhân vật suốt quãng đi vào (từng đi vào trong vô hình rồi hiện phụt ra ở giữa).
+    for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'cat' }).rig]) {
+      const actor = make(), line = L.sequence(actor, ['exit', 'enter']), back = line.data.steps[1];
+      line.time(back.start + back.duration * 0.4);
+      if (actor.s.mo < 0.99) hong('enter', `${actor.id || 'pet'}: still invisible (opacity ${actor.s.mo.toFixed(2)}) 40% into walking back in`);
+      if (Math.abs(actor.s.x) < 60) hong('enter', 'already at centre 40% into the walk');
+      line.kill(); actor.svg.remove();
+    }
+    // Ba kiểu bước tại chỗ phải KHÁC nhau khi nhìn thẳng: march đánh cẳng tay cao, stroll đung đưa nhẹ và chậm hơn, stepInPlace không đánh tay.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig, swing = {}, length = {};
+      for (const name of ['march', 'stroll', 'stepInPlace']) {
+        const t = actor[name](), rest = actor.NGHI.cangL; let most = 0;
+        for (let time = 0; time <= t.duration(); time += 1 / 30) { t.time(time); most = Math.max(most, Math.abs(actor.s.cangL - rest)); }
+        swing[name] = most; length[name] = t.duration(); t.kill(); actor.reset();
+      }
+      if (!(swing.march > 45 && swing.stroll > 1 && swing.stroll < swing.march / 2 && swing.stepInPlace < 1)) hong('steps in place', `forearm swing march ${swing.march.toFixed(0)}°, stroll ${swing.stroll.toFixed(0)}°, stepInPlace ${swing.stepInPlace.toFixed(0)}° — they should differ`);
+      if (!(length.stroll > length.march + 0.5)) hong('steps in place', 'stroll is not slower than march');
+      actor.svg.remove();
+    }
+    // Biểu cảm có THÂN NGƯỜI: ngạc nhiên bung tay, suy nghĩ đưa tay lên, vui thì nhún (đang ngồi thì không); tay cầm đồ đứng yên.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig, holder = L.createCharacter(host, { id: 'barista' }).rig;
+      const most = (rig, name, key, rest) => { const t = rig.express(name); let far = 0; for (let time = 0; time <= t.duration(); time += 1 / 30) { t.time(time); far = Math.max(far, Math.abs(rig.s[key] - rest)); } t.progress(1); const back = Math.abs(rig.s[key] - rest); t.kill(); rig.reset(); return [far, back]; };
+      for (const [name, key, least] of [['surprised', 'cangL', 25], ['thinking', 'cangR', 60], ['happy', 'y', 5], ['tired', 'tho', 0.8]]) {
+        const [far, back] = most(actor, name, key, actor.NGHI[key]);
+        if (far < least) hong('express', `${name}: the body does not join in (${key} moves ${far.toFixed(1)})`);
+        if (back > 0.01) hong('express', `${name}: ${key} does not return to rest`);
+      }
+      actor.s.seat = 1; const t = actor.express('happy'); let lift = 0; for (let p = 0; p <= 1; p += 0.02) { t.progress(p); lift = Math.min(lift, actor.s.y); } t.kill();
+      if (lift < -0.5) hong('express', 'a seated character hops when happy');
+      const side = holder.holds.R ? 'R' : 'L';
+      for (const name of ['surprised', 'thinking', 'angry', 'tired']) { const [far] = most(holder, name, 'cang' + side, holder.NGHI['cang' + side]); if (far > 1) hong('express', `${name}: the arm holding an item moves ${far.toFixed(0)}°`); }
+      actor.svg.remove(); holder.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

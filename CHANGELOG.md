@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.21.0
+
+More from the outside review of all 80 actions.
+
+Fixed
+- **`enter` after `exit` walked in invisible.** A character that had left the frame came back
+  unseen and popped up at centre at the end of the walk (people and pets). It is now visible
+  for the whole walk, with a 0.2 s fade-in at the start.
+
+Changed
+- **Sitting reads as sitting.** Seated, the thighs splay and the shins stay upright, so there
+  is a bend at the knee; before, the legs only got shorter.
+- **`march`, `stroll` and `stepInPlace` differ from the front.** `march` pumps the forearms in
+  front of the chest; `stroll` is slower with low steps and loosely swaying arms (3.2 s →
+  3.65 s for six steps); `stepInPlace` keeps the arms still. A hand holding an item stays put.
+- **Expressions move the body**, not only the face: `happy` hops (not when seated),
+  `surprised` flings the arms out, `thinking` raises a hand to the chest, `angry` makes
+  fists, `tired` sighs, `laughing` shakes more.
+
 ## 0.20.0
 
 From an outside review of a film chaining all 80 actions.

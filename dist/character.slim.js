@@ -1,4 +1,4 @@
-/* VGCharacter v0.20.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.21.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -729,20 +729,21 @@ class RigSVG {
       e['tai' + ben].setAttribute('transform', `translate(${dau * x} 4) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
-    const thighSeen = 1 - clamp(s.seat, 0, 1) * 0.72, shinFix = ` scale(1 ${(1 / thighSeen).toFixed(4)})`;
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongL})${shinFix}`);
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui}) rotate(${s.ongR})${shinFix}`);
+    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah);
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD), shinFix = ` scale(1 ${(1 / thighSeen).toFixed(4)})`;
+    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
     if (e.skirt) {
       const K = this.nv.skirt, thigh = DAI.dui * daiDui, halfLeg = 13 * dayChan, flare = K.flare ?? 4;
       const reach = (K.length ?? 1) * thigh;                     // gấu cách hông bao xa, đo dọc theo chân
       const along = (side, offset) => {
         const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
-        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * s['nhac' + side] * 6) * RAD;
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
-        const b = a + s['ong' + side] * RAD;
+        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay) * RAD;
         return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
       };
       const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
@@ -1117,6 +1118,7 @@ class RigSVG {
     return t;
   }
   static GESTURE_TURN = 0.2;
+  static SEAT_SPLAY = 22;               // độ xoè của mỗi đùi khi ngồi (nhìn từ trước)
   #openUp(t) {
     const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
     if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
@@ -1278,13 +1280,18 @@ class RigSVG {
     this.#khep(t, 0.5, 1.2);
     return t;
   }
-  #dam(t, at, h, ben, tay = 1, goiCao = 1) {
+  #dam(t, at, h, ben, tay = 1, goiCao = 1, arms = null) {
     const s = this.s, L = ben === 'L';
     const goi = L ? 'nhacL' : 'nhacR';
     t.to(s, { [goi]: goiCao, y: -5 * goiCao, than: (L ? 2 : -2) * goiCao, dauY: -1, duration: h * 0.5, ease: 'power2.out' }, at);
     t.to(s, { [goi]: 0, y: 0, dauY: 1.5, duration: h * 0.5, ease: 'power2.in' }, at + h * 0.5);
     t.to(s, { vungL: (L ? -1 : 1) * tay, vungR: (L ? 1 : -1) * tay, vai: -tay,
               duration: h * 0.9, ease: 'sine.inOut' }, at + h * 0.1);
+    if (arms) for (const side of ['L', 'R']) {
+      if (this.holds[side] && s['item' + side] > 0.5) continue;                // tay cầm đồ đứng yên
+      const [upper, fore] = side === ben ? arms.back : arms.front;
+      t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, duration: h * 0.9, ease: 'sine.inOut' }, at + h * 0.1);
+    }
     return at + h;
   }
   march(buoc = 6) {
@@ -1292,15 +1299,15 @@ class RigSVG {
     let at = 0;
     t.set(this.s, { tayL: 'nam', tayR: 'nam' }, 0);
     t.to(this.s, { cuoi: 0.6, mayL: 0.3, mayR: 0.3, duration: 0.2 }, 0);
-    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L');
+    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 1, 1, { front: [22, -78], back: [5, -10] });
     this.#khep(t, 0.4, at);
     return t;
   }
   stroll(buoc = 6) {
-    const t = this.tl(), h = 0.46;
+    const t = this.tl(), h = 0.54;
     let at = 0;
     t.to(this.s, { cuoi: 0.45, duration: 0.25 }, 0);
-    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 0.3, 0.75);
+    for (let i = 0; i < buoc; i++) at = this.#dam(t, at, h, i % 2 ? 'R' : 'L', 0.3, 0.5, { front: [15, -20], back: [7, -4] });      // tay buông, đung đưa nhẹ; gối nhấc thấp, nhịp chậm
     this.#khep(t, 0.4, at);
     return t;
   }
@@ -1346,9 +1353,29 @@ class RigSVG {
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
     if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
-    const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
+    const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32, N = this.NGHI;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
-    if (name === 'laughing') t.to(s, { dauY: face.dauY + 3.5, vai: face.vai + 2, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
+    const standing = s.seat < 0.5, free = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    const arm = (side, upper, fore, at, d, ease = 'power2.out') => t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, duration: d, ease }, at);
+    if (name === 'happy') {                                   // nhún người một cái, vai nhấc
+      if (standing) t.to(s, { y: -7, duration: 0.16, ease: 'power2.out' }, 0.05).to(s, { y: 0, duration: 0.22, ease: 'power2.in' }, 0.21);
+      t.to(s, { vai: -4, duration: 0.2, ease: 'power2.out' }, 0.05).to(s, { vai: -1, duration: 0.4, ease: 'sine.inOut' }, 0.3);
+    } else if (name === 'surprised') {                        // giật mình: người bật lên, hai tay bung ra
+      if (standing) t.to(s, { y: -5, duration: 0.12, ease: 'power2.out' }, 0).to(s, { y: 0, duration: 0.25, ease: 'power2.inOut' }, 0.12);
+      for (const side of free) { t.set(s, { ['tay' + side]: 'mo' }, 0); arm(side, 26, 30, 0, into + 0.06, 'back.out(1.8)'); }
+    } else if (name === 'thinking' && free.length) {          // đưa tay lên cằm
+      const side = this.#freeHand();
+      if (free.includes(side)) { t.set(s, { ['tay' + side]: 'mo' }, 0.05); arm(side, 34, -146, 0.05, 0.45, 'power2.inOut'); }
+    } else if (name === 'angry') {                            // nắm tay, tay gồng xuống
+      for (const side of free) { t.set(s, { ['tay' + side]: 'nam' }, 0.1); arm(side, 16, -8, 0, 0.3); }
+      t.to(s, { vai: -3, duration: 0.3, ease: 'power2.out' }, 0);
+    } else if (name === 'tired') {                            // thở dài: phồng ngực rồi xệ vai
+      t.to(s, { tho: 1, duration: 0.45, ease: 'sine.inOut' }, 0).to(s, { tho: 0, vai: face.vai + 2, dauY: face.dauY + 2, duration: 0.6, ease: 'sine.inOut' }, 0.45);
+      for (const side of free) arm(side, N['bat' + side] - 3, Math.abs(N['cang' + side]) > 40 ? N['cang' + side] : -6, 0.4, 0.6, 'sine.inOut');
+    } else if (name === 'sad') {
+      t.to(s, { than: N.than + 1.5, duration: 0.5, ease: 'sine.inOut' }, 0);
+    }
+    if (name === 'laughing') t.to(s, { dauY: face.dauY + 4.5, vai: face.vai + 3.5, tho: 1, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
     else if (name !== 'surprised' && hold > 0.8) { this.blinkTo = face.matY || 0; this.#chop(t, into + hold * 0.5); this.blinkTo = 0; }      // ngạc nhiên thì không chớp mắt
     this.#khep(t, 0.4, into + hold);
     return t;
@@ -1423,6 +1450,8 @@ class RigSVG {
     const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };    // hiện dần trong 0,2 s đầu: khung rộng thì điểm xuất phát vẫn nằm trong hình
+    t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
   }
@@ -2096,6 +2125,8 @@ class RigThu {
     const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
     t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
     const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); } };       // hiện suốt quãng chạy — xem `enter` trong rig-svg.js
+    t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
     return t;
   }
@@ -3246,7 +3277,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.20.0';
+const VERSION = '0.21.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
