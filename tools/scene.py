@@ -44,8 +44,9 @@ Scene file (every key except `characters` and `script` is optional):
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
-  script       `"mood": "happy" | "sad" | "surprised" | "angry" | "thinking"` on a turn plays that expression as
-               a beat before the turn's line or actions.
+  script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
+               With `say`, the whole line is spoken with that face; without it, it is an expression beat
+               before the turn's actions.
   props        `"front": true` draws a prop IN FRONT of the characters — a counter someone stands behind.
                `"tabletop"` is the height of a table or counter top in frame units (150; lower it for
                someone seated behind it — the tool tells you when a seated character would be hidden).
@@ -88,7 +89,7 @@ TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood')
-MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking')
+MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image')
 
 
@@ -237,11 +238,14 @@ def main():
         known(where, turn, TURN_KEYS)
         who = names[turn['who']]
         steps = []
-        # `mood`: một nhịp nét mặt TRƯỚC lời nói / động tác của lượt này (ngạc nhiên rồi mới nói…).
+        # `mood`: lượt CÓ lời thì cả câu được nói bằng nét mặt ấy; lượt không lời thì là một nhịp nét mặt
+        # trước các động tác của lượt.
+        mood = turn.get('mood')
         if 'mood' in turn:
-            if turn['mood'] not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(turn["mood"])}')
+            if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet — pets have no "mood"; use an action such as "wagTail" or "hiss"')
-            steps.append(f"['express', {js(turn['mood'])}, 0.9]")
+            if 'say' not in turn: steps.append(f"['express', {js(mood)}, 0.9]")
+        spoken_mood = f', {{ mood: {js(mood)} }}' if mood and 'say' in turn else ''
         if 'say' in turn:
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
@@ -251,10 +255,10 @@ def main():
                 key = slug(os.path.splitext(os.path.basename(turn['audio']))[0]).replace('-', '_')
                 if any(voice['key'] == key for voice in voices): key = f'{key}_{len(voices) + 1}'      # cùng một tệp dùng hai lần
                 voices.append({'key': key, 'file': os.path.basename(turn['audio']), 'source': source, 'text': words, 'who': who['name']})
-                steps.append(f"['speakCues', window.VOICE_CUES[{js(key)}]]")
+                steps.append(f"['speakCues', window.VOICE_CUES[{js(key)}]" + (f', null{spoken_mood}' if spoken_mood else '') + ']')
             else:
                 seconds = float(turn.get('dur') or round(0.6 + 0.36 * len(words.split()), 1))
-                steps.append(f"['explain', {js(words)}, {seconds}]")
+                steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
         for step in turn.get('do', []):
             steps.append(step_code(step, where))
         if not steps: fail(f'{where}: a turn needs "say", "do" or "mood"')

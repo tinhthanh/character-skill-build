@@ -244,7 +244,26 @@ try {
     rig.state.upperArmR = 77; expect('state.upperArmR ghi → s.batR', rig.s.batR, 77);
     rig.setColors({ top: '#654321' }); expect('setColors({top})', rig.mau.ao, '#654321');
     expect('partsOf("doctor").faceExtras là hàm', typeof L.kit.partsOf('doctor').faceExtras, 'function');
-    for (const name of ['happy', 'sad', 'surprised', 'angry', 'thinking']) { const t = rig.express(name, 0.5); t.progress(0.5); t.kill(); }
+    for (const name of L.list().expressions) {
+      const t = rig.express(name, 1); t.progress(0.5); rig.render();
+      if (xau(rig.svg)) hong('express', `${name}: bad attribute values`);
+      t.progress(1); for (const key of ['smile', 'browL', 'eyeClose', 'headTilt', 'mouthOpen'].filter((k) => k in rig.state)) if (Math.abs(rig.state[key] - rig.NGHI[S.PERSON_STATE_KEYS[key]]) > 1e-3) hong('express', `${name} does not return ${key} to rest`);
+      t.kill(); rig.reset();
+    }
+    if (L.list().expressions.length < 9) hong('express', 'expected at least nine expressions');
+    // GIỌNG ĐIỆU: nói bằng nét mặt buồn thì khoé miệng trễ xuống suốt câu; không khai thì vẫn tươi; xong thì về nghỉ.
+    const lineCues = { metadata: { duration: 2 }, mouthCues: [{ start: 0, end: 0.6, value: 'C' }, { start: 0.6, end: 1.2, value: 'D' }, { start: 1.2, end: 2, value: 'B' }] };
+    for (const [label, build] of [['speak', (mood) => rig.speak('xin chao ban nhe', 2, { mood })], ['explain', (mood) => rig.explain('xin chao ban nhe', 2, { mood })], ['speakCues', (mood) => rig.speakCues(lineCues, null, { mood })]]) {
+      const plain = build(null); let low = Infinity; for (let p = 0.2; p <= 0.7; p += 0.05) { plain.progress(p); low = Math.min(low, rig.state.smile); }
+      if (low < 0) hong(label, `without a mood the mouth corners drop (${low.toFixed(2)})`);
+      plain.kill(); rig.reset();
+      const sad = build('sad'); let high = -Infinity; for (let p = 0.2; p <= 0.7; p += 0.05) { sad.progress(p); high = Math.max(high, rig.state.smile); }
+      if (high > -0.2) hong(label, `with mood "sad" the mouth corners stay up (highest ${high.toFixed(2)})`);
+      sad.progress(0.4); if (Math.abs(rig.state.browL - 0.75) > 0.05) hong(label, `with mood "sad" the brows are at ${rig.state.browL}, expected 0.75`);
+      sad.progress(1); if (Math.abs(rig.state.smile - rig.NGHI.cuoi) > 1e-3 || Math.abs(rig.state.browL - rig.NGHI.mayL) > 1e-3) hong(label, 'a line spoken with a mood does not return the face to rest');
+      sad.kill(); rig.reset();
+    }
+    try { rig.speak('x', 1, { mood: 'joyful' }); hong('speak', 'an unknown mood should throw'); } catch (error) { /* đúng */ }
     // Thú: hình dáng + giống
     const pet = L.createPet(document.getElementById('san2'), { species: 'shiba', config: { shape: { legLength: 0.7, headSize: 1.2 }, colors: { fur: '#445566' } } }).rig;
     expect('pet shape.legLength', pet.shape.legLength, 0.7);

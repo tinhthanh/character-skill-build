@@ -49,8 +49,9 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   caption size follow the frame; captions sit mid-frame, inside the area that TikTok, Reels and
   Shorts leave clear, and the camera puts the speaker above them. Keep the characters' `x`
   within the narrower width. `examples/scene-vertical/scene.json` is a 9:16 sample.
-- `"mood": "happy" | "sad" | "surprised" | "angry" | "thinking"` on a turn plays that
-  expression as a beat before the turn's line or actions.
+- `"mood"` on a turn — `happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
+  `confused`, `tired`. With `say`, the whole line is spoken with that face; without it, it is
+  an expression beat before the turn's actions.
 - `background.image` (a file next to the scene file) fills the frame instead of the plain
   wall; the floor strip is then drawn only if `floor` is given too.
 - `"tabletop"` on a table or counter is the height of its top in frame units (150). Someone

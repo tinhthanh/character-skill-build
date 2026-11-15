@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0
+
+Added
+- **Tone of voice.** `speak`, `explain` and `speakCues` take `{ mood }`: the whole line is
+  delivered with that expression — brows, eyes and mouth corners — while the mouth still
+  follows the words. Until now every line was spoken with a smile.
+- Four expressions: `laughing`, `worried`, `confused`, `tired` (nine in all).
+- `tools/scene.py`: `"mood"` on a turn with `say` applies to the line itself (it used to be a
+  1.6 s beat before the line); on a turn without `say` it is still a beat.
+
 ## 0.13.0
 
 Changed

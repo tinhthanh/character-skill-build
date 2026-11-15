@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory() as work:
             if not re.search(r"together: \[\[vet, \['enter', \"left\"\][^\n]*\[boy, \['enter', \"right\"\]", page): problems.append('two entering characters do not enter together')
             if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
             if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
-            if "['express', \"surprised\", 0.9], ['explain'" not in page: problems.append('"mood" does not add an expression beat before the line')
+            if '{ mood: "surprised" }]' not in page or "['express', \"surprised\"" in page: problems.append('"mood" on a spoken turn is not passed to the line itself')
             if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
             if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
             if '"clerk" sits behind the counter' not in built.stdout or '"tabletop"' not in built.stdout: problems.append('no note about a seated character hidden behind a tall front counter')

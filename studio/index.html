@@ -360,7 +360,7 @@ const DONG_TAC = [
   ['walk', 'Đi ngang'], ['enter', 'Bước vào'], ['exit', 'Bước ra'], ['walkForward', 'Tiến lại gần'], ['walkAway', 'Đi ra xa'],
 ].filter(([m]) => typeof RigSVG.prototype[m] === 'function');
 const DT_CAN_MAT = new Set(['idle', 'speak', 'explain', 'nod', 'shake', 'worry', 'express']);
-const EXPRESSIONS = Object.keys(RigSVG.EXPRESSIONS);
+const EXPRESSIONS = Object.keys(RigSVG.EXPRESSIONS);      // nút "Biểu cảm" đi lần lượt qua cả chín nét mặt
 let expressionIndex = 0;                 // nút "Biểu cảm" đi lần lượt qua các nét mặt   // xem được khi đang cận mặt
 
 /* ─────────────────────────────────────────────────────────── trạng thái */

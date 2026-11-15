@@ -22,11 +22,11 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
-| `speak` | `(text, dur = 2)` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
-| `explain` | `(text, dur = 2.4)` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
-| `speakCues` | `(cues, dur, { cuChi })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
+| `speak` | `(text, dur = 2, { mood })` | mouth shapes paced to the syllable count of `text`, one gesture | `dur` + 0.55 |
+| `explain` | `(text, dur = 2.4, { mood })` | like `speak` with livelier head and hand gestures | `dur` + 0.55 |
+| `speakCues` | `(cues, dur, { cuChi, mood })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
 | `worry` | — | brows up, hands fidget | 2.1 |
-| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` | `hold` + 0.7 |
+| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
 | `sit` | `(hold = 2)` | sit down as on an unseen chair, hands on the lap, stand up again | `hold` + 0.95 |
 | `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |
@@ -41,6 +41,12 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
 | `enter` | `(from = 'left')` | walk in from off-frame, from the `'left'` or the `'right'` | 1.6–2.15 |
 | `exit` | `(to = 'right')` | walk out of frame to the `'right'` or the `'left'` — **ends hidden** | 1.6–2.05 |
+
+**Tone of voice.** A speaking step takes `{ mood }` — any `express` name — and the whole line
+is delivered with that face (brows, eyes, mouth corners) while the mouth still follows the
+words: `['explain', 'Oh no, I forgot again.', 2.2, { mood: 'worried' }]`,
+`['speakCues', cues, null, { mood: 'sad' }]`. Without it, lines are spoken brightly, with a
+slight smile.
 
 For `speak` / `explain`, set `dur` to the length of the voice-over clip. Syllables are
 counted per vowel group, so Vietnamese and English text both pace correctly.

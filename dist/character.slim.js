@@ -1,4 +1,4 @@
-/* VGCharacter v0.13.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.14.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1014,7 +1014,7 @@ class RigSVG {
   }
   #chop(t, at) {
     t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at)
-     .to(this.s, { matY: 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
+     .to(this.s, { matY: this.blinkTo || 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
   }
   #tuTheDi(f, a, kA = 1) {
     const N = this.NGHI, nv = this.nv, cc = nv.coChan, P = 2 * Math.PI;
@@ -1324,13 +1324,18 @@ class RigSVG {
     surprised: { cuoi: 0, mieng: 0.72, chum: 0.6, mayL: 1, mayR: 1, matY: -0.16, dauY: -3, vai: -3 },
     angry:     { cuoi: -0.6, mieng: 0.12, mayL: -0.9, mayR: -0.9, matY: 0.22, dau: 0, dauY: 2, than: 1.5 },
     thinking:  { cuoi: 0.1, mieng: 0, chum: 0.25, mayL: 0.7, mayR: -0.2, nhinX: 2.2, nhinY: -1.8, dau: 6, dauX: 2 },
+    laughing:  { cuoi: 1, mieng: 0.85, mayL: 0.75, mayR: 0.75, matY: 0.6, dau: -4, dauY: -2, vai: -2 },        // mắt híp, miệng há
+    worried:   { cuoi: -0.5, mieng: 0.14, mayL: 0.95, mayR: 0.95, matY: 0.06, dau: 3, dauY: 2, nhinY: 0.6, vai: 2 },
+    confused:  { cuoi: -0.15, mieng: 0.08, mayL: 0.9, mayR: -0.45, dau: -8, dauX: -2, nhinX: -1.6, nhinY: -0.8 },  // một mày nhướn, đầu nghiêng
+    tired:     { cuoi: -0.3, mieng: 0, mayL: 0.15, mayR: 0.15, matY: 0.5, dau: 4, dauY: 6, nhinY: 1.2, vai: 4 },   // mắt sụp, vai xệ
   };
   express(name = 'happy', hold = 1.2) {
     const face = RigSVG.EXPRESSIONS[name];
     if (!face) throw new Error(`[character] no expression "${name}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, into = name === 'surprised' ? 0.16 : 0.32;
     t.to(s, { ...face, duration: into, ease: name === 'surprised' ? 'back.out(2.2)' : 'power2.out' }, 0);
-    if (name !== 'surprised' && hold > 0.8) this.#chop(t, into + hold * 0.5);      // ngạc nhiên thì không chớp mắt
+    if (name === 'laughing') t.to(s, { dauY: face.dauY + 3.5, vai: face.vai + 2, duration: 0.13, ease: 'sine.inOut', yoyo: true, repeat: Math.max(1, 2 * Math.round(hold / 0.3) - 1) }, into);   // rung người vì cười
+    else if (name !== 'surprised' && hold > 0.8) { this.blinkTo = face.matY || 0; this.#chop(t, into + hold * 0.5); this.blinkTo = 0; }      // ngạc nhiên thì không chớp mắt
     this.#khep(t, 0.4, into + hold);
     return t;
   }
@@ -1425,7 +1430,14 @@ class RigSVG {
     }
     return Math.max(4, n);
   }
-  #khauHinh(t, soAm, nhip) {
+  #tone(mood, brows = 0.5, smile = 0.5) {
+    if (!mood) return { start: { mayL: brows, mayR: brows, cuoi: smile }, corner: (value) => value, eyes: 0 };
+    const face = RigSVG.EXPRESSIONS[mood];
+    if (!face) throw new Error(`[character] no mood "${mood}" (available: ${Object.keys(RigSVG.EXPRESSIONS).join(', ')})`);
+    const corner = (value) => face.cuoi * 0.7 + value * 0.3;
+    return { start: { mayL: face.mayL ?? 0, mayR: face.mayR ?? 0, cuoi: corner(smile), matY: face.matY || 0 }, corner, eyes: face.matY || 0 };
+  }
+  #khauHinh(t, soAm, nhip, corner = (value) => value) {
     const s = this.s;
     let truoc = -1;
     for (let i = 0; i < soAm; i++) {
@@ -1433,24 +1445,26 @@ class RigSVG {
       do { k = Math.floor(ngau() * KHAU.length); } while (k === truoc && KHAU.length > 1);
       truoc = k;
       const h = KHAU[k], a = i * nhip, giam = i % 5 === 4 ? 0.35 : 1;   // cuối nhịp thì hụt hơi
-      t.to(s, { mieng: h.mieng * giam * nhieu(0.82, 1.08), chum: h.chum, cuoi: h.cuoi,
+      t.to(s, { mieng: h.mieng * giam * nhieu(0.82, 1.08), chum: h.chum, cuoi: corner(h.cuoi),
                 duration: nhip * 0.45, ease: 'power1.out' }, a)
        .to(s, { mieng: h.mieng * giam * 0.16, chum: h.chum * 0.5,
                 duration: nhip * 0.55, ease: 'power1.in' }, a + nhip * 0.45);
     }
     return t;
   }
-  speak(text = null, dur = 2) {
-    const t = this.tl(), s = this.s;
+  speak(text = null, dur = 2, { mood = null } = {}) {
+    const t = this.tl(), s = this.s, tone = this.#tone(mood);
     this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     t.set(s, { tayR: 'mo' }, 0);
-    t.to(s, { mayL: 0.5, mayR: 0.5, cuoi: 0.5, nhinX: 0.8, duration: 0.2 }, 0);
-    this.#khauHinh(t, soAm, nhip);
+    t.to(s, { ...tone.start, nhinX: 0.8, duration: 0.2 }, 0);
+    this.blinkTo = tone.eyes;
+    this.#khauHinh(t, soAm, nhip, tone.corner);
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
     t.to(s, { batR: 34, cangR: -70, than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
      .to(s, { batR: 40, cangR: -60, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
+    this.blinkTo = 0;
     t.to(s, { mieng: 0, duration: 0.15 }, dur);
     this.#khep(t, 0.5, dur + 0.05);
     return t;
@@ -1496,25 +1510,28 @@ class RigSVG {
     });
     return t;
   }
-  explain(text = null, dur = 2.4) {
-    const t = this.tl(), s = this.s;
+  explain(text = null, dur = 2.4, { mood = null } = {}) {
+    const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.45, 0.5);
     this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     const NEN = { batL: 10, batR: 16, cangL: -60, cangR: -72 };
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0);
-    t.to(s, { ...NEN, than: -1.5, mayL: 0.45, mayR: 0.45, cuoi: 0.5, nhinX: 0.8,
+    t.to(s, { ...NEN, than: -1.5, ...tone.start, nhinX: 0.8,
               duration: 0.35, ease: 'power2.out' }, 0);
-    this.#khauHinh(t, soAm, nhip);
+    this.blinkTo = tone.eyes;
+    this.#khauHinh(t, soAm, nhip, tone.corner);
     const BUOC = 5, moc = [];
     for (let i = 1; i < soAm && i * nhip <= dur - 0.5; i += BUOC) moc.push(i * nhip);
     this.#cuChi(t, moc, dur);
     if (dur > 1.2) this.#chop(t, dur * nhieu(0.4, 0.65));
+    this.blinkTo = 0;
     t.to(s, { mieng: 0, chum: 0, duration: 0.15 }, dur);
     this.#khep(t, 0.5, dur + 0.05);
     return t;
   }
-  speakCues(cue, dur = null, { cuChi = true } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
-    const t = this.tl(), s = this.s;
+  speakCues(cue, dur = null, { cuChi = true, mood = null } = {}) {      // `{ text }` trong tham số thứ ba là LỜI cho `captions()`; rig không dùng tới
+    const t = this.tl(), s = this.s, tone = this.#tone(mood, 0.4, 0.45);
+    this.blinkTo = tone.eyes;
     this.#openUp(t);
     const ds = Array.isArray(cue) ? cue : (cue && cue.mouthCues) || [];
     const D = dur || (cue && cue.metadata && cue.metadata.duration)
@@ -1522,7 +1539,7 @@ class RigSVG {
     if (!ds.length) return this.explain(null, D);
     const NEN = { batL: 20, batR: 28, cangL: -70, cangR: -80 };
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0);
-    t.to(s, { ...NEN, than: -1.5, mayL: 0.4, mayR: 0.4, cuoi: 0.45, nhinX: 0.6,
+    t.to(s, { ...NEN, than: -1.5, ...tone.start, nhinX: 0.6,
               duration: 0.3, ease: 'power2.out' }, 0);
     this.#troi(t, 'tho', 0, 1, D, 0.9, 2.2);
     this.#troi(t, 'dau', -3.4, 3.4, D, 1.0, 2.6);
@@ -1546,7 +1563,7 @@ class RigSVG {
     const VAO = 0.06;
     for (const c of ds) {
       const h = RHUBARB[c.value] || RHUBARB.X;
-      t.to(s, { mieng: h.mieng, chum: h.chum, cuoi: h.cuoi,
+      t.to(s, { mieng: h.mieng, chum: h.chum, cuoi: tone.corner(h.cuoi),
                 duration: Math.min(VAO, Math.max(0.02, (c.end - c.start) * 0.6)),
                 ease: 'power1.out' }, c.start);
     }
@@ -1560,6 +1577,7 @@ class RigSVG {
     if (!moc.length && D > 1.6) moc.push(D * 0.35);
     if (cuChi) this.#cuChi(t, moc, D);
     for (let b = nhieu(0.6, 1.2); b < D - 0.4; b += nhieu(1.8, 3.4)) this.#chop(t, b);
+    this.blinkTo = 0;
     t.to(s, { mieng: 0, chum: 0, duration: 0.18 }, D);
     this.#khep(t, 0.5, D + 0.05, { x: x0 });       // `#khep` không đụng `x`; trả về đúng chỗ đứng lúc bắt đầu
     return t;
@@ -3166,7 +3184,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.13.0';
+const VERSION = '0.14.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
