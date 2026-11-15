@@ -951,7 +951,9 @@ export class RigSVG {
   }
 
   #layPhanTu() {
-    const q = (n) => this.svg.querySelector(`#${this.id}-${n}`);
+    // Nối chuỗi, KHÔNG dùng template literal trong querySelector: bộ lint của HyperFrames
+    // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
+    const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
@@ -1506,8 +1508,13 @@ export class RigSVG {
 
   /* ------------------------------------------------------------ tiện ích */
 
+  // `lazy: false` cho MỌI tween của rig. Mặc định GSAP hoãn lần ghi đầu tiên của một tween
+  // tới cuối tick; khi cả timeline bị đẩy một phát tới cuối (kichBan làm thế để dựng chuỗi,
+  // bộ dựng video làm thế khi tua thẳng tới một khung), tween đứng sau đọc giá trị đầu của
+  // nó TRƯỚC khi tween đứng trước kịp ghi — và ghi nhớ một trạng thái cũ. Triệu chứng: vừa
+  // bước vào xong, nhân vật giật về điểm xuất phát rồi trượt lại.
   tl() {
-    return gsap.timeline({ paused: true, onUpdate: () => this.apDung(), onComplete: () => this.apDung() });
+    return gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => this.apDung(), onComplete: () => this.apDung() });
   }
 
   // Khép về tư thế nghỉ, bàn tay đổi về 'mo' ở nửa sau đoạn khép.

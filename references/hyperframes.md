@@ -94,6 +94,22 @@ const act = VGCharacter.kichBan(rig, ['enter', 1.0, ['giaiThich', 'Chào bạn, 
 `kichBan` places the speech after `enter` and the 1 s pause; read the start time back with
 `act.getChildren(false, false, true)[1].startTime()` to set the audio clip's `data-start`.
 
+## Validate and render
+
+```bash
+npx hyperframes lint .          # static rules
+npx hyperframes check .         # lint + runtime + layout in headless Chrome
+npx hyperframes render -o out.mp4 .
+```
+
+- `lint` reads the bundle's source too. It rejects `querySelector` calls with interpolated
+  template literals, so keep custom drawing code free of them (the library builds selectors by
+  string concatenation for this reason).
+- `check` may report `off_pivot_rotation` on an arm (`#rig1-cangL` or similar). It is a
+  dial-pointer heuristic misreading a forearm; ignore it.
+- After rendering, scrub the first two seconds of any `enter`: the character must walk in and
+  stop, not snap back. `tools/check.sh` guards this, but it is the failure worth a look.
+
 ## How it stays deterministic
 
 - All randomness goes through one seeded generator.
@@ -101,6 +117,11 @@ const act = VGCharacter.kichBan(rig, ['enter', 1.0, ['giaiThich', 'Chào bạn, 
   setter, not by callbacks, so seeking backwards restores position and pose.
 - The rig redraws from its state object on every write, so it renders correctly whether the
   renderer seeks with `totalTime(t, false)` or with `seek(t)` (which suppresses GSAP callbacks).
+- Rig timelines use `lazy: false`. GSAP normally defers a tween's first write to the end of
+  the tick; when a renderer jumps straight to a frame, a later tween would otherwise record
+  its start value before an earlier one has written, and the character snaps to a stale
+  position.
 - `tools/check.sh` asserts these: same seed gives the same timeline, seeking to one time by
-  two different paths gives the same state, and frame 0 of a sequence that starts with
-  `enter` has the character off-frame.
+  two different paths gives the same state, frame 0 of a sequence that starts with `enter`
+  has the character off-frame, and no frame-to-frame position jump in a sequence built on a
+  fresh page.

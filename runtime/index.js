@@ -99,7 +99,7 @@ export function danhSach() {
  * dựng bước kế, rồi trả nhân vật về trạng thái đầu.
  */
 export function kichBan(rig, cacBuoc, { cach = 0.1 } = {}) {
-  const t = gsap.timeline({ paused: true, onUpdate: () => rig.apDung() });
+  const t = gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => rig.apDung() });
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
   const chup = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
   let at = 0, cuoi = chup(), khung0 = null;

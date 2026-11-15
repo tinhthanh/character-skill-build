@@ -35,6 +35,22 @@ try {
     // Slot bắt buộc
     for (const id of o.canCo || []) if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(ten, `thiếu phần tử #…-${id}`);
   };
+  // Không DỊCH CHUYỂN TỨC THỜI: dựng một chuỗi rồi đi từng khung 1/30 s — không khung nào được
+  // nhảy xa. Chạy ĐẦU TIÊN, trên trang còn sạch: lỗi này (tween ghi nhớ sai giá trị đầu do cơ
+  // chế lazy của GSAP — nhân vật bước vào xong giật về điểm xuất phát) chỉ lộ ra khi tween
+  // được vẽ lần đầu bằng một cú nhảy, đúng tình huống của bộ dựng video.
+  for (const [ten, tao, buoc] of [['bac_si_thu_y', (h) => new RigSVG(h, 'bac_si_thu_y'), ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']],
+                                  ['cho', (h) => new RigThu(h, 'cho'), ['enter', 'wagTail', ['walk', 4, 80], 'sit']]]) {
+    const rig = tao(document.getElementById('san')), t = L.kichBan(rig, buoc);
+    let truoc = null;
+    for (let k = 0; k <= Math.ceil(t.duration() * 30); k++) {
+      t.totalTime(k / 30, false);
+      if (truoc !== null && Math.abs(rig.s.x - truoc) > 16) { hong('kichBan', `${ten}: nhảy vị trí giữa hai khung liền nhau — khung ${k}: x ${truoc.toFixed(0)} → ${rig.s.x.toFixed(0)}`); break; }
+      truoc = rig.s.x;
+    }
+    if (rig.tl().vars.defaults.lazy !== false) hong(ten, 'timeline của rig phải có defaults.lazy = false');
+  }
+
   for (const k of Object.keys(RigSVG.NHAN_VAT)) {
     const rig = new RigSVG(document.getElementById('san'), k);
     for (const id of ['tocTruoc', 'matL', 'matR', 'nguoiL', 'nguoiR', 'banL', 'banR'])

@@ -958,7 +958,9 @@ class RigSVG {
   }
 
   #layPhanTu() {
-    const q = (n) => this.svg.querySelector(`#${this.id}-${n}`);
+    // Nối chuỗi, KHÔNG dùng template literal trong querySelector: bộ lint của HyperFrames
+    // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
+    const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
@@ -1513,8 +1515,13 @@ class RigSVG {
 
   /* ------------------------------------------------------------ tiện ích */
 
+  // `lazy: false` cho MỌI tween của rig. Mặc định GSAP hoãn lần ghi đầu tiên của một tween
+  // tới cuối tick; khi cả timeline bị đẩy một phát tới cuối (kichBan làm thế để dựng chuỗi,
+  // bộ dựng video làm thế khi tua thẳng tới một khung), tween đứng sau đọc giá trị đầu của
+  // nó TRƯỚC khi tween đứng trước kịp ghi — và ghi nhớ một trạng thái cũ. Triệu chứng: vừa
+  // bước vào xong, nhân vật giật về điểm xuất phát rồi trượt lại.
   tl() {
-    return gsap.timeline({ paused: true, onUpdate: () => this.apDung(), onComplete: () => this.apDung() });
+    return gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => this.apDung(), onComplete: () => this.apDung() });
   }
 
   // Khép về tư thế nghỉ, bàn tay đổi về 'mo' ở nửa sau đoạn khép.
@@ -2454,7 +2461,9 @@ class RigThu {
     this.host.innerHTML = this.#dungSVG();
     this.svg = this.host.querySelector('svg');
     if (khung) this.svg.setAttribute('viewBox', khung);
-    const q = (n) => this.svg.querySelector(`#${this.id}-${n}`);
+    // Nối chuỗi, KHÔNG dùng template literal trong querySelector: bộ lint của HyperFrames
+    // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
+    const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi',
       'duiN', 'duiX', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
@@ -2648,7 +2657,8 @@ class RigThu {
 
   /* ------------------------------------------------------------ tiện ích */
 
-  tl() { return gsap.timeline({ paused: true, onUpdate: () => this.apDung(), onComplete: () => this.apDung() }); }
+  // `lazy: false`: xem chú thích ở `tl()` của rig-svg.js.
+  tl() { return gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => this.apDung(), onComplete: () => this.apDung() }); }
 
   #khep(t, d = 0.4, at = '>', giu = {}) {
     // `x` không thuộc tư thế nghỉ: con vật đi tới đâu thì đứng lại ở đó (xem rig-svg.js).
@@ -3445,7 +3455,7 @@ function danhSach() {
  * dựng bước kế, rồi trả nhân vật về trạng thái đầu.
  */
 function kichBan(rig, cacBuoc, { cach = 0.1 } = {}) {
-  const t = gsap.timeline({ paused: true, onUpdate: () => rig.apDung() });
+  const t = gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => rig.apDung() });
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
   const chup = () => Object.fromEntries(Object.keys(rig.NGHI).map((k) => [k, rig.s[k]]));
   let at = 0, cuoi = chup(), khung0 = null;

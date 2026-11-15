@@ -66,10 +66,11 @@ a CDN by the pages here and by HyperFrames compositions. No Node, no bundler.
 
 - Code identifiers, code comments and the studio UI are in Vietnamese; `SKILL.md` and the
   references are in English and include a glossary.
-- The automated check was run against GSAP 3 in headless Chrome. The HyperFrames example
-  follows the published composition contract (classic scripts, one paused timeline registered
-  on `window.__timelines`, seeded randomness, no fetch) and its timeline has been seeked and
-  screenshotted directly, but it has **not** been rendered through the HyperFrames CLI here.
+- Verified with the HyperFrames CLI 0.9.52: `examples/hyperframes/index.html` passes
+  `hyperframes lint` and `hyperframes check` with no errors and renders to a 15 s, 1920 × 1080,
+  30 fps MP4 on six parallel workers with no discontinuity at worker boundaries. `check`
+  reports one heuristic layout warning (`off_pivot_rotation`) that mistakes a forearm for a
+  gauge needle; it can be ignored.
 
 ---
 
