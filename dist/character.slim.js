@@ -1,4 +1,4 @@
-/* VGCharacter v0.29.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.30.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3329,7 +3329,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.29.0';
+const VERSION = '0.30.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3619,12 +3619,15 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
       if (!box.shown) continue;
       const partly = (x) => { const a = box.left * scale + x, b = box.right * scale + x, seen = Math.min(frameWidth, b) - Math.max(0, a); return seen > 0.06 * (b - a) && seen < 0.94 * (b - a); };
       const overlapsY = box.bottom * scale + target.y > 0 && box.top * scale + target.y < frameHeight;
+      const seenY = Math.min(frameHeight, box.bottom * scale + target.y) - Math.max(0, box.top * scale + target.y), tall = (box.bottom - box.top) * scale;
+      const insideX = box.right * scale + target.x > 0 && box.left * scale + target.x < frameWidth;
+      if (insideX && seenY > 0.06 * tall && seenY < 0.94 * tall) { crowded.push(other); continue; }
       if (!overlapsY || !partly(target.x)) continue;
       const shifted = within(target.x + ((box.left + box.right) / 2 > (left + right) / 2 ? frameWidth - (box.left * scale + target.x) + 6 : -(box.right * scale + target.x) - 6), frameWidth);
       const keepsSubject = left * scale + shifted >= 0 && right * scale + shifted <= frameWidth;
       if (keepsSubject && !partly(shifted)) target.x = shifted; else crowded.push(other);
     }
-    if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame });
+    if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame, avoid });
     subjects = rigs;
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -3783,10 +3786,9 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
       if (spoken.length) lastWords = Math.max(lastWords, until);
       const crossing = turn.steps.find((step) => ['enter', 'exit', 'walkForward', 'walkAway'].includes(step.name));
-      if (crossing && turn.shot === undefined && aimed && aimed !== 'wide') {
-        cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, crossing.start - lead));
-        aimed = 'wide'; inFrame = [];
-      }
+      const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
+      const walksFirst = crossing && (!spoken.length || crossing.start <= from);
+      if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
@@ -3805,6 +3807,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
         aimed = key; inFrame = shotKind === 'wide' ? [] : (made && made.data && made.data.subjects) || [].concat(subject);
       }
       lastWords = Math.max(lastWords, until);
+      if (crossing && !walksFirst && turn.shot === undefined && aimed !== 'wide') goWide(crossing.start);
     }
     if (wide && aimed && aimed !== 'wide') cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), lastWords + 0.3);
   }

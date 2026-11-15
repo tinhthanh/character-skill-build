@@ -1,4 +1,4 @@
-/* VGCharacter v0.29.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.30.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5108,7 +5108,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.29.0';
+const VERSION = '0.30.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5567,16 +5567,25 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
     const crowded = [];
     for (const other of [].concat(avoid || [])) {
       if (rigs.includes(other) || typeof other.shotBox !== 'function') continue;
+      // Chỉ xét cái ĐẦU, cả với thú. Đã thử xét cả thân con vật: trong cảnh có con chó đứng giữa hai người, mọi cận
+      // cảnh đều phải nới ra ôm cả ba — mất hết cận cảnh. Nửa thân sau lấn vào mép khung thì chấp nhận.
       const box = boxAt(other, -1, 'face');
       if (!box.shown) continue;
       const partly = (x) => { const a = box.left * scale + x, b = box.right * scale + x, seen = Math.min(frameWidth, b) - Math.max(0, a); return seen > 0.06 * (b - a) && seen < 0.94 * (b - a); };
       const overlapsY = box.bottom * scale + target.y > 0 && box.top * scale + target.y < frameHeight;
+      // Bị mép DƯỚI / TRÊN cắt ngang (con vật đứng thấp hơn khung cận ngực của người): không đẩy khung theo chiều dọc
+      // được mà không cắt chủ thể, nên đưa luôn nó vào khung.
+      const seenY = Math.min(frameHeight, box.bottom * scale + target.y) - Math.max(0, box.top * scale + target.y), tall = (box.bottom - box.top) * scale;
+      const insideX = box.right * scale + target.x > 0 && box.left * scale + target.x < frameWidth;
+      if (insideX && seenY > 0.06 * tall && seenY < 0.94 * tall) { crowded.push(other); continue; }
       if (!overlapsY || !partly(target.x)) continue;
       const shifted = within(target.x + ((box.left + box.right) / 2 > (left + right) / 2 ? frameWidth - (box.left * scale + target.x) + 6 : -(box.right * scale + target.x) - 6), frameWidth);
       const keepsSubject = left * scale + shifted >= 0 && right * scale + shifted <= frameWidth;
       if (keepsSubject && !partly(shifted)) target.x = shifted; else crowded.push(other);
     }
-    if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame });
+    // Gộp xong thì XÉT LẠI những rig còn lại với khung mới (rộng hơn): bản trước không xét lại, nên con chó đứng cạnh
+    // vẫn bị cắt nửa cái đầu ở góc khung hai người.
+    if (crowded.length) return shot(scene, [...rigs, ...crowded], kind, { duration, ease, fill, centerY, time, frame, avoid });
     subjects = rigs;
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -5816,10 +5825,12 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       // Lượt có BƯỚC VÀO / BƯỚC RA: người ấy đi ngang qua cả cảnh, nên lùi về toàn cảnh ngay khi họ bắt đầu đi —
       // cận cảnh của người khác mà có một cái đầu lướt ngang mép khung thì rất khó hiểu.
       const crossing = turn.steps.find((step) => ['enter', 'exit', 'walkForward', 'walkAway'].includes(step.name));
-      if (crossing && turn.shot === undefined && aimed && aimed !== 'wide') {
-        cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, crossing.start - lead));
-        aimed = 'wide'; inFrame = [];
-      }
+      const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
+      // Bước đi diễn ra TRƯỚC lời của lượt (bước vào rồi mới nói): lùi ngay bây giờ. Bước đi SAU lời (nói xong rồi bước
+      // ra) thì lùi sau khi đã đặt cảnh cận cho câu nói — xem cuối vòng lặp. Bản trước chỉ có nhánh đầu, và bỏ qua nó
+      // khi máy quay đang ở toàn cảnh: người nói xong bước ra, máy quay vẫn ghì cận vào chỗ trống.
+      const walksFirst = crossing && (!spoken.length || crossing.start <= from);
+      if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
       // Lượt KHÔNG LỜI (con chó sủa, ai đó reo mừng) mà người diễn đang nằm ngoài cảnh cận hiện tại: lùi
       // về toàn cảnh cho khán giả thấy. Người diễn đang ở trong khung thì máy quay đứng yên.
       if (!spoken.length && turn.shot === undefined) {
@@ -5841,6 +5852,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
         aimed = key; inFrame = shotKind === 'wide' ? [] : (made && made.data && made.data.subjects) || [].concat(subject);
       }
       lastWords = Math.max(lastWords, until);
+      // Nói xong rồi BƯỚC RA (hoặc đi ngang cảnh): lùi về toàn cảnh đúng lúc bắt đầu đi.
+      if (crossing && !walksFirst && turn.shot === undefined && aimed !== 'wide') goWide(crossing.start);
     }
     if (wide && aimed && aimed !== 'wide') cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), lastWords + 0.3);
   }

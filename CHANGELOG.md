@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.30.0
+
+Fixed
+- **The camera stayed on an empty close-up after the speaker walked out.** In a
+  `conversation()` turn that speaks and then exits, the camera now goes back to the wide
+  shot when the character starts walking. It used to do so only if it was already on a
+  close-up before that turn.
+- **A pet beside the speaker was cut by the edge of a close-up.** A bystander cut by the
+  bottom or top edge is now brought into the frame (only the left and right edges were
+  handled), and after widening a shot to include a bystander the remaining characters are
+  checked again against the new frame.
+
 ## 0.29.0
 
 Changed

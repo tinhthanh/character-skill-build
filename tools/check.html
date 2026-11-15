@@ -615,6 +615,30 @@ try {
       if (moved[lead] < 30 || moved[lead] < moved[other]) hong('gesture hand', `${line.data.steps[0].name} with hand ${hand}: arm ${lead} moves ${moved[lead].toFixed(0)}°, arm ${other} ${moved[other].toFixed(0)}°`);
       line.kill(); actor.svg.remove();
     }
+    // MÁY QUAY và người bước ra: nói xong rồi `exit` thì máy quay về toàn cảnh lúc bắt đầu đi — kể cả khi trước lượt ấy
+    // máy quay đang ở toàn cảnh (từng ghì cận vào chỗ trống). Và con vật đứng cạnh không bị mép dưới khung cắt ngang.
+    {
+      const stage2 = document.createElement('div'); stage2.setAttribute('data-composition-id', 'check-camera');
+      stage2.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
+      const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage2.appendChild(d); return d; };
+      const h1 = mk('cam-a', 'left:260px;bottom:40px;width:340px;height:400px'), h2 = mk('cam-b', 'left:700px;bottom:40px;width:340px;height:400px'), h3 = mk('cam-d', 'left:960px;bottom:40px;width:218px;height:180px');
+      document.body.appendChild(stage2);
+      const p1 = L.createCharacter(h1, { id: 'vet' }).rig, p2 = L.createCharacter(h2, { id: 'granny' }).rig, pet = L.createPet(h3, { species: 'dog' }).rig;
+      const scene2 = ['#cam-a', '#cam-b', '#cam-d'], scaleNow = () => new DOMMatrix(getComputedStyle(h1).transform).a;
+      const talk = L.conversation([[pet, 'wagTail'], [p2, ['explain', 'mot hai ba', 1.6], ['exit', 'right']], [p1, ['explain', 'bon nam', 1.4]]], { camera: scene2 });
+      const reel2 = gsap.timeline({ paused: true }); talk.addTo(reel2, 0);
+      const leaving = talk.of(p2).data.steps.find((step) => step.name === 'exit');
+      reel2.time(leaving.start - 0.5); if (scaleNow() < 1.2) hong('camera', 'test setup: no close-up while the character speaks before leaving');
+      reel2.time(leaving.start + leaving.duration - 0.3); if (scaleNow() > 1.01) hong('camera', `the camera stays on a close-up (zoom ${scaleNow().toFixed(2)}) of the spot a character has just walked out of`);
+      // Cận cảnh người thứ nhất: đầu con chó hoặc nằm trọn trong khung, hoặc nằm hẳn ngoài — không bị cắt.
+      reel2.time(talk.turns[2].start + 0.9);
+      { const frame = stage2.getBoundingClientRect(), head = pet.el.dau.getBoundingClientRect();
+        const seenX = Math.min(frame.right, head.right) - Math.max(frame.left, head.left), seenY = Math.min(frame.bottom, head.bottom) - Math.max(frame.top, head.top);
+        const part = seenX > 0 && seenY > 0 ? (seenX * seenY) / (head.width * head.height) : 0;
+        if (part > 0.08 && part < 0.92) hong('camera', `a pet beside the speaker is cut by the frame edge (${Math.round(part * 100)}% of its head shows)`); }
+      talk.sequences.forEach((item) => item.kill()); if (talk.camera) talk.camera.kill();
+      L.shot(scene2, null, 'wide').progress(1); stage2.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;
@@ -947,7 +971,11 @@ try {
     const reel = gsap.timeline({ paused: true }); acted.addTo(reel, 0);
     const nodTurn = acted.turns[1], barkTurn = acted.turns[2];
     reel.time((nodTurn.start + nodTurn.end) / 2); if (zoom() < 1.3) hong('camera', 'the camera leaves the speaker while the same character nods');
-    reel.time(barkTurn.start + 0.5); if (zoom() > 1.01) hong('camera', `a silent turn by a character outside the close-up is not shown (zoom ${zoom().toFixed(2)} during the dog's bark)`);
+    // Lúc chó sủa: hoặc máy quay đã về toàn cảnh, hoặc cảnh đang quay ÔM TRỌN cái đầu con chó (từ 0.30: con vật bị mép
+    // khung cắt thì được đưa hẳn vào khung, nên cận cảnh trước đó có thể đã gồm nó).
+    reel.time(barkTurn.start + 0.5);
+    { const frame = stage.getBoundingClientRect(), head = dog.el.dau.getBoundingClientRect(), whole = head.left >= frame.left - 1 && head.right <= frame.right + 1 && head.top >= frame.top - 1 && head.bottom <= frame.bottom + 1;
+      if (zoom() > 1.01 && !whole) hong('camera', `a silent turn by a character outside the close-up is not shown (zoom ${zoom().toFixed(2)} during the dog's bark, its head not wholly in frame)`); }
     reel.time(acted.turns[3].steps[0].start + 0.6); if (zoom() < 1.3) hong('camera', 'the camera does not return to the next speaker after a silent turn');
     reel.time(0);
     // `face(người kia)` trong hội thoại phải nhìn về chỗ người kia ĐANG ĐỨNG, không phải chỗ họ xuất phát:
