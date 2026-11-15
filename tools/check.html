@@ -453,6 +453,50 @@ try {
     stage.remove();
   }
 
+  // ── Hội thoại tự căn giờ, và máy quay ngắm nhiều nhân vật (kể cả thú) ──
+  {
+    const stage = document.createElement('div'); stage.dataset.compositionId = 'check-talk';
+    stage.style.cssText = 'position:fixed;left:-4000px;top:0;width:1920px;height:1080px;overflow:hidden';
+    stage.innerHTML = '<div id="tk-wall" style="position:absolute;inset:0"></div><div id="tk-a" style="position:absolute;left:200px;bottom:96px;height:760px"></div><div id="tk-b" style="position:absolute;left:1100px;bottom:96px;height:700px"></div><div id="tk-dog" style="position:absolute;left:800px;bottom:96px;height:330px"></div>';
+    document.body.appendChild(stage);
+    const a = L.createCharacter(stage.querySelector('#tk-a'), { id: 'barista' }).rig, b = L.createCharacter(stage.querySelector('#tk-b'), { id: 'granny' }).rig;
+    const dog = L.createPet(stage.querySelector('#tk-dog'), { species: 'dog' }).rig;
+    b.state.seat = 1;
+    const talk = L.conversation([
+      [a, ['walk', 4, 120], ['face', b]],
+      [b, ['face', a]],
+      [a, ['explain', 'xin chao ba', 2]],
+      [b, ['speak', 'chao chau', 1.2], 'nod'],
+      { together: [[a, 'wave'], [dog, 'bark'], [b, 'standUp']] },
+    ], { gap: 0.25 });
+    const turns = talk.turns;
+    if (turns.length !== 7 || talk.sequences.length !== 3) hong('conversation', `expected 7 turns and 3 sequences, got ${turns.length} and ${talk.sequences.length}`);
+    // Lượt sau bắt đầu đúng `gap` sau khi lượt trước xong; ba lượt "together" bắt đầu cùng lúc.
+    for (const [index, previous] of [[1, 0], [2, 1], [3, 2], [4, 3]]) if (Math.abs(turns[index].start - turns[previous].end - 0.25) > 0.01) hong('conversation', `turn ${index + 1} starts at ${turns[index].start.toFixed(3)}s, expected ${(turns[previous].end + 0.25).toFixed(3)}s (0.25 s after turn ${previous + 1})`);
+    if (Math.abs(turns[5].start - turns[4].start) > 0.01 || Math.abs(turns[6].start - turns[4].start) > 0.01) hong('conversation', 'turns inside { together } do not start at the same time');
+    // Giờ trong `turns` phải khớp giờ thật của chuỗi đã dựng.
+    const real = talk.of(b).data.steps.find((step) => step.name === 'speak');
+    if (!real || Math.abs(real.start - turns[3].start) > 0.01) hong('conversation', `turns[] says granny speaks at ${turns[3].start}s but her sequence has it at ${real && real.start}s`);
+    // Trong lúc chờ lượt, nhân vật thở chứ không đứng hình; và thế ngồi vẫn giữ.
+    if (!talk.of(b).data.steps.some((step) => step.name === 'idle')) hong('conversation', 'a waiting character has no idle step');
+    talk.of(b).time(turns[3].start + 0.5); if (Math.abs(b.state.seat - 1) > 1e-3) hong('conversation', 'the seated character stands up during the conversation');
+    const timeline = gsap.timeline({ paused: true }); talk.addTo(timeline, 0);
+    if (Math.abs(timeline.duration() - talk.duration) > 0.01) hong('conversation', 'addTo() does not add every sequence at the given time');
+    try { L.conversation([[a]]); hong('conversation', 'a turn without steps should throw'); } catch (error) { /* đúng */ }
+    // Máy quay hai người: cả hai nằm trọn trong khung; người + chó cũng vậy.
+    const scene = ['#tk-wall', '#tk-a', '#tk-b', '#tk-dog'], when = turns[3].start + 0.5;
+    const inFrame = (rig, kind) => { const frame = stage.getBoundingClientRect(), svg = rig.svg.getBoundingClientRect(), size = rig.constructor.KHUNG, unit = svg.height / size.h, left = svg.left + (svg.width - size.w * unit) / 2, box = rig.shotBox(kind);
+      return left + box.x * unit >= frame.left - 2 && left + (box.x + box.width) * unit <= frame.right + 2 && svg.top + box.y * unit >= frame.top - 2 && svg.top + (box.y + box.height) * unit <= frame.bottom + 2; };
+    for (const [subjects, kind] of [[[a, b], 'chest'], [[a, dog], 'full'], [[dog], 'face'], [[a, b, dog], 'full']]) {
+      const push = L.shot(scene, subjects, kind, { time: when }); push.progress(1);
+      for (const rig of subjects) { rig.lastSequence.time(when); if (!inFrame(rig, kind)) hong('shot', `${kind} of ${subjects.length} subject(s): "${rig.publicId}" is not fully inside the frame`); }
+      if (subjects.length === 1 && push.data.target.scale < 1.5) hong('shot', `a ${kind} shot of the dog barely zooms (scale ${push.data.target.scale.toFixed(2)})`);
+      push.kill();
+    }
+    L.shot(scene, null, 'wide').progress(1);
+    stage.remove();
+  }
+
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
   {
     const load = (url) => new Promise((resolve) => {

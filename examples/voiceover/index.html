@@ -50,10 +50,12 @@
     tl.add(act.paused(false), 0);
     tl.add(pet.paused(false), 0);
     // Camera: push in to the vet's chest as she starts to speak, to her face for the last phrase,
-    // back to the wide shot when she is done. `sequence` + `time` aim at where she is by then.
-    tl.add(VGCharacter.shot(scene, vet, 'chest', { sequence: act, time: speech.start + 1, duration: 0.8 }).paused(false), speech.start - 0.3);
-    tl.add(VGCharacter.shot(scene, vet, 'face', { sequence: act, time: speech.start + 4.6, duration: 0.5 }).paused(false), speech.start + 4.3);
-    tl.add(VGCharacter.shot(scene, null, 'wide', { duration: 0.8 }).paused(false), speech.start + speech.duration - 0.2);
+    // `time` aims at where she is by then (she has walked to her mark).
+    tl.add(VGCharacter.shot(scene, vet, 'chest', { time: speech.start + 1, duration: 0.8 }).paused(false), speech.start - 0.3);
+    tl.add(VGCharacter.shot(scene, vet, 'face', { time: speech.start + 4.6, duration: 0.5 }).paused(false), speech.start + 4.3);
+    // …then the vet and the dog together (a shot can frame several subjects, pets included)…
+    tl.add(VGCharacter.shot(scene, [vet, dog], 'full', { time: speech.start + speech.duration, duration: 0.8 }).paused(false), speech.start + speech.duration - 0.2);
+    tl.add(VGCharacter.shot(scene, null, 'wide', { duration: 0.8 }).paused(false), speech.start + speech.duration + 1.6);
     window.__timelines = window.__timelines || {};
     window.__timelines['voiceover'] = tl;
   </script>

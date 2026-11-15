@@ -592,6 +592,19 @@ export class RigThu {
     return frame.left + frame.width / 2 + this.s.x * scale;
   }
 
+  /**
+   * KHUNG NGẮM cho máy quay (`shot` trong index.js), đơn vị khung 400 × 330, ở trạng thái hiện tại.
+   *   'face'  cận mặt        'chest' / 'full'  cả con vật
+   */
+  shotBox(kind = 'full') {
+    const { S } = this.#khung(), d = this.nv.dau, s = this.s, k = s.huong < 0 ? -1 : 1;
+    const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
+    if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
+    if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+    const top = headY - 72, bottom = DAT + 10;
+    return { x: 200 + s.x - 125, y: top, width: 250, height: bottom - top };
+  }
+
   /** NGỒI XUỐNG và ở yên trong dáng ngồi. */
   sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
 

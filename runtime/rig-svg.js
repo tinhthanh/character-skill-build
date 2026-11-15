@@ -1600,10 +1600,11 @@ export class RigSVG {
     const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
     const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
     const centre = KHUNG.w / 2 + s.x, hip = HONG.y + DOI_Y + drop;
-    const box = (top, bottom) => ({ x: centre - (bottom - top) / 2, y: top, width: bottom - top, height: bottom - top });
+    // Bề ngang: mặt thì vuông; ngang ngực và cả người thì hẹp hơn chiều cao (để ghép khung hai nhân vật cho sát).
+    const box = (top, bottom, aspect = 1) => ({ x: centre - (bottom - top) * aspect / 2, y: top, width: (bottom - top) * aspect, height: bottom - top });
     if (kind === 'face') return box(headY - head * 1.3, headY + head * 1.08 + 5);     // chừa chỗ cho búi tóc / mũ phía trên
-    if (kind === 'chest') return box(headY - head * 1.2, hip + 12);
-    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14);
+    if (kind === 'chest') return box(headY - head * 1.2, hip + 12, 0.8);
+    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14, 0.55);
     throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
   }
 

@@ -1,4 +1,4 @@
-/* VGCharacter v0.9.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.10.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -952,10 +952,10 @@ class RigSVG {
     const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
     const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
     const centre = KHUNG.w / 2 + s.x, hip = HONG.y + DOI_Y + drop;
-    const box = (top, bottom) => ({ x: centre - (bottom - top) / 2, y: top, width: bottom - top, height: bottom - top });
+    const box = (top, bottom, aspect = 1) => ({ x: centre - (bottom - top) * aspect / 2, y: top, width: (bottom - top) * aspect, height: bottom - top });
     if (kind === 'face') return box(headY - head * 1.3, headY + head * 1.08 + 5);     // chừa chỗ cho búi tóc / mũ phía trên
-    if (kind === 'chest') return box(headY - head * 1.2, hip + 12);
-    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14);
+    if (kind === 'chest') return box(headY - head * 1.2, hip + 12, 0.8);
+    if (kind === 'full') return box(headY - head * 1.25, 428 + DOI_Y + 14, 0.55);
     throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
   }
   hangChan() {
@@ -2003,6 +2003,14 @@ class RigThu {
     const frame = this.svg.getBoundingClientRect();
     const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
     return frame.left + frame.width / 2 + this.s.x * scale;
+  }
+  shotBox(kind = 'full') {
+    const { S } = this.#khung(), d = this.nv.dau, s = this.s, k = s.huong < 0 ? -1 : 1;
+    const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
+    if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
+    if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+    const top = headY - 72, bottom = DAT + 10;
+    return { x: 200 + s.x - 125, y: top, width: 250, height: bottom - top };
   }
   sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
   standUp() { return this.#khep(this.tl(), 0.35, 0, { ngoi: 0 }); }
@@ -3136,7 +3144,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.9.1';
+const VERSION = '0.10.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3359,10 +3367,11 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   timeline.to(playhead, { frame: lastPosition, duration, ease: 'none' }, 0);
   timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps, rig };
+  rig.lastSequence = timeline;                  // `shot(…, { time })` dùng chuỗi này để biết nhân vật đang ở đâu lúc ấy
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
-function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: actions, time, frame } = {}) {
+function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: given, time, frame } = {}) {
   const elements = [].concat(scene || []).flatMap((item) => (typeof item === 'string' ? [...document.querySelectorAll(item)] : [item])).filter((item) => item && item.nodeType === 1);
   if (!elements.length) throw new Error('[character] shot(scene, …): scene must be a selector, an element, or an array of them — and match at least one element');
   const root = frame || elements[0].closest('[data-composition-id]') || elements[0].parentElement;
@@ -3374,18 +3383,25 @@ function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2.inOut'
   };
   let target = { x: 0, y: 0, scale: 1 };
   if (kind !== 'wide') {
-    if (!rig || typeof rig.shotBox !== 'function') throw new Error(`[character] shot(scene, rig, "${kind}"): rig must be a person rig (createCharacter(...).rig)`);
-    const before = actions ? actions.time() : 0;
-    if (actions) actions.time(time ?? before);
-    const box = rig.shotBox(kind);
-    if (actions) actions.time(before);
-    const host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
-    const unit = Math.min(hostWidth / RigSVG.KHUNG.w, hostHeight / RigSVG.KHUNG.h);
-    const left = host.x + (hostWidth - RigSVG.KHUNG.w * unit) / 2, top = host.y + (hostHeight - RigSVG.KHUNG.h * unit) / 2;
-    const centreX = left + (box.x + box.width / 2) * unit, centreY = top + (box.y + box.height / 2) * unit;
-    const scale = Math.max(1, Math.min(8, fill * frameHeight / (box.height * unit)));
+    const rigs = [].concat(subject || []);
+    if (!rigs.length || rigs.some((rig) => !rig || typeof rig.shotBox !== 'function')) throw new Error(`[character] shot(scene, subject, "${kind}"): subject must be a rig (createCharacter / createPet …).rig, or an array of rigs`);
+    const sequences = [].concat(given || []);
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    rigs.forEach((rig, index) => {
+      const actions = time === undefined ? null : sequences[index] || (sequences.length === 1 && rigs.length === 1 ? sequences[0] : null) || rig.lastSequence || null;
+      const before = actions ? actions.time() : 0;
+      if (actions) actions.time(Math.min(time, actions.duration()));
+      const box = rig.shotBox(kind);
+      if (actions) actions.time(before);
+      const size = rig.constructor.KHUNG, host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
+      const unit = Math.min(hostWidth / size.w, hostHeight / size.h);
+      const originX = host.x + (hostWidth - size.w * unit) / 2, originY = host.y + (hostHeight - size.h * unit) / 2;
+      left = Math.min(left, originX + box.x * unit); right = Math.max(right, originX + (box.x + box.width) * unit);
+      top = Math.min(top, originY + box.y * unit); bottom = Math.max(bottom, originY + (box.y + box.height) * unit);
+    });
+    const scale = Math.max(1, Math.min(8, fill * frameHeight / (bottom - top), (rigs.length > 1 ? 0.9 : 1.6) * frameWidth / (right - left)));
     const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
-    target = { x: within(frameWidth / 2 - centreX * scale, frameWidth), y: within(frameHeight / 2 - centreY * scale, frameHeight), scale };
+    target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight / 2 - (top + bottom) / 2 * scale, frameHeight), scale };
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   for (const element of elements) {
@@ -3396,9 +3412,49 @@ function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2.inOut'
   timeline.data = { type: 'character-shot', kind, target };
   return timeline;
 }
+function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1 } = {}) {
+  if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
+  const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
+  const part = (rig) => { if (!cast.has(rig)) cast.set(rig, { steps: [], end: 0, used: false }); return cast.get(rig); };
+  const measure = (rig, steps) => { const draft = sequence(rig, steps, { gap: stepGap, sampleRate: 4 }); const data = { duration: draft.duration(), steps: draft.data.steps }; draft.kill(); return data; };
+  const turns = [];
+  let clock = 0;
+  turnList.forEach((entry, index) => {
+    const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
+    const begin = clock;
+    let finish = begin;
+    for (const turn of parallel) {
+      if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps] or { together: [[rig, ...steps], …] }`);
+      const [rig, ...steps] = turn, mine = part(rig);
+      const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
+      let wait = begin - mine.end - lead;
+      if (wait < -1e-6) throw new Error(`[character] conversation: turn ${index + 1} would start before "${rig.publicId || 'character'}" finished its previous turn`);
+      if (waiting && wait > 0.8 && typeof rig.idle === 'function') {
+        mine.steps.push(['idle', +(wait - 0.3).toFixed(3)]);
+        mine.end = measure(rig, mine.steps).duration; mine.used = true;
+        wait = begin - mine.end - stepGap;
+      }
+      if (wait > 1e-4) mine.steps.push(+wait.toFixed(4));
+      const from = mine.steps.length;
+      mine.steps.push(...steps);
+      const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
+      mine.end = measured.duration; mine.used = true;
+      finish = Math.max(finish, mine.end);
+      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real });
+    }
+    clock = finish + gap;
+  });
+  const sequences = [...cast.entries()].map(([rig, mine]) => sequence(rig, mine.steps, { gap: stepGap }));
+  const rigs = [...cast.keys()];
+  return {
+    sequences, turns, duration: Math.max(...sequences.map((item) => item.duration())),
+    of: (rig) => sequences[rigs.indexOf(rig)] || null,
+    addTo(timeline, at = 0) { for (const item of sequences) timeline.add(item.paused(false), at); return timeline; },
+  };
+}
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, RigSVG, RigThu, createProp };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, conversation, RigSVG, RigThu, createProp };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

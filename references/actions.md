@@ -165,8 +165,9 @@ granny.state.seat = 1;                       // already seated in the first fram
 | `VGCharacter.createCharacter(host, { id, config })` | build a person; returns `{ rig, id }`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
-| `VGCharacter.shot(scene, rig, kind, options)` | camera: zoom the scene onto a character's `'face'` / `'chest'` / `'full'`, or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
+| `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
 | `rig.shotBox(kind)` | the box such a shot aims at, in frame units, for the rig's current state |
+| `VGCharacter.conversation(turns, { gap, waiting })` | several characters taking turns, timed automatically; returns `{ sequences, turns, duration, of(rig), addTo(timeline, at) }` — see `references/hyperframes.md` → Staging recipes |
 | `VGCharacter.sequence(rig, steps, { gap })` | one paused timeline from a list of actions; step timings in `.data.steps`. The result is pre-sampled, so seeking to any time, in any order, gives the same frame |
 | `VGCharacter.seed(n)` | fix all randomness; `null` restores `Math.random` |
 | `VGCharacter.list()` | ids, action names, expression names, baked config ids |

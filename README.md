@@ -26,11 +26,11 @@ And what a scene can do with them:
   nods and waves while seated or turned toward someone. Pets do the same.
 - **Furniture** — `createProp(host, 'chair' | 'stool' | 'table' | 'counter', { for: rig })`
   draws props that line up with a seated character.
-- **Conversations** — one sequence per character, lines taking turns;
+- **Conversations** — `conversation([[rig, ...steps], …])` chains turns and times them;
   `examples/conversation/` is a complete two-person scene.
 - **Voice and camera** — `tools/cues.py voice.wav` turns a voice file into mouth cues for
-  `speakCues` (Rhubarb when installed, loudness otherwise); `shot(scene, rig, 'face')` pushes
-  the camera in. `examples/voiceover/` shows both.
+  `speakCues` (Rhubarb when installed, a built-in spectral method otherwise); `shot(scene, rig,
+  'face')` pushes the camera in on one character or frames several. `examples/voiceover/` shows both.
 
 - **`SKILL.md`** — instructions an AI agent follows to create a character from a brief,
   verify it, and place it in a composition.

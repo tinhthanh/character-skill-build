@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.9.1';
+export const VERSION = '0.10.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -367,34 +367,38 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   timeline.to(playhead, { frame: lastPosition, duration, ease: 'none' }, 0);
   timeline.data = { type: 'character-sequence', character: rig.publicId || '', steps, rig };
+  rig.lastSequence = timeline;                  // `shot(…, { time })` dùng chuỗi này để biết nhân vật đang ở đâu lúc ấy
   show(0);                                      // rig nằm sẵn ở đúng khung 0 của chuỗi
   return timeline;
 }
 
 /**
- * MÁY QUAY: phóng CẢNH vào một nhân vật — cận mặt, ngang ngực, cả người — hoặc trả về toàn
- * cảnh. Trả về một timeline (paused) để `add` vào timeline của composition.
+ * MÁY QUAY: phóng CẢNH vào một hay nhiều nhân vật — cận mặt, ngang ngực, cả người — hoặc trả
+ * về toàn cảnh. Trả về một timeline (paused) để `add` vào timeline của composition.
  *
  *   const scene = ['#wall', '#floor', '#dog', '#vet'];          // mọi thứ thuộc về cảnh
- *   tl.add(VGCharacter.shot(scene, rig, 'face', { sequence: act, time: 5.2 }).paused(false), 5.0);
- *   tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), 9.0);
+ *   tl.add(VGCharacter.shot(scene, vet, 'face', { time: 5.2 }).paused(false), 5.0);
+ *   tl.add(VGCharacter.shot(scene, [vet, dog], 'full', { time: 9 }).paused(false), 8.6);   // cả hai trong một khung
+ *   tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), 12.0);
  *
  *   scene     các phần tử của cảnh: một selector, một phần tử, hoặc một mảng của hai thứ đó.
  *             TỪNG phần tử được dịch và phóng như nhau quanh góc trên-trái của khung hình, nên
  *             chúng cứ nằm phẳng cạnh nhau trong composition — không cần (và không nên) bọc
  *             chung vào một lớp. Thứ không nằm trong danh sách (phụ đề, logo) thì đứng yên.
- *   rig       nhân vật NGƯỜI cần ngắm (bỏ qua khi kind = 'wide')
+ *   subject   một rig (người hoặc thú) hay một MẢNG rig — khung ôm lấy tất cả (bỏ qua khi kind = 'wide')
  *   kind      'face' | 'chest' | 'full' | 'wide'
- *   options   duration (0.6; 0 = cắt cảnh), ease, fill (0.82 — phần chiều cao khung mà vùng ngắm chiếm),
- *             sequence + time: chuỗi của nhân vật và thời điểm (tính trong chuỗi) của cảnh quay —
- *             để ngắm đúng chỗ nhân vật ĐANG Ở lúc ấy (đã đi, đã ngồi). Không đưa thì lấy
- *             trạng thái hiện tại của rig, tức khung đầu của chuỗi.
+ *   options   duration (0.6; 0 = cắt cảnh), ease, fill (0.82 — phần khung hình mà vùng ngắm chiếm),
+ *             time: thời điểm của cảnh quay, để ngắm đúng chỗ nhân vật ĐANG Ở lúc ấy (đã đi, đã
+ *             ngồi). Tính trong chuỗi của từng nhân vật — tức cũng là giờ của composition khi các
+ *             chuỗi được `add` ở 0. Không đưa thì lấy trạng thái hiện tại của rig (khung đầu).
+ *             sequence: chuỗi dùng để tua tới `time`; mặc định là chuỗi `sequence()` dựng gần nhất
+ *             cho rig ấy (đưa một mảng nếu ngắm nhiều rig và muốn chỉ định).
  *             frame: phần tử làm khung hình (mặc định: phần tử gốc có data-composition-id).
  *
  * Vị trí tính MỘT LẦN lúc dựng, từ bố cục trang và hình học của rig — nên tua tới đâu cũng ra
  * cùng một khung hình. Máy quay không bám theo nhân vật đang di chuyển.
  */
-export function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: actions, time, frame } = {}) {
+export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.inOut', fill = 0.82, sequence: given, time, frame } = {}) {
   const elements = [].concat(scene || []).flatMap((item) => (typeof item === 'string' ? [...document.querySelectorAll(item)] : [item])).filter((item) => item && item.nodeType === 1);
   if (!elements.length) throw new Error('[character] shot(scene, …): scene must be a selector, an element, or an array of them — and match at least one element');
   const root = frame || elements[0].closest('[data-composition-id]') || elements[0].parentElement;
@@ -408,21 +412,29 @@ export function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2
   };
   let target = { x: 0, y: 0, scale: 1 };
   if (kind !== 'wide') {
-    if (!rig || typeof rig.shotBox !== 'function') throw new Error(`[character] shot(scene, rig, "${kind}"): rig must be a person rig (createCharacter(...).rig)`);
-    // Đưa nhân vật tới đúng thời điểm của cảnh quay để đọc vị trí, rồi trả chuỗi về chỗ cũ.
-    const before = actions ? actions.time() : 0;
-    if (actions) actions.time(time ?? before);
-    const box = rig.shotBox(kind);
-    if (actions) actions.time(before);
-    // Khung của rig (400 × 470) nằm vừa trong host, canh giữa.
-    const host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
-    const unit = Math.min(hostWidth / RigSVG.KHUNG.w, hostHeight / RigSVG.KHUNG.h);
-    const left = host.x + (hostWidth - RigSVG.KHUNG.w * unit) / 2, top = host.y + (hostHeight - RigSVG.KHUNG.h * unit) / 2;
-    const centreX = left + (box.x + box.width / 2) * unit, centreY = top + (box.y + box.height / 2) * unit;
-    const scale = Math.max(1, Math.min(8, fill * frameHeight / (box.height * unit)));
+    const rigs = [].concat(subject || []);
+    if (!rigs.length || rigs.some((rig) => !rig || typeof rig.shotBox !== 'function')) throw new Error(`[character] shot(scene, subject, "${kind}"): subject must be a rig (createCharacter / createPet …).rig, or an array of rigs`);
+    const sequences = [].concat(given || []);
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    rigs.forEach((rig, index) => {
+      // Đưa nhân vật tới đúng thời điểm của cảnh quay để đọc vị trí, rồi trả chuỗi về chỗ cũ.
+      const actions = time === undefined ? null : sequences[index] || (sequences.length === 1 && rigs.length === 1 ? sequences[0] : null) || rig.lastSequence || null;
+      const before = actions ? actions.time() : 0;
+      if (actions) actions.time(Math.min(time, actions.duration()));
+      const box = rig.shotBox(kind);
+      if (actions) actions.time(before);
+      // Khung của rig (người 400 × 470, thú 400 × 330) nằm vừa trong host, canh giữa.
+      const size = rig.constructor.KHUNG, host = place(rig.host), hostWidth = rig.host.offsetWidth, hostHeight = rig.host.offsetHeight;
+      const unit = Math.min(hostWidth / size.w, hostHeight / size.h);
+      const originX = host.x + (hostWidth - size.w * unit) / 2, originY = host.y + (hostHeight - size.h * unit) / 2;
+      left = Math.min(left, originX + box.x * unit); right = Math.max(right, originX + (box.x + box.width) * unit);
+      top = Math.min(top, originY + box.y * unit); bottom = Math.max(bottom, originY + (box.y + box.height) * unit);
+    });
+    // Vừa cả chiều cao lẫn bề ngang của vùng ngắm (hai nhân vật đứng xa nhau thì bề ngang quyết định).
+    const scale = Math.max(1, Math.min(8, fill * frameHeight / (bottom - top), (rigs.length > 1 ? 0.9 : 1.6) * frameWidth / (right - left)));
     // Canh vùng ngắm vào giữa khung, nhưng không để lộ ra ngoài mép cảnh.
     const within = (value, size) => Math.min(0, Math.max(size - size * scale, value));
-    target = { x: within(frameWidth / 2 - centreX * scale, frameWidth), y: within(frameHeight / 2 - centreY * scale, frameHeight), scale };
+    target = { x: within(frameWidth / 2 - (left + right) / 2 * scale, frameWidth), y: within(frameHeight / 2 - (top + bottom) / 2 * scale, frameHeight), scale };
   }
   const timeline = gsap.timeline({ paused: true, defaults: { lazy: false } });
   for (const element of elements) {
@@ -434,6 +446,71 @@ export function shot(scene, rig, kind = 'face', { duration = 0.6, ease = 'power2
   }
   timeline.data = { type: 'character-shot', kind, target };
   return timeline;
+}
+
+/**
+ * HỘI THOẠI: xếp LƯỢT của nhiều nhân vật nối tiếp nhau và tự căn giờ — không phải cộng tay
+ * thời lượng của người này để ra quãng nghỉ của người kia.
+ *
+ *   const talk = VGCharacter.conversation([
+ *     [vet, ['enter', 'left'], ['walk', 4, 230], ['face', boy]],     // một lượt = [rig, ...các bước]
+ *     [boy, ['face', vet]],
+ *     [vet, ['speakCues', cues.line1]],
+ *     [boy, ['speakCues', cues.line2], 'nod'],
+ *     { together: [[vet, 'wave'], [dog, 'bark']] },                  // nhiều nhân vật CÙNG LÚC
+ *   ], { gap: 0.25 });
+ *   talk.addTo(tl, 0);
+ *
+ * Lượt sau bắt đầu khi lượt trước xong (cộng `gap` giây). Trong lúc chờ tới lượt, nhân vật
+ * THỞ và chớp mắt (`idle`) thay vì đứng hình — `waiting: false` để tắt.
+ *
+ * Trả về { sequences, turns, duration, addTo, of }:
+ *   sequences   mỗi nhân vật một timeline `sequence()` (cùng thứ tự xuất hiện)
+ *   turns       [{ rig, character, start, end, steps: [{ name, start, duration }] }] — giờ tuyệt đối
+ *   addTo(timeline, at = 0)   thêm mọi chuỗi vào timeline của composition
+ *   of(rig)     chuỗi của một nhân vật
+ */
+export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1 } = {}) {
+  if (!Array.isArray(turnList) || !turnList.length) throw new Error('[character] conversation(turns): turns must be a non-empty array of [rig, ...steps]');
+  const cast = new Map();                                  // rig → { steps: danh sách bước đang dựng, end: giờ kết thúc hiện tại }
+  const part = (rig) => { if (!cast.has(rig)) cast.set(rig, { steps: [], end: 0, used: false }); return cast.get(rig); };
+  // Đo một danh sách bước: dựng thử với tần số lấy mẫu thấp (nhanh), đọc giờ từng bước.
+  const measure = (rig, steps) => { const draft = sequence(rig, steps, { gap: stepGap, sampleRate: 4 }); const data = { duration: draft.duration(), steps: draft.data.steps }; draft.kill(); return data; };
+  const turns = [];
+  let clock = 0;
+  turnList.forEach((entry, index) => {
+    const parallel = entry && !Array.isArray(entry) && Array.isArray(entry.together) ? entry.together : [entry];
+    const begin = clock;
+    let finish = begin;
+    for (const turn of parallel) {
+      if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps] or { together: [[rig, ...steps], …] }`);
+      const [rig, ...steps] = turn, mine = part(rig);
+      // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
+      const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
+      let wait = begin - mine.end - lead;
+      if (wait < -1e-6) throw new Error(`[character] conversation: turn ${index + 1} would start before "${rig.publicId || 'character'}" finished its previous turn`);
+      if (waiting && wait > 0.8 && typeof rig.idle === 'function') {
+        mine.steps.push(['idle', +(wait - 0.3).toFixed(3)]);
+        mine.end = measure(rig, mine.steps).duration; mine.used = true;
+        wait = begin - mine.end - stepGap;
+      }
+      if (wait > 1e-4) mine.steps.push(+wait.toFixed(4));
+      const from = mine.steps.length;
+      mine.steps.push(...steps);
+      const measured = measure(rig, mine.steps), real = measured.steps.slice(measured.steps.length - steps.filter((step) => typeof step !== 'number').length);
+      mine.end = measured.duration; mine.used = true;
+      finish = Math.max(finish, mine.end);
+      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real });
+    }
+    clock = finish + gap;
+  });
+  const sequences = [...cast.entries()].map(([rig, mine]) => sequence(rig, mine.steps, { gap: stepGap }));
+  const rigs = [...cast.keys()];
+  return {
+    sequences, turns, duration: Math.max(...sequences.map((item) => item.duration())),
+    of: (rig) => sequences[rigs.indexOf(rig)] || null,
+    addTo(timeline, at = 0) { for (const item of sequences) timeline.add(item.paused(false), at); return timeline; },
+  };
 }
 
 // Đăng ký nhân vật có sẵn rồi tới nhân vật tuỳ chỉnh. Đặt ở CUỐI module: việc đăng ký dùng

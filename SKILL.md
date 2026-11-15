@@ -163,9 +163,10 @@ and non-hex colours. These still fail without an error:
   `height` as its sitter lines up by itself. See `references/actions.md` → Scene props.
 - **Voice and camera:** with a voice file, `python3 tools/cues.py voice.wav --js` makes mouth
   cues and `['speakCues', window.VOICE_CUES.voice]` lip-syncs to them; `VGCharacter.shot(scene,
-  rig, 'face' | 'chest' | 'full' | 'wide')` cuts or pushes in to a character. Both are in
+  subject, 'face' | 'chest' | 'full' | 'wide')` cuts or pushes in to one character or several. Both are in
   `references/hyperframes.md`; `examples/voiceover/` uses them together.
-- **Conversations:** `sitDown`, `standUp` and `face(target)` change the stance and *keep* it, so
+- **Conversations:** `VGCharacter.conversation([[rig, ...steps], …])` chains turns and times
+  them for you. `sitDown`, `standUp` and `face(target)` change the stance and *keep* it, so
   a character can speak while seated or while turned to another character. See
   `references/actions.md` → Stance.
 - **A bald head needs `backHair`.** The rig generates hair behind the skull when the head

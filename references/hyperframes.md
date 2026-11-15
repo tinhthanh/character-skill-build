@@ -114,9 +114,24 @@ starts 270 units to the left of it. Two ways to use that:
 
 **Enter from the right:** `['enter', 'right']` (people). Mirror the layout above.
 
-**Two characters talking.** One sequence per character, speaking steps taking turns; a bare
-number in a sequence is a pause that waits for the other's line. Start each with a stance
-(`sitDown`, `['face', otherRig]`) — it holds for everything after. For a character that is
+**Two characters talking.** Use `VGCharacter.conversation(turns)`: each turn is
+`[rig, ...steps]`, the next turn starts when the previous one is done, and a character
+waiting for its turn keeps breathing — no pauses to add up by hand:
+
+```js
+const talk = VGCharacter.conversation([
+  [vet, ['enter', 'left'], ['walk', 4, 230]],
+  { together: [[vet, ['face', boy]], [boy, ['face', vet]]] },      // several characters at once
+  [vet, ['speakCues', window.VOICE_CUES.line1]],
+  [boy, ['speakCues', window.VOICE_CUES.line2], 'nod'],
+], { gap: 0.25 });                                                 // seconds between turns
+talk.addTo(tl, 0);
+```
+
+`talk.turns` lists every turn with absolute `start` / `end` and its steps (to time shots,
+captions and audio), `talk.of(rig)` is that character's sequence. (Under the hood it is still
+one `sequence()` per character.) Give each character a stance (`sitDown`,
+`['face', otherRig]`) — it holds for everything after. For a character that is
 **already seated (or already turned) in the first frame**, set the stance on the rig before
 building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Hand gestures open
 the body toward the viewer for their duration (arms are drawn for a front view), then return
@@ -124,7 +139,8 @@ to the held facing. Draw the chair as an
 ordinary element behind the seated character. Run `tools/peek.sh`: it prints every step's
 start and end, and warns about speech overlapping by more than 0.15 s (the 0.55 s settling
 tail of a speaking step does not count), a character facing away
-from the one it turned to, and an `enter` that starts with the head already inside the frame. Complete example: `examples/conversation/index.html`.
+from the one it turned to, and an `enter` that starts with the head already inside the frame, and an `<audio>` clip that does
+not line up with its `speakCues` step (wrong start, wrong length, or missing). Complete example: `examples/conversation/index.html`.
 
 **Which way pets face.** Dogs and cats stand with the head toward screen right. Place a pet to
 the *left* of the person it should look toward, or expect to see its tail first.
@@ -165,9 +181,11 @@ Two ways to move the mouth:
 
    It uses [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync) when the
    `rhubarb` program is installed (on `PATH`, or its path in `$RHUBARB`) — mouth shapes then
-   follow the phonemes; add `--dialog words.txt` to help it. Otherwise it falls back to
-   **loudness**: timing is right, shapes are approximate (open / wider / widest). Force one
-   with `--method rhubarb|amplitude`. WAV is read directly; mp3, m4a and other formats need
+   follow the phonemes; add `--dialog words.txt` to help it. Otherwise it uses its own
+   **spectral** method: no dependency, it reads where the sound's energy is and picks open,
+   spread, rounded, closed or teeth-together shapes — an acoustic guess, not speech
+   recognition. `--method amplitude` is the simplest fallback (loudness only). Force one with
+   `--method rhubarb|spectral|amplitude`. WAV is read directly; mp3, m4a and other formats need
    `ffmpeg`. Without `--js` it writes Rhubarb-format JSON.
 
 2. Load the cues as a plain script (a composition cannot `fetch`) and use them as a step:
@@ -194,28 +212,33 @@ arrives, switch the step to `speakCues`.
 
 ## Camera shots
 
-`VGCharacter.shot(scene, rig, kind, options)` zooms the scene onto a character and returns a
-paused timeline to add to the composition's:
+`VGCharacter.shot(scene, subject, kind, options)` zooms the scene onto one or several
+characters and returns a paused timeline to add to the composition's:
 
 ```js
 const scene = ['#wall', '#floor', '#dog', '#vet'];            // everything that belongs to the scene
 const speech = act.data.steps.find((step) => step.name === 'speakCues');
-tl.add(VGCharacter.shot(scene, vet, 'chest', { sequence: act, time: speech.start + 1 }).paused(false), speech.start - 0.3);
-tl.add(VGCharacter.shot(scene, vet, 'face',  { sequence: act, time: speech.start + 4 }).paused(false), speech.start + 4);
+tl.add(VGCharacter.shot(scene, vet, 'chest', { time: speech.start + 1 }).paused(false), speech.start - 0.3);
+tl.add(VGCharacter.shot(scene, vet, 'face',  { time: speech.start + 4 }).paused(false), speech.start + 4);
+tl.add(VGCharacter.shot(scene, [vet, dog], 'full', { time: speech.start + 6 }).paused(false), speech.start + 6);
 tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), speech.start + speech.duration);
 ```
 
 - `scene` — a selector, an element, or an array of them. Every listed element gets the same
   move and zoom, so they stay flat siblings in the composition (no wrapper). Leave out what
   must not move: captions, a logo, the audio.
+- `subject` — a rig (person or pet) or an **array of rigs**; the frame then holds all of them
+  (two people talking, a person and their dog). `null` for `'wide'`.
 - `kind` — `'face'`, `'chest'` (top of the head to the hips), `'full'`, or `'wide'` (back to
-  the whole frame; `rig` may be `null`).
+  the whole frame). For a pet, `'chest'` and `'full'` both mean the whole animal.
 - `options` — `duration` (0.6 s; `0` is a hard cut), `ease`, `fill` (0.82: how much of the
-  frame height the target takes), and `sequence` + `time`: the character's sequence and the
-  moment of the shot **in that sequence**, so the camera aims at where the character is by
-  then (after a walk, seated…). Without them it aims at the character's first frame.
+  frame the target takes), and `time`: the moment of the shot, so the camera aims at where
+  each subject is **by then** (after a walk, seated…). It is a time in the subject's own
+  sequence — the same as the composition time when sequences are added at 0. Without `time`
+  the camera aims at the subject's first frame. `sequence` overrides which sequence is used
+  (default: the last one built for that rig).
 - The aim is computed once, when the timeline is built: the camera does not follow a
-  character that walks during the shot. Only people have shots.
+  character that walks during the shot.
 
 ## Validate and render
 

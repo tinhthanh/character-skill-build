@@ -5,14 +5,18 @@
     python3 tools/cues.py voice.wav --js            → voice.cues.js   (a plain <script> to include)
     python3 tools/cues.py voice.wav -o out.json --method amplitude
 
-Two methods, same output format (Rhubarb's: {"metadata": …, "mouthCues": [{start, end, value}]}):
+Three methods, same output format (Rhubarb's: {"metadata": …, "mouthCues": [{start, end, value}]}):
 
   rhubarb    Rhubarb Lip Sync reads the phonemes — mouth shapes follow the words. Used when
              the `rhubarb` program is installed (on PATH, or its path in $RHUBARB).
              https://github.com/DanielSWolf/rhubarb-lip-sync
-  amplitude  No dependency: the mouth opens with the loudness of the voice and closes in the
-             pauses. Timing is right, mouth SHAPES are approximate. The default when Rhubarb
-             is not installed.
+  spectral   No dependency. Looks at WHERE the sound's energy is, 20 ms at a time: hissing
+             sounds (s, t, ch) close the teeth, energy around 500–900 Hz opens the mouth (a, o),
+             energy up at 2–3 kHz spreads it (e, i), energy only at the bottom rounds it
+             (u, oo) or closes it (m, n). A guess from acoustics, not speech recognition — but
+             the mouth changes shape with the vowels. The default when Rhubarb is not installed.
+  amplitude  No dependency: the mouth just opens with the loudness of the voice. Timing is
+             right, shapes are only open / wider / widest.
 
 WAV (PCM) is read directly. Any other format (mp3, m4a, ogg…) is converted with `ffmpeg`,
 which must then be installed. Nothing is uploaded anywhere.
@@ -96,11 +100,97 @@ def amplitude_cues(path):
         else:
             cues.append({'start': i * FRAME, 'end': (i + 1) * FRAME, 'value': value})
     cues[-1]['end'] = duration
-    # A short quiet gap inside a phrase is a closed mouth (A: m, b, p), not a pause.
+    return tidy(cues), duration
+
+
+def samples_of(path, top_rate=11000):
+    """First channel as floats, halved in rate until at most `top_rate` (speech needs no more)."""
+    with wave.open(path, 'rb') as w:
+        channels, width, rate, count = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+        raw = w.readframes(count)
+    step = width * channels
+    if width == 1:
+        data = [raw[i * step] - 128 for i in range(count)]
+    else:
+        data = [int.from_bytes(raw[i * step:i * step + width], 'little', signed=True) for i in range(count)]
+    duration = count / rate
+    while rate > top_rate:                                   # trung bình từng cặp mẫu = lọc thô + giảm nửa tần số
+        data = [(data[i] + data[i + 1]) / 2 for i in range(0, len(data) - 1, 2)]
+        rate //= 2
+    return data, rate, duration
+
+
+# Bốn dải tần của tiếng nói (Hz): đáy · vùng mở miệng · giữa · vùng âm trước / âm xát.
+BANDS = ((200, 275, 350, 425), (500, 600, 700, 800, 900), (1050, 1250, 1450, 1650), (1900, 2150, 2400, 2650, 2900))
+
+
+def band_power(frame, rate, frequency):
+    """Power of one frequency in a frame (Goertzel)."""
+    k = 2 * math.cos(2 * math.pi * frequency / rate)
+    a = b = 0.0
+    for value in frame:
+        a, b = value + k * a - b, a
+    return a * a + b * b - k * a * b
+
+
+def spectral_shape(frame, emphasised, rate, level):
+    """Mouth shape of one voiced frame. `level` is its loudness, 0…1+ against the loud parts."""
+    size = len(frame)
+    crossings = sum(1 for i in range(1, size) if (frame[i] >= 0) != (frame[i - 1] >= 0)) * rate / (2 * size)
+    if crossings > 1800:                                     # tiếng xì (s, t, ch, sh): răng gần khít
+        return 'B'
+    usable = [[f for f in band if f < rate * 0.45] for band in BANDS]
+    power = [sum(band_power(emphasised, rate, f) for f in band) for band in usable]
+    total = sum(power) or 1.0
+    low, open_, mid, front = (p / total for p in power)
+    if front >= 0.35:                                        # e, i: miệng bè ngang
+        return 'C' if level >= 0.6 else 'B'
+    if open_ >= 0.45 or (open_ + mid >= 0.6 and mid >= 0.25):  # a, o: miệng mở
+        return 'D' if level >= 0.75 else 'C' if level >= 0.35 else 'B'
+    if low >= 0.6:                                           # chỉ có đáy: u / oo (to) hoặc m, n (nhỏ)
+        if level < 0.25:
+            return 'A'
+        return 'F' if level >= 0.55 and open_ + mid < 0.12 else 'E'
+    return 'D' if level >= 0.75 else 'C' if level >= 0.4 else 'B'
+
+
+def spectral_cues(path):
+    data, rate, duration = samples_of(path)
+    size = max(1, int(rate * FRAME))
+    count = len(data) // size
+    if not count:
+        return [{'start': 0.0, 'end': round(duration, 2), 'value': 'X'}], duration
+    emphasised = [data[i] - 0.95 * data[i - 1] if i else data[0] for i in range(len(data))]   # nâng tần cao cho phổ bớt dốc
+    levels = [math.sqrt(sum(v * v for v in data[n * size:(n + 1) * size]) / size) for n in range(count)]
+    ranked = sorted(levels)
+    loud = ranked[min(count - 1, int(count * 0.95))] or max(levels) or 1.0
+    floor = ranked[int(count * 0.1)]
+    gate = floor + (loud - floor) * 0.12
+    shapes = []
+    for n in range(count):
+        if levels[n] < gate:
+            shapes.append('X')
+        else:
+            shapes.append(spectral_shape(data[n * size:(n + 1) * size], emphasised[n * size:(n + 1) * size], rate, (levels[n] - gate) / max(1e-9, loud - gate)))
+    # Một khung lạc giữa hai khung giống nhau là nhiễu: theo hàng xóm.
+    for n in range(1, count - 1):
+        if shapes[n - 1] == shapes[n + 1] != shapes[n]:
+            shapes[n] = shapes[n - 1]
+    cues = []
+    for n, value in enumerate(shapes):
+        if cues and cues[-1]['value'] == value:
+            cues[-1]['end'] = (n + 1) * FRAME
+        else:
+            cues.append({'start': n * FRAME, 'end': (n + 1) * FRAME, 'value': value})
+    cues[-1]['end'] = duration
+    return tidy(cues), duration
+
+
+def tidy(cues):
+    """Short quiet gaps become a closed mouth, blink-length shapes are absorbed, equal neighbours merge."""
     for cue in cues:
         if cue['value'] == 'X' and cue['end'] - cue['start'] < PAUSE and cue is not cues[0] and cue is not cues[-1]:
             cue['value'] = 'A'
-    # Absorb shapes too short to see into their neighbour, then merge equal neighbours.
     merged = []
     for cue in cues:
         if merged and (cue['end'] - cue['start'] < MIN_CUE or merged[-1]['value'] == cue['value']):
@@ -109,7 +199,7 @@ def amplitude_cues(path):
             merged.append(dict(cue))
     for cue in merged:
         cue['start'], cue['end'] = round(cue['start'], 2), round(cue['end'], 2)
-    return merged, duration
+    return merged
 
 
 def rhubarb_cues(path, program, dialog):
@@ -127,7 +217,7 @@ def main():
     parser = argparse.ArgumentParser(description='Mouth cues for rig.speakCues() from a voice-over file.')
     parser.add_argument('audio')
     parser.add_argument('-o', '--output', help='output file (default: <audio>.cues.json, or .cues.js with --js)')
-    parser.add_argument('--method', choices=['auto', 'rhubarb', 'amplitude'], default='auto')
+    parser.add_argument('--method', choices=['auto', 'rhubarb', 'spectral', 'amplitude'], default='auto')
     parser.add_argument('--js', action='store_true', help='write a plain script that sets window.VOICE_CUES["<name>"]')
     parser.add_argument('--name', help='key used with --js (default: the audio file name without extension)')
     parser.add_argument('--dialog', help='text file with the spoken words (improves Rhubarb)')
@@ -137,13 +227,13 @@ def main():
     program = os.environ.get('RHUBARB') or shutil.which('rhubarb')
     method = args.method
     if method == 'auto':
-        method = 'rhubarb' if program else 'amplitude'
+        method = 'rhubarb' if program else 'spectral'
     if method == 'rhubarb' and not program:
-        fail('rhubarb is not installed (not on PATH and $RHUBARB is not set) — install it or use --method amplitude')
+        fail('rhubarb is not installed (not on PATH and $RHUBARB is not set) — install it or use --method spectral')
 
     with tempfile.TemporaryDirectory() as work:
         source = as_wav(args.audio, work)
-        cues, duration = rhubarb_cues(source, program, args.dialog) if method == 'rhubarb' else amplitude_cues(source)
+        cues, duration = (rhubarb_cues(source, program, args.dialog) if method == 'rhubarb' else spectral_cues(source) if method == 'spectral' else amplitude_cues(source))
 
     name = args.name or os.path.splitext(os.path.basename(args.audio))[0]
     data = {'metadata': {'soundFile': os.path.basename(args.audio), 'duration': round(duration, 2), 'method': method}, 'mouthCues': cues}

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0
+
+Added
+- `VGCharacter.conversation(turns, { gap, waiting })`: turns of several characters chained
+  and timed automatically (`{ together: […] }` for simultaneous turns); waiting characters
+  idle instead of freezing. Returns `{ sequences, turns, duration, of, addTo }`.
+- `shot()` frames several subjects at once and accepts pets: `shot(scene, [vet, dog], 'full')`.
+  `time` alone is enough to aim at where a subject will be (the rig remembers its sequence).
+- `tools/cues.py --method spectral`: a dependency-free lip-sync that picks mouth shapes from
+  where the sound's energy lies (open, spread, rounded, closed, teeth). It is the default when
+  Rhubarb is not installed; `amplitude` remains available.
+- `tools/peek.sh` checks audio against lip-sync: an `<audio>` clip that starts early or late,
+  has the wrong length, or is missing for a `speakCues` step — and audio nobody lip-syncs to.
+- `examples/conversation` is rewritten with `conversation()` and a two-person shot;
+  `examples/voiceover` adds a vet-and-dog shot.
+
+Changed
+- `shot(scene, rig, …)`: the second argument may now be an array; person boxes for `'chest'`
+  and `'full'` are narrower than tall (they were square), so two-person frames sit tighter.
+
 ## 0.9.1
 
 From a second independent agent trial (two characters, two voice lines, camera shots).
