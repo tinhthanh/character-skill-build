@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.31.1';
+export const VERSION = '0.31.2';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -628,7 +628,11 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
       const pad = 6 * ratio, over = (list, shift) => list.some((head) => head.right > box.left - pad && head.left < box.right + pad && head.bottom > box.top + shift - pad && head.top < box.bottom + shift + pad);
       // Đo cả lúc hộp chữ BẮT ĐẦU HIỆN (trước khi câu nói bắt đầu một nhịp `fade`): khi ấy máy quay còn đang ở cảnh
       // trước, chưa phóng vào người nói — cái đầu nằm ở chỗ khác hẳn so với giữa câu.
-      const lead = headsAt(line.start - fade), during = [line.start + 0.15, (line.start + line.end) / 2, line.end - 0.1].flatMap(headsAt);
+      // Quãng ĐẦU câu (từ lúc hộp chữ bắt đầu hiện tới khi máy quay phóng xong, ~0,4 s sau khi câu bắt đầu) đo dày,
+      // mỗi 0,08 s: máy quay đang chạy nên cái đầu lướt qua nhiều chỗ. Phần còn lại của câu đo ba điểm.
+      const settle = Math.min(line.start + 0.4, (line.start + line.end) / 2), leadTimes = [];
+      for (let time = line.start - fade; time < settle; time += 0.08) leadTimes.push(time);
+      const leadHeads = leadTimes.map(headsAt), lead = leadHeads.flat(), during = [settle, (line.start + line.end) / 2, line.end - 0.1].flatMap(headsAt);
       const hits = (shift) => over(lead, shift) || over(during, shift);
       if (!hits(0)) continue;
       // Vùng được dời tới: 6–94% chiều cao; khung DỌC thì 12–78% — phần dưới cùng của video dọc thường bị giao diện
@@ -642,10 +646,11 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
       // Không có chỗ nào trống suốt cả câu, nhưng chỉ vướng ở LÚC ĐẦU (máy quay còn đang phóng vào): cho hộp chữ hiện
       // MUỘN hơn một chút, khi máy quay đã tới nơi — tối đa một giây, và không quá nửa câu.
       if (line.shift === undefined && !over(during, 0)) {
-        for (let wait = 0.1; wait <= Math.min(1, (line.end - line.start) / 2); wait += 0.1) {
-          if (over(headsAt(line.start - fade + wait), 0)) continue;
-          line.start += wait; break;
-        }
+        // Hiện từ mẫu đầu tiên mà kể từ đó không còn mẫu nào vướng.
+        let clear = leadTimes.length;
+        while (clear > 0 && !over(leadHeads[clear - 1], 0)) clear--;
+        const wait = (clear < leadTimes.length ? leadTimes[clear] : settle) + fade - line.start;
+        if (wait > 0 && wait <= Math.min(1, (line.end - line.start) / 2)) line.start += wait;
       }
     }
     reels.forEach((reel, index) => reel.time(before[index]));

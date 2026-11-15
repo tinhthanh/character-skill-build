@@ -1,4 +1,4 @@
-/* VGCharacter v0.31.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.31.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3329,7 +3329,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.31.1';
+const VERSION = '0.31.2';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3714,7 +3714,9 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
         return found;
       };
       const pad = 6 * ratio, over = (list, shift) => list.some((head) => head.right > box.left - pad && head.left < box.right + pad && head.bottom > box.top + shift - pad && head.top < box.bottom + shift + pad);
-      const lead = headsAt(line.start - fade), during = [line.start + 0.15, (line.start + line.end) / 2, line.end - 0.1].flatMap(headsAt);
+      const settle = Math.min(line.start + 0.4, (line.start + line.end) / 2), leadTimes = [];
+      for (let time = line.start - fade; time < settle; time += 0.08) leadTimes.push(time);
+      const leadHeads = leadTimes.map(headsAt), lead = leadHeads.flat(), during = [settle, (line.start + line.end) / 2, line.end - 0.1].flatMap(headsAt);
       const hits = (shift) => over(lead, shift) || over(during, shift);
       if (!hits(0)) continue;
       const portrait = frame.height > frame.width, step = frame.height * 0.02;
@@ -3724,10 +3726,10 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
         line.shift = shift / ratio; break;
       }
       if (line.shift === undefined && !over(during, 0)) {
-        for (let wait = 0.1; wait <= Math.min(1, (line.end - line.start) / 2); wait += 0.1) {
-          if (over(headsAt(line.start - fade + wait), 0)) continue;
-          line.start += wait; break;
-        }
+        let clear = leadTimes.length;
+        while (clear > 0 && !over(leadHeads[clear - 1], 0)) clear--;
+        const wait = (clear < leadTimes.length ? leadTimes[clear] : settle) + fade - line.start;
+        if (wait > 0 && wait <= Math.min(1, (line.end - line.start) / 2)) line.start += wait;
       }
     }
     reels.forEach((reel, index) => reel.time(before[index]));

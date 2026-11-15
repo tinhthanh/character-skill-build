@@ -32,7 +32,11 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 }
 ```
 
-- `characters` — `id` is a registered person, `species` a pet. `x` is where the character
+- `characters` — `id` is a registered person, `species` a pet: any id from the Pets table in
+  `actions.md` (`dog`, `cat`, `shiba`, `orange_cat`, `black_cat`, or one you registered). `name`
+  is the handle the rest of the file uses (`who`, `faces`, `shot` all take a `name`, not an `id`).
+  The bundled examples use `vet`, `boy`, `girl`, `receptionist`, a dog and a cat; `tools/gallery.sh`
+  shows every character. `x` is where the character
   **stands** (its centre, px from the left); `height` the host height in px. `enter:
   "left" | "right" | true` walks it in from outside the frame to `x` (`true` = the nearer edge); `seated: true | "chair" |
   "stool"` starts it seated (and draws the seat); `faces` names who it looks at.
@@ -415,7 +419,8 @@ npx hyperframes render -o out.mp4 .
     (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
     joint. Several can appear. (Element ids inside the SVG use the rigs' internal names.)
   - `rotation_pivot_drift` on a leg part (`#rig1-ongL`, the shin) or a pet's body part
-    (`#thu1-gu`, the withers): the check expects a rotating element to spin about its own
+    (`#thu1-gu`, the withers; `#thu1-thanE`, the trunk — any `#thuN-…` or `#rigN-…` id is a
+    part of a character): the check expects a rotating element to spin about its own
     centre, but these rotate about a joint — the knee, or the pelvis when a dog sits — so their
     centre is meant to travel.
   - `film_silent` on a composition that has no audio.

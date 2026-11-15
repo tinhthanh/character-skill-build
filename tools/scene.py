@@ -637,7 +637,9 @@ def main():
         # Khung dọc: phụ đề nằm giữa khung (vùng an toàn), nên người nói được đặt ở PHẦN TRÊN và nhỏ lại
         # một chút — không thì chữ đè lên miệng.
         # Khung ngang: cảnh cận lấp 66% chiều cao (mặc định 82% của thư viện làm cái đầu chiếm nửa khung hình).
-        portrait = ', fill: 0.66' if width >= height else ', fill: 0.46, centerY: 0.34'
+        # Khung ngang có phụ đề ở dưới: đặt người nói cao hơn giữa khung một chút (centerY 0,45) để cằm không chạm
+        # hộp chữ — nhân vật đầu to, cận ngực là cái đầu đã cao quá nửa khung.
+        portrait = (', fill: 0.66' + (', centerY: 0.45' if captions else '')) if width >= height else ', fill: 0.46, centerY: 0.34'
         camera_code = f"camera: {{ scene: {js(layers)}, kind: {js(kind)}{portrait} }}, "
     seated_pets = [f"[{who['name']}, 'sitDown']" for who in names.values() if who['_pet'] and who.get('seated')]
     lines = []

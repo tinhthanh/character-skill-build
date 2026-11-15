@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.31.2
+
+From a first-time-user trial (a fresh agent building a new scene from the docs alone).
+
+Changed
+- Scene files, horizontal frame with captions: the speaker sits a little higher in a close-up
+  (`centerY: 0.45`), so the chin clears the caption box.
+- Captions sample the start of each line every 0.08 s while the camera is still moving in,
+  instead of at one moment, and appear once nothing is in the way.
+
+Docs
+- `references/hyperframes.md`: any id from the Pets table is a valid `species`; `who`, `faces`
+  and `shot` take a character's `name`, not its `id`; which characters the examples use; and
+  `rotation_pivot_drift` on any `#thuN-…` / `#rigN-…` part is a known false positive.
+
 ## 0.31.1
 
 Fixed
