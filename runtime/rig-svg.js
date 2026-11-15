@@ -1102,9 +1102,11 @@ export class RigSVG {
     // thân sớm, lúc nó còn nằm ngoài mép áo, để không "biến mất" giữa ngực.
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     for (const ben of ['L', 'R']) {
-      const tay = e['bat' + ben], cho = ben === xa ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      // Tay xa mà đang CẦM ĐỒ thì ở lại phía trước: đẩy nó ra sau thân là cái cốc biến mất suốt quãng đi ngang.
+      const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
+      const tay = e['bat' + ben], cho = ben === xa && !carrying ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
       if (tay.parentNode !== cho) cho.appendChild(tay);
-      const mo = ben === (h > 0 ? 'R' : 'L') ? ah : 0;
+      const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah : 0;
       // Tối đi bằng CSS `filter`. Thuộc tính CSS ĐÈ lên thuộc tính SVG `filter="url(#…-vien)"` của
       // chính phần tử ấy, nên phải nối bộ lọc viền vào trước — không thì tay / chân xa vừa tối đi
       // vừa mất luôn nét viền.
@@ -1118,6 +1120,7 @@ export class RigSVG {
     // thứ đưa ngang qua ngực, để nó dưới tay áo bên kia thì ngón tay bị áo che mất
     // (nắm tay tán thành, ngón cái chui dưới tay áo trái). Hai tay ngang nhau thì
     // tay phải nằm trên — có ngưỡng 8° để lúc hai tay đan nhau không nhấp nháy.
+    if (xa && e['bat' + xa].parentNode === e.tren) e.tren.appendChild(e['bat' + (xa === 'L' ? 'R' : 'L')]);      // tay gần vẫn nằm trên tay xa đang cầm đồ
     if (!xa) {
       const diem = (b) => Math.abs(s['bat' + b]) + Math.abs(s['cang' + b]);
       const tren = diem('L') > diem('R') + 8 ? e.batL : e.batR, duoi = tren === e.batL ? e.batR : e.batL;
@@ -2045,12 +2048,13 @@ export class RigSVG {
   }
 
   nod() {
-    const t = this.tl(), s = this.s;
+    const t = this.tl(), s = this.s, N = this.NGHI;
     t.to(s, { cuoi: 0.7, mayL: 0.3, mayR: 0.3, duration: 0.2 }, 0);
     for (let i = 0; i < 2; i++) {
       const a = i * 0.5;
-      t.to(s, { dauY: 8, dau: 1.5, nhinY: 1.5, than: 0.8, duration: 0.2, ease: 'power2.out' }, a)
-       .to(s, { dauY: 0, dau: 0, nhinY: 0, than: 0, duration: 0.3, ease: 'power2.inOut' }, a + 0.2);
+      // Gật đủ sâu để THẤY ở cỡ toàn thân, vai và thân chúi theo: 8 đơn vị là chưa tới bốn điểm ảnh trong khung 720p.
+      t.to(s, { dauY: 15, dau: N.dau + 1.5, nhinY: 2, than: N.than + 2.2, vai: N.vai + 2.5, duration: 0.2, ease: 'power2.out' }, a)
+       .to(s, { dauY: 0, dau: N.dau, nhinY: 0, than: N.than, vai: N.vai, duration: 0.3, ease: 'power2.inOut' }, a + 0.2);
     }
     this.#chop(t, 0.55);
     this.#khep(t, 0.35, 1.05);
@@ -2060,7 +2064,7 @@ export class RigSVG {
   shake() {
     const t = this.tl(), s = this.s;
     t.to(s, { cuoi: -0.1, mieng: 0, mayL: -0.4, mayR: -0.4, duration: 0.2 }, 0);
-    const bien = [-9, 9, -7, 6, -3];
+    const bien = [-16, 16, -13, 10, -5];           // lắc đủ rộng để thấy ở cỡ toàn thân
     bien.forEach((d, i) => {
       t.to(s, { dauX: d, dau: -d * 0.4, nhinX: -d * 0.3, duration: 0.18, ease: 'sine.inOut' }, i * 0.18);
     });

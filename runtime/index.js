@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.23.0';
+export const VERSION = '0.24.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -309,12 +309,13 @@ export function list() {
  * trạng thái (xem chú thích trong thân hàm).
  *
  * `gap`: giây nghỉ chèn giữa hai bước (mặc định 0.1). `sampleRate`: số mẫu mỗi giây (60).
+ * `breathe`: nhịp thở và đung đưa nhẹ chồng lên cả chuỗi (mặc định bật).
  */
 // Các bước CÓ LỜI, và quãng "về chỗ" (miệng đã khép, tay đang thu về) ở cuối mỗi bước ấy.
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues'];
 const SPEECH_SETTLE = 0.55;
 
-export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
+export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
@@ -368,6 +369,17 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const frames = [];
   for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
   source.kill();
+  // NHỊP THỞ nền, chồng lên mọi khung: phần lớn động tác tới dáng đích rồi GIỮ một hai giây, và trong lúc giữ nhân vật
+  // là một bức tượng. Ngực phồng xẹp chậm (chu kỳ 3,4 s) và thân đung đưa rất nhẹ (chu kỳ 5,6 s) suốt cả chuỗi; mờ
+  // dần ở 0,6 s đầu và cuối để chuỗi vẫn bắt đầu và kết thúc đúng trạng thái của các động tác. `breathe: false` để tắt.
+  const breath = keys.indexOf('tho'), sway = keys.indexOf('than');
+  if (breathe && breath >= 0 && duration > 1.5) {
+    frames.forEach((frame, n) => {
+      const time = Math.min(duration, n / sampleRate), fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
+      frame[breath] = Math.min(1, frame[breath] + fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)));
+      if (sway >= 0) frame[sway] += fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6);
+    });
+  }
 
   const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
   const lastPosition = duration * sampleRate;       // vị trí (tính bằng khung) của giây cuối cùng

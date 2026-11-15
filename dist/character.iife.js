@@ -1,4 +1,4 @@
-/* VGCharacter v0.23.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.24.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1109,9 +1109,11 @@ class RigSVG {
     // thân sớm, lúc nó còn nằm ngoài mép áo, để không "biến mất" giữa ngực.
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     for (const ben of ['L', 'R']) {
-      const tay = e['bat' + ben], cho = ben === xa ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      // Tay xa mà đang CẦM ĐỒ thì ở lại phía trước: đẩy nó ra sau thân là cái cốc biến mất suốt quãng đi ngang.
+      const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
+      const tay = e['bat' + ben], cho = ben === xa && !carrying ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
       if (tay.parentNode !== cho) cho.appendChild(tay);
-      const mo = ben === (h > 0 ? 'R' : 'L') ? ah : 0;
+      const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah : 0;
       // Tối đi bằng CSS `filter`. Thuộc tính CSS ĐÈ lên thuộc tính SVG `filter="url(#…-vien)"` của
       // chính phần tử ấy, nên phải nối bộ lọc viền vào trước — không thì tay / chân xa vừa tối đi
       // vừa mất luôn nét viền.
@@ -1125,6 +1127,7 @@ class RigSVG {
     // thứ đưa ngang qua ngực, để nó dưới tay áo bên kia thì ngón tay bị áo che mất
     // (nắm tay tán thành, ngón cái chui dưới tay áo trái). Hai tay ngang nhau thì
     // tay phải nằm trên — có ngưỡng 8° để lúc hai tay đan nhau không nhấp nháy.
+    if (xa && e['bat' + xa].parentNode === e.tren) e.tren.appendChild(e['bat' + (xa === 'L' ? 'R' : 'L')]);      // tay gần vẫn nằm trên tay xa đang cầm đồ
     if (!xa) {
       const diem = (b) => Math.abs(s['bat' + b]) + Math.abs(s['cang' + b]);
       const tren = diem('L') > diem('R') + 8 ? e.batL : e.batR, duoi = tren === e.batL ? e.batR : e.batL;
@@ -2052,12 +2055,13 @@ class RigSVG {
   }
 
   nod() {
-    const t = this.tl(), s = this.s;
+    const t = this.tl(), s = this.s, N = this.NGHI;
     t.to(s, { cuoi: 0.7, mayL: 0.3, mayR: 0.3, duration: 0.2 }, 0);
     for (let i = 0; i < 2; i++) {
       const a = i * 0.5;
-      t.to(s, { dauY: 8, dau: 1.5, nhinY: 1.5, than: 0.8, duration: 0.2, ease: 'power2.out' }, a)
-       .to(s, { dauY: 0, dau: 0, nhinY: 0, than: 0, duration: 0.3, ease: 'power2.inOut' }, a + 0.2);
+      // Gật đủ sâu để THẤY ở cỡ toàn thân, vai và thân chúi theo: 8 đơn vị là chưa tới bốn điểm ảnh trong khung 720p.
+      t.to(s, { dauY: 15, dau: N.dau + 1.5, nhinY: 2, than: N.than + 2.2, vai: N.vai + 2.5, duration: 0.2, ease: 'power2.out' }, a)
+       .to(s, { dauY: 0, dau: N.dau, nhinY: 0, than: N.than, vai: N.vai, duration: 0.3, ease: 'power2.inOut' }, a + 0.2);
     }
     this.#chop(t, 0.55);
     this.#khep(t, 0.35, 1.05);
@@ -2067,7 +2071,7 @@ class RigSVG {
   shake() {
     const t = this.tl(), s = this.s;
     t.to(s, { cuoi: -0.1, mieng: 0, mayL: -0.4, mayR: -0.4, duration: 0.2 }, 0);
-    const bien = [-9, 9, -7, 6, -3];
+    const bien = [-16, 16, -13, 10, -5];           // lắc đủ rộng để thấy ở cỡ toàn thân
     bien.forEach((d, i) => {
       t.to(s, { dauX: d, dau: -d * 0.4, nhinX: -d * 0.3, duration: 0.18, ease: 'sine.inOut' }, i * 0.18);
     });
@@ -3525,7 +3529,7 @@ class RigThu {
   wagTail() {
     const t = this.tl(), s = this.s;
     t.to(s, { taiL: 0.8, taiR: 0.8, cuoi: 1, mieng: 0.45, luoi: 0.7, dau: -3, duration: 0.2, ease: 'power2.out' }, 0);
-    this.#vay(t, 0.1, 12, 30, 0.11);
+    this.#vay(t, 0.1, 12, 44, 0.11);        // đuôi chó ngắn: biên nhỏ hơn thì ở cỡ toàn cảnh không thấy vẫy
     for (let i = 0; i < 12; i++) t.to(s, { sauX: i % 2 ? -2.2 : 2.2, duration: 0.11, ease: 'sine.inOut' }, 0.1 + i * 0.11);   // lắc cả mông theo đuôi
     this.#chop(t, 0.7);
     this.#khep(t, 0.4, 1.5);
@@ -3672,7 +3676,7 @@ class RigThu {
   tailSwish() {
     const t = this.tl(), s = this.s;
     t.to(s, { nhinX: -2, dau: -5, taiL: 0.4, duration: 0.25 }, 0);
-    for (let i = 0; i < 5; i++) t.to(s, { duoi: i % 2 ? -26 : 20, duoiCong: i % 2 ? 0.75 : -0.35, duration: 0.36, ease: 'sine.inOut' }, 0.1 + i * 0.36);
+    for (let i = 0; i < 5; i++) t.to(s, { duoi: i % 2 ? -38 : 30, duoiCong: i % 2 ? 0.9 : -0.5, duration: 0.36, ease: 'sine.inOut' }, 0.1 + i * 0.36);
     this.#chop(t, 1.0);
     this.#khep(t, 0.4, 1.95);
     return t;
@@ -5038,7 +5042,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.23.0';
+const VERSION = '0.24.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5326,12 +5330,13 @@ function list() {
  * trạng thái (xem chú thích trong thân hàm).
  *
  * `gap`: giây nghỉ chèn giữa hai bước (mặc định 0.1). `sampleRate`: số mẫu mỗi giây (60).
+ * `breathe`: nhịp thở và đung đưa nhẹ chồng lên cả chuỗi (mặc định bật).
  */
 // Các bước CÓ LỜI, và quãng "về chỗ" (miệng đã khép, tay đang thu về) ở cuối mỗi bước ấy.
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues'];
 const SPEECH_SETTLE = 0.55;
 
-function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
+function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
@@ -5385,6 +5390,17 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60 } = {}) {
   const frames = [];
   for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
   source.kill();
+  // NHỊP THỞ nền, chồng lên mọi khung: phần lớn động tác tới dáng đích rồi GIỮ một hai giây, và trong lúc giữ nhân vật
+  // là một bức tượng. Ngực phồng xẹp chậm (chu kỳ 3,4 s) và thân đung đưa rất nhẹ (chu kỳ 5,6 s) suốt cả chuỗi; mờ
+  // dần ở 0,6 s đầu và cuối để chuỗi vẫn bắt đầu và kết thúc đúng trạng thái của các động tác. `breathe: false` để tắt.
+  const breath = keys.indexOf('tho'), sway = keys.indexOf('than');
+  if (breathe && breath >= 0 && duration > 1.5) {
+    frames.forEach((frame, n) => {
+      const time = Math.min(duration, n / sampleRate), fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
+      frame[breath] = Math.min(1, frame[breath] + fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)));
+      if (sway >= 0) frame[sway] += fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6);
+    });
+  }
 
   const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
   const lastPosition = duration * sampleRate;       // vị trí (tính bằng khung) của giây cuối cùng

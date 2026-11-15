@@ -492,6 +492,41 @@ try {
       }
       actor.svg.remove();
     }
+    // Gật và lắc đầu đủ lớn để thấy ở cỡ toàn thân; đuôi chó vẫy đủ rộng.
+    {
+      const actor = L.createCharacter(host, { id: 'boy' }).rig, far = (t, key) => { let most = 0; for (let p = 0; p <= 1; p += 0.01) { t.progress(p); most = Math.max(most, Math.abs(actor.s[key])); } t.kill(); actor.reset(); return most; };
+      const dip = far(actor.nod(), 'dauY'), swing = far(actor.shake(), 'dauX');
+      if (dip < 12) hong('nod', `the head dips only ${dip.toFixed(0)} units`);
+      if (swing < 14) hong('shake', `the head swings only ${swing.toFixed(0)} units`);
+      actor.svg.remove();
+      const pet = L.createPet(host, { species: 'dog' }).rig, t = pet.wagTail(); let wag = 0; for (let p = 0; p <= 1; p += 0.005) { t.progress(p); wag = Math.max(wag, Math.abs(pet.s.duoi)); }
+      if (wag < 38) hong('wagTail', `the tail swings only ${wag.toFixed(0)}°`);
+      t.kill(); pet.svg.remove();
+    }
+    // Đi ngang: tay đang cầm đồ ở lại phía TRƯỚC thân dù là tay xa (từng lùi ra sau thân, cái cốc biến mất); cất đồ rồi thì lùi ra sau như thường.
+    {
+      const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', toward = side === 'R' ? 120 : -120;
+      const arm = actor.el['bat' + side], other = actor.el['bat' + (side === 'R' ? 'L' : 'R')];
+      let t = actor.walk(4, toward); t.progress(0.5); actor.render();
+      if (arm.parentNode !== actor.el.tren) hong('held item', 'walking sideways: the arm carrying the item goes behind the body');
+      else if (!(arm.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING)) hong('held item', 'the near arm is drawn under the far arm');
+      t.kill(); actor.reset(); actor.s['item' + side] = 0;
+      t = actor.walk(4, toward); t.progress(0.5); actor.render();
+      if (arm.parentNode === actor.el.tren) hong('held item', 'with the item put away the far arm should go behind the body');
+      t.kill(); actor.svg.remove();
+    }
+    // Nhịp thở nền của `sequence()`: trong lúc giữ dáng ngực vẫn phồng xẹp; chuỗi kết thúc đúng trạng thái nghỉ; `breathe: false` thì tắt.
+    for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'dog' }).rig]) {
+      const actor = make(), steps = [['idle', 0.2], 3, ['idle', 0.2]];
+      const range = (line) => { let low = 9, high = -9; for (let time = 0.8; time <= 3; time += 0.05) { line.time(time); low = Math.min(low, actor.s.tho); high = Math.max(high, actor.s.tho); } return high - low; };
+      const alive = L.sequence(actor, steps), moved = range(alive);
+      if (moved < 0.3) hong('breathing', `the chest moves only ${moved.toFixed(2)} during a three-second hold`);
+      alive.time(alive.duration()); if (Math.abs(actor.s.tho - actor.NGHI.tho) > 1e-6) hong('breathing', 'the sequence does not end at rest');
+      alive.kill();
+      const still = L.sequence(actor, steps, { breathe: false }), frozen = range(still);
+      if (frozen > 0.05) hong('breathing', '`breathe: false` still breathes');
+      still.kill(); actor.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;

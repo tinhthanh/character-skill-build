@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.24.0
+
+Added
+- **Sequences breathe.** `sequence()` (and so `conversation()` and scene files) lays slow
+  breathing and a very slight sway over every frame, so a character holding a pose for a
+  second or two is no longer a statue. It fades in and out over 0.6 s, so sequences still
+  start and end on the exact rest state. `sequence(rig, steps, { breathe: false })` turns it
+  off.
+
+Changed
+- `nod` and `shake` are large enough to read in a full-body shot (head dips 15 units instead
+  of 8, with the shoulders and body; head swings ±16 instead of ±9).
+- A dog's `wagTail` and a cat's `tailSwish` swing wider.
+
+Fixed
+- **The cup vanished while walking across.** When the carrying arm was the far arm it went
+  behind the body with the item. An arm carrying a shown item now stays in front.
+
 ## 0.23.0
 
 Fixed

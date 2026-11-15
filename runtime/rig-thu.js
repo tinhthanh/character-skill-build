@@ -682,7 +682,7 @@ export class RigThu {
   wagTail() {
     const t = this.tl(), s = this.s;
     t.to(s, { taiL: 0.8, taiR: 0.8, cuoi: 1, mieng: 0.45, luoi: 0.7, dau: -3, duration: 0.2, ease: 'power2.out' }, 0);
-    this.#vay(t, 0.1, 12, 30, 0.11);
+    this.#vay(t, 0.1, 12, 44, 0.11);        // đuôi chó ngắn: biên nhỏ hơn thì ở cỡ toàn cảnh không thấy vẫy
     for (let i = 0; i < 12; i++) t.to(s, { sauX: i % 2 ? -2.2 : 2.2, duration: 0.11, ease: 'sine.inOut' }, 0.1 + i * 0.11);   // lắc cả mông theo đuôi
     this.#chop(t, 0.7);
     this.#khep(t, 0.4, 1.5);
@@ -829,7 +829,7 @@ export class RigThu {
   tailSwish() {
     const t = this.tl(), s = this.s;
     t.to(s, { nhinX: -2, dau: -5, taiL: 0.4, duration: 0.25 }, 0);
-    for (let i = 0; i < 5; i++) t.to(s, { duoi: i % 2 ? -26 : 20, duoiCong: i % 2 ? 0.75 : -0.35, duration: 0.36, ease: 'sine.inOut' }, 0.1 + i * 0.36);
+    for (let i = 0; i < 5; i++) t.to(s, { duoi: i % 2 ? -38 : 30, duoiCong: i % 2 ? 0.9 : -0.5, duration: 0.36, ease: 'sine.inOut' }, 0.1 + i * 0.36);
     this.#chop(t, 1.0);
     this.#khep(t, 0.4, 1.95);
     return t;
