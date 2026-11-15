@@ -34,7 +34,7 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 
 - `characters` — `id` is a registered person, `species` a pet. `x` is where the character
   **stands** (its centre, px from the left); `height` the host height in px. `enter:
-  "left" | "right"` walks it in from outside the frame to `x`; `seated: true | "chair" |
+  "left" | "right" | true` walks it in from outside the frame to `x` (`true` = the nearer edge); `seated: true | "chair" |
   "stool"` starts it seated (and draws the seat); `faces` names who it looks at.
 - `script` — turns, in order. `say` speaks: with `audio` it lip-syncs to the file (cues are
   made for you, the `<audio>` clip is added and timed), without it the mouth is estimated
@@ -185,8 +185,8 @@ aligning hosts by `bottom` lines up everyone's feet.
 - Leave about 0.45 × host height of free space on each side for arm gestures, and that much
   again in the walking direction for `walk` with a distance. The SVG has `overflow: visible`,
   so a gesture is not clipped by the host — only by an ancestor with `overflow: hidden`.
-- `enter` starts about 0.57 × host height to the left of centre (270 of 470 frame units);
-  make sure that is off-screen or behind something if the entrance should be hidden.
+- `enter` starts outside the frame and `exit` ends there; both measure the distance from
+  the host to the edge of the composition (see *Walk in from off-screen* below).
 - A dog or cat beside a person looks right at roughly 0.4–0.45 × the person's host height.
 
 ## Staging recipes
@@ -195,24 +195,29 @@ aligning hosts by `bottom` lines up everyone's feet.
 frame, not in pixels: `px = units × hostHeight / 470` for people, `/ 330` for pets. A 760 px
 tall host therefore moves 1.62 px per unit.
 
-**Walk in from off-screen to a mark.** `enter` always ends at the centre of its host and
-starts 270 units to the left of it. Two ways to use that:
+**Walk in from off-screen to a mark.** Put the host where the character should end up;
+`enter` ends at the centre of its host and starts outside the frame by itself:
 
-- *Host at the mark.* Put the host where the character should end up. The entrance is only
-  hidden if the mark is within about 0.4 × host height of the left edge (270 units to the
-  character's centre, minus half the width of the head, which is the widest part), or
-  something covers the start. `tools/peek.sh` warns when the head starts inside the frame.
-- *Host at the edge, then walk.* Put the host so its centre is near the left edge, and follow
-  `enter` with a walk to the mark:
+```js
+// host centred on the mark; the composition root carries data-composition-id
+VGCharacter.sequence(rig, ['enter', 'wave']);              // from the left edge
+VGCharacter.sequence(rig, [['enter', 'right'], 'wave']);   // from the right edge (people and pets)
+```
 
-  ```js
-  // host: left:-60px; height:760px → centre ≈ 263 px. Mark at 670 px → 407 px → 251 units.
-  VGCharacter.sequence(rig, ['enter', ['walk', 4, 250], 'wave']);
-  ```
+How far it travels is measured from the host to the edge of the composition (the nearest
+ancestor with `data-composition-id`, or the page), between 270 and 700 units, so the step
+takes longer in a wide frame — about 1.6 s near the edge, up to about 5 s for a person
+(pets break into a faster run past 380 units). Two cases need a number:
 
-  A character keeps the position it walked to, so everything after the walk happens at the mark.
+- *The mark is further than 700 units from the edge.* The character would fade in inside the
+  frame. Pass the distance: `['enter', 'left', 900]`. In pixels it is
+  `(distance from the edge to the mark + about 0.4 × host height) × 470 / host height`
+  (`× 330` and `0.6 ×` for pets). `tools/scene.py` works this out for every entrance and exit.
+- *A fixed, short entrance* (from behind a prop, or to keep old timings):
+  `['enter', 'left', 270]`.
 
-**Enter from the right:** `['enter', 'right']` (people). Mirror the layout above.
+`exit` mirrors this: `'exit'`, `['exit', 'left']`, `['exit', 'right', 300]`. It starts from
+wherever the character stands (also after a `walk`) and ends hidden; `enter` brings it back.
 
 **Two characters talking.** Use `VGCharacter.conversation(turns)`: each turn is
 `[rig, ...steps]`, the next turn starts when the previous one is done, and a character

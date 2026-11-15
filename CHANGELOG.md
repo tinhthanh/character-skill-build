@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.29.0
+
+Changed
+- **Scene files: one walk from the edge to the mark.** `tools/scene.py` used to put an
+  entering character's host at the edge of the frame and chain `enter` with a `walk` to its
+  `x`. The host now sits at `x` and `enter` gets the exact distance, so the character walks
+  in one go and arrives sooner. Exits get an exact distance too, so a character far from the
+  edge leaves the frame completely instead of fading out after 700 units. Regenerate a scene
+  (`tools/scene.py scene.json --force`) to pick this up; timings shift slightly.
+- `references/hyperframes.md` describes entrances and exits as they work since 0.26.0 (the
+  270-unit recipes are gone).
+
 ## 0.28.0
 
 Added

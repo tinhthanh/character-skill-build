@@ -314,16 +314,16 @@ def main():
         unit = host_height / frame[1]
         stand = float(who['x'])
         centre = stand
-        # Điểm xuất phát của `enter` cách tâm host 0,57 × chiều cao; đầu + tóc rộng tới 0,3 × chiều cao về mỗi
-        # phía. Đặt tâm host cách mép 0,18 × chiều cao thì cả cái đầu nằm ngoài khung lúc bắt đầu.
         if who.get('enter') and name in late: fail(f'character "{name}" has "enter" both on the character (enters at the start) and on a turn (enters later) — keep one')
         if late.get(name) not in (None, 'left', 'right'): fail(f'a turn of "{name}" has "enter": {js(late.get(name))} — it must be "left", "right" or true')
         coming = who.get('enter') or late.get(name)
-        if coming == 'left': centre = min(stand, (0.18 if not pet else 0.3) * host_height)
-        if coming == 'right': centre = max(stand, width - (0.18 if not pet else 0.3) * host_height)
+        # Host nằm ngay TẠI chỗ đứng; `enter` nhận quãng đi tính sẵn, đủ để xuất phát ngoài hẳn mép khung: tới mép,
+        # cộng 0,39 × chiều cao host cho cái đầu và tóc (thú: 0,6 × — thân nằm ngang, dài hơn). Trước bản 0.29 host
+        # được đặt sát mép rồi nối thêm một bước `walk` tới chỗ đứng — hai động tác cho một việc.
+        reach = (stand if coming == 'left' else width - stand) + (0.39 if not pet else 0.6) * host_height if coming else 0
         # Số tính ra cất dưới khoá có gạch dưới ở đầu — khoá của người viết kịch bản không bao giờ trùng được.
         names[name] = dict(who, _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
-                           _walk=round((stand - centre) / unit), _element=f'{slug(name)}', _late=late.get(name), _nearer=nearer)
+                           _walk=0, _enter_distance=round(reach / unit), _element=f'{slug(name)}', _late=late.get(name), _nearer=nearer)
     for who in names.values():
         if who.get('faces') and who['faces'] not in names: fail(f'character "{who["name"]}" faces "{who["faces"]}", who is not in the scene')
 
@@ -357,8 +357,7 @@ def main():
             if turn['enter'] is True: turn['enter'] = who['_nearer']
             if who['_late'] != turn['enter'] or getattr(turn_code, 'entered', set()) & {who['name']}: fail(f'{where}: "{who["name"]}" can enter only once per scene')
             turn_code.entered = getattr(turn_code, 'entered', set()) | {who['name']}
-            steps.append(f"['enter', {js(turn['enter'])}]")
-            if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
+            steps.append(f"['enter', {js(turn['enter'])}, {who['_enter_distance']}]")
             if who.get('faces'): steps.append(f"['face', {who['faces']}]")
         if turn.get('exit') not in (None, False, True, 'left', 'right'): fail(f'{where}: "exit" must be "left", "right" or true (the nearer edge)')
         if turn.get('exit') is True: turn['exit'] = who['_nearer']
@@ -393,7 +392,10 @@ def main():
                 steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
         for step in turn.get('do', []):
             steps.append(step_code(step, where))
-        if turn.get('exit'): steps.append(f"['exit', {js(turn['exit'])}]")
+        if turn.get('exit'):
+            # Quãng đi ra tính sẵn như `enter`: tới mép khung cộng phần đầu / thân, để nhân vật khuất hẳn rồi mới ẩn.
+            leaving = (float(who['x']) if turn['exit'] == 'left' else width - float(who['x'])) + (0.39 if not who['_pet'] else 0.6) * who['_host_height']
+            steps.append(f"['exit', {js(turn['exit'])}, {round(leaving / who['_unit'])}]")
         if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
         # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
@@ -416,8 +418,7 @@ def main():
     entering = [who for who in names.values() if who.get('enter')]
     arrivals = []
     for who in entering:
-        steps = [f"['enter', {js(who['enter'])}]"]
-        if abs(who['_walk']) >= 5: steps.append(f"['walk', 4, {who['_walk']}]")
+        steps = [f"['enter', {js(who['enter'])}, {who['_enter_distance']}]"]
         if who.get('faces'): steps.append(f"['face', {who['faces']}]")
         arrivals.append(f"[{who['name']}, " + ', '.join(steps) + ']')
     # Mọi người bước vào CÙNG LÚC: vào lần lượt thì người vào sau đứng sẵn trong khung chờ tới lượt

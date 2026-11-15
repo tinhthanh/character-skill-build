@@ -61,11 +61,11 @@ with tempfile.TemporaryDirectory() as work:
             problems.append('a scene with two entrances, a front prop and a shot inside together does not build: ' + built.stderr.strip()[:200])
         else:
             page = open(os.path.join(work, 'staged', 'index.html'), encoding='utf-8').read()
-            if not re.search(r"together: \[\[vet, \['enter', \"left\"\][^\n]*\[boy, \['enter', \"right\"\]", page): problems.append('two entering characters do not enter together')
+            if not re.search(r"together: \[\[vet, \['enter', \"left\", \d+\][^\n]*\[boy, \['enter', \"right\", \d+\]", page): problems.append('two entering characters do not enter together')
             if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
             if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
             if 'late.state.opacity = 0' not in page: problems.append('a character that enters mid-scene is not hidden at the start')
-            if not re.search(r"\[late, \['enter', \"right\"\], \['walk', 4, -?\d+\], \['face', vet\], \['explain'[^\n]*\['exit', \"right\"\]\]", page): problems.append('a turn with enter / say / exit is not written in that order')
+            if not re.search(r"\[late, \['enter', \"right\", \d+\], \['face', vet\], \['explain'[^\n]*\['exit', \"right\", \d+\]\]", page): problems.append('a turn with enter / say / exit is not written in that order')
             if 'bella.state.facing = -1' not in page or "[bella, ['face'" in page: problems.append('a character present from the start is not turned toward its target up front')
             if 'data-role="music"' not in page or 'data-volume="0.15"' not in page: problems.append('"music" does not add a quiet music clip')
             if not re.search(r'\{ turn: \[vet, \[.speakCues.[^\n]*shot: \[vet, bella\] \}', page): problems.append('a line that names a pet does not frame the pet with the speaker')
@@ -125,7 +125,7 @@ with tempfile.TemporaryDirectory() as work:
         problems.append('the vertical example does not build: ' + (vertical.stderr.strip() or vertical.stdout.strip())[:200])
     else:
         page = open(os.path.join(work, 'vertical-near', 'index.html'), encoding='utf-8').read()
-        if "[miu, ['enter', \"right\"]" not in page: problems.append('"enter": true on a character standing on the right does not enter from the right')
+        if "[miu, ['enter', \"right\", " not in page: problems.append('"enter": true on a character standing on the right does not enter from the right')
         if 'maxChars' not in page: problems.append('captions are not chunked')
         if '<h2' in page or '<ul' in page: problems.append('content must be flat clips, not nested elements')
     # Kịch bản sai phải bị từ chối, và thông báo phải gọi đúng tên chỗ sai.
