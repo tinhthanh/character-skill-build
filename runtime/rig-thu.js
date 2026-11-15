@@ -577,11 +577,21 @@ export class RigThu {
     return t;
   }
 
-  /** Chạy VÀO khung rồi dừng ở giữa. `from`: 'left' (mặc định, chạy sang phải) hoặc 'right'. */
-  enter(from = 'left') {
-    const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
-    t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
-    const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
+  // Quãng từ chỗ đứng gốc ra hẳn ngoài khung hình về phía `dir` — xem `#offstage` trong rig-svg.js.
+  #offstage(dir) {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h);
+    if (!(scale > 0)) return 300;
+    const stage = (this.svg.closest('[data-composition-id]') || this.svg.ownerDocument.documentElement).getBoundingClientRect();
+    const centre = frame.left + frame.width / 2;
+    return clamp((dir > 0 ? stage.right - centre : centre - stage.left) / scale + 110, 300, 700);
+  }
+
+  /** Chạy VÀO từ ngoài khung hình rồi dừng ở chỗ của mình. `from`: 'left' (mặc định) hoặc 'right'; `distance`: quãng chạy, bỏ trống thì tự tính. */
+  enter(from = 'left', distance = null) {
+    const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1, far = distance > 0 ? distance : this.#offstage(-dir);
+    t.set(s, { x: -far * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
+    const at = this.#di(t, 0, Math.max(6, Math.round(far / 52)), 0.36, { vao: false, quang: far * dir, x0: -far * dir, A: 16, cao: 11 });
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
@@ -635,15 +645,16 @@ export class RigThu {
   }
 
   /** Chạy RA khỏi khung và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. */
-  exit(to = 'right') {
+  exit(to = 'right', distance = null) {
     const t = this.tl(), s = this.s, dir = to === 'left' ? -1 : 1, x0 = s.x;
     let at = this.#dung(t, 0);
     // Đang quay đầu về phía kia thì QUAY LẠI rồi mới chạy: bản trước cứ thế chạy sang phải — con vật đã
     // `face('left')` là đi giật lùi ra khỏi khung. Xuất phát từ chỗ đang đứng (`x0`), không phải từ giữa.
     if ((s.huong < 0 ? -1 : 1) !== dir) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
-    at = this.#di(t, at, 6, 0.36, { ra: false, quang: dir * 320 - x0, x0, A: 16, cao: 11 });
+    const far = Math.max(60, (dir * (distance > 0 ? distance : this.#offstage(dir)) - x0) * dir);
+    at = this.#di(t, at, Math.max(6, Math.round(far / 52)), 0.36, { ra: false, quang: dir * far, x0, A: 16, cao: 11 });
     t.to(s, { mo: 0, duration: 0.2 }, at - 0.2);
-    this.#khep(t, 0.2, at, { x: 320 * dir, mo: 0, huong: dir });
+    this.#khep(t, 0.2, at, { x: x0 + dir * far, mo: 0, huong: dir });
     return t;
   }
 

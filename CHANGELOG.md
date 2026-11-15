@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.26.0
+
+Changed
+- **`enter` and `exit` reach the real edge of the frame.** They used to travel a fixed
+  270–300 units, so in a wide scene a character faded out halfway across the stage and
+  walked in from the middle. The distance is now measured to the edge of the composition
+  (`data-composition-id`), between 270 and 700 units, for people and pets. **Timing
+  changes:** in a wide scene these steps now take longer (up to about 5 s). Pass a distance
+  to keep the old behaviour: `['exit', 'right', 300]`, `['enter', 'left', 270]`.
+- While gesturing, a character facing left or right opens up less toward the audience (to
+  0.3 instead of 0.2 of a turn) and more slowly, so it reads less as turning away and back.
+
+Fixed
+- `exit` started from the centre of the character's box even after a `walk`; it starts from
+  where the character stands.
+
 ## 0.25.0
 
 Fixed

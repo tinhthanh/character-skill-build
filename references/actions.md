@@ -39,8 +39,8 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |
 | `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
-| `enter` | `(from = 'left')` | walk in from off-frame, from the `'left'` or the `'right'` | 1.6–2.15 |
-| `exit` | `(to = 'right')` | walk out of frame to the `'right'` or the `'left'` — **ends hidden** | 1.6–2.05 |
+| `enter` | `(from = 'left', distance)` | walk in from outside the frame, from the `'left'` or the `'right'`, to the character's own spot. The distance is worked out from the composition's edge (270–700 units); pass `distance` to fix it | 1.6–5.2 |
+| `exit` | `(to = 'right', distance)` | walk out past the edge of the frame to the `'right'` or the `'left'`, from wherever the character stands — **ends hidden**. `distance` as for `enter` | 1.6–5.2 |
 
 **Tone of voice.** A speaking step takes `{ mood }` — any `express` name — and the whole line
 is delivered with that face (brows, eyes, mouth corners) while the mouth still follows the
@@ -112,8 +112,8 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `givePaw` | — | sit and offer a front paw | 1.9 |
 | `sniff` | — | nose to the ground | 1.8 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
-| `enter` | `(from = 'left')` | run in from the `'left'` or the `'right'`, stop at centre | 2.6 |
-| `exit` | `(to = 'right')` | turn that way and run out to the `'right'` or the `'left'` — **ends hidden** | 2.4 |
+| `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
+| `exit` | `(to = 'right', distance)` | turn that way and run out past the edge of the frame — **ends hidden** | 2.4 |
 
 **Cats** (`cat`, `orange_cat`, `black_cat`) rest **sitting**; actions that need them standing
 stand them up first:
@@ -130,8 +130,8 @@ stand them up first:
 | `tiltHead` | — | tilt one way, then the other | 2.3 |
 | `pounce` | — | crouch, wiggle, leap | 2.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
-| `enter` | `(from = 'left')` | run in from the `'left'` or the `'right'`, stop at centre | 2.6 |
-| `exit` | `(to = 'right')` | turn that way and run out to the `'right'` or the `'left'` — **ends hidden** | 2.7 |
+| `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
+| `exit` | `(to = 'right', distance)` | turn that way and run out past the edge of the frame — **ends hidden** | 2.7 |
 
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything

@@ -1,4 +1,4 @@
-/* VGCharacter v0.25.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.26.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1927,11 +1927,11 @@ class RigSVG {
    * bước). Nên cử chỉ nào cũng bớt quay về tối đa GESTURE_TURN trong lúc diễn — vẫn hơi hướng về
    * người đối diện — rồi `#khep` đưa về đúng hướng đang giữ.
    */
-  static GESTURE_TURN = 0.2;
+  static GESTURE_TURN = 0.3;
   static SEAT_SPLAY = 12;               // độ xoè của mỗi đùi khi ngồi (nhìn từ trước)
   #openUp(t) {
     const held = this.s.huong, limit = RigSVG.GESTURE_TURN;
-    if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.25, ease: 'power2.inOut' }, 0);
+    if (Math.abs(held) > limit) t.to(this.s, { huong: Math.sign(held) * limit, duration: 0.4, ease: 'sine.inOut' }, 0);
   }
 
   /**
@@ -2371,29 +2371,52 @@ class RigSVG {
     return t;
   }
 
-  /** Bước VÀO khung rồi dừng ở giữa. `from`: 'left' (mặc định, đi sang phải) hoặc 'right'. */
-  enter(from = 'left') {
-    const t = this.tl(), s = this.s, chieu = from === 'right' ? -1 : 1, x0 = -270 * chieu;
-    const d = this.#doBuoc(270, false, true);              // vào khung khi đang đi, dừng lại ở giữa
+  /**
+   * Từ chỗ đứng gốc (x = 0) phải đi bao xa về phía `dir` (−1 trái, +1 phải) thì RA HẲN ngoài khung hình — đơn vị
+   * viewBox. Khung hình là phần tử composition (`data-composition-id`) chứa nhân vật, không có thì là cả trang.
+   * Bản trước đi cố định 270–300 đơn vị: trong cảnh rộng nhân vật mới tới lưng chừng sân khấu đã mờ đi, và bước
+   * vào thì hiện ra giữa khung. Chặn trên 700 đơn vị cho khỏi mất quá năm giây; khi ấy vẫn còn đoạn mờ ở cuối.
+   */
+  #offstage(dir) {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h);
+    if (!(scale > 0)) return 300;                                   // chưa có kích thước (chưa gắn vào trang)
+    const stage = (this.svg.closest('[data-composition-id]') || this.svg.ownerDocument.documentElement).getBoundingClientRect();
+    const centre = frame.left + frame.width / 2;
+    return clamp((dir > 0 ? stage.right - centre : centre - stage.left) / scale + 80, 270, 700);
+  }
+
+  /**
+   * Bước VÀO từ ngoài khung hình rồi dừng ở chỗ đứng của mình. `from`: 'left' (mặc định, đi sang phải) hoặc 'right'.
+   * `distance` (đơn vị viewBox): quãng đi; bỏ trống thì tự tính cho vừa từ ngoài mép khung hình.
+   */
+  enter(from = 'left', distance = null) {
+    const t = this.tl(), s = this.s, chieu = from === 'right' ? -1 : 1;
+    const far = distance > 0 ? distance : this.#offstage(-chieu), x0 = -far * chieu;
+    const d = this.#doBuoc(far, false, true);              // vào khung khi đang đi, dừng lại ở giữa
     t.set(s, { x: x0, mo: 1, cuoi: 0.5, huong: chieu }, 0);
     const at = this.#di(t, 0, d.buoc, 0.42, { vao: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
     // HIỆN suốt quãng đi. `set` ở trên không đủ: `sequence()` đặt sẵn trạng thái đầu của động tác vào rig trước khi
     // dựng nó, nên GSAP thấy `mo` đã là 1, không ghi gì — nhân vật vừa `exit` (mo 0) bước vào trong vô hình rồi hiện
     // phụt ra ở giữa khung. Ghi qua setter thì khung nào cũng ghi.
-    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.huong = chieu; s.seat = 0; } };    // hiện dần trong 0,2 s đầu: khung rộng thì điểm xuất phát vẫn nằm trong hình
+    const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.huong = chieu; s.seat = 0; } };    // hiện dần trong 0,2 s đầu
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
     return t;
   }
 
-  /** Bước RA khỏi khung và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. */
-  exit(to = 'right') {
-    const t = this.tl(), s = this.s, chieu = to === 'left' ? -1 : 1;
-    const d = this.#doBuoc(300, true, false);              // nhấc chân bước đi, ra khỏi khung khi vẫn đang đi
+  /**
+   * Bước RA khỏi khung hình và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. `distance`: như `enter`.
+   * Xuất phát từ chỗ ĐANG ĐỨNG (kể cả sau khi đã `walk` đi chỗ khác).
+   */
+  exit(to = 'right', distance = null) {
+    const t = this.tl(), s = this.s, chieu = to === 'left' ? -1 : 1, x0 = s.x;
+    const end = chieu * (distance > 0 ? distance : this.#offstage(chieu)), far = Math.max(60, (end - x0) * chieu);
+    const d = this.#doBuoc(far, true, false);              // nhấc chân bước đi, ra khỏi khung khi vẫn đang đi
     t.to(s, { huong: chieu, cuoi: 0.6, duration: 0.35, ease: 'power2.inOut' }, 0);
-    const at = this.#di(t, 0.1, d.buoc, 0.42, { ra: false, kA: d.kA, chieu, x: (b) => chieu * d.x(b) });
+    const at = this.#di(t, 0.1, d.buoc, 0.42, { ra: false, kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
     t.to(s, { mo: 0, duration: 0.25 }, at - 0.25);
-    this.#khep(t, 0.25, at, { x: 300 * chieu, mo: 0, huong: chieu });   // khép tư thế nhưng vẫn ở ngoài khung và ẩn
+    this.#khep(t, 0.25, at, { x: x0 + chieu * far, mo: 0, huong: chieu });   // khép tư thế nhưng vẫn ở ngoài khung và ẩn
     return t;
   }
 
@@ -3438,11 +3461,21 @@ class RigThu {
     return t;
   }
 
-  /** Chạy VÀO khung rồi dừng ở giữa. `from`: 'left' (mặc định, chạy sang phải) hoặc 'right'. */
-  enter(from = 'left') {
-    const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1;
-    t.set(s, { x: -300 * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
-    const at = this.#di(t, 0, 6, 0.36, { vao: false, quang: 300 * dir, x0: -300 * dir, A: 16, cao: 11 });
+  // Quãng từ chỗ đứng gốc ra hẳn ngoài khung hình về phía `dir` — xem `#offstage` trong rig-svg.js.
+  #offstage(dir) {
+    const frame = this.svg.getBoundingClientRect();
+    const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h);
+    if (!(scale > 0)) return 300;
+    const stage = (this.svg.closest('[data-composition-id]') || this.svg.ownerDocument.documentElement).getBoundingClientRect();
+    const centre = frame.left + frame.width / 2;
+    return clamp((dir > 0 ? stage.right - centre : centre - stage.left) / scale + 110, 300, 700);
+  }
+
+  /** Chạy VÀO từ ngoài khung hình rồi dừng ở chỗ của mình. `from`: 'left' (mặc định) hoặc 'right'; `distance`: quãng chạy, bỏ trống thì tự tính. */
+  enter(from = 'left', distance = null) {
+    const t = this.tl(), s = this.s, dir = from === 'right' ? -1 : 1, far = distance > 0 ? distance : this.#offstage(-dir);
+    t.set(s, { x: -far * dir, mo: 1, ngoi: 0, huong: dir, cuoi: 0.8, taiL: 0.6, taiR: 0.6 }, 0);
+    const at = this.#di(t, 0, Math.max(6, Math.round(far / 52)), 0.36, { vao: false, quang: far * dir, x0: -far * dir, A: 16, cao: 11 });
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.ngoi = 0; s.huong = dir; } };       // hiện, ĐỨNG và quay đúng hướng suốt quãng chạy — `set` ở trên không được ghi khi chạy trong `sequence()` (xem `enter` trong rig-svg.js): mèo từng trượt vào trong dáng ngồi
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
@@ -3496,15 +3529,16 @@ class RigThu {
   }
 
   /** Chạy RA khỏi khung và ẩn đi. `to`: 'right' (mặc định) hoặc 'left'. */
-  exit(to = 'right') {
+  exit(to = 'right', distance = null) {
     const t = this.tl(), s = this.s, dir = to === 'left' ? -1 : 1, x0 = s.x;
     let at = this.#dung(t, 0);
     // Đang quay đầu về phía kia thì QUAY LẠI rồi mới chạy: bản trước cứ thế chạy sang phải — con vật đã
     // `face('left')` là đi giật lùi ra khỏi khung. Xuất phát từ chỗ đang đứng (`x0`), không phải từ giữa.
     if ((s.huong < 0 ? -1 : 1) !== dir) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
-    at = this.#di(t, at, 6, 0.36, { ra: false, quang: dir * 320 - x0, x0, A: 16, cao: 11 });
+    const far = Math.max(60, (dir * (distance > 0 ? distance : this.#offstage(dir)) - x0) * dir);
+    at = this.#di(t, at, Math.max(6, Math.round(far / 52)), 0.36, { ra: false, quang: dir * far, x0, A: 16, cao: 11 });
     t.to(s, { mo: 0, duration: 0.2 }, at - 0.2);
-    this.#khep(t, 0.2, at, { x: 320 * dir, mo: 0, huong: dir });
+    this.#khep(t, 0.2, at, { x: x0 + dir * far, mo: 0, huong: dir });
     return t;
   }
 
@@ -5056,7 +5090,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.25.0';
+const VERSION = '0.26.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

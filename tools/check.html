@@ -81,7 +81,7 @@ try {
   { const rig = new RigSVG(document.getElementById('san'), 'surgeon');
     const t = L.sequence(rig, ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']);
     t.seek(0); rig.apDung(); const x0 = rig.s.x;
-    if (Math.abs(x0 + 270) > 2) hong('sequence', `frame 0: x = ${x0.toFixed(1)}, expected −270 (enter)`);
+    if (x0 > -268) hong('sequence', `frame 0: x = ${x0.toFixed(1)}, expected −270 or further out (enter)`);
     const chup = (tg) => { t.seek(tg); rig.apDung(); return JSON.stringify(Object.keys(rig.NGHI).map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k]))); };
     const tg = t.duration() * 0.63, a = chup(tg); chup(0.2); chup(t.duration()); const b = chup(tg);
     if (a !== b) hong('sequence', 'seeking to one time by two paths gives two states');
@@ -549,6 +549,33 @@ try {
       const rest = height();
       for (const distance of [120, -120]) { const t = actor.walk(4, distance); t.progress(0.5); const now = height(); if (Math.abs(now - rest) > 26) hong('held item', `walking ${distance > 0 ? 'right' : 'left'}: the item moves ${(now - rest).toFixed(0)} units from where it is held at rest`); t.kill(); actor.reset(); }
       actor.svg.remove();
+    }
+    // CẢNH RỘNG: `exit` đi ra HẲN ngoài khung hình, `enter` bắt đầu từ ngoài khung hình — không mờ đi / hiện ra giữa sân khấu.
+    {
+      const stage = document.createElement('div'); stage.setAttribute('data-composition-id', 'check-stage');
+      stage.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:400px;overflow:hidden';
+      const spot = document.createElement('div'); spot.style.cssText = 'position:absolute;left:330px;top:0;width:400px;height:400px';
+      stage.appendChild(spot); document.body.appendChild(stage);
+      for (const make of [() => L.createCharacter(spot, { id: 'vet' }).rig, () => L.createPet(spot, { species: 'dog' }).rig]) {
+        const actor = make(), who = actor.holds ? 'person' : 'pet', edge = stage.getBoundingClientRect();
+        // Mép trái / phải của thân nhân vật trên màn hình: tâm ± 45 đơn vị (bề ngang thân, không tính tay vung).
+        const body = () => { actor.render(); const frame = actor.svg.getBoundingClientRect(), unit = Math.min(frame.width / actor.constructor.KHUNG.w, frame.height / actor.constructor.KHUNG.h), centre = actor.centerX(); return [centre - 45 * unit, centre + 45 * unit]; };
+        for (const side of ['right', 'left']) {
+          let t = actor.exit(side); t.progress(1); let [left, right] = body();
+          if (side === 'right' ? left < edge.right - 2 : right > edge.left + 2) hong('exit', `${who} to the ${side}: still inside the frame when it fades out`);
+          t.kill(); actor.reset();
+          t = actor.enter(side); t.time(0.05); [left, right] = body();
+          if (side === 'left' ? right > edge.left + 12 : left < edge.right - 12) hong('enter', `${who} from the ${side}: appears inside the frame`);
+          t.progress(1); if (Math.abs(actor.s.x) > 1e-6) hong('enter', `${who}: does not stop at its own spot`);
+          t.kill(); actor.reset();
+        }
+        // Quãng tự chọn; và `exit` xuất phát từ chỗ đang đứng, không giật về giữa.
+        let t = actor.exit('right', 320); t.progress(1); if (Math.abs(actor.s.x - 320) > 1) hong('exit', `${who}: exit('right', 320) ends at x ${actor.s.x.toFixed(0)}`);
+        t.kill(); actor.reset(); actor.s.x = 90;
+        t = actor.exit('right'); t.time(0.02); if (Math.abs(actor.s.x - 90) > 6) hong('exit', `${who}: jumps to x ${actor.s.x.toFixed(0)} when leaving from x 90`);
+        t.kill(); actor.svg.remove();
+      }
+      stage.remove();
     }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
