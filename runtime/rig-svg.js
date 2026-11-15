@@ -674,7 +674,7 @@ export class RigSVG {
   // `wave` bỏ theo yêu cầu, không phải vì dịch ngang (nó dịch ngang 0).
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -2428,6 +2428,29 @@ export class RigSVG {
   }
 
   /**
+   * GHI CHÉP: tay kia đưa tới món đồ đang cầm (bìa kẹp hồ sơ, điện thoại) và viết vài nét, đầu cúi xuống nhìn.
+   * `dur` = số giây viết. Không cầm gì thì viết lên lòng bàn tay trái.
+   */
+  write(dur = 1.2) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    const held = ['L', 'R'].filter((k) => this.holds[k] && s['item' + k] > 0.5), pad = held[0] || 'L', pen = pad === 'L' ? 'R' : 'L', m = pen === 'L' ? -1 : 1;
+    this.#openUp(t);
+    // Tay giữ "tờ giấy": đang cầm đồ thì ở yên dáng bưng; không thì đưa bàn tay ngửa ra trước bụng.
+    if (!held.length) { t.set(s, { ['tay' + pad]: 'mo' }, 0); t.to(s, { ['bat' + pad]: 14, ['cang' + pad]: -85, duration: 0.3, ease: 'power2.out' }, 0); }
+    // Tay viết: ngón trỏ làm bút, đưa ngang qua trước bụng tới chỗ tay kia.
+    t.set(s, { ['tay' + pen]: 'chi' }, 0.1);
+    t.to(s, { ['bat' + pen]: 20, ['cang' + pen]: -104, dauY: 7, dau: N.dau - m * 4, nhinY: 2.4, nhinX: -m * 1.2, mayL: 0.2, mayR: 0.2, cuoi: 0.3, duration: 0.35, ease: 'power2.out' }, 0);
+    const strokes = Math.max(2, Math.round(dur / 0.15));
+    for (let n = 0; n < strokes; n++) {
+      // Nét bút: cẳng tay rung nhỏ, và cứ bốn nét thì dịch sang một chút như xuống dòng.
+      t.to(s, { ['cang' + pen]: -104 + (n % 2 ? 4 : -5) - (n % 8 < 4 ? 0 : 6), ['bat' + pen]: 20 + (n % 2 ? 1.5 : -1.5), duration: dur / strokes, ease: 'sine.inOut' }, 0.38 + n * dur / strokes);
+    }
+    if (dur > 0.8) this.#chop(t, 0.38 + dur * 0.6);
+    this.#khep(t, 0.45, 0.42 + dur);
+    return t;
+  }
+
+  /**
    * VUỐT VE một con vật (hay chạm vào một thứ gì thấp hơn mình): cúi người, đưa bàn tay tới `target` — một rig thú,
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
    */
@@ -2553,7 +2576,9 @@ export class RigSVG {
     // phụt ra ở giữa khung. Ghi qua setter thì khung nào cũng ghi.
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.huong = chieu; s.seat = 0; } };    // hiện dần trong 0,2 s đầu
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
-    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
+    // Bước vào thì món đồ về trạng thái BAN ĐẦU của nhân vật: đang cầm (mặc định), hoặc đang cất nếu nhân vật được tạo
+    // với `itemsHidden` — ghi cứng 1 ở đây là người sắp `take()` một món đồ bước vào đã cầm sẵn nó.
+    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: this.NGHI.itemL, itemR: this.NGHI.itemR });
     return t;
   }
 

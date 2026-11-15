@@ -43,6 +43,9 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   (or `"clipboard"`, `"phone"`, or `{ "L": "cup" }` for the left hand) gives a person that item;
   `"holdsHidden": true` keeps it put away, so it can be received mid-scene:
   `{ "together": [ { "who": "barista", "do": [["handOver", "@granny"]] }, { "who": "granny", "do": [["take", "@barista"]] } ] }`.
+  Other interaction steps for `do`: `"drink"`, `"write"`, and `["stroke", "@pet"]` — in a turn
+  without `say` the pet answers at the same time (a cat purrs, a dog wags its tail). Sample:
+  `examples/scene-interact/scene.json`.
 - `script` — turns, in order. `say` speaks: with `audio` it lip-syncs to the file (cues are
   made for you, the `<audio>` clip is added and timed), without it the mouth is estimated
   over `dur` seconds. `do` is a list of `sequence()` steps; `"@name"` inside a step refers to

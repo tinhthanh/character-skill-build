@@ -125,6 +125,14 @@ with tempfile.TemporaryDirectory() as work:
         if 'camera:' in page: problems.append('the presenter layout must not add the close-up camera by default')
         # Người dẫn đứng bên phải, bảng nội dung bên trái: tay diễn phải là tay phía bảng (trái).
         if 'hand: "L"' not in page or 'hand: "R"' in page: problems.append('the presenter does not gesture with the arm on the content side')
+    # Cảnh tương tác: vuốt ve một con vật trong lượt không lời → con vật đáp lại cùng lúc; `holds` tới createCharacter.
+    interact = build(os.path.join(ROOT, 'examples', 'scene-interact', 'scene.json'), os.path.join(work, 'interact'))
+    if interact.returncode != 0:
+        problems.append('the interaction example does not build: ' + (interact.stderr.strip() or interact.stdout.strip())[:200])
+    else:
+        page = open(os.path.join(work, 'interact', 'index.html'), encoding='utf-8').read()
+        if not re.search(r'together: \[\[vet, [^\n]*\["stroke", miu\]\], \[miu, "purr"\]\]', page): problems.append('stroking a pet in a wordless turn does not add the pet\'s reaction')
+        if 'items: "clipboard"' not in page and 'items: {"R": "clipboard"}' not in page: problems.append('"holds": "clipboard" is not passed to createCharacter')
     # Cảnh dọc: mèo đứng nửa phải, "enter": true → vào từ mép PHẢI (mép gần), không băng ngang qua cô bé.
     vertical = build(os.path.join(ROOT, 'examples', 'scene-vertical', 'scene.json'), os.path.join(work, 'vertical-near'))
     if vertical.returncode != 0:

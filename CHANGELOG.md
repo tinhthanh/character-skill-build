@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.34.0
+
+Added
+- **`write(dur)`** — the free hand comes over to the held clipboard or phone and writes a few
+  lines.
+- **A pet answers when it is stroked.** In a scene file, a turn without `say` that has
+  `["stroke", "@pet"]` runs the pet's reaction at the same time: a cat purrs, a dog wags.
+- **`examples/scene-interact`** — a clinic visit with voices that uses `stroke`, `write`,
+  `handOver` and `take`, and a character created holding an item.
+
+Changed
+- The camera goes back to the wide shot for `write`, and for a reach (`handOver`, `take`,
+  `stroke`) that follows speech in the same turn — a close-up hides the hands.
+- When checking whether a bystander is cut by the edge of a close-up, the camera allows for
+  hair that sticks out beyond the face (a ponytail used to show at the edge).
+
+Fixed
+- **A put-away item reappeared on `enter`.** A character created with `itemsHidden` walked in
+  holding the item, so it could not `take()` it afterwards.
+
 ## 0.33.0
 
 Added

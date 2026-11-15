@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.33.0';
+export const VERSION = '0.34.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -497,6 +497,9 @@ export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'po
       // cảnh đều phải nới ra ôm cả ba — mất hết cận cảnh. Nửa thân sau lấn vào mép khung thì chấp nhận.
       const box = boxAt(other, -1, 'face');
       if (!box.shown) continue;
+      // Hộp mặt là hình vuông quanh cái đầu; tóc buộc / tóc xoã sang bên thì thò ra ngoài nó. Nới ngang mỗi bên một
+      // phần tư để một mảng tóc ló vào mép khung cũng được tính là "bị cắt".
+      { const hair = (box.right - box.left) * 0.25; box.left -= hair; box.right += hair; }
       const partly = (x) => { const a = box.left * scale + x, b = box.right * scale + x, seen = Math.min(frameWidth, b) - Math.max(0, a); return seen > 0.06 * (b - a) && seen < 0.94 * (b - a); };
       const overlapsY = box.bottom * scale + target.y > 0 && box.top * scale + target.y < frameHeight;
       // Bị mép DƯỚI / TRÊN cắt ngang (con vật đứng thấp hơn khung cận ngực của người): không đẩy khung theo chiều dọc
@@ -836,8 +839,9 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       // về toàn cảnh cho khán giả thấy. Người diễn đang ở trong khung thì máy quay đứng yên.
       // Lượt không lời có động tác VƯƠN TỚI người / vật khác (đưa đồ, nhận đồ, vuốt ve): cận cảnh của một người thì
       // không thấy bàn tay và bên kia — về toàn cảnh.
-      const reaching = !spoken.length && turn.steps.find((step) => ['handOver', 'take', 'stroke'].includes(step.name));
-      if (reaching && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
+      // Cả `write`: viết vào bìa kẹp diễn ra ngang bụng, cận mặt thì không thấy gì.
+      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write'].includes(step.name));
+      if (reaching && !spoken.length && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
@@ -859,6 +863,8 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       lastWords = Math.max(lastWords, until);
       // Nói xong rồi BƯỚC RA (hoặc đi ngang cảnh): lùi về toàn cảnh đúng lúc bắt đầu đi.
       if (crossing && !walksFirst && turn.shot === undefined && aimed !== 'wide') goWide(crossing.start);
+      // Nói xong rồi mới VƯƠN TAY / GHI CHÉP trong cùng lượt: cũng lùi về toàn cảnh lúc động tác ấy bắt đầu.
+      if (reaching && reaching.start >= until - 0.05 && turn.shot === undefined && aimed !== 'wide') goWide(reaching.start);
     }
     if (wide && aimed && aimed !== 'wide') cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), lastWords + 0.3);
   }

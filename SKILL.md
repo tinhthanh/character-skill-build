@@ -8,7 +8,7 @@ description: Create custom 2D SVG characters (people, plus dogs and cats) on a s
 A library of **100% SVG characters driven by GSAP** and the tools to put them in a
 [HyperFrames](https://github.com/heygen-com/hyperframes) video. A character is a small JS
 definition on a shared skeleton, so every character can already wave, talk, walk, sit,
-cheer, drink, stroke a pet, hand an item to someone (27 actions) and hold a stance (sit down, face someone, put an item away).
+cheer, drink, write, stroke a pet, hand an item to someone (28 actions) and hold a stance (sit down, face someone, put an item away).
 
 There are two jobs. Do the one you were asked for; most videos need both.
 
@@ -200,7 +200,7 @@ configs/        tuned numbers written by the studio, baked into dist/
 dist/           character.slim.js (use this) · character.iife.js (same, commented) — generated
 runtime/        the library sources (ES modules)
 studio/         visual editor (Vietnamese UI)
-examples/       hyperframes/ · conversation/ · voiceover/ · scene/ · scene-vertical/ · scene-presenter/
+examples/       hyperframes/ · conversation/ · voiceover/ · scene/ · scene-vertical/ · scene-presenter/ · scene-interact/
 tools/          check.sh (everything, must PASS) · shot.sh (pose sheet) · describe.sh · gallery.sh ·
                 scene.py (scene file → composition; --retime) · cues.py (mouth cues from audio) ·
                 peek.sh (preview; --mouth) · lint-examples.sh (hyperframes lint / check; needs Node) ·

@@ -23,6 +23,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shrug` | — | shrug with open palms | 1.7 |
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
 | `drink` | `(side = 'auto')` | raise the held item (a cup) to the mouth, tilt it, eyes closed, then lower it with a smile; a turned character faces the viewer to drink. With empty hands it mimes the sip | 1.85 |
+| `write` | `(dur = 1.2)` | the other hand comes over to the held item (clipboard, phone) and writes a few lines, head down; with empty hands it writes on the left palm | `dur` + 0.87 |
 | `stroke` | `(target)` | lean toward a pet (a rig, an element, or `{ x, y }`) and stroke it three times with the hand on that side; crouches if the target is below the hips. Keep the pet within about 0.25 × host height of the person, arms are short | 2.2 |
 | `handOver` | `(target, side = 'auto')` | reach the held item toward `target` (a rig, `'left'`, `'right'`); it leaves the hand, which relaxes. Throws if nothing is held | 1.33 |
 | `take` | `(source, side = 'auto')` | reach toward `source` and receive an item into the hand: the character must already have it put away (`items` + `itemsHidden`, below). Run it `together` with the giver's `handOver` | 1.33 |

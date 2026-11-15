@@ -45,7 +45,9 @@ Scene file (every key except `characters` and `script` is optional):
                to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
-               ("@name" refers to another character). `shot`: "face" | "wide" | false | ["vet", "bella"]
+               ("@name" refers to another character). Interaction steps: "drink", "write", ["stroke", "@pet"]
+               (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), and
+               ["handOver", "@other"] together with the other's ["take", "@giver"]. `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
@@ -460,7 +462,15 @@ def main():
             if not isinstance(entry['together'], list) or not entry['together']: fail(f'{where}: "together" must be a non-empty list of turns')
             turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
         else:
-            turns.append((None, turn_code(entry, where)))
+            code = turn_code(entry, where)
+            # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
+            # tự viết `together`.
+            stroked = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'stroke' and isinstance(step[1], str) and step[1].startswith('@')]
+            pets = [name for name in stroked if name in names and names[name]['_pet']]
+            if pets and 'say' not in entry and code.startswith('['):
+                pet = names[pets[0]]
+                code = '{ together: [' + code + f", [{pet['name']}, {js('purr' if 'cat' in pet['species'] else 'wagTail')}]] }}"
+            turns.append((None, code))
 
     # ── đạo cụ ──
     props = []

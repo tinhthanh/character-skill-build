@@ -1,4 +1,4 @@
-/* VGCharacter v0.33.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.34.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -681,7 +681,7 @@ class RigSVG {
   // `wave` bỏ theo yêu cầu, không phải vì dịch ngang (nó dịch ngang 0).
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -2435,6 +2435,29 @@ class RigSVG {
   }
 
   /**
+   * GHI CHÉP: tay kia đưa tới món đồ đang cầm (bìa kẹp hồ sơ, điện thoại) và viết vài nét, đầu cúi xuống nhìn.
+   * `dur` = số giây viết. Không cầm gì thì viết lên lòng bàn tay trái.
+   */
+  write(dur = 1.2) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    const held = ['L', 'R'].filter((k) => this.holds[k] && s['item' + k] > 0.5), pad = held[0] || 'L', pen = pad === 'L' ? 'R' : 'L', m = pen === 'L' ? -1 : 1;
+    this.#openUp(t);
+    // Tay giữ "tờ giấy": đang cầm đồ thì ở yên dáng bưng; không thì đưa bàn tay ngửa ra trước bụng.
+    if (!held.length) { t.set(s, { ['tay' + pad]: 'mo' }, 0); t.to(s, { ['bat' + pad]: 14, ['cang' + pad]: -85, duration: 0.3, ease: 'power2.out' }, 0); }
+    // Tay viết: ngón trỏ làm bút, đưa ngang qua trước bụng tới chỗ tay kia.
+    t.set(s, { ['tay' + pen]: 'chi' }, 0.1);
+    t.to(s, { ['bat' + pen]: 20, ['cang' + pen]: -104, dauY: 7, dau: N.dau - m * 4, nhinY: 2.4, nhinX: -m * 1.2, mayL: 0.2, mayR: 0.2, cuoi: 0.3, duration: 0.35, ease: 'power2.out' }, 0);
+    const strokes = Math.max(2, Math.round(dur / 0.15));
+    for (let n = 0; n < strokes; n++) {
+      // Nét bút: cẳng tay rung nhỏ, và cứ bốn nét thì dịch sang một chút như xuống dòng.
+      t.to(s, { ['cang' + pen]: -104 + (n % 2 ? 4 : -5) - (n % 8 < 4 ? 0 : 6), ['bat' + pen]: 20 + (n % 2 ? 1.5 : -1.5), duration: dur / strokes, ease: 'sine.inOut' }, 0.38 + n * dur / strokes);
+    }
+    if (dur > 0.8) this.#chop(t, 0.38 + dur * 0.6);
+    this.#khep(t, 0.45, 0.42 + dur);
+    return t;
+  }
+
+  /**
    * VUỐT VE một con vật (hay chạm vào một thứ gì thấp hơn mình): cúi người, đưa bàn tay tới `target` — một rig thú,
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
    */
@@ -2560,7 +2583,9 @@ class RigSVG {
     // phụt ra ở giữa khung. Ghi qua setter thì khung nào cũng ghi.
     const shown = { get v() { return 0; }, set v(v) { s.mo = Math.min(1, v * at / 0.2); s.huong = chieu; s.seat = 0; } };    // hiện dần trong 0,2 s đầu
     t.to(shown, { v: 1, duration: at, ease: 'none' }, 0);
-    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: 1, itemR: 1 });
+    // Bước vào thì món đồ về trạng thái BAN ĐẦU của nhân vật: đang cầm (mặc định), hoặc đang cất nếu nhân vật được tạo
+    // với `itemsHidden` — ghi cứng 1 ở đây là người sắp `take()` một món đồ bước vào đã cầm sẵn nó.
+    this.#khep(t, 0.45, at, { x: 0, huong: 0, seat: 0, itemL: this.NGHI.itemL, itemR: this.NGHI.itemR });
     return t;
   }
 
@@ -5261,7 +5286,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.33.0';
+const VERSION = '0.34.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -5737,6 +5762,9 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
       // cảnh đều phải nới ra ôm cả ba — mất hết cận cảnh. Nửa thân sau lấn vào mép khung thì chấp nhận.
       const box = boxAt(other, -1, 'face');
       if (!box.shown) continue;
+      // Hộp mặt là hình vuông quanh cái đầu; tóc buộc / tóc xoã sang bên thì thò ra ngoài nó. Nới ngang mỗi bên một
+      // phần tư để một mảng tóc ló vào mép khung cũng được tính là "bị cắt".
+      { const hair = (box.right - box.left) * 0.25; box.left -= hair; box.right += hair; }
       const partly = (x) => { const a = box.left * scale + x, b = box.right * scale + x, seen = Math.min(frameWidth, b) - Math.max(0, a); return seen > 0.06 * (b - a) && seen < 0.94 * (b - a); };
       const overlapsY = box.bottom * scale + target.y > 0 && box.top * scale + target.y < frameHeight;
       // Bị mép DƯỚI / TRÊN cắt ngang (con vật đứng thấp hơn khung cận ngực của người): không đẩy khung theo chiều dọc
@@ -6076,8 +6104,9 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       // về toàn cảnh cho khán giả thấy. Người diễn đang ở trong khung thì máy quay đứng yên.
       // Lượt không lời có động tác VƯƠN TỚI người / vật khác (đưa đồ, nhận đồ, vuốt ve): cận cảnh của một người thì
       // không thấy bàn tay và bên kia — về toàn cảnh.
-      const reaching = !spoken.length && turn.steps.find((step) => ['handOver', 'take', 'stroke'].includes(step.name));
-      if (reaching && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
+      // Cả `write`: viết vào bìa kẹp diễn ra ngang bụng, cận mặt thì không thấy gì.
+      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write'].includes(step.name));
+      if (reaching && !spoken.length && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {
           cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, turn.start - lead));
@@ -6099,6 +6128,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       lastWords = Math.max(lastWords, until);
       // Nói xong rồi BƯỚC RA (hoặc đi ngang cảnh): lùi về toàn cảnh đúng lúc bắt đầu đi.
       if (crossing && !walksFirst && turn.shot === undefined && aimed !== 'wide') goWide(crossing.start);
+      // Nói xong rồi mới VƯƠN TAY / GHI CHÉP trong cùng lượt: cũng lùi về toàn cảnh lúc động tác ấy bắt đầu.
+      if (reaching && reaching.start >= until - 0.05 && turn.shot === undefined && aimed !== 'wide') goWide(reaching.start);
     }
     if (wide && aimed && aimed !== 'wide') cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), lastWords + 0.3);
   }

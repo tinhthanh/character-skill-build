@@ -1,0 +1,21 @@
+{
+  "id": "checkup-notes",
+  "width": 1920,
+  "height": 1080,
+  "seed": 8,
+  "background": { "preset": "clinic" },
+  "characters": [
+    { "name": "vet", "id": "vet", "x": 640, "faces": "ba", "holds": "clipboard", "voice": "maichi" },
+    { "name": "miu", "species": "orange_cat", "x": 850, "faces": "vet" },
+    { "name": "ba", "id": "granny", "x": 1320, "enter": true, "faces": "vet", "holds": { "L": "clipboard" }, "holdsHidden": true, "voice": "kimoanh" }
+  ],
+  "script": [
+    { "who": "vet", "say": "Chào bà. Hôm nay bé Miu thế nào ạ?" },
+    { "who": "ba", "say": "Dạo này bé ăn ít lắm, bác sĩ xem giúp tôi với.", "mood": "worried" },
+    { "who": "vet", "do": [["face", "@miu"], ["stroke", "@miu"]] },
+    { "who": "vet", "say": "Bé ngoan lắm. Để cháu ghi lại vài dòng.", "do": ["write"] },
+    { "who": "vet", "say": "Bé khoẻ, chỉ cần đổi thức ăn thôi ạ. Phiếu dặn dò của bà đây.", "mood": "happy", "do": [["face", "@ba"]] },
+    { "together": [ { "who": "vet", "do": [["handOver", "@ba"]] }, { "who": "ba", "do": [["take", "@vet"]] } ] },
+    { "who": "ba", "say": "Cảm ơn bác sĩ nhiều.", "mood": "happy", "do": ["nod"] }
+  ]
+}

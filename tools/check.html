@@ -794,6 +794,24 @@ try {
       if (carried > 1) hong('stroke', 'the hand holding an item is used to stroke');
       t.kill(); stage6.remove();
     }
+    // GHI CHÉP: tay kia đưa tới món đồ đang cầm và viết; tay cầm đồ đứng yên; không cầm gì thì viết lên tay trái.
+    {
+      const clerk = L.createCharacter(host, { id: 'boy', items: { L: 'clipboard' } }).rig, t = clerk.write(1.2); let pen = 0, pad = 0, flips = 0, way = 0, before = null;
+      for (let time = 0; time <= t.duration(); time += 1 / 60) { t.time(time); pen = Math.max(pen, Math.abs(clerk.s.cangR - clerk.NGHI.cangR)); pad = Math.max(pad, Math.abs(clerk.s.cangL - clerk.NGHI.cangL));
+        if (before !== null) { const d = Math.sign(Math.round((clerk.s.cangR - before) * 30)); if (d && d !== way) { if (way) flips++; way = d; } } before = clerk.s.cangR; }
+      if (pen < 50) hong('write', `the writing hand does not come over to the item (${pen.toFixed(0)}°)`);
+      if (pad > 1) hong('write', 'the hand holding the item moves');
+      if (flips < 5) hong('write', `only ${flips} pen strokes`);
+      t.progress(1); if (Math.abs(clerk.s.cangR - clerk.NGHI.cangR) > 1e-6 || clerk.s.tayR !== clerk.NGHI.tayR) hong('write', 'does not return to rest');
+      t.kill(); clerk.svg.remove();
+    }
+    // Nhân vật có món đồ ĐANG CẤT bước vào bằng `enter` thì món đồ vẫn cất (từng tự hiện ra, nên không `take()` được).
+    {
+      const late = L.createCharacter(host, { id: 'granny', items: { L: 'cup' }, itemsHidden: true }).rig, line = L.sequence(late, [['enter', 'right'], ['take', 'left']]);
+      line.time(line.data.steps[1].start - 0.01); if (late.s.itemL > 0.01) hong('enter', 'a put-away item appears when the character walks in');
+      line.time(line.duration()); if (late.s.itemL !== 1) hong('take', 'the item is not received after walking in');
+      line.kill(); late.svg.remove();
+    }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
     for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;
@@ -1167,7 +1185,7 @@ try {
     });
     const cells = (frame) => [...frame.contentDocument.body.children].filter((el) => el.tagName === 'DIV');
     const names = JSON.parse(listAtStart);
-    for (const [id, expected] of [['receptionist', 25], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
+    for (const [id, expected] of [['receptionist', 26], ['dog', 2 + RigThu.DONG_TAC.dog.length - 1]]) {
       const { frame, done } = await load(`sheet.html?nv=${id}`);
       if (!done) hong(`sheet.html?nv=${id}`, 'the pose sheet does not finish (script error?)');
       else if (cells(frame).length !== expected) hong(`sheet.html?nv=${id}`, `the pose sheet shows ${cells(frame).length} panels, expected ${expected}`);
