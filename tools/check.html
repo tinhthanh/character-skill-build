@@ -515,6 +515,44 @@ try {
       if (clear < item.width * 0.6) hong('held item', `walking sideways: only ${Math.round(clear / item.width * 100)}% of the carried item shows in front of the body`);
       t.kill(); actor.svg.remove();
     }
+    // CỬ CHỈ Ở DÁNG 3/4 (kênh `aim`): nhân vật giữ nguyên hướng đang quay, cánh tay diễn theo góc màn hình.
+    {
+      const mid = (rig, t, at) => { t.pause(); t.time(at); rig.render(); };
+      const vet = L.createCharacter(host, { id: 'vet' }).rig; vet.face('left').progress(1);
+      let t = vet.point({ x: 30, y: 190 }); mid(vet, t, 0.7);
+      if (Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', `point: the body turned to ${vet.s.huong.toFixed(2)} instead of keeping its three-quarter stance`);
+      if (vet.s.aimL !== 1) hong('3/4 gestures', 'point: the pointing arm is not in screen-aim mode');
+      if (vet.el.batL.parentNode !== vet.el.tren) hong('3/4 gestures', 'point: the far arm is drawn behind the body while it points');
+      if (/brightness/.test(vet.el.batL.style.filter)) hong('3/4 gestures', 'point: the far arm is dimmed while it points');
+      const squeeze = Math.abs(new DOMMatrix(getComputedStyle(vet.el.tayG.L).transform === 'none' ? vet.el.tayG.L.getAttribute('transform') : getComputedStyle(vet.el.tayG.L).transform).a);
+      if (squeeze < 0.5) hong('3/4 gestures', `point: the far hand is squeezed to ${(squeeze * 100).toFixed(0)}% of its width`);
+      const vetAngle = vet.s.batL;
+      t.progress(1); vet.render();
+      if (vet.s.aimL !== 0 || Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', 'point: does not return to the held stance');
+      if (vet.el.batL.parentNode === vet.el.tren) hong('3/4 gestures', 'the far arm stays in front of the body after the gesture');
+      t.kill();
+      // Vẫy tay ở dáng 3/4: bàn tay nằm cạnh đầu, không đè lên mặt.
+      t = vet.wave(); mid(vet, t, 1.0);
+      const hand = vet.el.tayG.L.getBoundingClientRect(), face = vet.el.khuon.getBoundingClientRect();
+      const over = Math.max(0, Math.min(hand.right, face.right) - Math.max(hand.left, face.left)) / hand.width;
+      if (over > 0.35) hong('3/4 gestures', `wave: ${(over * 100).toFixed(0)}% of the waving hand is over the face`);
+      if (Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', 'wave: the body does not keep its three-quarter stance');
+      t.kill(); vet.svg.remove();
+      // Góc chỉ tính từ vai của CHÍNH nhân vật: cậu bé vai thấp phải giơ tay cao hơn người lớn cho cùng một đích.
+      const boy = L.createCharacter(host, { id: 'boy' }).rig;
+      t = boy.point({ x: 30, y: 190 }); mid(boy, t, 0.7);
+      if (boy.s.batL < vetAngle + 8) hong('3/4 gestures', `point: the boy raises his arm ${boy.s.batL.toFixed(0)}°, the vet ${vetAngle.toFixed(0)}° — the angle ignores his lower shoulder`);
+      t.kill(); boy.svg.remove();
+      // Nói: tay phía người nghe rảnh thì giữ dáng 3/4; tay ấy đang cầm đồ (tay kia diễn, mở ra sau lưng) thì mở người như cũ.
+      const free = L.createCharacter(host, { id: 'vet' }).rig; free.face('left').progress(1);
+      t = free.explain('một hai ba bốn năm sáu bảy tám', 3); mid(free, t, 1.5);
+      if (Math.abs(free.s.huong + 0.55) > 0.01) hong('3/4 gestures', `explain: an empty-handed speaker turned to ${free.s.huong.toFixed(2)} instead of keeping the stance`);
+      t.kill(); free.svg.remove();
+      const busy = L.createCharacter(host, { id: 'vet', items: { L: 'cup' } }).rig; busy.face('left').progress(1);
+      t = busy.explain('một hai ba bốn năm sáu bảy tám', 3); mid(busy, t, 1.5);
+      if (Math.abs(busy.s.huong + 0.3) > 0.01) hong('3/4 gestures', `explain: with the listener-side hand full the speaker should open up to the viewer (facing ${busy.s.huong.toFixed(2)})`);
+      t.kill(); busy.svg.remove();
+    }
     // Nhịp thở nền của `sequence()`: trong lúc giữ dáng ngực vẫn phồng xẹp; chuỗi kết thúc đúng trạng thái nghỉ; `breathe: false` thì tắt.
     for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'dog' }).rig]) {
       const actor = make(), steps = [['idle', 0.2], 3, ['idle', 0.2]];

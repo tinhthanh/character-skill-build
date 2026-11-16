@@ -295,9 +295,12 @@ shots, effects and audio), `talk.of(rig)` is that character's sequence. (Under t
 one `sequence()` per character.) Give each character a stance (`sitDown`,
 `['face', otherRig]`) — it holds for everything after. For a character that is
 **already seated (or already turned) in the first frame**, set the stance on the rig before
-building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Hand gestures open
-the body toward the viewer for their duration (arms are drawn for a front view), then return
-to the held facing. Draw the chair as an
+building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Speech gestures, `point`, `wave`,
+`present`, `handOver` and `take` keep the held three-quarter stance: the arms that act are
+drawn at their on-screen angles, the far arm in front of the body. (A speaker whose
+listener-side hand holds an item gestures with the other hand and opens toward the viewer
+instead, as do `thumbsUp`, `cheer`, `shrug`, `stroke`, `write`, `drink`, `worry` and `speak`,
+which then return to the held facing.) Draw the chair as an
 ordinary element behind the seated character. Run `tools/peek.sh`: it prints every step's
 start and end, and warns about speech overlapping by more than 0.15 s (the 0.55 s settling
 tail of a speaking step does not count), a character facing away

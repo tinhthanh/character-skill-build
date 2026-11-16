@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.36.0
+
+Changed
+- **Gestures keep the three-quarter stance.** A character turned toward someone (`face`) used
+  to swing back toward the viewer for every hand gesture. `point`, `wave`, `present`,
+  `handOver`, `take` and the gestures of `explain` / `speakCues` now keep the body turned and
+  draw the acting arms at their on-screen angles; the far arm comes in front of the body,
+  undimmed, with a full hand. A speaker whose listener-side hand holds an item still opens
+  toward the viewer (its free hand would otherwise gesture behind its back).
+- `wave` in a three-quarter stance moves the elbow outward so the hand stays beside the head.
+
+Fixed
+- `point` aims from the character's own shoulder height. Short characters (the boy) pointed
+  about ten degrees below the target.
+
 ## 0.35.0
 
 Added

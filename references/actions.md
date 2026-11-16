@@ -67,10 +67,12 @@ A character keeps its horizontal position after `walk` with a distance. `sit` dr
 chair; put one in the composition behind the character if the scene needs it.
 
 **Stance.** Sitting (`sitDown` / `standUp`) and facing (`face`) are *held*: every other action
-ends in the stance it started from, not standing-facing-front. Actions that move the arms
-(`wave`, `thumbsUp`, `point`, `present`, `shrug`, `worry`, `speak`, `explain`) turn the body to
-at most 0.2 for their duration, because raised arms are drawn for a front view; they return
-to the held facing at the end. To start a scene already seated or turned, set
+ends in the stance it started from, not standing-facing-front. `point`, `wave`,
+`present`, `handOver`, `take` and the gestures of `explain` / `speakCues` keep the held facing
+and draw the acting arms at their on-screen angles. The other arm actions (`thumbsUp`, `shrug`,
+`cheer`, `worry`, `speak`, `stroke`, `write`) — and a speaker whose listener-side hand holds
+an item — turn the body to at most 0.3 for their duration and return to the held facing at
+the end. To start a scene already seated or turned, set
 `rig.state.seat = 1` / `rig.state.facing = ±0.55` before calling `sequence()`. So a conversation is
 
 ```js
