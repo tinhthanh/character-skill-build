@@ -1387,6 +1387,15 @@ export class RigSVG {
       rotation['bat' + side] += (sign * pose.bat - rotation['bat' + side]) * aim;
       rotation['cang' + side] += (sign * pose.cang - rotation['cang' + side]) * aim;
     }
+    // Tay XA đang gập cẳng tay vào trong (dáng nghỉ đan tay trước bụng) mà không diễn: cẳng tay và bàn tay đã khuất sau
+    // thân, chỉ còn BẮP TAY ló ra ngoài mép áo như một mẩu da cụt bên eo — rõ nhất ở mức quay 0,3–0,45. Cho cả cánh
+    // tay ấy buông thẳng, hơi khép vào, nằm gọn sau thân và chân. (Tay xa đang cầm đồ thì không: món đồ phải ló ra.)
+    if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
+      const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
+      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (1 - Math.abs(clamp(s['aim' + xa], -1, 1)));
+      rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
+      rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
+    }
     e.batL.setAttribute('transform', `translate(${chotX.L + doiChot.L.x} ${CHOT_VAI.y + doiChot.L.y}) rotate(${rotation.batL}) scale(1 ${1 - (1 - tL.co) * cF})`);
     e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${rotation.batR}) scale(1 ${1 - (1 - tR.co) * cF})`);
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);

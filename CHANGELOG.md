@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.36.3
+
+Fixed
+- **No arm stump at the waist in a three-quarter stance.** A character that rests with its
+  hands folded and is turned by about 0.3–0.45 showed the far upper arm sticking out beyond
+  the shirt while the forearm was hidden behind the body. The resting far arm now hangs
+  straight, tucked behind the body and legs (a far arm that carries an item is unchanged).
+
 ## 0.36.2
 
 Fixed

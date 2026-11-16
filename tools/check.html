@@ -543,6 +543,14 @@ try {
       t = boy.point({ x: 30, y: 190 }); mid(boy, t, 0.7);
       if (boy.s.batL < vetAngle + 8) hong('3/4 gestures', `point: the boy raises his arm ${boy.s.batL.toFixed(0)}°, the vet ${vetAngle.toFixed(0)}° — the angle ignores his lower shoulder`);
       t.kill(); boy.svg.remove();
+      // Tay xa lúc NGHỈ ở dáng đan tay: không ló ra ngoài mép áo như một mẩu da cụt bên eo.
+      for (const amount of [0.3, 0.42, 0.55]) {
+        const still = L.createCharacter(host, { id: 'vet' }).rig; still.face('right', amount).progress(1); still.render();
+        const arm = still.el.batR.getBoundingClientRect(), shirt = still.el.ao.getBoundingClientRect();
+        if (arm.right > shirt.right + shirt.width * 0.04) hong('3/4 stance', `turned ${amount}: the resting far arm sticks out ${(arm.right - shirt.right).toFixed(1)}px beyond the shirt`);
+        if (arm.left < shirt.left - shirt.width * 0.04) hong('3/4 stance', `turned ${amount}: the resting far arm sticks out behind the back`);
+        still.svg.remove();
+      }
       // Nói: tay phía người nghe rảnh thì giữ dáng 3/4; tay ấy đang cầm đồ (tay kia diễn, mở ra sau lưng) thì mở người như cũ.
       const free = L.createCharacter(host, { id: 'vet' }).rig; free.face('left').progress(1);
       t = free.explain('một hai ba bốn năm sáu bảy tám', 3); mid(free, t, 1.5);
