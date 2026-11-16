@@ -1,4 +1,4 @@
-/* VGCharacter v0.37.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.37.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2944,7 +2944,18 @@ class RigSVG {
       if (!POSES.length) return;
       let pick = last; while (pick === last && POSES.length > 1) pick = Math.floor(ngau() * POSES.length);
       last = pick;
-      const pose = POSES[pick];
+      let pose = POSES[pick];
+      // Đang đứng dáng 3/4 và chỉ MỘT tay (tay phía người nghe) mở ra, tay kia vẫn đan trước bụng: các dáng trên đặt
+      // cẳng tay nằm ngang đúng độ cao khuỷu — tức đúng độ cao của cẳng tay đang đan. Hai cẳng tay thẳng hàng, nối đầu
+      // vào nhau, nhìn như MỘT cánh tay dài xuyên qua thân. Đưa bắp tay ra ngoài hơn và duỗi bớt cẳng tay: cả cánh tay thành một đường chéo từ vai xuống về phía người nghe, bàn tay mở ở ngang hông.
+      // (Chếch LÊN thì bàn tay chỉ lên tới ngang bàn tay kia — tay nhân vật ngắn — vẫn thẳng hàng.)
+      if (RigSVG.SCREEN_AIM && Math.abs(s.huong) > 0.1 && lead === (s.huong < 0 ? 'L' : 'R') && !pose.other && pose.lead[1] > 0)
+{
+        // Bắp tay không quá 38° (đưa ra nhiều hơn là khuỷu lên cao, bàn tay lại về ngang bàn tay kia); bắp + cẳng ≤ 52°,
+        // chừa chỗ cho phần xê dịch ngẫu nhiên và nhịp nhấn (tới +17°) mà cẳng tay vẫn còn chếch xuống rõ.
+        const upper = Math.min(pose.lead[0] + 22, 38);
+        pose = { lead: [upper, Math.min(pose.lead[1] - 30, 52 - upper)], other: null };
+      }
       const next = i + 1 < anchors.length ? anchors[i + 1] : D;
       // Thời gian đưa tay dài nhất trong các tay tham gia (đường đi càng dài càng lâu, xem bên dưới).
       const travel = Math.max(Math.abs(pose.lead[1] - base(lead)[1]), other && pose.other ? Math.abs(pose.other[1] - base(other)[1]) : 0);
@@ -5455,7 +5466,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.37.1';
+const VERSION = '0.37.2';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

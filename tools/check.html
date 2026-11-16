@@ -572,6 +572,31 @@ try {
         if (Math.abs(stays.top - before.top) > shirt.height * 0.12) hong('3/4 stance', `thumbsUp while facing right: the far hand moved ${(stays.top - before.top).toFixed(1)}px with the gesture`);
         t.kill(); thumb.svg.remove();
       }
+      // Nói ở dáng 3/4, một tay mở ra còn tay kia đan trước bụng: cẳng tay đang mở KHÔNG nằm ngang (nó sẽ thẳng hàng với
+      // cẳng tay đang đan, nhìn như một cánh tay dài xuyên qua thân) — nó chếch xuống ít nhất 18°, và bàn tay của nó nằm
+      // thấp hơn hẳn bàn tay đang đan.
+      {
+        const talker = L.createCharacter(host, { id: 'vet' }).rig; talker.face('right').progress(1); talker.render();
+        const middle = (rig, side) => { const box = rig.el.tayG[side].getBoundingClientRect(); return box.top + box.height / 2; };
+        const folded = middle(talker, 'L'), unit = talker.el.ao.getBoundingClientRect().height;
+        let flattest = -Infinity, closest = Infinity, seen = 0;
+        for (const seedValue of [1, 2, 3, 4, 5, 6]) {
+          L.seed(seedValue);
+          const t = talker.explain('một hai ba bốn năm sáu bảy tám chín mười', 4); t.pause();
+          for (let at = 0.6; at < 3.4; at += 0.1) {
+            t.time(at); talker.render();
+            if (talker.s.aimR < 0.99 || talker.s.aimL > 0.01 || talker.s.batR < 30) continue;          // chỉ xét lúc một mình tay xa đang giữ dáng mở
+            seen++; flattest = Math.max(flattest, talker.s.batR + talker.s.cangR); closest = Math.min(closest, middle(talker, 'R') - folded);
+          }
+          t.kill(); talker.reset(); talker.face('right').progress(1);
+        }
+        if (!seen) hong('3/4 gestures', 'test setup: no one-arm speech gesture was sampled');
+        else {
+          if (flattest > 72) hong('3/4 gestures', `explain: the open far forearm is only ${(90 - flattest).toFixed(0)}° below level — in line with the folded near forearm`);
+          if (closest < unit * 0.12) hong('3/4 gestures', `explain: the open far hand is at the height of the folded hand (${(closest / unit * 100).toFixed(0)}% of the shirt height below it)`);
+        }
+        talker.svg.remove();
+      }
       // Nói: tay phía người nghe rảnh thì giữ dáng 3/4; tay ấy đang cầm đồ (tay kia diễn, mở ra sau lưng) thì mở người như cũ.
       const free = L.createCharacter(host, { id: 'vet' }).rig; free.face('left').progress(1);
       t = free.explain('một hai ba bốn năm sáu bảy tám', 3); mid(free, t, 1.5);

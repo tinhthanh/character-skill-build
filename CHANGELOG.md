@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.2
+
+Fixed
+- **One-arm speech gestures in a three-quarter stance.** When only the listener-side arm
+  opened and the other stayed folded, its forearm lay level at the height of the folded
+  forearm: the two lined up and read as one long arm through the body. That arm now reaches
+  diagonally down toward the listener, the open hand at hip height.
+
 ## 0.37.1
 
 Fixed

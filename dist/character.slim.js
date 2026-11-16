@@ -1,4 +1,4 @@
-/* VGCharacter v0.37.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.37.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1793,7 +1793,12 @@ class RigSVG {
       if (!POSES.length) return;
       let pick = last; while (pick === last && POSES.length > 1) pick = Math.floor(ngau() * POSES.length);
       last = pick;
-      const pose = POSES[pick];
+      let pose = POSES[pick];
+      if (RigSVG.SCREEN_AIM && Math.abs(s.huong) > 0.1 && lead === (s.huong < 0 ? 'L' : 'R') && !pose.other && pose.lead[1] > 0)
+{
+        const upper = Math.min(pose.lead[0] + 22, 38);
+        pose = { lead: [upper, Math.min(pose.lead[1] - 30, 52 - upper)], other: null };
+      }
       const next = i + 1 < anchors.length ? anchors[i + 1] : D;
       const travel = Math.max(Math.abs(pose.lead[1] - base(lead)[1]), other && pose.other ? Math.abs(pose.other[1] - base(other)[1]) : 0);
       const longest = clamp(travel / 300, 0.36, 0.62) + 0.17;                 // + nhịp trễ của tay phụ và của cẳng tay
@@ -3539,7 +3544,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.37.1';
+const VERSION = '0.37.2';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
