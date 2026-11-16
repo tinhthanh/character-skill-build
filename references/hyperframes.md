@@ -76,7 +76,7 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   frame the panel sits above the captions and the presenter below. The tool notes content that
   is taller than the panel. Sample: `examples/scene-presenter/scene.json`.
 - **Vertical video:** set `"width": 1080, "height": 1920`. Default character heights and the
-  caption size follow the frame; captions sit mid-frame, inside the area that TikTok, Reels and
+  caption size follow the frame; captions (always one line at a time) sit mid-frame, inside the area that TikTok, Reels and
   Shorts leave clear, the camera puts the speaker above them, and the floor line sits higher
   (the bottom of a vertical video is covered by the app's controls). **Spacing:** a head is
   about 0.45 × the character's host height wide, so in a 1080 px frame two default-size people
@@ -104,7 +104,7 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   **seated** behind a `front` counter needs a lower one — the tool prints a note with a value
   that leaves the chest visible.
 - Also: `props` (`kind`, `x`, `color`, `height`, `front`, `tabletop`, `width`, `back`), `background` (`wall`, `wallDark`, `floor`,
-  `floorHeight`), `camera` (`true` / `{ "kind": "face" }` / `false`), `captions`, `seed`,
+  `floorHeight`), `camera` (`true` / `{ "kind": "face" }` / `false`), `captions` (one line at the bottom centre, each chunk shown when the speech reaches it; `false` = none), `seed`,
   `width`, `height`, `gap`.
 
 The result is plain, commented HTML using the same API as the rest of this page — edit it by

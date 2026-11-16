@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.36.1
+
+Changed
+- **Scene files: captions are one line.** `tools/scene.py` puts the caption at the bottom
+  centre of a landscape frame (mid-frame in a vertical one, as before), one line at a time;
+  a long sentence is cut into chunks that fit the line, each shown when the speech reaches
+  it. The caption no longer moves to avoid heads. A two- or three-line box covered short
+  characters and their gestures. `"captions": false` still removes it.
+
 ## 0.36.0
 
 Changed
