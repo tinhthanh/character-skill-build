@@ -462,7 +462,7 @@ try {
     }
     // Quay 3/4: tay XA nằm sau cả hai chân (từng ló bàn tay ra giữa hai đùi); nhìn thẳng thì về lại lớp trên thân.
     {
-      const actor = L.createCharacter(host, { id: 'vet' }).rig, legs = actor.el.chanG;
+      const actor = L.createCharacter(host, { id: 'boy' }).rig, legs = actor.el.chanG;       // cậu bé nghỉ ở dáng BUÔNG tay (dáng đan tay thì cẳng tay xa vắt ra trước bụng, xem '3/4 stance')
       for (const [turn, far] of [[0.55, 'batR'], [-0.55, 'batL']]) {
         actor.s.huong = turn; actor.render();
         if (!(actor.el[far].compareDocumentPosition(legs) & Node.DOCUMENT_POSITION_FOLLOWING)) hong('far arm', `turned ${turn}: the far arm is drawn over the legs`);
@@ -529,7 +529,7 @@ try {
       const vetAngle = vet.s.batL;
       t.progress(1); vet.render();
       if (vet.s.aimL !== 0 || Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', 'point: does not return to the held stance');
-      if (vet.el.batL.parentNode !== vet.el.sauChan) hong('3/4 gestures', 'the far arm does not go back behind the body after the gesture');
+      if (vet.el.batL.parentNode !== vet.el.tren || vet.el.canhHinhL.style.visibility !== 'hidden') hong('3/4 gestures', 'the far arm does not go back to the folded-hands pose after the gesture');
       t.kill();
       // Vẫy tay ở dáng 3/4: bàn tay nằm cạnh đầu, không đè lên mặt.
       t = vet.wave(); mid(vet, t, 1.0);
@@ -543,13 +543,30 @@ try {
       t = boy.point({ x: 30, y: 190 }); mid(boy, t, 0.7);
       if (boy.s.batL < vetAngle + 8) hong('3/4 gestures', `point: the boy raises his arm ${boy.s.batL.toFixed(0)}°, the vet ${vetAngle.toFixed(0)}° — the angle ignores his lower shoulder`);
       t.kill(); boy.svg.remove();
-      // Tay xa lúc NGHỈ ở dáng đan tay: không ló ra ngoài mép áo như một mẩu da cụt bên eo.
+      // Tay xa lúc NGHỈ ở dáng đan tay: bắp tay ẩn sau thân (không ló ra thành mẩu da cụt bên eo), cẳng tay vắt ra trước
+      // bụng và bàn tay nằm chồng lên bàn tay kia — không giấu hẳn cả cánh tay.
       for (const amount of [0.3, 0.42, 0.55]) {
         const still = L.createCharacter(host, { id: 'vet' }).rig; still.face('right', amount).progress(1); still.render();
-        const arm = still.el.batR.getBoundingClientRect(), shirt = still.el.ao.getBoundingClientRect();
-        if (arm.right > shirt.right + shirt.width * 0.04) hong('3/4 stance', `turned ${amount}: the resting far arm sticks out ${(arm.right - shirt.right).toFixed(1)}px beyond the shirt`);
-        if (arm.left < shirt.left - shirt.width * 0.04) hong('3/4 stance', `turned ${amount}: the resting far arm sticks out behind the back`);
+        if (still.el.canhHinhR.style.visibility !== 'hidden') hong('3/4 stance', `turned ${amount}: the far upper arm of folded hands is still drawn`);
+        if (still.el.batR.parentNode !== still.el.tren) hong('3/4 stance', `turned ${amount}: the far forearm of folded hands is not in front of the body`);
+        const far = still.el.tayG.R.getBoundingClientRect(), near = still.el.tayG.L.getBoundingClientRect(), shirt = still.el.ao.getBoundingClientRect();
+        const overlap = Math.max(0, Math.min(far.right, near.right) - Math.max(far.left, near.left)) * Math.max(0, Math.min(far.bottom, near.bottom) - Math.max(far.top, near.top));
+        if (overlap < 0.2 * far.width * far.height) hong('3/4 stance', `turned ${amount}: the two hands of the folded-hands pose do not meet (${Math.round(overlap / (far.width * far.height) * 100)}% overlap)`);
+        const forearm = still.el.cangHinhR.getBoundingClientRect();
+        if (forearm.right > shirt.right + shirt.width * 0.25) hong('3/4 stance', `turned ${amount}: the far forearm starts ${(forearm.right - shirt.right).toFixed(1)}px outside the shirt`);
         still.svg.remove();
+      }
+      // Giơ ngón cái khi đang quay mặt: diễn bằng tay GẦN người xem (tay xa đưa lên ngực là khuất sau thân), bàn tay ấy
+      // giơ lên thật; còn bàn tay xa ở yên chỗ đan tay trước bụng, không bám theo.
+      {
+        const thumb = L.createCharacter(host, { id: 'vet' }).rig; thumb.face('right').progress(1); thumb.render();
+        const before = thumb.el.tayG.R.getBoundingClientRect();
+        const t = thumb.thumbsUp(); t.pause(); t.time(0.9); thumb.render();
+        const raised = thumb.el.tayG.L.getBoundingClientRect(), stays = thumb.el.tayG.R.getBoundingClientRect(), shirt = thumb.el.ao.getBoundingClientRect();
+        if (thumb.s.tayL !== 'cai') hong('3/4 stance', `thumbsUp while facing right uses hand ${thumb.s.tayR === 'cai' ? 'R (the far one)' : '?'} instead of the near hand`);
+        if (raised.top > shirt.top + shirt.height * 0.35) hong('3/4 stance', 'thumbsUp while facing right: the thumb is not raised to the chest');
+        if (Math.abs(stays.top - before.top) > shirt.height * 0.12) hong('3/4 stance', `thumbsUp while facing right: the far hand moved ${(stays.top - before.top).toFixed(1)}px with the gesture`);
+        t.kill(); thumb.svg.remove();
       }
       // Nói: tay phía người nghe rảnh thì giữ dáng 3/4; tay ấy đang cầm đồ (tay kia diễn, mở ra sau lưng) thì mở người như cũ.
       const free = L.createCharacter(host, { id: 'vet' }).rig; free.face('left').progress(1);

@@ -72,7 +72,8 @@ ends in the stance it started from, not standing-facing-front. `point`, `wave`,
 and draw the acting arms at their on-screen angles. The other arm actions (`thumbsUp`, `shrug`,
 `cheer`, `worry`, `speak`, `stroke`, `write`) — and a speaker whose listener-side hand holds
 an item — turn the body to at most 0.3 for their duration and return to the held facing at
-the end. To start a scene already seated or turned, set
+the end; of these, `thumbsUp`, `worry` and `speak` use the hand nearer the viewer while the
+character is turned. To start a scene already seated or turned, set
 `rig.state.seat = 1` / `rig.state.facing = ±0.55` before calling `sequence()`. So a conversation is
 
 ```js

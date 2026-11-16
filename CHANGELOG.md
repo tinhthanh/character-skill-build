@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.37.0
+
+Changed
+- **Folded hands in a three-quarter stance.** A character that rests with its hands folded
+  and is turned toward someone used to lose its far arm behind the body. Now the far upper
+  arm is hidden behind the body and the forearm comes forward across the belly
+  (foreshortened), its hand under the near hand.
+- **Chest-level gestures use the near hand when turned.** `thumbsUp`, `worry` and `speak`
+  bring a hand up in front of the chest; while the character faces left or right they now
+  use the hand nearer the viewer (the far one would be hidden behind the body). Pass
+  `thumbsUp('L' | 'R')` to choose the hand yourself.
+
+Fixed
+- Since 0.36.3 a far arm in any folded pose, not only the rest pose, was tucked behind the
+  body in a turned stance. Only a resting arm, or one leaving the rest pose for a gesture, is
+  tucked now.
+- The far leg keeps its shading while the far arm gestures.
+
 ## 0.36.5
 
 Fixed
