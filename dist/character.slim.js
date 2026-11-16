@@ -1,4 +1,4 @@
-/* VGCharacter v0.36.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.36.5 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -846,14 +846,16 @@ class RigSVG {
       rotation['bat' + side] += (sign * pose.bat - rotation['bat' + side]) * aim;
       rotation['cang' + side] += (sign * pose.cang - rotation['cang' + side]) * aim;
     }
+    const shrink = { L: 1, R: 1 };
     if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
-      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
+      const tuck = clamp(ah / 0.2, 0, 1) * clamp((0.9 - ah) / 0.2, 0, 1) * clamp(-pose.cang / 45, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
+      shrink[xa] = 1 - 0.35 * tuck;               // …và ngắn lại (như đang đưa ra sau), kẻo bàn tay thò xuống dưới gấu áo cạnh đùi
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
-    e.batL.setAttribute('transform', `translate(${chotX.L + doiChot.L.x} ${CHOT_VAI.y + doiChot.L.y}) rotate(${rotation.batL}) scale(1 ${1 - (1 - tL.co) * cF})`);
-    e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${rotation.batR}) scale(1 ${1 - (1 - tR.co) * cF})`);
+    e.batL.setAttribute('transform', `translate(${chotX.L + doiChot.L.x} ${CHOT_VAI.y + doiChot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
+    e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
@@ -3499,7 +3501,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.36.4';
+const VERSION = '0.36.5';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

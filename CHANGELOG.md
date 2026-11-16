@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.36.5
+
+Fixed
+- **The hidden far arm in a three-quarter stance.** Its hand showed below the hem beside the
+  thigh; the arm is now shortened while it is tucked behind the body. And when the arm left
+  that pose for a gesture the forearm was pulled back before it opened (the hand dropped,
+  rose and dropped again within three frames); it now unfolds in one sweep.
+
 ## 0.36.4
 
 Fixed

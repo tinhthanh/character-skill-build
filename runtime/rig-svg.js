@@ -1390,17 +1390,23 @@ export class RigSVG {
     // Tay XA đang gập cẳng tay vào trong (dáng nghỉ đan tay trước bụng) mà không diễn: cẳng tay và bàn tay đã khuất sau
     // thân, chỉ còn BẮP TAY ló ra ngoài mép áo như một mẩu da cụt bên eo — rõ nhất ở mức quay 0,3–0,45. Cho cả cánh
     // tay ấy buông thẳng, hơi khép vào, nằm gọn sau thân và chân. (Tay xa đang cầm đồ thì không: món đồ phải ló ra.)
+    const shrink = { L: 1, R: 1 };
     if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
       // Mức khép chỉ theo ĐỘ GẬP của cẳng tay, không mờ dần theo `aim`: lúc tay rời dáng nghỉ để diễn, `aim` lên trước
       // khi cẳng tay kịp mở ra — mờ theo `aim` là mẩu bắp tay lại ló ra bên eo trong vài khung. Tay ở yên sau thân cho
       // tới khi cẳng tay mở quá −75°…−45°, rồi mới vươn ra từ sau mép áo. (Dáng đặt tay lên ngực, `aim` đủ 0,9: thôi khép.)
-      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
+      // Khép hết khi cẳng tay gập quá 45°, nhả dần cho tới khi cẳng tay duỗi thẳng (0°): ở mốc ấy tay khép và tay thật
+      // trùng nhau, nên cẳng tay đi một mạch từ sau thân ra ngoài. (Bản 0.36.4 nhả trong khoảng −75°…−45°: cẳng tay đang
+      // duỗi 0° bị kéo ngược về −45° rồi mới mở ra — bàn tay hạ, hất lên, lại tụt xuống trong ba khung liền.) Đi ngang
+      // (quay gần hết cỡ) thì thôi: tay đánh theo bước chân.
+      const tuck = clamp(ah / 0.2, 0, 1) * clamp((0.9 - ah) / 0.2, 0, 1) * clamp(-pose.cang / 45, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
+      shrink[xa] = 1 - 0.35 * tuck;               // …và ngắn lại (như đang đưa ra sau), kẻo bàn tay thò xuống dưới gấu áo cạnh đùi
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
-    e.batL.setAttribute('transform', `translate(${chotX.L + doiChot.L.x} ${CHOT_VAI.y + doiChot.L.y}) rotate(${rotation.batL}) scale(1 ${1 - (1 - tL.co) * cF})`);
-    e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${rotation.batR}) scale(1 ${1 - (1 - tR.co) * cF})`);
+    e.batL.setAttribute('transform', `translate(${chotX.L + doiChot.L.x} ${CHOT_VAI.y + doiChot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
+    e.batR.setAttribute('transform', `translate(${chotX.R + doiChot.R.x} ${CHOT_VAI.y + doiChot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:

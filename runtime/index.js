@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.36.4';
+export const VERSION = '0.36.5';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
