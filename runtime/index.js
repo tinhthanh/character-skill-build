@@ -21,7 +21,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.36.1';
+export const VERSION = '0.36.2';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -577,14 +577,21 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
     let rest = line.text.trim();
     while (rest.length > maxChars) {
       const head = rest.slice(0, maxChars + 1);
-      // Ưu tiên ngắt ở cuối CÂU (. ! ? …), rồi tới dấu phẩy / chấm phẩy, cuối cùng mới là khoảng trắng.
-      // Không ngắt sau dấu hai chấm: "Ba:" mà đứng cuối cụm thì người đọc bị treo.
+      // Ưu tiên ngắt ở cuối CÂU (. ! ? …), rồi tới dấu phẩy / chấm phẩy — lấy dấu CUỐI CÙNG còn vừa dòng, miễn cụm
+      // không ngắn hơn một phần tư dòng. Không ngắt sau dấu hai chấm: "Ba:" mà đứng cuối cụm thì người đọc bị treo.
       let cut = -1;
       for (const marks of [/[.!?…]\s/g, /[;,]\s/g]) {
-        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.35) cut = mark.index + 1;
+        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.25) cut = mark.index + 1;
         if (cut > 0) break;
       }
-      if (cut < 0) cut = head.lastIndexOf(' ');
+      // Không có dấu câu nào trong tầm: ngắt ở khoảng trắng, nhưng CHIA ĐỀU phần còn lại thay vì nhồi đầy dòng —
+      // nhồi đầy thì cụm cuối chỉ còn một hai chữ ("…suốt cả" / "ngày, …"), và cụm nào cũng đứt giữa chừng một ý.
+      if (cut < 0) {
+        // Chia đều trong phạm vi MỆNH ĐỀ hiện tại (tới dấu câu kế tiếp), để chỗ ngắt sau rơi đúng vào dấu câu ấy.
+        const clause = rest.slice(maxChars).search(/[.!?…;,]\s/), span = clause < 0 ? rest.length : maxChars + clause + 1;
+        const target = span / Math.ceil(span / maxChars);
+        for (let at = head.indexOf(' '); at > 0; at = head.indexOf(' ', at + 1)) if (cut < 0 || Math.abs(at - target) < Math.abs(cut - target)) cut = at;
+      }
       if (cut <= 0) cut = maxChars;
       parts.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
     }

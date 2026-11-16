@@ -946,6 +946,10 @@ export class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <mask id="${p}-xaMask" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
+      <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
+      <g id="${p}-xaMaskG" style="filter:brightness(0)"><use href="#${p}-ao"/><use href="#${p}-vaiL"/><use href="#${p}-vaiR"/></g>
+    </mask>
     <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
@@ -1012,6 +1016,7 @@ export class RigSVG {
             </g>
           </g>
         </g>
+        <g id="${p}-xaTruoc" mask="url(#${p}-xaMask)"></g>
         <g id="${p}-batR"${this.#Vtay()}>${this.#canhTay('R')}</g>
         <g id="${p}-phuKienTren" clip-path="url(#${p}-vaiCat)">${this.nv.phuKienTren(p, this.mau, this.nv)}</g>
       </g>
@@ -1025,7 +1030,7 @@ export class RigSVG {
     // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaMaskG: q('xaMaskG'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -1114,7 +1119,15 @@ export class RigSVG {
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
       // …nhưng CHỈ khi đã quay gần hẳn sang ngang (đang đi). Đứng dáng 3/4 thì bàn tay ấy còn nằm sau thân: đẩy cánh
       // tay ra sau là món đồ biến mất — bác sĩ quay về phía khách mà không thấy bìa kẹp đâu.
-      const tay = e['bat' + ben], cho = ben === xa && !(carrying && ah < 0.8) && s['aim' + ben] < 0.5 ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      // Tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da.
+      // Tay xa đang DIỄN (`aim`) thì khác: nó phải thấy được, kể cả khi vươn ngang qua cái đầu to của nhân vật chibi —
+      // nhưng ống tay áo không được đè lên ngực áo (bản 0.36.0 vẽ cả cánh tay trước thân: ống tay che ống nghe và bảng
+      // tên, như dán lên ngực). Nên nó vào lớp `xaTruoc`: nằm TRÊN đầu, và bị MẶT NẠ hình thân áo che đi phần chồng
+      // lên thân — cánh tay ló ra từ sau mép áo. Riêng dáng gập cẳng tay vào trong (đặt tay lên ngực) thì bàn tay
+      // phải nằm trước thân, không mặt nạ.
+      const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
+      const tay = e['bat' + ben];
+      const cho = ben !== xa || (carrying && ah < 0.8) ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       // Tay đang HƯỚNG THEO MÀN HÌNH (`aim`) là tay đang diễn: không làm tối, dù nó là tay phía xa.
       const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
@@ -1279,6 +1292,7 @@ export class RigSVG {
     e.vaiCatR.setAttribute('height', caoCat);
     e.tren.setAttribute('transform', `translate(0 ${nhacY})`);
     e.sau.setAttribute('transform', `translate(0 ${nhacY})`);
+    e.xaMaskG.setAttribute('transform', `translate(0 ${-nhacY})`);            // mặt nạ nằm trong hệ của `tren` (đã nhấc `nhacY`), thân áo thì không
     e.sauChan.setAttribute('transform', `${e.than.getAttribute('transform')} translate(0 ${nhacY})`);        // lớp tay xa nằm ngoài nhóm thân nên phải mang theo phép biến đổi của thân
     e.coAo.setAttribute('transform', `translate(${h * 3} 0) scale(${1 - ah * 0.45} 1)`);   // cổ áo hẹp theo thân, lệch về phía ngực
     // CỔ cũng phải hẹp lại khi xoay — nhưng không đều: thân cổ chỉ thon đi một chút

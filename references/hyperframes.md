@@ -297,7 +297,8 @@ one `sequence()` per character.) Give each character a stance (`sitDown`,
 **already seated (or already turned) in the first frame**, set the stance on the rig before
 building its sequence: `rig.state.seat = 1; rig.state.facing = -0.55;`. Speech gestures, `point`, `wave`,
 `present`, `handOver` and `take` keep the held three-quarter stance: the arms that act are
-drawn at their on-screen angles, the far arm in front of the body. (A speaker whose
+drawn at their on-screen angles; the far arm comes out from behind the shirt (and passes in
+front of the head). (A speaker whose
 listener-side hand holds an item gestures with the other hand and opens toward the viewer
 instead, as do `thumbsUp`, `cheer`, `shrug`, `stroke`, `write`, `drink`, `worry` and `speak`,
 which then return to the held facing.) Draw the chair as an

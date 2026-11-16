@@ -1,4 +1,4 @@
-/* VGCharacter v0.36.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.36.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -549,6 +549,10 @@ class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <mask id="${p}-xaMask" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
+      <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
+      <g id="${p}-xaMaskG" style="filter:brightness(0)"><use href="#${p}-ao"/><use href="#${p}-vaiL"/><use href="#${p}-vaiR"/></g>
+    </mask>
     <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
@@ -615,6 +619,7 @@ class RigSVG {
             </g>
           </g>
         </g>
+        <g id="${p}-xaTruoc" mask="url(#${p}-xaMask)"></g>
         <g id="${p}-batR"${this.#Vtay()}>${this.#canhTay('R')}</g>
         <g id="${p}-phuKienTren" clip-path="url(#${p}-vaiCat)">${this.nv.phuKienTren(p, this.mau, this.nv)}</g>
       </g>
@@ -625,7 +630,7 @@ class RigSVG {
   #layPhanTu() {
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaMaskG: q('xaMaskG'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -681,7 +686,9 @@ class RigSVG {
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     for (const ben of ['L', 'R']) {
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
-      const tay = e['bat' + ben], cho = ben === xa && !(carrying && ah < 0.8) && s['aim' + ben] < 0.5 ? e.sauChan : e.tren;      // tay XA nằm sau cả hai CHÂN: để nó sau thân mà trước chân thì bàn tay ló ra giữa hai đùi như một vệt da
+      const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
+      const tay = e['bat' + ben];
+      const cho = ben !== xa || (carrying && ah < 0.8) ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       const mo = ben === (h > 0 ? 'R' : 'L') && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
       for (const limb of [e['chan' + ben], tay]) {
@@ -784,6 +791,7 @@ class RigSVG {
     e.vaiCatR.setAttribute('height', caoCat);
     e.tren.setAttribute('transform', `translate(0 ${nhacY})`);
     e.sau.setAttribute('transform', `translate(0 ${nhacY})`);
+    e.xaMaskG.setAttribute('transform', `translate(0 ${-nhacY})`);            // mặt nạ nằm trong hệ của `tren` (đã nhấc `nhacY`), thân áo thì không
     e.sauChan.setAttribute('transform', `${e.than.getAttribute('transform')} translate(0 ${nhacY})`);        // lớp tay xa nằm ngoài nhóm thân nên phải mang theo phép biến đổi của thân
     e.coAo.setAttribute('transform', `translate(${h * 3} 0) scale(${1 - ah * 0.45} 1)`);   // cổ áo hẹp theo thân, lệch về phía ngực
     const coHep = 1 - ah * 0.2, chanCo = 20 * (1 - ah * 0.5) / coHep, eoCo = 15 - ah * 4;
@@ -3485,7 +3493,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.36.1';
+const VERSION = '0.36.2';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3827,10 +3835,14 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
       const head = rest.slice(0, maxChars + 1);
       let cut = -1;
       for (const marks of [/[.!?…]\s/g, /[;,]\s/g]) {
-        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.35) cut = mark.index + 1;
+        for (const mark of head.matchAll(marks)) if (mark.index + 1 >= maxChars * 0.25) cut = mark.index + 1;
         if (cut > 0) break;
       }
-      if (cut < 0) cut = head.lastIndexOf(' ');
+      if (cut < 0) {
+        const clause = rest.slice(maxChars).search(/[.!?…;,]\s/), span = clause < 0 ? rest.length : maxChars + clause + 1;
+        const target = span / Math.ceil(span / maxChars);
+        for (let at = head.indexOf(' '); at > 0; at = head.indexOf(' ', at + 1)) if (cut < 0 || Math.abs(at - target) < Math.abs(cut - target)) cut = at;
+      }
       if (cut <= 0) cut = maxChars;
       parts.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
     }

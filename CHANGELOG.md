@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.36.2
+
+Fixed
+- **The far arm no longer lies on the chest.** Since 0.36.0 a far arm that gestured in a
+  three-quarter stance was drawn in front of the body: its sleeve covered the chest, the
+  stethoscope and the name badge. It now sits in a layer above the head that is masked by
+  the shirt, so the arm comes out from behind the edge of the body. A hand laid on the chest
+  still passes in front.
+- **Caption chunks break at punctuation.** `captions({ maxChars })` cuts at the last full stop
+  or comma that fits the line, also when that makes a short chunk; without punctuation in
+  reach it splits the clause evenly instead of filling the line and leaving a few words over.
+
 ## 0.36.1
 
 Changed
