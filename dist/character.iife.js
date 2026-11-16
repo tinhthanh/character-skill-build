@@ -1,4 +1,4 @@
-/* VGCharacter v0.37.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.37.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1122,11 +1122,13 @@ class RigSVG {
     // như mất một tay. Ngoài đời, nhìn chếch thì BẮP tay xa khuất sau thân còn CẲNG tay vắt ra trước bụng, bàn tay nằm
     // cạnh bàn tay gần. Cánh tay ở đây là MỘT khối nên không tách hai lớp được; thay vào đó: đưa cả cánh tay ra lớp
     // trước, ẨN phần bắp tay, và đặt cẳng tay đi từ mép áo phía xa tới cổ tay của tay gần (xem chỗ tính góc bên dưới).
-    // CHỈ áp dụng cho TƯ THẾ NGHỈ: `atRest` 1…0 là tay xa còn cách dáng nghỉ của nó bao xa (0 khi lệch 20°). Một động
+    // CHỈ áp dụng cho TƯ THẾ NGHỈ: `atRest` 1…0 là tay xa còn cách dáng nghỉ của nó bao xa — 1 khi lệch dưới 10° (lúc
+    // nói, tay ở nền vẫn nhấn nhịp vài độ: bản 0.37.0 tính mờ dần ngay từ 0° nên suốt câu nói bàn tay xa gần như trong
+    // suốt), 0 khi lệch 20°. Một động
     // tác khác cũng gập cẳng tay — giơ ngón cái, đặt tay lên ngực, đưa cốc lên miệng — thì không phải đan tay, và cũng
     // không được đem giấu sau thân. `fold` = `atRest` nếu dáng nghỉ ấy là dáng gập cẳng tay vào trong.
     const restFar = xa ? this.#restArm(xa) : [0, 0];
-    const atRest = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && ah < 0.8 ? clamp(1 - Math.max(Math.abs(s['bat' + xa] - restFar[0]), Math.abs(s['cang' + xa] - restFar[1])) / 20, 0, 1) : 0;
+    const atRest = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && ah < 0.8 ? clamp(2 - Math.max(Math.abs(s['bat' + xa] - restFar[0]), Math.abs(s['cang' + xa] - restFar[1])) / 10, 0, 1) : 0;
     const fold = restFar[1] <= -45 && Math.abs(s['aim' + xa]) < 0.9 ? atRest : 0;
     const clasp = fold >= 0.5 ? xa : null;
     for (const ben of ['L', 'R']) {
@@ -5453,7 +5455,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.37.0';
+const VERSION = '0.37.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

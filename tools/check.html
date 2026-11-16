@@ -552,6 +552,10 @@ try {
         const far = still.el.tayG.R.getBoundingClientRect(), near = still.el.tayG.L.getBoundingClientRect(), shirt = still.el.ao.getBoundingClientRect();
         const overlap = Math.max(0, Math.min(far.right, near.right) - Math.max(far.left, near.left)) * Math.max(0, Math.min(far.bottom, near.bottom) - Math.max(far.top, near.top));
         if (overlap < 0.2 * far.width * far.height) hong('3/4 stance', `turned ${amount}: the two hands of the folded-hands pose do not meet (${Math.round(overlap / (far.width * far.height) * 100)}% overlap)`);
+        // Lúc NÓI, tay ở nền vẫn nhấn nhịp vài độ quanh dáng nghỉ: bàn tay xa phải còn nguyên đó, không mờ đi.
+        still.s.cangR += 7; still.s.batR -= 3; still.render();
+        if (still.el.batR.style.opacity !== '' || still.el.batR.parentNode !== still.el.tren) hong('3/4 stance', `turned ${amount}: the far hand fades (opacity ${still.el.batR.style.opacity || 1}) when the resting arm moves a few degrees, as it does during speech`);
+        still.s.cangR -= 7; still.s.batR += 3; still.render();
         const forearm = still.el.cangHinhR.getBoundingClientRect();
         if (forearm.right > shirt.right + shirt.width * 0.25) hong('3/4 stance', `turned ${amount}: the far forearm starts ${(forearm.right - shirt.right).toFixed(1)}px outside the shirt`);
         still.svg.remove();

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.1
+
+Fixed
+- **The far hand of folded hands faded while the character spoke.** In a three-quarter
+  stance the far hand was almost transparent during speech: the resting arm moves a few
+  degrees with every stress beat, and the fade meant for leaving the pose started at the
+  first degree. The hand is now solid within ten degrees of the rest pose.
+
 ## 0.37.0
 
 Changed
