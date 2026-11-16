@@ -38,7 +38,7 @@ mid-action, and some failures are silent (see [Pitfalls](#pitfalls)).
 
    | Base | Gives you |
    |---|---|
-   | `vet` | woman, hair bun, wrap scrubs, stethoscope, hands clasped |
+   | `vet` | woman, hair bun, long-sleeve zip jacket, stethoscope, hands clasped |
    | `surgeon` | man, short hair + surgical cap, boxy V-neck scrubs, arms down |
    | `nurse` | young woman, ponytail, round-neck tunic with flared sleeves |
    | `doctor` | woman with glasses, long-sleeved white coat with lapels |

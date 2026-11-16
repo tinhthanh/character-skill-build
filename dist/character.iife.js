@@ -1,4 +1,4 @@
-/* VGCharacter v0.37.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -511,17 +511,16 @@ const ONG_TIM = '#8c4680';        // ống nghe
 const MANH_CHI = 0.5;
 const rongGau = (nv) => nv.vienGau * (nv.netGau ? MANH_CHI : 1);
 
-// Thân áo chữ A: hóp ở eo (±25 tại y −27) rồi xoè dần ra gấu (±33 tại y +21),
-// gấu võng xuống giữa. Bản cũ thẳng đuột ±30 từ nách tới gấu.
-const AO_BS = 'M -33 21 Q 0 30 33 21 Q 30.5 2 27 -14 Q 24 -30 26 -42 Q 27 -70 35 -88'
-            + ' Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88'
-            + ' Q -27 -70 -26 -42 Q -24 -30 -27 -14 Q -30.5 2 -33 21 Z';
-// Hai dải tối ôm sát mép áo — bám ĐÚNG đường bao mới, thụt vào 5. Dùng lại
-// dải cũ (vẽ cho thân thẳng) thì nó lơ lửng giữa ngực khi áo xoè ra.
-const SUON_BS = ['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1;
-  return `M ${g * 35} -88 Q ${g * 27} -70 ${g * 26} -42 Q ${g * 24} -30 ${g * 27} -14`
-       + ` Q ${g * 30.5} 2 ${g * 33} 21 L ${g * 28} 22 Q ${g * 25.5} 3 ${g * 22} -13`
-       + ` Q ${g * 19.5} -29 ${g * 21} -42 Q ${g * 22} -68 ${g * 30} -86 Z`; }).join(' ');
+// ÁO KHOÁC THÚ Y DÀI TAY (bản 0.38). Thay bộ scrubs ngắn tay chữ A: ống tay ngắn loe rộng mà cánh tay da thì mảnh,
+// nên dang tay là hai cái cánh vải với hai que da thò ra, giơ tay cao là hai khối vải đè lên má. Áo dài tay thì cả
+// cánh tay là vải có viền, chỉ bàn tay là da — dáng nào cũng ra một cánh tay liền.
+// Thân áo gần thẳng: hơi ôm ở eo (±27 tại y −30), gấu ±30 tại y +20 võng nhẹ.
+const AO_KHOAC = 'M -30 20 Q 0 26 30 20 Q 28.5 0 27 -30 Q 27.5 -70 35 -88'
+               + ' Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88'
+               + ' Q -27.5 -70 -27 -30 Q -28.5 0 -30 20 Z';
+const SUON_KHOAC = ['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1;
+  return `M ${g * 35} -88 Q ${g * 27.5} -70 ${g * 27} -30 Q ${g * 28.5} 0 ${g * 30} 20`
+       + ` L ${g * 25} 21 Q ${g * 23.5} 0 ${g * 22} -30 Q ${g * 22.5} -68 ${g * 30} -86 Z`; }).join(' ');
 
 // Chỉ may: nét tím ĐỨT QUÃNG. Cùng một hàm cho gấu áo, hai túi hông và túi
 // ngực nên ba chỗ không bao giờ lệch bước chỉ nhau.
@@ -529,22 +528,16 @@ const chiMay = (d, m, rong = 1.05) =>
   `<path d="${d}" stroke="${m.phuKien}" stroke-width="${rong}" fill="none"
          stroke-dasharray="3 2.6" stroke-linecap="round"/>`;
 
-// Túi hông: miệng túi chạy TỪ đường sườn vào rồi bổ thẳng xuống gấu. Nét đen
-// là mép vải, nét tím là đường chỉ, thụt vào trong 1.5. Cả hai bị `aoCat` xén
-// nên đầu trên luôn dừng đúng ở mép áo dù áo có xoè rộng hẹp thế nào.
-const tuiHong = (ben, m) => { const g = ben === 'L' ? -1 : 1; return `
-          <path d="M ${g * 28} -15 Q ${g * 21.5} -8 ${g * 17} -3 Q ${g * 16} 10 ${g * 15.5} 26"
-                stroke="${m.vienNet}" stroke-width="1.9" fill="none" stroke-linecap="round"/>
-          ${chiMay(`M ${g * 26} -12 Q ${g * 20.5} -6.5 ${g * 15.2} -2 Q ${g * 14.2} 10 ${g * 13.7} 23`, m)}`; };
-
-// Túi ngực: hình khiên — hai cạnh thẳng rồi đáy vát vào một mũi nhọn ở giữa.
-// Ảnh mẫu để túi ở x 7.5…23.2; thu mép PHẢI về 22.5 để nó không chui xuống
-// dưới tay áo (gấu tay áo hạ tới y −57, mép trong tay áo ở x 21.5).
-const tuiNguc = (m) => `
-        <path d="M 7.5 -68 h 13 a 2 2 0 0 1 2 2 v 19 l -8.5 6 l -8.5 -6 v -19 a 2 2 0 0 1 2 -2 z"
-              fill="${chinhSang(m.ao, 0.05)}" stroke="${m.vienNet}" stroke-width="1.6" stroke-linejoin="round"/>
-        ${chiMay('M 8.5 -66 h 11 a 1 1 0 0 1 1 1 v 16.5 l -6.5 4.6 l -6.5 -4.6 v -16.5 a 1 1 0 0 1 1 -1 z', m, 1)}
+// Túi ngực của áo khoác: chữ nhật bo góc, nắp túi là một đường ngang. Huy hiệu vẫn căn theo tâm túi (x 14).
+const tuiNgucKhoac = (m) => `
+        <path d="M 6.5 -66 h 15 a 1.6 1.6 0 0 1 1.6 1.6 v 18.4 a 3 3 0 0 1 -3 3 h -12.2 a 3 3 0 0 1 -3 -3 v -18.4 a 1.6 1.6 0 0 1 1.6 -1.6 z"
+              fill="${chinhSang(m.ao, 0.06)}" stroke="${m.vienNet}" stroke-width="1.5" stroke-linejoin="round"/>
+        ${chiMay('M 5.6 -61.5 h 16.8', m, 1)}
         ${'__HUYHIEU__'}`;
+// Túi hông của áo khoác: miệng túi xéo, một nét mép vải và một đường chỉ tím song song.
+const tuiHongKhoac = (ben, m) => { const g = ben === 'L' ? -1 : 1; return `
+          <path d="M ${g * 25} -12 L ${g * 15} 4" stroke="${m.vienNet}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          ${chiMay(`M ${g * 23} -11.5 L ${g * 13.4} 3.8`, m)}`; };
 
 // Ống nghe: hai ống tím vắt qua cổ. Ống PHẢI đổ xuống loa (đĩa tròn ngay trên
 // túi ngực); ống TRÁI đổ xuống bộ tai nghe — hai nhánh bạc cong ra rồi chụm
@@ -569,8 +562,8 @@ const ongNghe = (m) => `
           <circle cx="17.7" cy="-75.5" r="3.1" fill="#eef0f4" stroke="#8d949f" stroke-width="1.3"/>
         </g>`;
 
-// Bác sĩ thú y (kiểu chibi): đầu to, mắt to nâu có ánh sáng, tóc đen búi bóng, scrubs xám đậm
-// viền tím, túi ngực có huy hiệu, ống nghe, giày bệt, tay đan trước bụng khi đứng.
+// Bác sĩ thú y (kiểu chibi): đầu to, mắt to nâu có ánh sáng, tóc đen búi bóng, áo khoác xám đậm dài tay
+// kéo khoá, chỉ tím, túi ngực có huy hiệu, ống nghe, giày bệt, tay đan trước bụng khi đứng.
 const NV_BAC_SI_THU_Y = {
   ...NV_MAC_DINH,
   ten: 'Bác sĩ thú y',
@@ -581,7 +574,8 @@ const NV_BAC_SI_THU_Y = {
   coDau: 1.37, coThan: 0.94, coChan: 0.68, dauLech: 9,
   daiCanhTay: 1.09, daiCangTay: 0.7, dayTay: 0.68, coBanTay: 0.95,
   daiDui: 1.4, daiOng: 1.25, dayChan: 1, cachChan: 14, coBanChan: 1,
-  daiTayAo: 1.3, xeoTayAo: 1, rongTayAo: 1.3,
+  // Áo dài tay: cả cánh tay tô màu áo và có viền; ống tay vừa cánh tay, không loe.
+  tayDai: true, daiTayAo: 1, xeoTayAo: 3, rongTayAo: 1.1, vienGau: 0, boGocTayAo: 4,
   may: { dai: 10, day: 3.6, cong: 2, thon: 0.45, xech: 1 },
   khuon: { rong: 50, cao: 54, cam: 56, yRong: -6, tranVuong: 0.1, hamVuong: -0.05, rongTran: 1.06, rongCam: 1.1 },   // dò từ path cũ, lệch tối đa 1.26px
   matX: 20, matY: 2, mayY: -18, maX: 31, maY: 24, miengY: 30, moiRong: 1.2, taiX: 51, maRong: 10, miengRong: 1.45, tocLech: 5, netLech: 21, buiLech: 15,
@@ -596,9 +590,10 @@ const NV_BAC_SI_THU_Y = {
   huyHieu: 'C+',                                 // chữ trên túi ngực ('' = dấu chân thú)
   // Gấu tay áo không phải nét viền vải mà là ĐƯỜNG CHỈ MAY — cùng màu tím với
   // chỉ ở gấu áo và hai túi, nên phải đứt quãng chứ không liền.
-  mauGau: CHI_TIM, netGau: '3 2.6', lechGau: 7, vienGau: 2.5, boGocTayAo: 6,
   damSuon: 0.34,
-  nghi: { batL: 19, batR: 19, cangL: -97, cangR: -97, cuoi: 1, mieng: 0.6, mayL: 0.15, mayR: 0.15 },
+  // Tay đan ở NGANG BỤNG (bắp 14°, cẳng −82°). Bản trước (19°, −97°) để cẳng tay hơi chếch lên: nhìn thẳng thì vừa,
+  // nhưng quay 3/4 là bàn tay lên tới ngực, đè vào đáy bảng tên.
+  nghi: { batL: 14, batR: 14, cangL: -82, cangR: -82, cuoi: 1, mieng: 0.6, mayL: 0.15, mayR: 0.15 },
   // Sáu màu vải đo TRUNG VỊ từ ảnh mẫu chứ không ước lượng:
   // thân áo và quần CÙNG một mã (#4f5b64) — trong ảnh mẫu chúng chỉ tách nhau
   // nhờ nét viền, nên bỏ viền đi là hai mảnh dính làm một.
@@ -630,31 +625,30 @@ const NV_BAC_SI_THU_Y = {
               <path d="M -11.5 -4 Q 0 -15.5 11.5 -4" stroke="#17110c" stroke-width="2.6" fill="none" stroke-linecap="round"/>
               <path d="${ben === 'L' ? 'M -11 -6 l -3.4 -2.2 M -10 -9.5 l -2.6 -3.2' : 'M 11 -6 l 3.4 -2.2 M 10 -9.5 l 2.6 -3.2'}" stroke="#17110c" stroke-width="1.9" stroke-linecap="round"/>
             </g>`,
-  // CỔ CHỮ V BẮT CHÉO (surplice), đo từ ảnh mẫu: KHÔNG phải một chữ V mà là
-  // hai vạt áo vắt qua nhau. Mép trong hai vạt cắt nhau ở (0,−79) rồi mỗi mép
-  // còn thò tiếp một đoạn ngắn xuống dưới; mép ngoài mới là chữ V khép ở
-  // (0,−68). Vẽ đúng một chữ V thì mất hẳn cái nút thắt ở đáy cổ.
+  // CỔ TRÒN CÓ BO (áo khoác kéo khoá): hai miếng vai che phần cổ loe ra, một vòng bo sẫm ôm chân cổ, viền ngoài và
+  // viền trong của bo là hai nét mảnh. Bản trước là cổ chữ V bắt chéo của bộ scrubs.
   coAo: (p, m) => `
         <path d="M -28.5 -96 Q -22 -102.5 -12.2 -103.5 L -8.5 -96 Z" fill="${m.ao}"/>
         <path d="M 28.5 -96 Q 22 -102.5 12.2 -103.5 L 8.5 -96 Z" fill="${m.ao}"/>
-        <path d="M -8.5 -96 L 8.5 -96 L 0 -79 Z" fill="${m.aoToi}"/>
-        <path d="M -12.2 -103.5 L 2.8 -73.4 M 12.2 -103.5 L -2.8 -73.4"
-              stroke="${m.vienNet}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-        <path d="M -17.6 -101.9 L 0 -68 L 17.6 -101.9"
-              stroke="${m.vienNet}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+        <path d="M -15 -104 Q -13 -90 0 -88 Q 13 -90 15 -104 L 9.5 -104.5 Q 8.5 -94.5 0 -93.5 Q -8.5 -94.5 -9.5 -104.5 Z" fill="${m.aoToi}"/>
+        <path d="M -15 -104 Q -13 -90 0 -88 Q 13 -90 15 -104 M -9.5 -104.5 Q -8.5 -94.5 0 -93.5 Q 8.5 -94.5 9.5 -104.5"
+              stroke="${m.vienNet}" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
   phuKien: (p, m) => `
       <g id="${p}-phuKien">
-        <clipPath id="${p}-aoCat"><path d="${AO_BS}"/></clipPath>
+        <clipPath id="${p}-aoCat"><path d="${AO_KHOAC}"/></clipPath>
         <g clip-path="url(#${p}-aoCat)">
-          ${chiMay('M -30 14 Q 0 32 30 14', m)}
-          ${tuiHong('L', m)}${tuiHong('R', m)}
+          <path d="M 0 -88 V 26" stroke="${m.vienNet}" stroke-width="1.5" fill="none"/>
+          <path d="M -30 12.5 Q 0 18.5 30 12.5 L 30 30 L -30 30 Z" fill="${m.aoToi}" opacity=".55"/>
+          ${chiMay('M -30 12.5 Q 0 18.5 30 12.5', m)}
+          ${tuiHongKhoac('L', m)}${tuiHongKhoac('R', m)}
         </g>
-        ${tuiNguc(m)}
+        <rect x="-1.9" y="-88" width="3.8" height="6.4" rx="1.2" fill="#c3c9d1" stroke="${m.vienNet}" stroke-width="1"/>
+        ${tuiNgucKhoac(m)}
         ${ongNghe(m)}
       </g>`,
   phuKienTren: (p, m) => ongNghe(m),
-  ao: () => AO_BS,
-  suon: SUON_BS,
+  ao: () => AO_KHOAC,
+  suon: SUON_KHOAC,
   giay: (p, ben, m, ong) => `
           <g id="${p}-ban${ben}">
             <path d="M -11 ${ong - 5} Q 0 ${ong - 8} 11 ${ong - 5} L 12 ${ong + 4} q 0 6 -7 6 h -10 q -7 0 -7 -6 z" fill="${m.da}"/>
@@ -1023,6 +1017,7 @@ class RigSVG {
             </g>
           </g>
         </g>
+        <g id="${p}-xaCang"${this.#Vtay()}></g>
         <g id="${p}-xaTruoc" mask="url(#${p}-xaMask)"></g>
         <g id="${p}-batR"${this.#Vtay()}>${this.#canhTay('R')}</g>
         <g id="${p}-phuKienTren" clip-path="url(#${p}-vaiCat)">${this.nv.phuKienTren(p, this.mau, this.nv)}</g>
@@ -1037,7 +1032,7 @@ class RigSVG {
     // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaMaskG: q('xaMaskG'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -1119,9 +1114,11 @@ class RigSVG {
     // thân sớm, lúc nó còn nằm ngoài mép áo, để không "biến mất" giữa ngực.
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     // ĐAN TAY ở dáng 3/4. Tay xa gập cẳng tay vào trong (dáng nghỉ đan tay) mà đem giấu hết sau thân thì nhân vật trông
-    // như mất một tay. Ngoài đời, nhìn chếch thì BẮP tay xa khuất sau thân còn CẲNG tay vắt ra trước bụng, bàn tay nằm
-    // cạnh bàn tay gần. Cánh tay ở đây là MỘT khối nên không tách hai lớp được; thay vào đó: đưa cả cánh tay ra lớp
-    // trước, ẨN phần bắp tay, và đặt cẳng tay đi từ mép áo phía xa tới cổ tay của tay gần (xem chỗ tính góc bên dưới).
+    // như mất một tay. Ngoài đời, nhìn chếch thì BẮP tay xa nằm sau thân — ló ra một dải ở mép sườn xa, khuỷu nhô ở
+    // ngang eo — còn CẲNG tay vòng ra TRƯỚC bụng, bàn tay nằm dưới bàn tay gần. Một cánh tay, hai lớp: nhóm cánh tay
+    // (còn lại bắp tay) ở lớp sau thân, còn nhóm CẲNG TAY + bàn tay được chuyển sang `xaCang` — một nhóm ở lớp trước
+    // thân mang đúng phép biến đổi của cánh tay, nên khuỷu vẫn khớp. (Bản 0.37 ẩn hẳn bắp tay và vẽ một mẩu cẳng tay
+    // ngắn trước bụng: với áo dài tay thì thấy rõ là thiếu cả ống tay áo — cụt tay.)
     // CHỈ áp dụng cho TƯ THẾ NGHỈ: `atRest` 1…0 là tay xa còn cách dáng nghỉ của nó bao xa — 1 khi lệch dưới 10° (lúc
     // nói, tay ở nền vẫn nhấn nhịp vài độ: bản 0.37.0 tính mờ dần ngay từ 0° nên suốt câu nói bàn tay xa gần như trong
     // suốt), 0 khi lệch 20°. Một động
@@ -1132,12 +1129,15 @@ class RigSVG {
     const fold = restFar[1] <= -45 && Math.abs(s['aim' + xa]) < 0.9 ? atRest : 0;
     const clasp = fold >= 0.5 ? xa : null;
     for (const ben of ['L', 'R']) {
-      // Tay xa đang DIỄN một dáng gập cẳng tay vào trong (giơ ngón cái trước ngực, đặt tay lên ngực) cũng nằm trước thân
-      // và cũng ẩn bắp tay: để nguyên thì ống tay áo đè lên ngực áo, như dán lên ngực.
+      // Tay xa đang DIỄN một dáng gập cẳng tay vào trong (giơ ngón cái trước ngực, đặt tay lên ngực) nằm trước thân và ẩn
+      // bắp tay: để nguyên thì ống tay áo đè lên ngực áo, như dán lên ngực.
       const acting = ben === xa && Math.abs(s['aim' + ben]) >= 0.9 && s['cang' + ben] <= -30 && !(this.holds[ben] && s['item' + ben] > 0.5);
-      e['canhHinh' + ben].style.visibility = (ben === clasp || acting) && ah >= 0.175 ? 'hidden' : '';
-      e['bat' + ben].style.opacity = ben === clasp && fold < 1 ? ((fold - 0.5) * 2).toFixed(3) : '';       // hai ba khung mờ dần lúc cẳng tay mở ra, thay cho biến mất đột ngột
+      e['canhHinh' + ben].style.visibility = acting && ah >= 0.175 ? 'hidden' : '';
+      // Cẳng tay của tay đang đan sang lớp trước thân; không thì về lại trong cánh tay của nó.
+      const fore = e['cang' + ben], home = ben === clasp ? e.xaCang : e['canh' + ben];
+      if (fore.parentNode !== home) home.appendChild(fore);
     }
+    e.xaCang.style.opacity = clasp && fold < 1 ? ((fold - 0.5) * 2).toFixed(3) : '';       // hai ba khung mờ dần lúc tay rời dáng nghỉ, thay cho biến mất đột ngột
     for (const ben of ['L', 'R']) {
       // Tay xa đang CẦM ĐỒ cũng nằm SAU thân như mọi tay xa. Nó giữ dáng bưng (cẳng tay gập ra trước bụng, xem
       // `carry`), nên bàn tay và món đồ ló ra khỏi mép trước của thân — đúng như nhìn một người bưng cốc đi ngang.
@@ -1154,10 +1154,10 @@ class RigSVG {
       // phải nằm trước thân, không mặt nạ.
       const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
       const tay = e['bat' + ben];
-      const cho = ben !== xa || (carrying && ah < 0.8) || ben === clasp ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
+      const cho = ben !== xa || (carrying && ah < 0.8) ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       // Tay đang HƯỚNG THEO MÀN HÌNH (`aim`) là tay đang diễn: không làm tối, dù nó là tay phía xa.
-      const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying && ben !== clasp ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
+      const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
       // Tối đi bằng CSS `filter`. Thuộc tính CSS ĐÈ lên thuộc tính SVG `filter="url(#…-vien)"` của
       // chính phần tử ấy, nên phải nối bộ lọc viền vào trước — không thì tay / chân xa vừa tối đi
       // vừa mất luôn nét viền.
@@ -1166,6 +1166,9 @@ class RigSVG {
         const outline = limb.getAttribute('filter');
         limb.style.filter = dim ? `${outline ? outline + ' ' : ''}brightness(${1 - dim * 0.28})` : '';
       }
+      // Cẳng tay xa đang đan (ở lớp trước) tối đúng như bắp tay của nó ở lớp sau — và nhờ thế bàn tay xa sẫm hơn bàn
+      // tay gần: hai bàn tay cùng màu da chồng lên nhau mà sáng như nhau thì dính thành một khối.
+      if (ben === clasp) { const outline = e.xaCang.getAttribute('filter'); e.xaCang.style.filter = `${outline ? outline + ' ' : ''}brightness(${1 - ah * 0.28})`; }
     }
     // Nhìn thẳng thì cả hai tay nằm trong `tren`, và tay nào vẽ SAU thì đè lên tay
     // kia. Tay đang LÀM ĐỘNG TÁC (giơ, gập nhiều hơn) phải nằm trên: bàn tay ấy là
@@ -1431,22 +1434,18 @@ class RigSVG {
       const a0 = restUpper * RAD_, b0 = (restUpper + restFore) * RAD_;
       const wrist = { x: pivot[near].x - upper * Math.sin(a0) - fore * Math.sin(b0), y: pivot[near].y + upper * Math.cos(a0) + fore * Math.cos(b0) };
       // Cổ tay của tay XA: cạnh cổ tay kia, lệch về phía xa và thấp hơn một chút — hai bàn tay chồng lên nhau một nửa.
-      const target = { x: wrist.x + out * 5, y: wrist.y + 6 };
-      // KHUỶU nằm ở mép áo phía xa, ngang cổ tay (cẳng tay nằm ngang: bàn tay úp ngang lên bàn tay kia, không chúc xuống). Cẳng tay từ đó tới cổ tay NGẮN hơn chiều dài thật: nó đang
-      // chĩa chếch về phía người xem nên bị rút ngắn theo phối cảnh. (Giữ đủ chiều dài thì khuỷu phải lên tận ngực,
-      // cẳng tay dựng đứng và bắt chéo với tay kia thành chữ X.)
-      const elbow = { x: pivot[clasp].x + out * 4, y: target.y + 3 };
-      const reach = Math.max(8, Math.hypot(target.x - elbow.x, target.y - elbow.y));
-      const bend = Math.atan2(-(target.x - elbow.x), target.y - elbow.y) / RAD_;
+      const target = { x: wrist.x + out * 3, y: wrist.y + 3 };
+      // Hai đốt, đủ chiều dài, từ VAI THẬT tới cổ tay ấy; khuỷu bẻ ra phía xa (ngoài mép sườn). Góc α ở vai theo định lý
+      // cos; hướng vai → cổ tay là φ (0° = thẳng xuống, cùng quy ước với phép xoay của đốt tay).
+      const from = pivot[clasp], gap = clamp(Math.hypot(target.x - from.x, target.y - from.y), Math.abs(upper - fore) + 1, upper + fore - 1);
+      const toward = Math.atan2(-(target.x - from.x), target.y - from.y), open = Math.acos(clamp((upper * upper + gap * gap - fore * fore) / (2 * upper * gap), -1, 1));
+      const lift = toward - out * open;                                             // góc bắp tay (rad)
+      const elbow = { x: from.x - upper * Math.sin(lift), y: from.y + upper * Math.cos(lift) };
+      const bend = Math.atan2(-(target.x - elbow.x), target.y - elbow.y) - lift;      // góc cẳng tay so với bắp tay
       // Vào dần trong lúc quay người (0,1 → 0,25), để nối liền với dáng nhìn thẳng.
       const ease = clamp((ah - 0.1) / 0.15, 0, 1);
-      rotation['bat' + clasp] += (0 - rotation['bat' + clasp]) * ease;
-      rotation['cang' + clasp] += (bend - rotation['cang' + clasp]) * ease;
-      pivot[clasp].x += (elbow.x - pivot[clasp].x) * ease;
-      pivot[clasp].y += (elbow.y - upper - pivot[clasp].y) * ease;           // bắp tay (ẩn) dựng thẳng đứng, đầu dưới là khuỷu
-      const shorten = 1 + (Math.min(1, reach / fore) - 1) * ease;
-      e['cangHinh' + clasp].setAttribute('transform', `scale(${dayTay} ${daiCangTay * shorten})`);
-      e['coTay' + clasp].setAttribute('transform', `translate(0 ${DAI.cangTay * daiCangTay * shorten}) scale(${coBanTay})`);
+      rotation['bat' + clasp] += (lift / RAD_ - rotation['bat' + clasp]) * ease;
+      rotation['cang' + clasp] += (chuanHoaGoc(bend / RAD_) - rotation['cang' + clasp]) * ease;
     } else if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
       // Mức khép chỉ theo ĐỘ GẬP của cẳng tay, không mờ dần theo `aim`: lúc tay rời dáng nghỉ để diễn, `aim` lên trước
@@ -1464,6 +1463,7 @@ class RigSVG {
     }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
+    if (clasp) e.xaCang.setAttribute('transform', e['bat' + clasp].getAttribute('transform'));        // cẳng tay ở lớp trước đi theo đúng cánh tay của nó
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:
@@ -5466,7 +5466,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.37.2';
+const VERSION = '0.38.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

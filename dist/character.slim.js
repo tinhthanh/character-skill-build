@@ -1,4 +1,4 @@
-/* VGCharacter v0.37.2 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -255,25 +255,23 @@ const CHI_TIM = '#7d4472';        // chỉ may — hạ sáng cho khớp bề d�
 const ONG_TIM = '#8c4680';        // ống nghe
 const MANH_CHI = 0.5;
 const rongGau = (nv) => nv.vienGau * (nv.netGau ? MANH_CHI : 1);
-const AO_BS = 'M -33 21 Q 0 30 33 21 Q 30.5 2 27 -14 Q 24 -30 26 -42 Q 27 -70 35 -88'
-            + ' Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88'
-            + ' Q -27 -70 -26 -42 Q -24 -30 -27 -14 Q -30.5 2 -33 21 Z';
-const SUON_BS = ['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1;
-  return `M ${g * 35} -88 Q ${g * 27} -70 ${g * 26} -42 Q ${g * 24} -30 ${g * 27} -14`
-       + ` Q ${g * 30.5} 2 ${g * 33} 21 L ${g * 28} 22 Q ${g * 25.5} 3 ${g * 22} -13`
-       + ` Q ${g * 19.5} -29 ${g * 21} -42 Q ${g * 22} -68 ${g * 30} -86 Z`; }).join(' ');
+const AO_KHOAC = 'M -30 20 Q 0 26 30 20 Q 28.5 0 27 -30 Q 27.5 -70 35 -88'
+               + ' Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88'
+               + ' Q -27.5 -70 -27 -30 Q -28.5 0 -30 20 Z';
+const SUON_KHOAC = ['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1;
+  return `M ${g * 35} -88 Q ${g * 27.5} -70 ${g * 27} -30 Q ${g * 28.5} 0 ${g * 30} 20`
+       + ` L ${g * 25} 21 Q ${g * 23.5} 0 ${g * 22} -30 Q ${g * 22.5} -68 ${g * 30} -86 Z`; }).join(' ');
 const chiMay = (d, m, rong = 1.05) =>
   `<path d="${d}" stroke="${m.phuKien}" stroke-width="${rong}" fill="none"
          stroke-dasharray="3 2.6" stroke-linecap="round"/>`;
-const tuiHong = (ben, m) => { const g = ben === 'L' ? -1 : 1; return `
-          <path d="M ${g * 28} -15 Q ${g * 21.5} -8 ${g * 17} -3 Q ${g * 16} 10 ${g * 15.5} 26"
-                stroke="${m.vienNet}" stroke-width="1.9" fill="none" stroke-linecap="round"/>
-          ${chiMay(`M ${g * 26} -12 Q ${g * 20.5} -6.5 ${g * 15.2} -2 Q ${g * 14.2} 10 ${g * 13.7} 23`, m)}`; };
-const tuiNguc = (m) => `
-        <path d="M 7.5 -68 h 13 a 2 2 0 0 1 2 2 v 19 l -8.5 6 l -8.5 -6 v -19 a 2 2 0 0 1 2 -2 z"
-              fill="${chinhSang(m.ao, 0.05)}" stroke="${m.vienNet}" stroke-width="1.6" stroke-linejoin="round"/>
-        ${chiMay('M 8.5 -66 h 11 a 1 1 0 0 1 1 1 v 16.5 l -6.5 4.6 l -6.5 -4.6 v -16.5 a 1 1 0 0 1 1 -1 z', m, 1)}
+const tuiNgucKhoac = (m) => `
+        <path d="M 6.5 -66 h 15 a 1.6 1.6 0 0 1 1.6 1.6 v 18.4 a 3 3 0 0 1 -3 3 h -12.2 a 3 3 0 0 1 -3 -3 v -18.4 a 1.6 1.6 0 0 1 1.6 -1.6 z"
+              fill="${chinhSang(m.ao, 0.06)}" stroke="${m.vienNet}" stroke-width="1.5" stroke-linejoin="round"/>
+        ${chiMay('M 5.6 -61.5 h 16.8', m, 1)}
         ${'__HUYHIEU__'}`;
+const tuiHongKhoac = (ben, m) => { const g = ben === 'L' ? -1 : 1; return `
+          <path d="M ${g * 25} -12 L ${g * 15} 4" stroke="${m.vienNet}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          ${chiMay(`M ${g * 23} -11.5 L ${g * 13.4} 3.8`, m)}`; };
 const NHANH_TAI = ['M -19 -65.5 Q -26.5 -55 -20.8 -45', 'M -19 -65.5 Q -9 -55 -13.2 -45'];
 const ongNghe = (m) => `
         <g>
@@ -295,16 +293,15 @@ const NV_BAC_SI_THU_Y = {
   coDau: 1.37, coThan: 0.94, coChan: 0.68, dauLech: 9,
   daiCanhTay: 1.09, daiCangTay: 0.7, dayTay: 0.68, coBanTay: 0.95,
   daiDui: 1.4, daiOng: 1.25, dayChan: 1, cachChan: 14, coBanChan: 1,
-  daiTayAo: 1.3, xeoTayAo: 1, rongTayAo: 1.3,
+  tayDai: true, daiTayAo: 1, xeoTayAo: 3, rongTayAo: 1.1, vienGau: 0, boGocTayAo: 4,
   may: { dai: 10, day: 3.6, cong: 2, thon: 0.45, xech: 1 },
   khuon: { rong: 50, cao: 54, cam: 56, yRong: -6, tranVuong: 0.1, hamVuong: -0.05, rongTran: 1.06, rongCam: 1.1 },   // dò từ path cũ, lệch tối đa 1.26px
   matX: 20, matY: 2, mayY: -18, maX: 31, maY: 24, miengY: 30, moiRong: 1.2, taiX: 51, maRong: 10, miengRong: 1.45, tocLech: 5, netLech: 21, buiLech: 15,
   mui: (m) => `<path d="M -1 8 q -3 4 1 5" stroke="${m.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none"/>`,
   vien: '#1d0d10', vienRong: 1.15,
   huyHieu: 'C+',                                 // chữ trên túi ngực ('' = dấu chân thú)
-  mauGau: CHI_TIM, netGau: '3 2.6', lechGau: 7, vienGau: 2.5, boGocTayAo: 6,
   damSuon: 0.34,
-  nghi: { batL: 19, batR: 19, cangL: -97, cangR: -97, cuoi: 1, mieng: 0.6, mayL: 0.15, mayR: 0.15 },
+  nghi: { batL: 14, batR: 14, cangL: -82, cangR: -82, cuoi: 1, mieng: 0.6, mayL: 0.15, mayR: 0.15 },
   mau: { da: '#f7d9c4', daToi: '#e2b39a', toc: '#151319', tocSang: '#3a3644', ao: '#4f5b64', aoToi: '#3b454a',
          quan: '#4f5b64', giay: '#d7b48f', mieng: '#7d2f3d', ma: '#f2a3a3', phuKien: CHI_TIM, mat: '#3a2416',
          vien: '#1d0d10', vienNet: '#2a1519' },
@@ -336,24 +333,25 @@ const NV_BAC_SI_THU_Y = {
   coAo: (p, m) => `
         <path d="M -28.5 -96 Q -22 -102.5 -12.2 -103.5 L -8.5 -96 Z" fill="${m.ao}"/>
         <path d="M 28.5 -96 Q 22 -102.5 12.2 -103.5 L 8.5 -96 Z" fill="${m.ao}"/>
-        <path d="M -8.5 -96 L 8.5 -96 L 0 -79 Z" fill="${m.aoToi}"/>
-        <path d="M -12.2 -103.5 L 2.8 -73.4 M 12.2 -103.5 L -2.8 -73.4"
-              stroke="${m.vienNet}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-        <path d="M -17.6 -101.9 L 0 -68 L 17.6 -101.9"
-              stroke="${m.vienNet}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+        <path d="M -15 -104 Q -13 -90 0 -88 Q 13 -90 15 -104 L 9.5 -104.5 Q 8.5 -94.5 0 -93.5 Q -8.5 -94.5 -9.5 -104.5 Z" fill="${m.aoToi}"/>
+        <path d="M -15 -104 Q -13 -90 0 -88 Q 13 -90 15 -104 M -9.5 -104.5 Q -8.5 -94.5 0 -93.5 Q 8.5 -94.5 9.5 -104.5"
+              stroke="${m.vienNet}" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
   phuKien: (p, m) => `
       <g id="${p}-phuKien">
-        <clipPath id="${p}-aoCat"><path d="${AO_BS}"/></clipPath>
+        <clipPath id="${p}-aoCat"><path d="${AO_KHOAC}"/></clipPath>
         <g clip-path="url(#${p}-aoCat)">
-          ${chiMay('M -30 14 Q 0 32 30 14', m)}
-          ${tuiHong('L', m)}${tuiHong('R', m)}
+          <path d="M 0 -88 V 26" stroke="${m.vienNet}" stroke-width="1.5" fill="none"/>
+          <path d="M -30 12.5 Q 0 18.5 30 12.5 L 30 30 L -30 30 Z" fill="${m.aoToi}" opacity=".55"/>
+          ${chiMay('M -30 12.5 Q 0 18.5 30 12.5', m)}
+          ${tuiHongKhoac('L', m)}${tuiHongKhoac('R', m)}
         </g>
-        ${tuiNguc(m)}
+        <rect x="-1.9" y="-88" width="3.8" height="6.4" rx="1.2" fill="#c3c9d1" stroke="${m.vienNet}" stroke-width="1"/>
+        ${tuiNgucKhoac(m)}
         ${ongNghe(m)}
       </g>`,
   phuKienTren: (p, m) => ongNghe(m),
-  ao: () => AO_BS,
-  suon: SUON_BS,
+  ao: () => AO_KHOAC,
+  suon: SUON_KHOAC,
   giay: (p, ben, m, ong) => `
           <g id="${p}-ban${ben}">
             <path d="M -11 ${ong - 5} Q 0 ${ong - 8} 11 ${ong - 5} L 12 ${ong + 4} q 0 6 -7 6 h -10 q -7 0 -7 -6 z" fill="${m.da}"/>
@@ -619,6 +617,7 @@ class RigSVG {
             </g>
           </g>
         </g>
+        <g id="${p}-xaCang"${this.#Vtay()}></g>
         <g id="${p}-xaTruoc" mask="url(#${p}-xaMask)"></g>
         <g id="${p}-batR"${this.#Vtay()}>${this.#canhTay('R')}</g>
         <g id="${p}-phuKienTren" clip-path="url(#${p}-vaiCat)">${this.nv.phuKienTren(p, this.mau, this.nv)}</g>
@@ -630,7 +629,7 @@ class RigSVG {
   #layPhanTu() {
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaMaskG: q('xaMaskG'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -690,20 +689,23 @@ class RigSVG {
     const clasp = fold >= 0.5 ? xa : null;
     for (const ben of ['L', 'R']) {
       const acting = ben === xa && Math.abs(s['aim' + ben]) >= 0.9 && s['cang' + ben] <= -30 && !(this.holds[ben] && s['item' + ben] > 0.5);
-      e['canhHinh' + ben].style.visibility = (ben === clasp || acting) && ah >= 0.175 ? 'hidden' : '';
-      e['bat' + ben].style.opacity = ben === clasp && fold < 1 ? ((fold - 0.5) * 2).toFixed(3) : '';       // hai ba khung mờ dần lúc cẳng tay mở ra, thay cho biến mất đột ngột
+      e['canhHinh' + ben].style.visibility = acting && ah >= 0.175 ? 'hidden' : '';
+      const fore = e['cang' + ben], home = ben === clasp ? e.xaCang : e['canh' + ben];
+      if (fore.parentNode !== home) home.appendChild(fore);
     }
+    e.xaCang.style.opacity = clasp && fold < 1 ? ((fold - 0.5) * 2).toFixed(3) : '';       // hai ba khung mờ dần lúc tay rời dáng nghỉ, thay cho biến mất đột ngột
     for (const ben of ['L', 'R']) {
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
       const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
       const tay = e['bat' + ben];
-      const cho = ben !== xa || (carrying && ah < 0.8) || ben === clasp ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
+      const cho = ben !== xa || (carrying && ah < 0.8) ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
-      const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying && ben !== clasp ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
+      const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
       for (const [limb, dim] of [[e['chan' + ben], far ? ah : 0], [tay, mo]]) {
         const outline = limb.getAttribute('filter');
         limb.style.filter = dim ? `${outline ? outline + ' ' : ''}brightness(${1 - dim * 0.28})` : '';
       }
+      if (ben === clasp) { const outline = e.xaCang.getAttribute('filter'); e.xaCang.style.filter = `${outline ? outline + ' ' : ''}brightness(${1 - ah * 0.28})`; }
     }
     if (xa && e['bat' + xa].parentNode === e.tren) e.tren.appendChild(e['bat' + (xa === 'L' ? 'R' : 'L')]);      // tay gần vẫn nằm trên tay xa đang cầm đồ
     if (!xa) {
@@ -864,18 +866,15 @@ class RigSVG {
       const restUpper = sign * front.bat * cF - sF * side.bat, restFore = sign * front.cang * cF - sF * side.cang;
       const a0 = restUpper * RAD_, b0 = (restUpper + restFore) * RAD_;
       const wrist = { x: pivot[near].x - upper * Math.sin(a0) - fore * Math.sin(b0), y: pivot[near].y + upper * Math.cos(a0) + fore * Math.cos(b0) };
-      const target = { x: wrist.x + out * 5, y: wrist.y + 6 };
-      const elbow = { x: pivot[clasp].x + out * 4, y: target.y + 3 };
-      const reach = Math.max(8, Math.hypot(target.x - elbow.x, target.y - elbow.y));
-      const bend = Math.atan2(-(target.x - elbow.x), target.y - elbow.y) / RAD_;
+      const target = { x: wrist.x + out * 3, y: wrist.y + 3 };
+      const from = pivot[clasp], gap = clamp(Math.hypot(target.x - from.x, target.y - from.y), Math.abs(upper - fore) + 1, upper + fore - 1);
+      const toward = Math.atan2(-(target.x - from.x), target.y - from.y), open = Math.acos(clamp((upper * upper + gap * gap - fore * fore) / (2 * upper * gap), -1, 1));
+      const lift = toward - out * open;                                             // góc bắp tay (rad)
+      const elbow = { x: from.x - upper * Math.sin(lift), y: from.y + upper * Math.cos(lift) };
+      const bend = Math.atan2(-(target.x - elbow.x), target.y - elbow.y) - lift;      // góc cẳng tay so với bắp tay
       const ease = clamp((ah - 0.1) / 0.15, 0, 1);
-      rotation['bat' + clasp] += (0 - rotation['bat' + clasp]) * ease;
-      rotation['cang' + clasp] += (bend - rotation['cang' + clasp]) * ease;
-      pivot[clasp].x += (elbow.x - pivot[clasp].x) * ease;
-      pivot[clasp].y += (elbow.y - upper - pivot[clasp].y) * ease;           // bắp tay (ẩn) dựng thẳng đứng, đầu dưới là khuỷu
-      const shorten = 1 + (Math.min(1, reach / fore) - 1) * ease;
-      e['cangHinh' + clasp].setAttribute('transform', `scale(${dayTay} ${daiCangTay * shorten})`);
-      e['coTay' + clasp].setAttribute('transform', `translate(0 ${DAI.cangTay * daiCangTay * shorten}) scale(${coBanTay})`);
+      rotation['bat' + clasp] += (lift / RAD_ - rotation['bat' + clasp]) * ease;
+      rotation['cang' + clasp] += (chuanHoaGoc(bend / RAD_) - rotation['cang' + clasp]) * ease;
     } else if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
       const tuck = clamp(ah / 0.2, 0, 1) * clamp((0.9 - ah) / 0.2, 0, 1) * clamp(-pose.cang / 45, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1)
@@ -886,6 +885,7 @@ class RigSVG {
     }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
+    if (clasp) e.xaCang.setAttribute('transform', e['bat' + clasp].getAttribute('transform'));        // cẳng tay ở lớp trước đi theo đúng cánh tay của nó
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
@@ -3544,7 +3544,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.37.2';
+const VERSION = '0.38.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

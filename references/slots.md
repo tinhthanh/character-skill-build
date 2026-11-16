@@ -24,7 +24,7 @@ shoulder accessories) the base actually draws.
 | Base | Hair | `hat` | `faceExtras` | Top | `longSleeves` | `shoulderAccessories` | Rest pose | Extra colours |
 |---|---|---|---|---|---|---|---|---|
 | `default` | short | — | — | T-shirt, no outline (`colors.outline: null`) | — | — | arms down | — |
-| `vet` | bun | — | — | wrap scrubs, chest-pocket text (`badgeText`) | — | stethoscope | hands clasped | — |
+| `vet` | bun | — | — | long-sleeve zip jacket, chest-pocket text (`badgeText`) | `true` | stethoscope | hands clasped | — |
 | `surgeon` | short | surgical cap, `backSkullColor: 'hat'` | — | boxy V-neck scrubs, mask at the neck | — | — | arms down | `hat`, `hatHighlight` |
 | `nurse` | ponytail, tie in `colors.accent` | — | — | paw-print tunic, flared sleeves | — | — | arms slightly out | — |
 | `doctor` | side parting | — | glasses, frame in `colors.accent` | long coat with lapels | `true` | stethoscope | hands clasped | `innerShirt`, `stethoscope` |

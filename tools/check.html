@@ -529,7 +529,7 @@ try {
       const vetAngle = vet.s.batL;
       t.progress(1); vet.render();
       if (vet.s.aimL !== 0 || Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', 'point: does not return to the held stance');
-      if (vet.el.batL.parentNode !== vet.el.tren || vet.el.canhHinhL.style.visibility !== 'hidden') hong('3/4 gestures', 'the far arm does not go back to the folded-hands pose after the gesture');
+      if (vet.el.batL.parentNode !== vet.el.sauChan || vet.el.cangL.parentNode !== vet.el.xaCang) hong('3/4 gestures', 'the far arm does not go back to the folded-hands pose after the gesture');
       t.kill();
       // Vẫy tay ở dáng 3/4: bàn tay nằm cạnh đầu, không đè lên mặt.
       t = vet.wave(); mid(vet, t, 1.0);
@@ -543,22 +543,33 @@ try {
       t = boy.point({ x: 30, y: 190 }); mid(boy, t, 0.7);
       if (boy.s.batL < vetAngle + 8) hong('3/4 gestures', `point: the boy raises his arm ${boy.s.batL.toFixed(0)}°, the vet ${vetAngle.toFixed(0)}° — the angle ignores his lower shoulder`);
       t.kill(); boy.svg.remove();
-      // Tay xa lúc NGHỈ ở dáng đan tay: bắp tay ẩn sau thân (không ló ra thành mẩu da cụt bên eo), cẳng tay vắt ra trước
-      // bụng và bàn tay nằm chồng lên bàn tay kia — không giấu hẳn cả cánh tay.
+      // Tay xa lúc NGHỈ ở dáng đan tay là MỘT cánh tay ở HAI lớp: bắp tay sau thân, ló ống tay áo ra ngoài mép sườn xa
+      // (không có nó thì nhân vật trông như cụt tay); cẳng tay và bàn tay ở lớp trước thân, bàn tay chồng lên bàn tay kia.
       for (const amount of [0.3, 0.42, 0.55]) {
         const still = L.createCharacter(host, { id: 'vet' }).rig; still.face('right', amount).progress(1); still.render();
-        if (still.el.canhHinhR.style.visibility !== 'hidden') hong('3/4 stance', `turned ${amount}: the far upper arm of folded hands is still drawn`);
-        if (still.el.batR.parentNode !== still.el.tren) hong('3/4 stance', `turned ${amount}: the far forearm of folded hands is not in front of the body`);
+        if (still.el.batR.parentNode !== still.el.sauChan) hong('3/4 stance', `turned ${amount}: the far upper arm of folded hands is not behind the body`);
+        if (still.el.cangR.parentNode !== still.el.xaCang) hong('3/4 stance', `turned ${amount}: the far forearm of folded hands is not in the layer in front of the body`);
+        if (still.el.canhHinhR.style.visibility === 'hidden') hong('3/4 stance', `turned ${amount}: the far upper arm of folded hands is hidden`);
         const far = still.el.tayG.R.getBoundingClientRect(), near = still.el.tayG.L.getBoundingClientRect(), shirt = still.el.ao.getBoundingClientRect();
         const overlap = Math.max(0, Math.min(far.right, near.right) - Math.max(far.left, near.left)) * Math.max(0, Math.min(far.bottom, near.bottom) - Math.max(far.top, near.top));
         if (overlap < 0.2 * far.width * far.height) hong('3/4 stance', `turned ${amount}: the two hands of the folded-hands pose do not meet (${Math.round(overlap / (far.width * far.height) * 100)}% overlap)`);
-        // Lúc NÓI, tay ở nền vẫn nhấn nhịp vài độ quanh dáng nghỉ: bàn tay xa phải còn nguyên đó, không mờ đi.
+        const sleeve = still.el.canhHinhR.getBoundingClientRect();
+        if (sleeve.right < shirt.right + shirt.width * 0.08) hong('3/4 stance', `turned ${amount}: no far sleeve shows beyond the edge of the body (${(sleeve.right - shirt.right).toFixed(1)}px)`);
+        // Khuỷu khớp: đầu trên của cẳng tay (lớp trước) nằm đúng ở đầu dưới của bắp tay (lớp sau).
+        const upperEnd = still.el.canhHinhR.getBoundingClientRect(), foreStart = still.el.cangHinhR.getBoundingClientRect();
+        if (foreStart.right < upperEnd.right - upperEnd.width * 0.9 || foreStart.top > upperEnd.bottom + 2) hong('3/4 stance', `turned ${amount}: the far forearm is detached from its upper arm at the elbow`);
+        // Lúc NÓI, tay ở nền vẫn nhấn nhịp vài độ quanh dáng nghỉ: cẳng tay xa phải còn nguyên đó, không mờ đi.
         still.s.cangR += 7; still.s.batR -= 3; still.render();
-        if (still.el.batR.style.opacity !== '' || still.el.batR.parentNode !== still.el.tren) hong('3/4 stance', `turned ${amount}: the far hand fades (opacity ${still.el.batR.style.opacity || 1}) when the resting arm moves a few degrees, as it does during speech`);
-        still.s.cangR -= 7; still.s.batR += 3; still.render();
-        const forearm = still.el.cangHinhR.getBoundingClientRect();
-        if (forearm.right > shirt.right + shirt.width * 0.25) hong('3/4 stance', `turned ${amount}: the far forearm starts ${(forearm.right - shirt.right).toFixed(1)}px outside the shirt`);
+        if (still.el.xaCang.style.opacity !== '' || still.el.cangR.parentNode !== still.el.xaCang) hong('3/4 stance', `turned ${amount}: the far hand fades (opacity ${still.el.xaCang.style.opacity || 1}) when the resting arm moves a few degrees, as it does during speech`);
         still.svg.remove();
+      }
+      // Dáng đan tay ở 3/4 nằm ngang bụng: bàn tay gần không lên tới nửa trên của thân áo (chỗ bảng tên và ống nghe).
+      {
+        const low = L.createCharacter(host, { id: 'vet' }).rig; low.face('right').progress(1); low.render();
+        const hand = low.el.tayG.L.getBoundingClientRect(), shirt = low.el.ao.getBoundingClientRect();
+        if (hand.top < shirt.top + shirt.height * 0.45) hong('3/4 stance', `folded hands sit at the chest (top of the near hand at ${Math.round((hand.top - shirt.top) / shirt.height * 100)}% of the shirt height)`);
+        if (!/brightness/.test(low.el.xaCang.style.filter)) hong('3/4 stance', 'the far hand of folded hands is not shaded apart from the near hand');
+        low.svg.remove();
       }
       // Giơ ngón cái khi đang quay mặt: diễn bằng tay GẦN người xem (tay xa đưa lên ngực là khuất sau thân), bàn tay ấy
       // giơ lên thật; còn bàn tay xa ở yên chỗ đan tay trước bụng, không bám theo.
@@ -573,27 +584,23 @@ try {
         t.kill(); thumb.svg.remove();
       }
       // Nói ở dáng 3/4, một tay mở ra còn tay kia đan trước bụng: cẳng tay đang mở KHÔNG nằm ngang (nó sẽ thẳng hàng với
-      // cẳng tay đang đan, nhìn như một cánh tay dài xuyên qua thân) — nó chếch xuống ít nhất 18°, và bàn tay của nó nằm
-      // thấp hơn hẳn bàn tay đang đan.
+      // cẳng tay đang đan, nhìn như một cánh tay dài xuyên qua thân) — nó chếch xuống ít nhất 18°.
       {
         const talker = L.createCharacter(host, { id: 'vet' }).rig; talker.face('right').progress(1); talker.render();
-        const middle = (rig, side) => { const box = rig.el.tayG[side].getBoundingClientRect(); return box.top + box.height / 2; };
-        const folded = middle(talker, 'L'), unit = talker.el.ao.getBoundingClientRect().height;
-        let flattest = -Infinity, closest = Infinity, seen = 0;
+        let flattest = -Infinity, seen = 0;
         for (const seedValue of [1, 2, 3, 4, 5, 6]) {
           L.seed(seedValue);
           const t = talker.explain('một hai ba bốn năm sáu bảy tám chín mười', 4); t.pause();
           for (let at = 0.6; at < 3.4; at += 0.1) {
             t.time(at); talker.render();
             if (talker.s.aimR < 0.99 || talker.s.aimL > 0.01 || talker.s.batR < 30) continue;          // chỉ xét lúc một mình tay xa đang giữ dáng mở
-            seen++; flattest = Math.max(flattest, talker.s.batR + talker.s.cangR); closest = Math.min(closest, middle(talker, 'R') - folded);
+            seen++; flattest = Math.max(flattest, talker.s.batR + talker.s.cangR);
           }
           t.kill(); talker.reset(); talker.face('right').progress(1);
         }
         if (!seen) hong('3/4 gestures', 'test setup: no one-arm speech gesture was sampled');
         else {
           if (flattest > 72) hong('3/4 gestures', `explain: the open far forearm is only ${(90 - flattest).toFixed(0)}° below level — in line with the folded near forearm`);
-          if (closest < unit * 0.12) hong('3/4 gestures', `explain: the open far hand is at the height of the folded hand (${(closest / unit * 100).toFixed(0)}% of the shirt height below it)`);
         }
         talker.svg.remove();
       }

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.38.0
+
+Changed
+- **`vet` wears a new long-sleeve zip jacket.** The wrap scrubs are gone: their short, flared
+  sleeves turned into two flaps of cloth with thin bare arms when the arms spread, and into
+  blocks over the cheeks when they were raised. The whole arm is now cloth with an outline
+  (`longSleeves: true`); round ribbed collar, front zip, rounded chest pocket with the badge
+  text, slanted hip pockets, hem band. Grey, purple stitching and the stethoscope stay.
+  Characters built on other outfits are unchanged.
+- **`vet` rests with its hands at the belly** (upper arm 14°, forearm −82°; was 19°, −97°).
+  In a three-quarter stance the hands used to ride up against the chest pocket.
+- **Folded hands in a three-quarter stance show the whole far arm.** The far arm is drawn in
+  two layers: the upper arm behind the body, its sleeve showing beyond the far edge with the
+  elbow at waist height, and the forearm and hand in front of the body under the near hand.
+  0.37 hid the upper arm and drew a short forearm stub, which read as a missing arm. The far
+  forearm is shaded like its upper arm, so the two hands do not merge.
+
 ## 0.37.2
 
 Fixed
