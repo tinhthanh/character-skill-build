@@ -563,6 +563,14 @@ try {
         if (still.el.xaCang.style.opacity !== '' || still.el.cangR.parentNode !== still.el.xaCang) hong('3/4 stance', `turned ${amount}: the far hand fades (opacity ${still.el.xaCang.style.opacity || 1}) when the resting arm moves a few degrees, as it does during speech`);
         still.svg.remove();
       }
+      // Vai GẦN ở dáng 3/4 nằm sát mép thân (ống tay áo trùm ra ngoài mép áo như lúc nhìn thẳng), không lùi vào giữa
+      // ngực: lùi vào thì cả cánh tay gần đè lên túi ngực và che nửa mặt ống nghe khi quay trái.
+      for (const [turn, near] of [['right', 'L'], ['left', 'R']]) {
+        const body = L.createCharacter(host, { id: 'vet' }).rig; body.face(turn).progress(1); body.render();
+        const pivot = Math.abs(parseFloat(/translate\(([-\d.]+)/.exec(body.el['bat' + near].getAttribute('transform'))[1]));
+        if (pivot < 20) hong('3/4 stance', `facing ${turn}: the near shoulder is only ${pivot.toFixed(1)} units from the middle of the body (33 when facing front) — the arm lies over the chest`);
+        body.svg.remove();
+      }
       // Dáng đan tay ở 3/4 nằm ngang bụng: bàn tay gần không lên tới nửa trên của thân áo (chỗ bảng tên và ống nghe).
       {
         const low = L.createCharacter(host, { id: 'vet' }).rig; low.face('right').progress(1); low.render();

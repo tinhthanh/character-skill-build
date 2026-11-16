@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.38.1
+
+Fixed
+- **The near arm no longer lies over the chest in a three-quarter stance.** The near shoulder
+  moved toward the middle of the body in a straight line with the turn, so at three-quarter
+  the whole near arm covered the chest pocket and, facing left, half of the stethoscope. It
+  now follows the cosine of the turn and stays at the edge of the body. Applies to every
+  character.
+- **Folded hands, far arm:** more of the far sleeve shows beyond the edge of the body, and
+  the far hand lies under the near hand at the middle of the belly, its cuff visible.
+- **`vet` jacket:** the hem is wider than the hips (the trousers showed as a ridge beside
+  the hem when the body turned); the wrist joint of long sleeves is smaller.
+
 ## 0.38.0
 
 Changed

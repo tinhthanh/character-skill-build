@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -255,12 +255,12 @@ const CHI_TIM = '#7d4472';        // chỉ may — hạ sáng cho khớp bề d�
 const ONG_TIM = '#8c4680';        // ống nghe
 const MANH_CHI = 0.5;
 const rongGau = (nv) => nv.vienGau * (nv.netGau ? MANH_CHI : 1);
-const AO_KHOAC = 'M -30 20 Q 0 26 30 20 Q 28.5 0 27 -30 Q 27.5 -70 35 -88'
+const AO_KHOAC = 'M -35 20 Q 0 26 35 20 Q 31 0 27 -30 Q 27.5 -70 35 -88'
                + ' Q 30 -97 20 -101 Q 10 -105 0 -105 Q -10 -105 -20 -101 Q -30 -97 -35 -88'
-               + ' Q -27.5 -70 -27 -30 Q -28.5 0 -30 20 Z';
+               + ' Q -27.5 -70 -27 -30 Q -31 0 -35 20 Z';
 const SUON_KHOAC = ['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1;
-  return `M ${g * 35} -88 Q ${g * 27.5} -70 ${g * 27} -30 Q ${g * 28.5} 0 ${g * 30} 20`
-       + ` L ${g * 25} 21 Q ${g * 23.5} 0 ${g * 22} -30 Q ${g * 22.5} -68 ${g * 30} -86 Z`; }).join(' ');
+  return `M ${g * 35} -88 Q ${g * 27.5} -70 ${g * 27} -30 Q ${g * 31} 0 ${g * 35} 20`
+       + ` L ${g * 30} 21 Q ${g * 26} 0 ${g * 22} -30 Q ${g * 22.5} -68 ${g * 30} -86 Z`; }).join(' ');
 const chiMay = (d, m, rong = 1.05) =>
   `<path d="${d}" stroke="${m.phuKien}" stroke-width="${rong}" fill="none"
          stroke-dasharray="3 2.6" stroke-linecap="round"/>`;
@@ -341,8 +341,8 @@ const NV_BAC_SI_THU_Y = {
         <clipPath id="${p}-aoCat"><path d="${AO_KHOAC}"/></clipPath>
         <g clip-path="url(#${p}-aoCat)">
           <path d="M 0 -88 V 26" stroke="${m.vienNet}" stroke-width="1.5" fill="none"/>
-          <path d="M -30 12.5 Q 0 18.5 30 12.5 L 30 30 L -30 30 Z" fill="${m.aoToi}" opacity=".55"/>
-          ${chiMay('M -30 12.5 Q 0 18.5 30 12.5', m)}
+          <path d="M -36 12.5 Q 0 18.5 36 12.5 L 36 30 L -36 30 Z" fill="${m.aoToi}" opacity=".55"/>
+          ${chiMay('M -36 12.5 Q 0 18.5 36 12.5', m)}
           ${tuiHongKhoac('L', m)}${tuiHongKhoac('R', m)}
         </g>
         <rect x="-1.9" y="-88" width="3.8" height="6.4" rx="1.2" fill="#c3c9d1" stroke="${m.vienNet}" stroke-width="1"/>
@@ -496,7 +496,7 @@ class RigSVG {
           <g id="${p}-cangHinh${ben}">
             <circle cx="0" cy="0" r="8" fill="${da}"/>
             <path d="M -8 0 Q -9.5 ${g * 0.4} -6 ${g} L 6 ${g} Q 9.5 ${g * 0.4} 8 0 Z" fill="${da}"/>
-            <circle cx="0" cy="${g}" r="6" fill="${daThat}"/>
+            <circle cx="0" cy="${g}" r="${dai ? 4.6 : 6}" fill="${daThat}"/>
             ${dai ? `<path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5} L 6.2 ${g - 1} Q 0 ${g + 1.5} -6.2 ${g - 1} Z" fill="${da}"/>
             <path d="M -6.6 ${g - 5} Q 0 ${g - 2.5} 6.6 ${g - 5}" stroke="${this.mau.vienNet}" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".7"/>` : ''}
           </g>
@@ -830,6 +830,7 @@ class RigSVG {
     const gocVai = { L: GOC_VAI_MAX * mem((Math.abs(tL.bat) * cF - 40) / 110), R: GOC_VAI_MAX * mem((Math.abs(tR.bat) * cF - 40) / 110) };
     const ghep = { L: mem((Math.abs(tL.bat) * cF - 15) / 50), R: mem((Math.abs(tR.bat) * cF - 15) / 50) };
     const chotX = { L: -CHOT_VAI.x * (1 - ah * 0.92) - ah * 2, R: CHOT_VAI.x * (1 - ah * 0.92) + ah * 2 };
+    if (ah > 0) chotX[h > 0 ? 'L' : 'R'] = (h > 0 ? -1 : 1) * (CHOT_VAI.x * (0.08 + 0.92 * Math.cos(ah * Math.PI / 2)) + ah * 2);
     const tuck = Math.sin(Math.PI * Math.min(1, ah)) * 8;
     if (h > 0) chotX.R -= tuck; else if (h < 0) chotX.L += tuck;
     const doiChot = {};
@@ -866,13 +867,14 @@ class RigSVG {
       const restUpper = sign * front.bat * cF - sF * side.bat, restFore = sign * front.cang * cF - sF * side.cang;
       const a0 = restUpper * RAD_, b0 = (restUpper + restFore) * RAD_;
       const wrist = { x: pivot[near].x - upper * Math.sin(a0) - fore * Math.sin(b0), y: pivot[near].y + upper * Math.cos(a0) + fore * Math.cos(b0) };
-      const target = { x: wrist.x + out * 3, y: wrist.y + 3 };
+      const target = { x: wrist.x + out * 12 * coBanTay, y: wrist.y + 4 };
+      const ease = clamp((ah - 0.1) / 0.15, 0, 1);
+      pivot[clasp].x += out * 6 * ease;
       const from = pivot[clasp], gap = clamp(Math.hypot(target.x - from.x, target.y - from.y), Math.abs(upper - fore) + 1, upper + fore - 1);
       const toward = Math.atan2(-(target.x - from.x), target.y - from.y), open = Math.acos(clamp((upper * upper + gap * gap - fore * fore) / (2 * upper * gap), -1, 1));
       const lift = toward - out * open;                                             // góc bắp tay (rad)
       const elbow = { x: from.x - upper * Math.sin(lift), y: from.y + upper * Math.cos(lift) };
       const bend = Math.atan2(-(target.x - elbow.x), target.y - elbow.y) - lift;      // góc cẳng tay so với bắp tay
-      const ease = clamp((ah - 0.1) / 0.15, 0, 1);
       rotation['bat' + clasp] += (lift / RAD_ - rotation['bat' + clasp]) * ease;
       rotation['cang' + clasp] += (chuanHoaGoc(bend / RAD_) - rotation['cang' + clasp]) * ease;
     } else if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
@@ -1273,6 +1275,7 @@ class RigSVG {
     const h = this.s.huong, ah = Math.abs(h), tuck = Math.sin(Math.PI * Math.min(1, ah)) * 8;
     let x = (side === 'L' ? -1 : 1) * (CHOT_VAI.x * (1 - ah * 0.92) + ah * 2);
     if (h > 0 && side === 'R') x -= tuck; else if (h < 0 && side === 'L') x += tuck;
+    else if (ah > 0) x = (side === 'L' ? -1 : 1) * (CHOT_VAI.x * (0.08 + 0.92 * Math.cos(ah * Math.PI / 2)) + ah * 2);      // vai gần: theo cos (xem apDung)
     return HONG.x + x * this.nv.coThan;
   }
   #shoulderY() {
@@ -3544,7 +3547,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.38.0';
+const VERSION = '0.38.1';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
