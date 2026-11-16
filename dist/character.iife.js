@@ -1,4 +1,4 @@
-/* VGCharacter v0.36.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.36.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1399,7 +1399,10 @@ class RigSVG {
     // tay ấy buông thẳng, hơi khép vào, nằm gọn sau thân và chân. (Tay xa đang cầm đồ thì không: món đồ phải ló ra.)
     if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
-      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (1 - Math.abs(clamp(s['aim' + xa], -1, 1)));
+      // Mức khép chỉ theo ĐỘ GẬP của cẳng tay, không mờ dần theo `aim`: lúc tay rời dáng nghỉ để diễn, `aim` lên trước
+      // khi cẳng tay kịp mở ra — mờ theo `aim` là mẩu bắp tay lại ló ra bên eo trong vài khung. Tay ở yên sau thân cho
+      // tới khi cẳng tay mở quá −75°…−45°, rồi mới vươn ra từ sau mép áo. (Dáng đặt tay lên ngực, `aim` đủ 0,9: thôi khép.)
+      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
@@ -1457,7 +1460,7 @@ class RigSVG {
       // (= ra sau khi nghiêng) nên lật lại; lật mượt theo mức xoay để không giật.
       // Tay đang `aim` thì KHÔNG lật: phép lật mượt đi qua bề ngang 0 đúng ở dáng 3/4 — bàn tay chỉ của tay phía xa
       // co lại thành một cái gai.
-      const lon = (ben === 'R' ? Math.max(0, h) : Math.max(0, -h)) * (1 - clamp(s['aim' + ben], 0, 1));
+      const lon = s['aim' + ben] > 0.02 ? 0 : ben === 'R' ? Math.max(0, h) : Math.max(0, -h);       // đổi hẳn, không lật mượt: lật mượt theo `aim` thì bàn tay vẫn mảnh như que ở mấy khung đầu của cử chỉ
       lat *= 1 - 2 * lon;
       e.tayG[ben].setAttribute('transform',
         `scale(${guong * lat} 1) rotate(${-12 * (1 - xoe)}) scale(${0.68 + 0.32 * xoe} 1)`);
@@ -5382,7 +5385,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.36.3';
+const VERSION = '0.36.4';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

@@ -1,4 +1,4 @@
-/* VGCharacter v0.36.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.36.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -848,7 +848,7 @@ class RigSVG {
     }
     if (xa && !(this.holds[xa] && s['item' + xa] > 0.5)) {
       const pose = xa === 'L' ? tL : tR, inward = xa === 'L' ? -1 : 1;
-      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (1 - Math.abs(clamp(s['aim' + xa], -1, 1)));
+      const tuck = clamp(ah / 0.2, 0, 1) * clamp((-pose.cang - 45) / 30, 0, 1) * (Math.abs(s['aim' + xa]) >= 0.9 ? 0 : 1);
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
@@ -876,7 +876,7 @@ class RigSVG {
       const huongTay = chuanHoaGoc(ben === 'L' ? 90 + s.batL + s.cangL : 90 - s.batR - s.cangR);   // 90 = xuống, -90 = lên (đã chuẩn hoá về ±180)
       const len = clamp((-huongTay - 15) / 45, 0, 1);
       let lat = chon === 'mo' ? 1 - 2 * len : (len < 0.5 ? 1 : -1);
-      const lon = (ben === 'R' ? Math.max(0, h) : Math.max(0, -h)) * (1 - clamp(s['aim' + ben], 0, 1));
+      const lon = s['aim' + ben] > 0.02 ? 0 : ben === 'R' ? Math.max(0, h) : Math.max(0, -h);       // đổi hẳn, không lật mượt: lật mượt theo `aim` thì bàn tay vẫn mảnh như que ở mấy khung đầu của cử chỉ
       lat *= 1 - 2 * lon;
       e.tayG[ben].setAttribute('transform',
         `scale(${guong * lat} 1) rotate(${-12 * (1 - xoe)}) scale(${0.68 + 0.32 * xoe} 1)`);
@@ -3499,7 +3499,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.36.3';
+const VERSION = '0.36.4';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

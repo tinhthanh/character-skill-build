@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.36.4
+
+Fixed
+- **The first frames of a far-arm gesture in a three-quarter stance.** The hand of the far
+  arm was nearly edge-on for the first frames (it turned gradually as the gesture began), and
+  the upper arm showed beside the waist again for a few frames before the forearm opened.
+  The hand now switches to its full shape at once, and the arm stays behind the body until
+  the forearm has opened.
+
 ## 0.36.3
 
 Fixed
