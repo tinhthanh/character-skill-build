@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.5 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2904,8 +2904,13 @@ class RigSVG {
 
   speak(text = null, dur = 2, { mood = null } = {}) {
     const t = this.tl(), s = this.s, tone = this.#tone(mood);
-    this.#openUp(t);
-    const arm = this.#chestHand();                            // tay phải; đang quay mặt sang phải thì tay trái (tay gần người xem)
+    // Nhân vật nghỉ ĐAN TAY đang quay về phía ai đó: nói bằng tay Ở PHÍA NGƯỜI NGHE, giữ nguyên dáng 3/4 (kênh `aim`)
+    // — mở tay gần ra thì bàn tay đưa về phía sau lưng, quay khỏi người đang nghe. Các trường hợp khác như cũ: mở
+    // người về phía người xem, diễn bằng tay gần.
+    const listener = s.huong > 0.1 ? 'R' : s.huong < -0.1 ? 'L' : null;
+    const toListener = RigSVG.SCREEN_AIM && listener && this.#restArm(listener)[1] <= -45 && this.#freeHand() === listener;
+    const arm = toListener ? listener : this.#chestHand();    // tay phải; đang quay mặt sang phải thì tay trái (tay gần người xem)
+    if (toListener) this.#stage(t, [arm], 0.1); else this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
     t.set(s, { ['tay' + arm]: 'mo' }, 0);
     t.to(s, { ...tone.start, nhinX: 0.8, duration: 0.2 }, 0);
@@ -2917,7 +2922,7 @@ class RigSVG {
     // gần như đứng yên, chỉ có khuỷu bạnh ra — đọc thành chống tay vào hông. Với họ cử chỉ là MỞ cẳng tay ra khỏi bụng
     // sang bên một nhịp, bàn tay xoè (dáng nhỏ của `explain`).
     const [restUpper, restFore] = this.#restArm(arm), folded = restFore <= -45;
-    const beat = folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];
+    const beat = toListener ? [[36, 12], [40, 22]] : folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];      // tay xa: chéo xuống về phía người nghe, như cử chỉ một tay của `explain`
     t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
      .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
@@ -3244,12 +3249,16 @@ class RigSVG {
                 duration: 0.12, ease: 'power2.out' }, m);
     }
 
-    const VAO = 0.06;
+    // MIỆNG ĐI TRƯỚC TIẾNG `LEAD` giây. Đo trên một câu 7,5 s (giọng máy + cue `spectral`): bắt đầu đổi khẩu hình đúng
+    // mốc cue thì độ mở miệng khớp biên độ tiếng nhất khi dời SỚM 67 ms — tức miệng đang chậm hơn tiếng chừng hai
+    // khung hình 30 fps. Mắt người chịu được hình đi trước tiếng tốt hơn nhiều so với hình đi sau (đó cũng là lệ của
+    // dân hoạt hình: khẩu hình sớm một hai khung), nên dời mọi khẩu hình sớm lên.
+    const VAO = 0.06, LEAD = 0.06;
     for (const c of ds) {
       const h = RHUBARB[c.value] || RHUBARB.X;
       t.to(s, { mieng: h.mieng, chum: h.chum, cuoi: tone.corner(h.cuoi),
                 duration: Math.min(VAO, Math.max(0.02, (c.end - c.start) * 0.6)),
-                ease: 'power1.out' }, c.start);
+                ease: 'power1.out' }, Math.max(0, c.start - LEAD));
     }
 
     const moc = [];
@@ -5569,7 +5578,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.38.4';
+const VERSION = '0.38.5';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

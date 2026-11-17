@@ -615,6 +615,26 @@ try {
           const talker = L.createCharacter(host, { id: 'vet' }).rig; const g2 = talker.speak('Xin chào các bạn', 2); mid(talker, g2, 0.9);
           if (Math.max(talker.s.cangL, talker.s.cangR) < 30) hong('hands', `speak: a character resting with folded hands keeps both forearms folded (${talker.s.cangL.toFixed(0)}°, ${talker.s.cangR.toFixed(0)}°)`);
           g2.kill(); talker.svg.remove();
+          // …và khi đang quay về phía ai đó: tay PHÍA NGƯỜI NGHE diễn, dáng 3/4 giữ nguyên.
+          const turned = L.createCharacter(host, { id: 'vet' }).rig; turned.face('right').progress(1);
+          const g3 = turned.speak('Xin chào các bạn', 2); mid(turned, g3, 0.9);
+          if (turned.s.aimR !== 1) hong('3/4 gestures', 'speak: facing right, the arm on the listener side (R) does not gesture');
+          if (Math.abs(turned.s.huong - 0.55) > 0.01) hong('3/4 gestures', `speak: the body turned to ${turned.s.huong.toFixed(2)} instead of keeping its three-quarter stance`);
+          if (Math.abs(turned.s.cangL - turned.NGHI.cangL) > 3) hong('3/4 gestures', 'speak: the near hand leaves its rest pose although the listener-side arm gestures');
+          g3.progress(1); turned.render();
+          if (turned.s.aimR !== 0) hong('3/4 gestures', 'speak: the arm stays in screen-aim mode after the line');
+          g3.kill(); turned.svg.remove();
+        }
+        // Khẩu hình đi TRƯỚC tiếng: đúng mốc bắt đầu của một âm mở to, miệng đã mở hơn nửa chừng.
+        {
+          const lips = L.createCharacter(host, { id: 'vet' }).rig;
+          const g4 = lips.speakCues({ metadata: { duration: 2 }, mouthCues: [{ start: 0, end: 1, value: 'X' }, { start: 1, end: 1.5, value: 'D' }, { start: 1.5, end: 2, value: 'X' }] }, null, { cuChi: false });
+          mid(lips, g4, 1.3); const full = lips.s.mieng; mid(lips, g4, 1.0);
+          if (!(full > 0.3)) hong('lip-sync', `the open-mouth cue opens the mouth only to ${full.toFixed(2)} — the test checks nothing`);
+          else if (lips.s.mieng < full * 0.5) hong('lip-sync', `at the start of an open-mouth cue the mouth is ${(lips.s.mieng / full * 100).toFixed(0)}% open — mouth shapes do not lead the voice`);
+          mid(lips, g4, 0.85);
+          if (lips.s.mieng > full * 0.2) hong('lip-sync', 'the mouth opens more than 150 ms before its cue');
+          g4.kill(); lips.svg.remove();
         }
         // Dáng đặt thẳng (cẳng tay đưa ngang ra ngoài như lúc nói) chứ không lấy từ `explain`: cử chỉ lúc nói chọn
         // ngẫu nhiên, ở một thời điểm cố định có khi cả hai tay đang nghỉ và phép thử không đo gì.

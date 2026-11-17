@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.38.5
+
+Fixed
+- **Lip-sync: the mouth no longer trails the voice.** Measured on three spoken lines (two
+  Vietnamese, one English, cues from `tools/cues.py`): the mouth opening matched the
+  loudness of the voice best when shifted 67 ms earlier — the mouth was about two frames
+  late. `speakCues` now starts every mouth shape 60 ms before its cue; the same three lines
+  now match best at 0–17 ms.
+- **`speak` in a turned stance gestures toward the listener.** A character that rests with
+  folded hands opened its near hand, which points away from the person it is talking to.
+  It now keeps its three-quarter stance and gestures with the arm on the listener's side,
+  like `explain`. (If that hand holds an item, it opens toward the viewer as before.)
+
 ## 0.38.4
 
 Fixed
