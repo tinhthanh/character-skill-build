@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.38.4
+
+Fixed
+- **The hand on a cup has a thumb.** It shows above the index finger, pointing toward the
+  lid; four fingers alone read as four pills stuck on the cup.
+- **The legs turn with the body.** In a three-quarter stance the zip moved toward the facing
+  side but the gap between the trouser legs stayed in the middle. Both hips now shift the
+  same way, by less than the chest.
+
 ## 0.38.3
 
 Fixed

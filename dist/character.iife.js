@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1096,8 +1096,11 @@ class RigSVG {
     // tay & chân xa hơi tối đi, bàn chân xoay mũi về phía trước.
     const h = s.huong, ah = Math.abs(h);
     const { daiDui, daiOng, dayChan, cachChan, coBanChan } = this.nv;
-    e.hongL.setAttribute('transform', `translate(${-cachChan * (1 - ah * 0.7) - ah * 3} 0)`);
-    e.hongR.setAttribute('transform', `translate(${cachChan * (1 - ah * 0.7) + ah * 3} 0)`);
+    // Thân dưới cũng xoay: khe giữa hai ống quần dời về phía đang quay tới như khoá kéo phía trên (xem `CHEST_SHIFT`),
+    // ít hơn vì hông xoay ít hơn ngực. Không có nó thì khoá kéo lệch một đằng, đường giữa quần đứng nguyên một nẻo.
+    const turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9), legShift = Math.sign(h) * turnDetail * 3;
+    e.hongL.setAttribute('transform', `translate(${-cachChan * (1 - ah * 0.7) - ah * 3 + legShift} 0)`);
+    e.hongR.setAttribute('transform', `translate(${cachChan * (1 - ah * 0.7) + ah * 3 + legShift} 0)`);
     // Tỉ lệ chân: đùi và ống co giãn quanh khớp đầu của nó; bàn chân KHÔNG co
     // theo ống, chỉ dời xuống cổ chân mới rồi phóng theo cỡ riêng quanh cổ chân.
     for (const ben of ['L', 'R']) {
@@ -1279,7 +1282,7 @@ class RigSVG {
       // Điểm trên chân `side` ở cách hông `reach`, lệch ngang `offset` so với trục chân — trong
       // hệ toạ độ nhóm chân. Quá gối thì đi tiếp theo hướng ống chân.
       const along = (side, offset) => {
-        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
+        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3) + legShift;
         const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
@@ -1327,7 +1330,7 @@ class RigSVG {
     // thân ở dáng 3/4 đọc thành một thân chính diện bị ép dẹp. Trên một khối trụ, đường giữa ngực dời về phía đang
     // quay tới: dịch cả lớp chi tiết `CHEST_SHIFT` đơn vị mỗi đơn vị `huong` và ép thêm một chút; phần trôi ra ngoài
     // mép thân bên xa bị cắt (ô cắt chỉ giới hạn bề NGANG — yếm, dây đeo vẫn được vượt lên cổ và xuống dưới gấu).
-    const CHEST_SHIFT = 7.2, turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9);     // về 0 khi nghiêng hẳn: lúc ấy `ah * 0.4` đã ép chi tiết lại, dịch nữa là trôi khỏi thân
+    const CHEST_SHIFT = 7.2;     // về 0 khi nghiêng hẳn: lúc ấy `ah * 0.4` đã ép chi tiết lại, dịch nữa là trôi khỏi thân
     const scaleAo = (1 + s.tho * 0.03) * (1 - ah * 0.4);
     if (e.phuKien) e.phuKien.setAttribute('transform', `translate(${h * 2 + Math.sign(h) * turnDetail * CHEST_SHIFT} ${nhacY}) scale(${scaleAo * (1 - 0.1 * turnDetail)} 1)`);
     if (e.phuKienRect) {
@@ -1529,7 +1532,7 @@ class RigSVG {
       // nên ở dáng bưng của một trong hai tay nó quay gần 180° so với cổ tay — và các ngón mọc ra từ mép BÊN KIA cái
       // cốc, rời hẳn khỏi cổ tay áo. Món đồ quay quá 90° thì lật nhóm ngón lại quanh lòng bàn tay.
       const fingers = e['item' + side].querySelector('[data-grip]');
-      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'rotate(180 0 10)' : '');
+      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = !!fingers && s['item' + side] > 0.5;
     }
 
@@ -4960,14 +4963,15 @@ function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
 // Bốn ngón tay ÔM PHÍA TRƯỚC món đồ, vẽ SAU món đồ nên nằm trên nó. Rig vẽ bàn tay trước rồi mới tới món đồ: không
 // có lớp này thì cả bàn tay nằm sau cái cốc, chỉ ló mấy đầu ngón ở một mép — cốc trông như dán vào bụng hoặc cắm vào
 // cổ tay chứ không được cầm. Hệ toạ độ cổ tay: ngón chạy theo +y (hướng cẳng tay) từ mép phía cổ tay, vắt ngang món
-// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
+// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. NGÓN CÁI ló ra phía trên ngón trỏ, chếch về phía
+// miệng món đồ (+x): thiếu nó thì bốn ngón đọc thành bốn viên thuốc dán lên cốc. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
 // chảy liền vào các ngón; rig ẩn nắm tay phía sau món đồ khi có nhóm `data-grip` (nắm tay ló ra ở mép bên kia cái cốc,
 // đọc thành một bàn tay thứ hai).
 const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   const line = lineOf(c), band = (x, len) =>
     `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
   return `
-        <g data-grip="1">${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
+        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
 };
 
 // Món đồ DẸT (bìa hồ sơ, điện thoại) cầm kiểu khác: bốn ngón đỡ phía SAU, chỉ NGÓN CÁI đè lên mặt trước — vẽ bốn ngón
@@ -5565,7 +5569,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.38.3';
+const VERSION = '0.38.4';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.3 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.4 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -671,8 +671,9 @@ class RigSVG {
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
     const h = s.huong, ah = Math.abs(h);
     const { daiDui, daiOng, dayChan, cachChan, coBanChan } = this.nv;
-    e.hongL.setAttribute('transform', `translate(${-cachChan * (1 - ah * 0.7) - ah * 3} 0)`);
-    e.hongR.setAttribute('transform', `translate(${cachChan * (1 - ah * 0.7) + ah * 3} 0)`);
+    const turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9), legShift = Math.sign(h) * turnDetail * 3;
+    e.hongL.setAttribute('transform', `translate(${-cachChan * (1 - ah * 0.7) - ah * 3 + legShift} 0)`);
+    e.hongR.setAttribute('transform', `translate(${cachChan * (1 - ah * 0.7) + ah * 3 + legShift} 0)`);
     for (const ben of ['L', 'R']) {
       e['duiHinh' + ben].setAttribute('transform', `scale(${dayChan} ${daiDui})`);
       e['ongHinh' + ben].setAttribute('transform', `scale(${dayChan} ${daiOng})`);
@@ -771,7 +772,7 @@ class RigSVG {
       const K = this.nv.skirt, thigh = DAI.dui * daiDui, halfLeg = 13 * dayChan, flare = K.flare ?? 4;
       const reach = (K.length ?? 1) * thigh;                     // gấu cách hông bao xa, đo dọc theo chân
       const along = (side, offset) => {
-        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3);
+        const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3) + legShift;
         const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
@@ -802,7 +803,7 @@ class RigSVG {
     const bienAo = `translate(${h * 2} ${nhacY}) scale(${(1 + s.tho * 0.03) * (1 - ah * 0.4)} 1)`;  // ngực nở khi hít, hẹp khi xoay
     e.ao.setAttribute('transform', bienAo);
     if (e.suon) e.suon.setAttribute('transform', bienAo);
-    const CHEST_SHIFT = 7.2, turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9);     // về 0 khi nghiêng hẳn: lúc ấy `ah * 0.4` đã ép chi tiết lại, dịch nữa là trôi khỏi thân
+    const CHEST_SHIFT = 7.2;     // về 0 khi nghiêng hẳn: lúc ấy `ah * 0.4` đã ép chi tiết lại, dịch nữa là trôi khỏi thân
     const scaleAo = (1 + s.tho * 0.03) * (1 - ah * 0.4);
     if (e.phuKien) e.phuKien.setAttribute('transform', `translate(${h * 2 + Math.sign(h) * turnDetail * CHEST_SHIFT} ${nhacY}) scale(${scaleAo * (1 - 0.1 * turnDetail)} 1)`);
     if (e.phuKienRect) {
@@ -921,7 +922,7 @@ class RigSVG {
       const itemTurn = upright + (side === 'L' ? 1 : -1) * tilt;
       e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
       const fingers = e['item' + side].querySelector('[data-grip]');
-      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'rotate(180 0 10)' : '');
+      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = !!fingers && s['item' + side] > 0.5;
     }
     for (const ben of ['L', 'R']) {
@@ -3170,7 +3171,7 @@ const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   const line = lineOf(c), band = (x, len) =>
     `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
   return `
-        <g data-grip="1">${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
+        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
 };
 const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
   const line = lineOf(c);
@@ -3594,7 +3595,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.38.3';
+const VERSION = '0.38.4';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

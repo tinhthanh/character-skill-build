@@ -550,6 +550,13 @@ try {
         const front = offset(0), right = offset(0.55), left = offset(-0.55);
         if (right - front < 0.06) hong('3/4 stance', `facing right: the chest details moved ${((right - front) * 100).toFixed(1)}% of the shirt width toward the facing side — they stay frontal`);
         if (front - left < 0.06) hong('3/4 stance', `facing left: the chest details moved ${((front - left) * 100).toFixed(1)}% of the shirt width toward the facing side — they stay frontal`);
+        // Khe giữa hai ống quần dời cùng phía với khoá kéo.
+        for (const amount of [0.55, -0.55]) {
+          const legs = L.createCharacter(host, { id: 'vet' }).rig; legs.s.huong = amount; legs.render();
+          const x = (k) => parseFloat(/translate\(([-\d.]+)/.exec(legs.el['hong' + k].getAttribute('transform'))[1]), seam = (x('L') + x('R')) / 2;
+          if (seam * Math.sign(amount) < 1.5) hong('3/4 stance', `turned ${amount}: the gap between the legs is ${seam.toFixed(1)} units from the middle — it does not follow the zip`);
+          legs.svg.remove();
+        }
         const arm = L.createCharacter(host, { id: 'vet' }).rig;
         Object.assign(arm.s, { batL: 85, cangL: 0, batR: 85, cangR: 0 }); arm.render();
         for (const k of ['L', 'R']) {
@@ -579,7 +586,7 @@ try {
         {
           const holder = L.createCharacter(host, { id: 'vet', items: { R: 'cup' } }).rig; holder.render();
           const fingers = holder.el.itemR.querySelector('[data-grip]');
-          if (!fingers || fingers.querySelectorAll('rect').length !== 4) hong('hands', 'cup: no four fingers drawn over the cup');
+          if (!fingers || fingers.querySelectorAll('rect').length !== 5) hong('hands', 'cup: no four fingers and a thumb drawn over the cup');
           else {
             const f = box(fingers), cupBody = box(holder.el.itemR.querySelector('path'));
             const across = (Math.min(f.right, cupBody.right) - Math.max(f.left, cupBody.left)) / cupBody.width;
