@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.5 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.38.6 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -940,9 +940,9 @@ class RigSVG {
       const huongTay = chuanHoaGoc(ben === 'L' ? 90 + s.batL + s.cangL : 90 - s.batR - s.cangR);   // 90 = xuống, -90 = lên (đã chuẩn hoá về ±180)
       const len = clamp((-huongTay - 15) / 45, 0, 1);
       const m = chuanHoaGoc(guong * (armTurn[ben] + s.than));
-      const side = m > 0 ? clamp((135 - m) / 12, 0, 1) : clamp((m + 46) / 12, 0, 1);
+      const side = m > 0 ? clamp((135 - m) / 12, 0, 1) : clamp((m + 30) / 10, 0, 1);
       let lat = chon === 'mo' ? 2 * side - 1 : (len < 0.5 ? 1 : -1);
-      const lon = s['aim' + ben] > 0.02 || ben === clasp ? 0 : ben === 'R' ? Math.max(0, h) : Math.max(0, -h);       // đổi hẳn, không lật mượt: lật mượt theo `aim` thì bàn tay vẫn mảnh như que ở mấy khung đầu của cử chỉ
+      const lon = s['aim' + ben] > 0.02 || ben === clasp ? 0 : (ben === 'R' ? h : -h) > 0.5 ? 1 : 0;
       lat *= 1 - 2 * lon;
       if (chon === 'cai') e.tayG[ben].setAttribute('transform', `rotate(${chuanHoaGoc(-armTurn[ben] - s.than).toFixed(2)} 0 9) scale(${guong} 1)`);
       else e.tayG[ben].setAttribute('transform',
@@ -1329,6 +1329,7 @@ class RigSVG {
       tx = (r.left + r.width / 2 - ox) / k - s.x;
       ty = (r.top + r.height / 2 - oy) / k - s.y - DOI_Y;
     }
+    if (!muc) ty = (screen ? this.#shoulderY() : VAI.R.y) - 6;
     const ben = tx < HONG.x ? 'L' : 'R', v = screen ? { x: this.#shoulderX(ben), y: this.#shoulderY() } : VAI[ben];
     const goc = Math.atan2(ty - v.y, tx - v.x) * 180 / Math.PI;
     const bat = clamp(chuanHoaGoc(ben === 'L' ? goc - 90 : 90 - goc), -15, 172);
@@ -1662,7 +1663,7 @@ class RigSVG {
     const across = (k === 'L') !== (tx < HONG.x);
     const upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
     this.#openUp(t);
-    t.set(s, { ['tay' + k]: 'mo' }, 0);
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.02);         // bàn tay XOÈ úp lên lưng con vật; dáng thả lỏng nhìn cạnh ở đầu một cánh tay duỗi chéo chỉ là một cái gai
     if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
@@ -1771,7 +1772,7 @@ class RigSVG {
   speak(text = null, dur = 2, { mood = null } = {}) {
     const t = this.tl(), s = this.s, tone = this.#tone(mood);
     const listener = s.huong > 0.1 ? 'R' : s.huong < -0.1 ? 'L' : null;
-    const toListener = RigSVG.SCREEN_AIM && listener && this.#restArm(listener)[1] <= -45 && this.#freeHand() === listener;
+    const toListener = RigSVG.SCREEN_AIM && listener && this.#freeHand() === listener;
     const arm = toListener ? listener : this.#chestHand();    // tay phải; đang quay mặt sang phải thì tay trái (tay gần người xem)
     if (toListener) this.#stage(t, [arm], 0.1); else this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
@@ -1780,8 +1781,7 @@ class RigSVG {
     this.blinkTo = tone.eyes;
     this.#khauHinh(t, soAm, nhip, tone.corner);
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
-    const [restUpper, restFore] = this.#restArm(arm), folded = restFore <= -45;
-    const beat = toListener ? [[36, 12], [40, 22]] : folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];      // tay xa: chéo xuống về phía người nghe, như cử chỉ một tay của `explain`
+    const beat = toListener ? [[36, 12], [40, 22]] : [[26, 48], [30, 60]];      // tay phía người nghe: chéo xuống về phía họ, như cử chỉ một tay của `explain`
     t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
      .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
@@ -1946,6 +1946,8 @@ class RigSVG {
                 ease: 'power1.out' }, Math.max(0, c.start - LEAD));
     }
     const moc = [];
+    const opening = ds.find((c) => c.value !== 'X');
+    if (opening && D > 2.4 && opening.start < 0.6) moc.push(Math.max(opening.start, 0.12));
     for (const c of ds) {
       if (c.value !== 'X' || c.end - c.start < 0.16) continue;
       if (c.end < 0.2 || c.end > D - 0.6) continue;
@@ -3597,7 +3599,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.38.5';
+const VERSION = '0.38.6';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

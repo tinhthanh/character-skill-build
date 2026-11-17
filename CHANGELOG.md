@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.38.6
+
+Fixed
+- **`stroke`: the hand on the pet is a hand.** It was the relaxed, side-on hand, and it
+  flipped over with every stroke, passing through zero width — a spike at the end of the arm.
+  The stroking hand is now the open hand and keeps its width.
+- **Open hands no longer thin out at arm angles gestures hold.** The thumb changes side
+  between 20° and 30° from a hanging arm (0.38.2 put it at 34–46°, where an arm held out
+  diagonally sits), and the far hand no longer narrows while the body is only partly turned.
+- **`speak` no longer reads as a hand on the hip.** Every character opens the forearm out to
+  the side with an open hand; turned toward someone, it gestures with the arm on the
+  listener's side and keeps its stance (0.38.5 did this only for characters that rest with
+  folded hands). If the listener-side hand holds an item, the other hand gestures.
+- **`point()` with no target is level with the character's own shoulder.** The default
+  target sat at an adult's shoulder height, so children pointed upward, hand over the face.
+- **`speakCues`: the first gesture comes with the first words.** Gestures were anchored only
+  to pauses inside the line, so every line began with the arms at rest — 1.5 s on a 7.5 s
+  line. Lines longer than 2.4 s now also gesture on their opening.
+
 ## 0.38.5
 
 Fixed

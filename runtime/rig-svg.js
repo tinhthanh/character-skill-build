@@ -1563,18 +1563,23 @@ export class RigSVG {
       const len = clamp((-huongTay - 15) / 45, 0, 1);
       // Bàn tay xoè: ngón cái nằm phía TRÊN mỗi khi cẳng tay nằm ngang trên màn hình, bất kể nó đưa ra ngoài hay
       // gập vào trong. Tính từ góc THẬT của cẳng tay (`armTurn`, đã gồm `aim` và dáng xoay), soi gương cho tay trái:
-      // m = 0 thõng xuống, +90 đưa ngang ra ngoài, −90 gập ngang vào trong, ±180 giơ thẳng lên. Mốc cũ chỉ lật khi
+      // m = 0 thõng xuống, −90 đưa ngang RA NGOÀI, +90 gập ngang VÀO TRONG, ±180 giơ thẳng lên. Mốc cũ chỉ lật khi
       // cẳng tay vượt lên trên phương ngang, nên suốt cử chỉ lúc nói ngón cái chúc xuống đất và bàn tay đọc thành
-      // một nắm tay sần. Hai điểm đổi (−40° và 135°) hẹp 12° để bàn tay không đứng lâu ở dáng "cạnh tay".
+      // một nắm tay sần. Hai điểm đổi hẹp 10–12° để bàn tay không đứng lâu ở dáng "cạnh tay", và điểm đổi phía ngoài
+      // đặt ở 20–30° so với phương thõng: KHÔNG cử chỉ nào dừng ở đó (tay nghỉ lệch dưới 17°, cử chỉ đưa tay từ 33°
+      // trở lên). Bản 0.38.2 đặt nó ở 34–46°: nhịp vuốt ve đung đưa quanh 33–40° làm bàn tay lật qua lật lại, mỗi
+      // lần đi qua bề ngang 0 — một cái gai ở đầu cánh tay.
       const m = chuanHoaGoc(guong * (armTurn[ben] + s.than));
-      const side = m > 0 ? clamp((135 - m) / 12, 0, 1) : clamp((m + 46) / 12, 0, 1);
+      const side = m > 0 ? clamp((135 - m) / 12, 0, 1) : clamp((m + 30) / 10, 0, 1);
       let lat = chon === 'mo' ? 2 * side - 1 : (len < 0.5 ? 1 : -1);
       // Xoay nghiêng: nhìn từ bên hông chỉ thấy cạnh ngón cái, và ngón cái phải quay về
       // phía TRƯỚC (hướng đi). Tay phía gần người xem vốn có ngón cái quay vào thân
       // (= ra sau khi nghiêng) nên lật lại; lật mượt theo mức xoay để không giật.
       // Tay đang `aim` thì KHÔNG lật: phép lật mượt đi qua bề ngang 0 đúng ở dáng 3/4 — bàn tay chỉ của tay phía xa
       // co lại thành một cái gai.
-      const lon = s['aim' + ben] > 0.02 || ben === clasp ? 0 : ben === 'R' ? Math.max(0, h) : Math.max(0, -h);       // đổi hẳn, không lật mượt: lật mượt theo `aim` thì bàn tay vẫn mảnh như que ở mấy khung đầu của cử chỉ
+      // …ĐỔI HẲN ở giữa vòng xoay, không lật mượt: lật mượt đi qua bề ngang 0 đúng ở dáng 3/4, nên mọi cử chỉ của tay xa
+      // khi thân đang hé 0,3 (vuốt ve, reo mừng, nhún vai) có bàn tay chỉ còn 40% bề ngang — một cái gai ở đầu cánh tay.
+      const lon = s['aim' + ben] > 0.02 || ben === clasp ? 0 : (ben === 'R' ? h : -h) > 0.5 ? 1 : 0;
       lat *= 1 - 2 * lon;
       // NGÓN CÁI GIƠ LÊN thì phải chỉ LÊN TRỜI. Hình 'cai' vẽ ngón cái dọc theo cẳng tay; cẳng tay đặt chéo trước
       // ngực thì ngón cái chĩa ngang — đọc thành "chỉ vào túi áo". Xoay cả nắm tay quanh lòng bàn tay (0, 9) cho
@@ -2259,6 +2264,9 @@ export class RigSVG {
       tx = (r.left + r.width / 2 - ox) / k - s.x;
       ty = (r.top + r.height / 2 - oy) / k - s.y - DOI_Y;
     }
+    // Không có đích: chỉ NGANG VAI CỦA CHÍNH MÌNH về bên phải. Đích mặc định cũ nằm ở một cao độ cố định trong khung
+    // (ngang vai người lớn): nhân vật trẻ con, vai thấp hơn, phải chỉ chếch lên — bàn tay chồng lên bím tóc và mép mặt.
+    if (!muc) ty = (screen ? this.#shoulderY() : VAI.R.y) - 6;
     // Chỉ bằng tay ở PHÍA đích; góc tính từ chỗ cái vai ấy đang nằm trên màn hình (quay nghiêng thì vai dồn vào giữa).
     const ben = tx < HONG.x ? 'L' : 'R', v = screen ? { x: this.#shoulderX(ben), y: this.#shoulderY() } : VAI[ben];
     const goc = Math.atan2(ty - v.y, tx - v.x) * 180 / Math.PI;
@@ -2715,7 +2723,7 @@ export class RigSVG {
     const across = (k === 'L') !== (tx < HONG.x);
     const upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
     this.#openUp(t);
-    t.set(s, { ['tay' + k]: 'mo' }, 0);
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.02);         // bàn tay XOÈ úp lên lưng con vật; dáng thả lỏng nhìn cạnh ở đầu một cánh tay duỗi chéo chỉ là một cái gai
     if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
@@ -2897,11 +2905,12 @@ export class RigSVG {
 
   speak(text = null, dur = 2, { mood = null } = {}) {
     const t = this.tl(), s = this.s, tone = this.#tone(mood);
-    // Nhân vật nghỉ ĐAN TAY đang quay về phía ai đó: nói bằng tay Ở PHÍA NGƯỜI NGHE, giữ nguyên dáng 3/4 (kênh `aim`)
-    // — mở tay gần ra thì bàn tay đưa về phía sau lưng, quay khỏi người đang nghe. Các trường hợp khác như cũ: mở
+    // Đang quay về phía ai đó: nói bằng tay Ở PHÍA NGƯỜI NGHE, giữ nguyên dáng 3/4 (kênh `aim`)
+    // — nhân vật đan tay mở tay gần ra thì bàn tay đưa về phía sau lưng; nhân vật buông tay nâng tay gần lên bụng thì
+    // khuỷu bạnh ra, bàn tay đặt ở hông như chống nạnh. Các trường hợp khác (tay ấy đang cầm đồ, nhìn thẳng) như cũ: mở
     // người về phía người xem, diễn bằng tay gần.
     const listener = s.huong > 0.1 ? 'R' : s.huong < -0.1 ? 'L' : null;
-    const toListener = RigSVG.SCREEN_AIM && listener && this.#restArm(listener)[1] <= -45 && this.#freeHand() === listener;
+    const toListener = RigSVG.SCREEN_AIM && listener && this.#freeHand() === listener;
     const arm = toListener ? listener : this.#chestHand();    // tay phải; đang quay mặt sang phải thì tay trái (tay gần người xem)
     if (toListener) this.#stage(t, [arm], 0.1); else this.#openUp(t);
     const soAm = this.#soAm(text, dur), nhip = dur / soAm;
@@ -2911,11 +2920,10 @@ export class RigSVG {
     this.#khauHinh(t, soAm, nhip, tone.corner);
     // đầu và tay phụ hoạ theo câu nói
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
-    // Nhân vật nghỉ ở dáng ĐAN TAY trước bụng (cẳng tay đã gập sẵn) mà đưa về dáng "nâng tay lên ngang bụng" thì bàn tay
-    // gần như đứng yên, chỉ có khuỷu bạnh ra — đọc thành chống tay vào hông. Với họ cử chỉ là MỞ cẳng tay ra khỏi bụng
-    // sang bên một nhịp, bàn tay xoè (dáng nhỏ của `explain`).
-    const [restUpper, restFore] = this.#restArm(arm), folded = restFore <= -45;
-    const beat = toListener ? [[36, 12], [40, 22]] : folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];      // tay xa: chéo xuống về phía người nghe, như cử chỉ một tay của `explain`
+    // Cử chỉ là MỞ cẳng tay sang bên một nhịp, bàn tay xoè (dáng nhỏ của `explain`). Dáng cũ nâng bàn tay lên ngang bụng
+    // (bắp 34°, cẳng −70°): nhân vật đan tay thì bàn tay gần như đứng yên, nhân vật buông tay thì bàn tay dừng ở hông —
+    // cả hai chỉ thấy khuỷu bạnh ra, đọc thành chống nạnh.
+    const beat = toListener ? [[36, 12], [40, 22]] : [[26, 48], [30, 60]];      // tay phía người nghe: chéo xuống về phía họ, như cử chỉ một tay của `explain`
     t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
      .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
@@ -3255,6 +3263,11 @@ export class RigSVG {
     }
 
     const moc = [];
+    // CỬ CHỈ ĐẦU TIÊN đi cùng tiếng đầu tiên. Mốc cử chỉ vốn chỉ là chỗ dứt một quãng ngắt hơi GIỮA câu, nên câu nào
+    // cũng mở đầu bằng một đoạn đứng yên tay cho tới quãng ngắt đầu — đo trên một câu 7,5 s là 1,5 s đứng đan tay mà
+    // nói. Câu đủ dài (trên 2,4 s) thì thêm mốc ở ngay tiếng đầu; mốc ngắt hơi nào sát nó hơn 2,4 s vẫn bị bỏ như cũ.
+    const opening = ds.find((c) => c.value !== 'X');
+    if (opening && D > 2.4 && opening.start < 0.6) moc.push(Math.max(opening.start, 0.12));
     for (const c of ds) {
       if (c.value !== 'X' || c.end - c.start < 0.16) continue;
       if (c.end < 0.2 || c.end > D - 0.6) continue;

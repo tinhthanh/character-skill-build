@@ -310,7 +310,8 @@ try {
       const line = L.sequence(seated, [['speak', 'xin chao', 1], ['nod']]);
       for (const time of [0, 0.9, line.duration()]) { line.time(time); if (Math.abs(seated.state.seat - 1) > 1e-3) hong('initial stance', `seat set before sequence() is ${seated.state.seat} at ${time}s`); }
       if (Math.abs(seated.state.facing + 0.55) > 1e-3) hong('initial stance', 'facing set before sequence() is not kept at the end');
-      line.time(0.9); if (Math.abs(seated.state.facing) > L.RigSVG.GESTURE_TURN + 1e-3) hong('speak', 'the body does not open toward the viewer for the gesture while turned');
+      // `speak` khi đang quay: tay phía người nghe diễn (kênh aim), dáng quay giữ nguyên — không mở người ra nữa.
+      line.time(0.9); if (Math.abs(seated.state.facing + 0.55) > 1e-3 || seated.s.aimL !== 1) hong('speak', `turned: facing ${seated.state.facing.toFixed(2)}, aim of the listener-side arm ${seated.s.aimL} — expected the stance kept and that arm gesturing`);
       line.kill(); seated.svg.remove();
     }
     // Hai tay đều cầm đồ: vẫy / tán thành bằng ĐẦU, hai tay đứng yên, thời lượng không đổi.
@@ -625,6 +626,16 @@ try {
           if (turned.s.aimR !== 0) hong('3/4 gestures', 'speak: the arm stays in screen-aim mode after the line');
           g3.kill(); turned.svg.remove();
         }
+        // Câu có tiếng thật: cử chỉ đầu tiên đến cùng những tiếng đầu, không đợi quãng ngắt hơi đầu tiên.
+        {
+          const opener = L.createCharacter(host, { id: 'vet' }).rig;
+          const shapes = Array.from({ length: 16 }, (_, n) => ({ start: 0.1 + n * 0.25, end: 0.35 + n * 0.25, value: n === 7 ? 'X' : n % 4 ? 'B' : 'D' }));
+          const g7 = opener.speakCues({ metadata: { duration: 4.2 }, mouthCues: [{ start: 0, end: 0.1, value: 'X' }, ...shapes, { start: 4.1, end: 4.2, value: 'X' }] });
+          let first = null;
+          for (let time = 0; time <= 2.2 && first === null; time += 0.05) { mid(opener, g7, time); if (Math.max(Math.abs(opener.s.cangL - opener.NGHI.cangL), Math.abs(opener.s.cangR - opener.NGHI.cangR)) > 25) first = time; }
+          if (first === null || first > 1) hong('speakCues gestures', `the first gesture starts ${first === null ? 'after 2.2 s' : 'at ' + first.toFixed(2) + ' s'} — the line opens with the arms at rest`);
+          g7.kill(); opener.svg.remove();
+        }
         // Khẩu hình đi TRƯỚC tiếng: đúng mốc bắt đầu của một âm mở to, miệng đã mở hơn nửa chừng.
         {
           const lips = L.createCharacter(host, { id: 'vet' }).rig;
@@ -635,6 +646,28 @@ try {
           mid(lips, g4, 0.85);
           if (lips.s.mieng > full * 0.2) hong('lip-sync', 'the mouth opens more than 150 ms before its cue');
           g4.kill(); lips.svg.remove();
+        }
+        // Vuốt ve: bàn tay XOÈ, đủ bề ngang suốt ba nhịp vuốt (không lật qua lật lại thành cái gai).
+        {
+          // Bề ngang của bàn tay = tích các hệ số scale(x …) trong thuộc tính transform SVG của nhóm bàn tay.
+          const widthOf = (el) => [...el.getAttribute('transform').matchAll(/scale\(([-\d.e]+)/g)].reduce((w, found) => w * Math.abs(parseFloat(found[1])), 1);
+          const petter = L.createCharacter(host, { id: 'vet' }).rig; const g5 = petter.stroke({ x: 300, y: 330 });
+          let thin = 1, shape = '';
+          for (let time = 0.5; time <= 1.6; time += 0.05) { mid(petter, g5, time); shape = petter.s.tayR; thin = Math.min(thin, widthOf(petter.el.tayG.R)); }
+          if (shape !== 'xoe') hong('hands', `stroke: the stroking hand is '${shape}', not open`);
+          if (thin < 0.9) hong('hands', `stroke: the stroking hand shrinks to ${(thin * 100).toFixed(0)}% of its width during the strokes`);
+          g5.kill(); petter.svg.remove();
+          // Tay giơ chéo 33–45° (dáng thả lỏng hay xoè) không nằm trong vùng đổi phía ngón cái.
+          const held = L.createCharacter(host, { id: 'default' }).rig;
+          for (const angle of [33, 38, 45]) { Object.assign(held.s, { batR: angle, cangR: 0, batL: angle, cangL: 0 }); held.render();
+            for (const k of ['L', 'R']) { const w = widthOf(held.el.tayG[k]); if (w < 0.6) hong('hands', `arm held ${angle}° out: the ${k} hand is ${(w * 100).toFixed(0)}% wide — it sits in the thumb-flip zone`); } }
+          held.svg.remove();
+          // `point` không đích: ngang vai của chính nhân vật, kể cả trẻ con.
+          for (const id of ['girl', 'boy', 'vet']) {
+            const kid = L.createCharacter(host, { id }).rig; const g6 = kid.point(); mid(kid, g6, 0.8);
+            if (Math.abs(kid.s.batR - 90) > 12) hong('gestures', `${id}: point() with no target raises the arm to ${kid.s.batR.toFixed(0)}° — expected about level (90°)`);
+            g6.kill(); kid.svg.remove();
+          }
         }
         // Dáng đặt thẳng (cẳng tay đưa ngang ra ngoài như lúc nói) chứ không lấy từ `explain`: cử chỉ lúc nói chọn
         // ngẫu nhiên, ở một thời điểm cố định có khi cả hai tay đang nghỉ và phép thử không đo gì.
@@ -1352,7 +1385,7 @@ try {
     // Bong bóng: nằm phía trên đầu người nói, và đổi chỗ khi đổi người nói.
     const bubble = document.createElement('div'); bubble.style.cssText = 'position:absolute;width:200px;height:60px'; stage.appendChild(bubble);
     const said = L.captions(talk, bubble, { follow: true });
-    const over = (rig, time) => { said.time(time); rig.lastSequence.time(time); const head = rig.el.dau.getBoundingClientRect(), box = bubble.getBoundingClientRect();
+    const over = (rig, time) => { said.time(time); rig.lastSequence.time(time); const head = rig.el.khuon.getBoundingClientRect(), box = bubble.getBoundingClientRect();      // căn theo KHUÔN MẶT như `captions` làm: ở dáng 3/4 tóc sau gáy kéo tâm cả khối đầu lệch đi
       return Math.abs((box.left + box.right) / 2 - (head.left + head.right) / 2) < 60 && box.bottom <= head.top + 30; };
     if (!over(a, lineA.start + 1)) hong('captions', 'follow: the bubble is not above the first speaker');
     if (!over(b, lineB.start + 0.6)) hong('captions', 'follow: the bubble does not move to the second speaker');
