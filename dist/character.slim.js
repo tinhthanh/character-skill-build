@@ -1569,9 +1569,10 @@ class RigSVG {
     if (typeof draw !== 'function') throw new Error('[character] setItem(side, draw): draw must be a function returning SVG');
     this.nv = { ...this.nv, ['heldItem' + side]: draw };
     const carry = { ['bat' + side]: 14, ['cang' + side]: -85, ['tay' + side]: 'nam' };
-    this.NGHI = Object.freeze({ ...this.NGHI, ...carry, ['item' + side]: shown ? 1 : 0 });
+    const free = side === 'L' && !this.holds.R && this.NGHI.cangR < -40 ? { batR: NGHI.batR, cangR: NGHI.cangR, tayR: 'mo' } : {};
+    this.NGHI = Object.freeze({ ...this.NGHI, ...carry, ...free, ['item' + side]: shown ? 1 : 0 });
     this.#dungLai();
-    Object.assign(this.s, shown ? carry : { ['bat' + side]: NGHI['bat' + side], ['cang' + side]: NGHI['cang' + side], ['tay' + side]: 'mo' }, { ['item' + side]: shown ? 1 : 0 });
+    Object.assign(this.s, free, shown ? carry : { ['bat' + side]: NGHI['bat' + side], ['cang' + side]: NGHI['cang' + side], ['tay' + side]: 'mo' }, { ['item' + side]: shown ? 1 : 0 });
     this.apDung();
     return this;
   }
@@ -1776,8 +1777,10 @@ class RigSVG {
     this.blinkTo = tone.eyes;
     this.#khauHinh(t, soAm, nhip, tone.corner);
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
-    t.to(s, { ['bat' + arm]: 34, ['cang' + arm]: -70, than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
-     .to(s, { ['bat' + arm]: 40, ['cang' + arm]: -60, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
+    const [restUpper, restFore] = this.#restArm(arm), folded = restFore <= -45;
+    const beat = folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];
+    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
+     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
     this.blinkTo = 0;
     t.to(s, { mieng: 0, duration: 0.15 }, dur);
@@ -3169,6 +3172,12 @@ const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   return `
         <g data-grip="1">${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
 };
+const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
+  const line = lineOf(c);
+  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
+  return `
+        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
+};
 function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true } = {}) {
   const line = lineOf(c);
   return `
@@ -3178,7 +3187,7 @@ function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size =
           <path d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round"/>
         </g>${grip ? gripFingers(c) : ''}`;
 }
-function clipboard(c, { color = '#b9834f', paper = '#ffffff' } = {}) {
+function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
   const line = lineOf(c);
   return `
         <g transform="translate(2 10) rotate(90)">
@@ -3186,14 +3195,14 @@ function clipboard(c, { color = '#b9834f', paper = '#ffffff' } = {}) {
           <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
           <path d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
           <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
-        </g>`;
+        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
-function phone(c, { color = '#22262e', screen = '#8fd3ff' } = {}) {
+function phone(c, { color = '#22262e', screen = '#8fd3ff', grip = true } = {}) {
   return `
         <g transform="translate(0 10) rotate(90)">
           <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}"/>
           <rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>
-        </g>`;
+        </g>${grip ? gripThumb(c, { reach: 11, far: 18 }) : ''}`;
 }
 return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone };
 })();
