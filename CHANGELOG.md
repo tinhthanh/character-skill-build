@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.38.2
+
+Fixed
+- **`thumbsUp` shows a thumb pointing up.** The thumb was drawn along the forearm, so with
+  the forearm across the chest it pointed sideways and read as "pointing at the pocket". The
+  fist is redrawn (four curled fingers as bands, thumb rising from its top edge) and is kept
+  upright whatever the angle of the arm.
+- **Open hand while speaking: the thumb is on top.** With the forearm held out level, the
+  thumb pointed at the floor and the hand read as a lumpy fist; on the left hand it was
+  already on top, so the two hands did not match. The side of the thumb now follows the real
+  on-screen angle of the forearm, the same for both hands.
+- **A held cup is gripped.** The whole hand was drawn under the cup, so only fingertips
+  showed at one edge and the cup read as stuck to the belly, or to the end of the wrist when
+  handed over. `kit.parts.cup` now draws four fingers across the front of the cup
+  (`grip: false` leaves them out).
+- **Hands redrawn.** Open hand: a narrower palm, fingers of different lengths that fan out
+  slightly, and a thumb that stands clear of them — it was a square palm with four short
+  equal fingers. Relaxed hand: one tapered shape instead of a blob with scalloped tips.
+  Pointing finger: thicker and shorter.
+- **`vet` wears light closed shoes with a dark sole.** The skin-coloured flats with a bare
+  instep read as bare feet.
+- **The chest turns with the body.** In a three-quarter stance the zip, pockets, badge and
+  stethoscope only got narrower with the shirt, so the torso read as a frontal torso squeezed
+  flat. They now move toward the side the character faces (the collar follows by half as
+  much) and are cut off at the far edge of the body. Applies to every character.
+- **A raised arm is never ruler-straight.** Pointing, handing over and presenting put the
+  forearm exactly in line with the upper arm. An arm raised more than 40° now keeps at least
+  9° of bend at the elbow; the upper arm gives back part of it so the hand stays close to
+  where it was. Hanging arms and rest poses are untouched.
+- **No flap of cloth under a raised arm.** The gusset left at the armpit when an arm goes up
+  ended in a point below the shoulder; it is now a small rounded shape.
+
 ## 0.38.1
 
 Fixed

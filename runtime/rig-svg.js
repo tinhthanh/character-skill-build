@@ -249,8 +249,8 @@ const gauTayAo = (nv, ben) => {
 const gauDemVai = (nv, ben, t) => {
   const sg = ben === 'L' ? -1 : 1, g = gauTayAo(nv, ben);
   return { xB: pha(g.xB, sg * 12, t), yB: pha(g.yB, 6, t),
-           cx: pha(g.cx, sg * 6, t), cy: pha(g.cy, 11, t),
-           ex: pha(g.ex, -sg * 3, t), ey: pha(g.ey, 14, t) };
+           cx: pha(g.cx, sg * 6, t), cy: pha(g.cy, 9, t),
+           ex: pha(g.ex, -sg * 5, t), ey: pha(g.ey, 9.5, t) };
 };
 // BO GÓC TRONG của gấu tay áo. Góc này — chỗ gấu gặp mép nách — là góc duy
 // nhất của tay áo chĩa VÀO ngực, nên tay áo càng loe (`rongTayAo`) thì nó càng
@@ -592,7 +592,7 @@ const NV_BAC_SI_THU_Y = {
   // thân áo và quần CÙNG một mã (#4f5b64) — trong ảnh mẫu chúng chỉ tách nhau
   // nhờ nét viền, nên bỏ viền đi là hai mảnh dính làm một.
   mau: { da: '#f7d9c4', daToi: '#e2b39a', toc: '#151319', tocSang: '#3a3644', ao: '#4f5b64', aoToi: '#3b454a',
-         quan: '#4f5b64', giay: '#d7b48f', mieng: '#7d2f3d', ma: '#f2a3a3', phuKien: CHI_TIM, mat: '#3a2416',
+         quan: '#4f5b64', giay: '#eef0f2', mieng: '#7d2f3d', ma: '#f2a3a3', phuKien: CHI_TIM, mat: '#3a2416',
          vien: '#1d0d10', vienNet: '#2a1519' },
   toc: (p, m) => `
               <g id="${p}-tocTruoc" fill="${m.toc}">
@@ -643,10 +643,12 @@ const NV_BAC_SI_THU_Y = {
   phuKienTren: (p, m) => ongNghe(m),
   ao: () => AO_KHOAC,
   suon: SUON_KHOAC,
+  // Giày thể thao kín mũi, sáng màu, có đế sẫm. Đôi giày bệt hở mu màu da trước đây đọc thành chân trần.
   giay: (p, ben, m, ong) => `
           <g id="${p}-ban${ben}">
-            <path d="M -11 ${ong - 5} Q 0 ${ong - 8} 11 ${ong - 5} L 12 ${ong + 4} q 0 6 -7 6 h -10 q -7 0 -7 -6 z" fill="${m.da}"/>
-            <path d="M -12 ${ong + 1} Q 0 ${ong - 1} 12 ${ong + 1} L 12 ${ong + 4} q 0 6 -7 6 h -10 q -7 0 -7 -6 z" fill="${m.giay}"/>
+            <path d="M -12 ${ong - 6} h 24 v 10 q 0 6 -7 6 h -10 q -7 0 -7 -6 z" fill="${m.giay}"/>
+            <path d="M -12 ${ong + 5.5} q 1 4.5 7 4.5 h 10 q 6 0 7 -4.5 z" fill="${m.quan}"/>
+            <path d="M -5 ${ong - 1} h 10 M -4.5 ${ong + 2} h 9" stroke="${m.quan}" stroke-width="1" stroke-linecap="round" opacity=".45"/>
           </g>`,
   net: () => '',
 };
@@ -808,12 +810,11 @@ export class RigSVG {
     const p = `${this.id}-tay${ben}`, da = this.mau.da, toi = this.mau.daToi;
     // Bàn tay dựng từ khối tròn không viền: lòng bàn tay + 4 ngón khép nhẹ, ngón cái ở
     // phía trong (về thân). Vẽ cho tay phải (ngón cái ở -x), tay trái lật gương.
+    // Ngón xoè: mọc từ mép lòng bàn tay (y 11), dài NGẮN KHÁC NHAU và hơi toả ra — bốn ngón bằng nhau, song song thì
+    // bàn tay đọc thành một cái găng hộp.
     const ngon = (x, dai, xoay) =>
-      `<rect x="${x}" y="17" width="4.8" height="${dai}" rx="2.4" fill="${da}" transform="rotate(${xoay} ${x + 2.4} 17)"/>`;
-    // Ngón thả lỏng: cong dần vào lòng bàn tay (về phía ngón cái), đầu ngón tròn.
-    const ngonCong = (x, dai, cong) =>
-      `<path d="M ${x} 16 q ${-cong * 0.15} ${dai * 0.55} ${-cong} ${dai * 0.9}" stroke="${da}" stroke-width="4.6" stroke-linecap="round" fill="none"/>`;
-    const ke = (x) => `<path d="M ${x} 21 L ${x} 29" stroke="${toi}" stroke-width="1" stroke-linecap="round" opacity=".45"/>`;
+      `<rect x="${x}" y="11" width="4.5" height="${dai}" rx="2.25" fill="${da}" transform="rotate(${xoay} ${x + 2.25} 11)"/>`;
+    const ke = (x, xoay) => `<path d="M ${x} 16 L ${x} 25" stroke="${toi}" stroke-width="1" stroke-linecap="round" opacity=".45" transform="rotate(${xoay} ${x} 11)"/>`;
     const nam = `
       <rect x="-10" y="-3" width="20" height="24" rx="8" fill="${da}"/>
       <circle cx="-7" cy="20" r="3.4" fill="${da}"/><circle cx="-2.3" cy="21" r="3.4" fill="${da}"/>
@@ -824,24 +825,31 @@ export class RigSVG {
     return `
       <g id="${p}">
         <g data-tay="mo">
-          <path d="M -9 -3 Q -11 8 -8 18 Q 0 21 8 18 Q 11 8 9 -3 Q 0 -6 -9 -3 Z" fill="${da}"/>
-          ${ngonCong(-6.6, 14, 5)}${ngonCong(-2.2, 15.5, 6.5)}${ngonCong(2.2, 14.5, 6.5)}${ngonCong(6.6, 11, 5)}
-          <path d="M -6 3 q -6 4 -5 12" stroke="${da}" stroke-width="5.2" stroke-linecap="round" fill="none"/>
-          <path d="M -7 17 Q 0 20 7 17" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".35"/>
+          <!-- Bàn tay buông, nhìn từ cạnh: MỘT khối thon dần tới các đầu ngón hơi cong vào thân, ngón cái nằm phía trước. -->
+          <path d="M -6.5 -3 Q -9.5 6 -8.6 15 Q -9.4 23 -7 28.5 Q -4.6 32.5 -1.6 30.6 Q 0.6 33.4 3.2 30.4 Q 5.8 31 6.8 27 Q 9.4 20 8.6 12 Q 9.4 4 6.5 -3 Q 0 -5 -6.5 -3 Z" fill="${da}"/>
+          <path d="M -1.8 30 Q -1.2 26 -1.6 22 M 3 30 Q 3.4 26.5 3 23" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".45"/>
+          <path d="M -4.6 3 Q -9.6 8 -7.4 17.5" stroke="${da}" stroke-width="5.6" stroke-linecap="round" fill="none"/>
+          <path d="M -4.4 12 Q -3.6 15.5 -5.6 18.6" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".4"/>
         </g>
         <g data-tay="xoe">
-          <rect x="-9.5" y="-3" width="19" height="24" rx="7.5" fill="${da}"/>
-          <rect x="-10.5" y="1" width="7" height="17" rx="3.5" fill="${da}" transform="rotate(32 -7 3)"/>
-          ${ngon(-9.6, 15, -4)}${ngon(-4.8, 17.5, -1.5)}${ngon(0, 17, 1.5)}${ngon(4.8, 13.5, 4)}
-          ${ke(-4.8)}${ke(0)}${ke(4.8)}
-          <path d="M -9 6 Q -3 9 3 6" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".35"/>
+          <!-- Lòng bàn tay hẹp ở cổ tay, rộng dần tới gốc ngón; ngón cái là một khối RIÊNG chĩa chéo ra ngoài. -->
+          <path d="M -6.5 -3 Q -10.5 3 -9.6 14 L 9.6 13 Q 10.5 3 6.5 -3 Q 0 -5 -6.5 -3 Z" fill="${da}"/>
+          <rect x="-12.2" y="0" width="6.2" height="16" rx="3.1" fill="${da}" transform="rotate(44 -9 3)"/>
+          ${ngon(-9.5, 18, -7)}${ngon(-4.7, 20.5, -2.2)}${ngon(0.1, 19, 2.6)}${ngon(4.9, 15, 8)}
+          ${ke(-4.9, -4.5)}${ke(-0.1, 0.2)}${ke(4.7, 5.2)}
+          <path d="M -8.5 6 Q -3 9.5 3 7" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".35"/>
         </g>
         <g data-tay="nam">${nam}</g>
-        <g data-tay="cai">${nam}
-          <rect x="-4" y="17" width="8" height="21" rx="4" fill="${da}"/>
+        <g data-tay="cai">
+          <!-- Vẽ trong hệ ĐỨNG THẲNG quanh lòng bàn tay (0, 9): apDung xoay cả nhóm cho ngón cái luôn chỉ lên trời.
+               Nắm tay nhìn từ phía mu: bốn ngón cuộn là bốn dải NGANG, ngón cái mọc lên từ mép trên, lệch về phía thân. -->
+          <rect x="-4.6" y="-13" width="8.6" height="20" rx="4.3" fill="${da}" transform="rotate(-8 -1 2)"/>
+          <rect x="-11" y="-1.5" width="22" height="21" rx="7.5" fill="${da}"/>
+          <path d="M -1 4 L 9.5 4 M -2 9 L 10 9 M -1 14 L 9.5 14" stroke="${toi}" stroke-width="1" stroke-linecap="round" opacity=".5"/>
+          <path d="M -5.2 -1 Q -6 3 -3.4 6" stroke="${toi}" stroke-width="1" stroke-linecap="round" fill="none" opacity=".45"/>
         </g>
         <g data-tay="chi">${nam}
-          <rect x="-3" y="17" width="6" height="27" rx="3" fill="${da}"/>
+          <rect x="-3.5" y="15" width="7" height="23" rx="3.5" fill="${da}"/>
         </g>
       </g>`;
   }
@@ -941,6 +949,7 @@ export class RigSVG {
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
+    <clipPath id="${p}-phuKienClip" clipPathUnits="userSpaceOnUse"><rect id="${p}-phuKienRect" x="-400" y="-500" width="800" height="1000"/></clipPath>
     <mask id="${p}-xaMask" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
       <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
       <g id="${p}-xaMaskG" style="filter:brightness(0)"><use href="#${p}-ao"/><use href="#${p}-vaiL"/><use href="#${p}-vaiR"/></g>
@@ -966,7 +975,7 @@ export class RigSVG {
       <path id="${p}-mayVaiR" d="${veDuongMayVai(this.nv, 'R', 0)}" fill="none" stroke="${chinhSang(this.mau.ao, -0.45)}" stroke-width="1.5" stroke-linecap="round" opacity=".85" transform="translate(${CHOT_VAI.x} ${CHOT_VAI.y})"/>
       <path id="${p}-suon" d="${this.nv.suon}" fill="${this.mau.aoToi}" opacity="${this.nv.damSuon}"/>
       </g>
-      ${this.nv.phuKien(p, this.mau, this.nv)}
+      <g id="${p}-phuKienCat" clip-path="url(#${p}-phuKienClip)">${this.nv.phuKien(p, this.mau, this.nv)}</g>
       <g id="${p}-tren">
         <g id="${p}-co"${this.#Vda()}>
         <path id="${p}-coDa" d="M -13 -130 L 13 -130 L 13.5 -106 Q 15 -100 20 -96 L -20 -96 Q -15 -100 -13.5 -106 Z" fill="${this.mau.da}"/>
@@ -1026,7 +1035,7 @@ export class RigSVG {
     // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = {
-      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), dau: q('dau'),
+      goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
@@ -1307,7 +1316,18 @@ export class RigSVG {
     const bienAo = `translate(${h * 2} ${nhacY}) scale(${(1 + s.tho * 0.03) * (1 - ah * 0.4)} 1)`;  // ngực nở khi hít, hẹp khi xoay
     e.ao.setAttribute('transform', bienAo);
     if (e.suon) e.suon.setAttribute('transform', bienAo);
-    if (e.phuKien) e.phuKien.setAttribute('transform', bienAo);
+    // CHI TIẾT NGỰC XOAY THEO THÂN. Thân áo chỉ hẹp lại khi xoay; nếu túi, khoá kéo, ống nghe hẹp theo đúng như thế thì
+    // thân ở dáng 3/4 đọc thành một thân chính diện bị ép dẹp. Trên một khối trụ, đường giữa ngực dời về phía đang
+    // quay tới: dịch cả lớp chi tiết `CHEST_SHIFT` đơn vị mỗi đơn vị `huong` và ép thêm một chút; phần trôi ra ngoài
+    // mép thân bên xa bị cắt (ô cắt chỉ giới hạn bề NGANG — yếm, dây đeo vẫn được vượt lên cổ và xuống dưới gấu).
+    const CHEST_SHIFT = 7.2, turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9);     // về 0 khi nghiêng hẳn: lúc ấy `ah * 0.4` đã ép chi tiết lại, dịch nữa là trôi khỏi thân
+    const scaleAo = (1 + s.tho * 0.03) * (1 - ah * 0.4);
+    if (e.phuKien) e.phuKien.setAttribute('transform', `translate(${h * 2 + Math.sign(h) * turnDetail * CHEST_SHIFT} ${nhacY}) scale(${scaleAo * (1 - 0.1 * turnDetail)} 1)`);
+    if (e.phuKienRect) {
+      this._aoBox ||= e.ao.getBBox();
+      const half = ah > 0.02 ? Math.max(Math.abs(this._aoBox.x), Math.abs(this._aoBox.x + this._aoBox.width)) * scaleAo : 400;
+      e.phuKienRect.setAttribute('x', (h * 2 - half).toFixed(2)); e.phuKienRect.setAttribute('width', (half * 2).toFixed(2));
+    }
     // Cùng biến đổi với thân áo, trừ phần nhấc vai (nhóm `tren` đã mang sẵn). Cắt
     // ở gấu TRONG của tay áo — chỗ dây ống nghe chui ra khỏi nắp tay áo. Hai ô
     // cắt chừa lại dải giữa (|x| < 18): ở đó là cổ áo, và dây phải chui DƯỚI cổ áo.
@@ -1319,7 +1339,7 @@ export class RigSVG {
     e.sau.setAttribute('transform', `translate(0 ${nhacY})`);
     e.xaMaskG.setAttribute('transform', `translate(0 ${-nhacY})`);            // mặt nạ nằm trong hệ của `tren` (đã nhấc `nhacY`), thân áo thì không
     e.sauChan.setAttribute('transform', `${e.than.getAttribute('transform')} translate(0 ${nhacY})`);        // lớp tay xa nằm ngoài nhóm thân nên phải mang theo phép biến đổi của thân
-    e.coAo.setAttribute('transform', `translate(${h * 3} 0) scale(${1 - ah * 0.45} 1)`);   // cổ áo hẹp theo thân, lệch về phía ngực
+    e.coAo.setAttribute('transform', `translate(${h * 3 + Math.sign(h) * turnDetail * CHEST_SHIFT * 0.5} 0) scale(${1 - ah * 0.45} 1)`);   // cổ áo hẹp theo thân, lệch về phía ngực
     // CỔ cũng phải hẹp lại khi xoay — nhưng không đều: thân cổ chỉ thon đi một chút
     // (cổ người nhìn nghiêng gần bằng nhìn thẳng), còn phần CHÂN CỔ loe ra hai vai
     // thì phải thu mạnh, vì hai vai đã dồn về một đường. Để nguyên thì chân cổ rộng
@@ -1416,6 +1436,19 @@ export class RigSVG {
       rotation['bat' + side] += (sign * pose.bat - rotation['bat' + side]) * aim;
       rotation['cang' + side] += (sign * pose.cang - rotation['cang' + side]) * aim;
     }
+    // KHUỶU KHÔNG BAO GIỜ THẲNG ĐUỘT khi tay giơ lên. Chỉ tay, đưa đồ, dang tay giới thiệu đặt cẳng tay thẳng hàng với
+    // bắp tay: cả cánh tay thành một cái ống thước kẻ. Tay giơ quá 40° thì cẳng tay gập thêm tối thiểu `MIN_ELBOW`
+    // về phía đang giơ, và bắp tay lùi lại gần nửa góc ấy để bàn tay vẫn ở gần chỗ cũ (đích chỉ không lệch đáng kể).
+    // Tay buông không đụng tới: tay thõng thẳng là tự nhiên, và dáng nghỉ của từng nhân vật đã dò sẵn.
+    const MIN_ELBOW = 9;
+    for (const side of ['L', 'R']) {
+      const upper = rotation['bat' + side], dir = Math.sign(upper) || 1, bend = rotation['cang' + side] * dir;
+      const raised = clamp((Math.abs(upper) - 40) / 25, 0, 1);
+      if (!raised || Math.abs(bend) >= MIN_ELBOW) continue;
+      const add = (MIN_ELBOW - bend) * raised;
+      rotation['cang' + side] += dir * add;
+      rotation['bat' + side] -= dir * add * 0.45;
+    }
     // Tay XA đang gập cẳng tay vào trong (dáng nghỉ đan tay trước bụng) mà không diễn: cẳng tay và bàn tay đã khuất sau
     // thân, chỉ còn BẮP TAY ló ra ngoài mép áo như một mẩu da cụt bên eo — rõ nhất ở mức quay 0,3–0,45. Cho cả cánh
     // tay ấy buông thẳng, hơi khép vào, nằm gọn sau thân và chân. (Tay xa đang cầm đồ thì không: món đồ phải ló ra.)
@@ -1503,18 +1536,25 @@ export class RigSVG {
       // của trạng thái, không phải của lịch sử. Để tay không nháy quanh ngưỡng, `xoe`
       // tính từ mốc gập 44° (xem trên): cử chỉ lúc nói gập 60–70° nằm hẳn về phía xoè.
       const dangXoe = xoe >= 0.5;
+      const guong = ben === 'L' ? -1 : 1;
       for (const [k, g] of Object.entries(e.tay[ben])) {
         const op = chon === 'mo' ? (k === (dangXoe ? 'xoe' : 'mo') ? 1 : 0) : (k === chon ? 1 : 0);
         g.setAttribute('opacity', op);
       }
-      const guong = ben === 'L' ? -1 : 1;
       // Ngửa/sấp cẳng tay: khi bàn tay hướng LÊN (giơ tay, vẫy) cẳng tay xoay ngửa nên
       // ngón cái phải nằm phía TRONG (về phía đầu). Tính "độ hướng lên" của cẳng tay,
       // rồi lật gương bàn tay; với tay xoè thì lật mượt (đi qua cạnh tay như đang xoay
       // cổ tay), với nắm tay/ngón chỉ thì lật thẳng vì hình gần đối xứng.
       const huongTay = chuanHoaGoc(ben === 'L' ? 90 + s.batL + s.cangL : 90 - s.batR - s.cangR);   // 90 = xuống, -90 = lên (đã chuẩn hoá về ±180)
       const len = clamp((-huongTay - 15) / 45, 0, 1);
-      let lat = chon === 'mo' ? 1 - 2 * len : (len < 0.5 ? 1 : -1);
+      // Bàn tay xoè: ngón cái nằm phía TRÊN mỗi khi cẳng tay nằm ngang trên màn hình, bất kể nó đưa ra ngoài hay
+      // gập vào trong. Tính từ góc THẬT của cẳng tay (`armTurn`, đã gồm `aim` và dáng xoay), soi gương cho tay trái:
+      // m = 0 thõng xuống, +90 đưa ngang ra ngoài, −90 gập ngang vào trong, ±180 giơ thẳng lên. Mốc cũ chỉ lật khi
+      // cẳng tay vượt lên trên phương ngang, nên suốt cử chỉ lúc nói ngón cái chúc xuống đất và bàn tay đọc thành
+      // một nắm tay sần. Hai điểm đổi (−40° và 135°) hẹp 12° để bàn tay không đứng lâu ở dáng "cạnh tay".
+      const m = chuanHoaGoc(guong * (armTurn[ben] + s.than));
+      const side = m > 0 ? clamp((135 - m) / 12, 0, 1) : clamp((m + 46) / 12, 0, 1);
+      let lat = chon === 'mo' ? 2 * side - 1 : (len < 0.5 ? 1 : -1);
       // Xoay nghiêng: nhìn từ bên hông chỉ thấy cạnh ngón cái, và ngón cái phải quay về
       // phía TRƯỚC (hướng đi). Tay phía gần người xem vốn có ngón cái quay vào thân
       // (= ra sau khi nghiêng) nên lật lại; lật mượt theo mức xoay để không giật.
@@ -1522,7 +1562,11 @@ export class RigSVG {
       // co lại thành một cái gai.
       const lon = s['aim' + ben] > 0.02 || ben === clasp ? 0 : ben === 'R' ? Math.max(0, h) : Math.max(0, -h);       // đổi hẳn, không lật mượt: lật mượt theo `aim` thì bàn tay vẫn mảnh như que ở mấy khung đầu của cử chỉ
       lat *= 1 - 2 * lon;
-      e.tayG[ben].setAttribute('transform',
+      // NGÓN CÁI GIƠ LÊN thì phải chỉ LÊN TRỜI. Hình 'cai' vẽ ngón cái dọc theo cẳng tay; cẳng tay đặt chéo trước
+      // ngực thì ngón cái chĩa ngang — đọc thành "chỉ vào túi áo". Xoay cả nắm tay quanh lòng bàn tay (0, 9) cho
+      // ngón cái đứng thẳng, cùng cách món đồ cầm được giữ thẳng ở trên.
+      if (chon === 'cai') e.tayG[ben].setAttribute('transform', `rotate(${chuanHoaGoc(-armTurn[ben] - s.than).toFixed(2)} 0 9) scale(${guong} 1)`);
+      else e.tayG[ben].setAttribute('transform',
         `scale(${guong * lat} 1) rotate(${-12 * (1 - xoe)}) scale(${0.68 + 0.32 * xoe} 1)`);
     }
 

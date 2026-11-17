@@ -538,6 +538,68 @@ try {
       if (over > 0.35) hong('3/4 gestures', `wave: ${(over * 100).toFixed(0)}% of the waving hand is over the face`);
       if (Math.abs(vet.s.huong + 0.55) > 0.01) hong('3/4 gestures', 'wave: the body does not keep its three-quarter stance');
       t.kill(); vet.svg.remove();
+      // Chi tiết ngực dời về phía nhân vật đang quay tới (thân 3/4 không phải thân chính diện ép dẹp), và tay giơ thẳng
+      // vẫn có một chút gập ở khuỷu.
+      {
+        const mid2 = (el) => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+        const offset = (amount) => {
+          const body = L.createCharacter(host, { id: 'vet' }).rig; body.s.huong = amount; body.render();
+          const zip = body.el.phuKien, shirt = body.el.ao, value = (mid2(zip) - mid2(shirt)) / shirt.getBoundingClientRect().width;
+          body.svg.remove(); return value;
+        };
+        const front = offset(0), right = offset(0.55), left = offset(-0.55);
+        if (right - front < 0.06) hong('3/4 stance', `facing right: the chest details moved ${((right - front) * 100).toFixed(1)}% of the shirt width toward the facing side — they stay frontal`);
+        if (front - left < 0.06) hong('3/4 stance', `facing left: the chest details moved ${((front - left) * 100).toFixed(1)}% of the shirt width toward the facing side — they stay frontal`);
+        const arm = L.createCharacter(host, { id: 'vet' }).rig;
+        Object.assign(arm.s, { batL: 85, cangL: 0, batR: 85, cangR: 0 }); arm.render();
+        for (const k of ['L', 'R']) {
+          const bend = Math.abs(parseFloat((/rotate\(([-\d.]+)/.exec(arm.el['cang' + k].getAttribute('transform')) || [0, 0])[1]));
+          if (bend < 6) hong('arms', `a raised straight ${k} arm bends ${bend.toFixed(1)}° at the elbow — it is a ruler`);
+        }
+        Object.assign(arm.s, { batL: 8, cangL: 0, batR: 8, cangR: 0 }); arm.render();
+        const hang = Math.abs(parseFloat((/rotate\(([-\d.]+)/.exec(arm.el.cangL.getAttribute('transform')) || [0, 0])[1]));
+        if (hang > 1) hong('arms', `a hanging straight arm is bent ${hang.toFixed(1)}° — the minimum elbow bend must not touch rest poses`);
+        arm.svg.remove();
+      }
+      // Bàn tay: ngón cái của `thumbsUp` chỉ LÊN TRỜI (trước đây nó nằm dọc cẳng tay, chĩa ngang ngực như đang chỉ),
+      // và bàn tay xoè lúc nói có ngón cái ở phía TRÊN (trước đây chúc xuống đất, bàn tay đọc thành nắm tay).
+      {
+        const box = (el) => el.getBoundingClientRect();
+        const up = L.createCharacter(host, { id: 'vet' }).rig;
+        let g = up.thumbsUp(); mid(up, g, 1.0);
+        const fistSide = ['L', 'R'].find((k) => up.s['tay' + k] === 'cai');
+        if (!fistSide) hong('hands', 'thumbsUp: no hand shows the thumb shape at 1.0 s');
+        else {
+          const shape = up.el.tay[fistSide].cai, thumb = box(shape.querySelector('rect')), whole = box(shape);
+          if (thumb.height < thumb.width * 1.3) hong('hands', `thumbsUp: the thumb is ${thumb.width.toFixed(0)} × ${thumb.height.toFixed(0)} on screen — it does not stand upright`);
+          if (Math.abs(thumb.top - whole.top) > 1.5) hong('hands', 'thumbsUp: the thumb is not the top of the fist');
+        }
+        g.kill(); up.svg.remove();
+        // Cốc được CẦM: bốn ngón ôm phía trước thân cốc. Không có chúng thì cả bàn tay nằm sau cốc.
+        {
+          const holder = L.createCharacter(host, { id: 'vet', items: { R: 'cup' } }).rig; holder.render();
+          const fingers = holder.el.itemR.querySelector('[data-grip]');
+          if (!fingers || fingers.querySelectorAll('rect').length !== 4) hong('hands', 'cup: no four fingers drawn over the cup');
+          else {
+            const f = box(fingers), cupBody = box(holder.el.itemR.querySelector('path'));
+            const across = (Math.min(f.right, cupBody.right) - Math.max(f.left, cupBody.left)) / cupBody.width;
+            if (across < 0.6) hong('hands', `cup: the fingers cover ${(across * 100).toFixed(0)}% of the width of the cup`);
+          }
+          holder.svg.remove();
+        }
+        // Dáng đặt thẳng (cẳng tay đưa ngang ra ngoài như lúc nói) chứ không lấy từ `explain`: cử chỉ lúc nói chọn
+        // ngẫu nhiên, ở một thời điểm cố định có khi cả hai tay đang nghỉ và phép thử không đo gì.
+        const talk = L.createCharacter(host, { id: 'vet' }).rig;
+        for (const k of ['L', 'R']) {
+          Object.assign(talk.s, { ['bat' + k]: 30, ['cang' + k]: 60, ['tay' + k]: 'mo' }); talk.render();
+          const flat = talk.el.tay[k].xoe;
+          if (flat.getAttribute('opacity') !== '1') { hong('hands', `the ${k} hand is not open with the forearm held out`); continue; }
+          // Trong hệ của hình bàn tay, ngón cái nằm ở phía −x và ngón út ở +x: đưa hai mép ấy ra toạ độ màn hình.
+          const ctm = flat.getScreenCTM(), at = (x) => new DOMPoint(x, 8).matrixTransform(ctm).y;
+          if (at(-9) > at(9) - 2) hong('hands', `forearm held out: the thumb edge of the open ${k} hand is ${(at(-9) - at(9)).toFixed(0)} px below the little-finger edge`);
+        }
+        talk.svg.remove();
+      }
       // Góc chỉ tính từ vai của CHÍNH nhân vật: cậu bé vai thấp phải giơ tay cao hơn người lớn cho cùng một đích.
       const boy = L.createCharacter(host, { id: 'boy' }).rig;
       t = boy.point({ x: 30, y: 190 }); mid(boy, t, 0.7);
