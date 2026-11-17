@@ -1515,6 +1515,7 @@ class RigSVG {
     // cẳng tay gập ra trước — thì cái cốc nghiêng theo bấy nhiêu, có lúc nằm ngang. Xoay ngược nó lại quanh LÒNG BÀN
     // TAY (0, 10) để nó vẫn nằm trong tay.
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
+    const gripping = { L: false, R: false };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       // Mốc là −90° cho CẢ HAI tay: hình tay trái được soi gương sẵn bên trong, còn hình tay phải vẽ nguyên — ở dáng
       // bưng đồ của tay phải (+90°) nắp cốc chúc XUỐNG. Trước bản này cốc của người cầm tay phải luôn lộn ngược.
@@ -1522,7 +1523,14 @@ class RigSVG {
       // `itemTilt` nghiêng món đồ về phía mặt và NHẤC nó lên một chút trong lòng bàn tay (0,6 đơn vị mỗi độ): tay nhân
       // vật ngắn, bàn tay chỉ lên tới ngực trên — không nhấc thì miệng cốc không tới được môi.
       const tilt = s['itemTilt' + side];
-      e['item' + side].setAttribute('transform', `rotate(${(upright + (side === 'L' ? 1 : -1) * tilt).toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
+      const itemTurn = upright + (side === 'L' ? 1 : -1) * tilt;
+      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
+      // Các ngón ôm món đồ (`data-grip`) vẽ trong hệ của MÓN ĐỒ, mọc từ mép phía cổ tay. Món đồ được xoay cho đứng thẳng,
+      // nên ở dáng bưng của một trong hai tay nó quay gần 180° so với cổ tay — và các ngón mọc ra từ mép BÊN KIA cái
+      // cốc, rời hẳn khỏi cổ tay áo. Món đồ quay quá 90° thì lật nhóm ngón lại quanh lòng bàn tay.
+      const fingers = e['item' + side].querySelector('[data-grip]');
+      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'rotate(180 0 10)' : '');
+      gripping[side] = !!fingers && s['item' + side] > 0.5;
     }
 
     for (const ben of ['L', 'R']) {
@@ -1544,6 +1552,9 @@ class RigSVG {
       // tính từ mốc gập 44° (xem trên): cử chỉ lúc nói gập 60–70° nằm hẳn về phía xoè.
       const dangXoe = xoe >= 0.5;
       const guong = ben === 'L' ? -1 : 1;
+      // Món đồ tự vẽ các ngón ôm nó (`data-grip`) thì nắm tay phía sau ẩn đi: chỉ còn ống tay áo → các ngón. Ẩn cả NHÓM
+      // chứ không đổi hình: bàn tay vẫn ở dáng nắm, món đồ rời tay là nó hiện lại ngay.
+      e.tayG[ben].style.visibility = gripping[ben] ? 'hidden' : '';
       for (const [k, g] of Object.entries(e.tay[ben])) {
         const op = chon === 'mo' ? (k === (dangXoe ? 'xoe' : 'mo') ? 1 : 0) : (k === chon ? 1 : 0);
         g.setAttribute('opacity', op);
@@ -4940,8 +4951,10 @@ function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
 // Bốn ngón tay ÔM PHÍA TRƯỚC món đồ, vẽ SAU món đồ nên nằm trên nó. Rig vẽ bàn tay trước rồi mới tới món đồ: không
 // có lớp này thì cả bàn tay nằm sau cái cốc, chỉ ló mấy đầu ngón ở một mép — cốc trông như dán vào bụng hoặc cắm vào
 // cổ tay chứ không được cầm. Hệ toạ độ cổ tay: ngón chạy theo +y (hướng cẳng tay) từ mép phía cổ tay, vắt ngang món
-// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay.
-const gripFingers = (c, { reach = 19, from = -1 } = {}) => {
+// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
+// chảy liền vào các ngón; rig ẩn nắm tay phía sau món đồ khi có nhóm `data-grip` (nắm tay ló ra ở mép bên kia cái cốc,
+// đọc thành một bàn tay thứ hai).
+const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   const line = lineOf(c), band = (x, len) =>
     `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
   return `

@@ -584,6 +584,11 @@ try {
             const f = box(fingers), cupBody = box(holder.el.itemR.querySelector('path'));
             const across = (Math.min(f.right, cupBody.right) - Math.max(f.left, cupBody.left)) / cupBody.width;
             if (across < 0.6) hong('hands', `cup: the fingers cover ${(across * 100).toFixed(0)}% of the width of the cup`);
+            // Các ngón mọc từ phía CỔ TAY ÁO: mép ngón ở phía tay áo phải chạm tới ống tay, không lơ lửng giữa cốc.
+            const cuff = box(holder.el.cangHinhR), cuffSide = cuff.left + cuff.width / 2 > f.left + f.width / 2 ? 1 : -1;
+            const gap = cuffSide > 0 ? cuff.left - f.right : f.left - cuff.right;
+            if (gap > 1) hong('hands', `cup: ${gap.toFixed(0)} px of gap between the sleeve and the fingers on the cup`);
+            if (holder.el.tayG.R.style.visibility !== 'hidden') hong('hands', 'cup: the fist is still drawn behind a cup that draws its own fingers');
           }
           holder.svg.remove();
         }

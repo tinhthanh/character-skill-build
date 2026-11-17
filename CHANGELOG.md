@@ -13,8 +13,10 @@ Fixed
   on-screen angle of the forearm, the same for both hands.
 - **A held cup is gripped.** The whole hand was drawn under the cup, so only fingertips
   showed at one edge and the cup read as stuck to the belly, or to the end of the wrist when
-  handed over. `kit.parts.cup` now draws four fingers across the front of the cup
-  (`grip: false` leaves them out).
+  handed over. `kit.parts.cup` now draws four fingers across the front of the cup, starting
+  at the cuff on the side the arm comes from; the fist behind the cup is hidden
+  (`grip: false` leaves the fingers out). Custom items get the same with a
+  `<g data-grip="1">` group.
 - **Hands redrawn.** Open hand: a narrower palm, fingers of different lengths that fan out
   slightly, and a thumb that stands clear of them — it was a square palm with four short
   equal fingers. Relaxed hand: one tapered shape instead of a blob with scalloped tips.

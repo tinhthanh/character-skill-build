@@ -75,8 +75,10 @@ export function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } 
 // Bốn ngón tay ÔM PHÍA TRƯỚC món đồ, vẽ SAU món đồ nên nằm trên nó. Rig vẽ bàn tay trước rồi mới tới món đồ: không
 // có lớp này thì cả bàn tay nằm sau cái cốc, chỉ ló mấy đầu ngón ở một mép — cốc trông như dán vào bụng hoặc cắm vào
 // cổ tay chứ không được cầm. Hệ toạ độ cổ tay: ngón chạy theo +y (hướng cẳng tay) từ mép phía cổ tay, vắt ngang món
-// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay.
-const gripFingers = (c, { reach = 19, from = -1 } = {}) => {
+// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
+// chảy liền vào các ngón; rig ẩn nắm tay phía sau món đồ khi có nhóm `data-grip` (nắm tay ló ra ở mép bên kia cái cốc,
+// đọc thành một bàn tay thứ hai).
+const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   const line = lineOf(c), band = (x, len) =>
     `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
   return `

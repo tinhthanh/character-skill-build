@@ -914,10 +914,15 @@ class RigSVG {
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
+    const gripping = { L: false, R: false };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
       const tilt = s['itemTilt' + side];
-      e['item' + side].setAttribute('transform', `rotate(${(upright + (side === 'L' ? 1 : -1) * tilt).toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
+      const itemTurn = upright + (side === 'L' ? 1 : -1) * tilt;
+      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
+      const fingers = e['item' + side].querySelector('[data-grip]');
+      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'rotate(180 0 10)' : '');
+      gripping[side] = !!fingers && s['item' + side] > 0.5;
     }
     for (const ben of ['L', 'R']) {
       const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
@@ -926,6 +931,7 @@ class RigSVG {
       const xoe = chon !== 'mo' ? 1 : clamp(Math.max(bat - 30, cang - 44) / 22, 0, 1)   // chỉ xoè khi giơ tay cao hoặc gập cẳng tay lên; vung tay khi đi vẫn thả lỏng;
       const dangXoe = xoe >= 0.5;
       const guong = ben === 'L' ? -1 : 1;
+      e.tayG[ben].style.visibility = gripping[ben] ? 'hidden' : '';
       for (const [k, g] of Object.entries(e.tay[ben])) {
         const op = chon === 'mo' ? (k === (dangXoe ? 'xoe' : 'mo') ? 1 : 0) : (k === chon ? 1 : 0);
         g.setAttribute('opacity', op);
@@ -3157,7 +3163,7 @@ function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
         <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
         <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
 }
-const gripFingers = (c, { reach = 19, from = -1 } = {}) => {
+const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
   const line = lineOf(c), band = (x, len) =>
     `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
   return `
