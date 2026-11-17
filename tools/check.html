@@ -592,6 +592,23 @@ try {
           }
           holder.svg.remove();
         }
+        // Bìa hồ sơ và điện thoại cũng có ngón giữ; cầm đồ tay TRÁI thì tay phải rảnh không nằm đè lên món đồ.
+        for (const item of ['clipboard', 'phone']) {
+          const holder = L.createCharacter(host, { id: 'vet', items: { R: item } }).rig; holder.render();
+          if (!holder.el.itemR.querySelector('[data-grip]')) hong('hands', `${item}: no thumb drawn over the item`);
+          holder.svg.remove();
+        }
+        {
+          const lefty = L.createCharacter(host, { id: 'vet', items: { L: 'cup' } }).rig; lefty.render();
+          const cupBox = box(lefty.el.itemL), free = box(lefty.el.tayG.R);
+          const overlapX = Math.min(cupBox.right, free.right) - Math.max(cupBox.left, free.left), overlapY = Math.min(cupBox.bottom, free.bottom) - Math.max(cupBox.top, free.top);
+          if (overlapX > 2 && overlapY > 2) hong('hands', 'cup in the left hand: the free right hand lies over the cup');
+          lefty.svg.remove();
+          // `speak` của nhân vật nghỉ đan tay: cẳng tay MỞ ra ngoài (góc dương), không đứng nguyên ở dáng gập.
+          const talker = L.createCharacter(host, { id: 'vet' }).rig; const g2 = talker.speak('Xin chào các bạn', 2); mid(talker, g2, 0.9);
+          if (Math.max(talker.s.cangL, talker.s.cangR) < 30) hong('hands', `speak: a character resting with folded hands keeps both forearms folded (${talker.s.cangL.toFixed(0)}°, ${talker.s.cangR.toFixed(0)}°)`);
+          g2.kill(); talker.svg.remove();
+        }
         // Dáng đặt thẳng (cẳng tay đưa ngang ra ngoài như lúc nói) chứ không lấy từ `explain`: cử chỉ lúc nói chọn
         // ngẫu nhiên, ở một thời điểm cố định có khi cả hai tay đang nghỉ và phép thử không đo gì.
         const talk = L.createCharacter(host, { id: 'vet' }).rig;

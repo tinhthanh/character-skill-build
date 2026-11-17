@@ -85,6 +85,16 @@ const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
         <g data-grip="1">${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
 };
 
+// Món đồ DẸT (bìa hồ sơ, điện thoại) cầm kiểu khác: bốn ngón đỡ phía SAU, chỉ NGÓN CÁI đè lên mặt trước — vẽ bốn ngón
+// vắt ngang thì che mất tờ giấy hay màn hình. `far`: vị trí mép bên kia của món đồ (y); cho vào thì vẽ thêm ba đầu ngón
+// ló ra ở mép ấy.
+const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
+  const line = lineOf(c);
+  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
+  return `
+        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
+};
+
 /** Cốc giấy có nắp (cà phê mang đi), bàn tay nắm ngang thân cốc: bốn ngón ôm phía trước cốc (`grip: false` để bỏ). */
 export function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true } = {}) {
   const line = lineOf(c);
@@ -96,8 +106,8 @@ export function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f',
         </g>${grip ? gripFingers(c) : ''}`;
 }
 
-/** Bìa kẹp hồ sơ, cầm ở mép dưới. */
-export function clipboard(c, { color = '#b9834f', paper = '#ffffff' } = {}) {
+/** Bìa kẹp hồ sơ, cầm ở mép dưới: ngón cái đè lên mặt trước (`grip: false` để bỏ). */
+export function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
   const line = lineOf(c);
   return `
         <g transform="translate(2 10) rotate(90)">
@@ -105,14 +115,14 @@ export function clipboard(c, { color = '#b9834f', paper = '#ffffff' } = {}) {
           <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
           <path d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
           <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
-        </g>`;
+        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
 
-/** Điện thoại, cầm dọc trong lòng bàn tay. */
-export function phone(c, { color = '#22262e', screen = '#8fd3ff' } = {}) {
+/** Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ). */
+export function phone(c, { color = '#22262e', screen = '#8fd3ff', grip = true } = {}) {
   return `
         <g transform="translate(0 10) rotate(90)">
           <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}"/>
           <rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>
-        </g>`;
+        </g>${grip ? gripThumb(c, { reach: 11, far: 18 }) : ''}`;
 }

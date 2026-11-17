@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.38.3
+
+Fixed
+- **Clipboard and phone are gripped too.** A thumb lies over the front of the item, coming
+  from the cuff; the phone also shows three fingertips at its far edge. The fist behind the
+  item is hidden, as for the cup (`grip: false` leaves the thumb out).
+- **An item in the left hand is no longer covered by the right hand.** A character that rests
+  with folded hands kept its free right hand at the belly, on top of the cup. That hand now
+  hangs at the side. (With the item in the right hand the left hand lies behind it and reads
+  as a supporting hand — unchanged.)
+- **`speak` for characters that rest with folded hands.** The gesture moved the forearm to
+  where it already was, so only the elbow swung out and the pose read as a hand on the hip.
+  These characters now open the forearm out to the side, hand open — a small `explain`.
+
 ## 0.38.2
 
 Fixed

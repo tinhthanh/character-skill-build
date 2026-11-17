@@ -2575,9 +2575,13 @@ export class RigSVG {
     if (typeof draw !== 'function') throw new Error('[character] setItem(side, draw): draw must be a function returning SVG');
     this.nv = { ...this.nv, ['heldItem' + side]: draw };
     const carry = { ['bat' + side]: 14, ['cang' + side]: -85, ['tay' + side]: 'nam' };
-    this.NGHI = Object.freeze({ ...this.NGHI, ...carry, ['item' + side]: shown ? 1 : 0 });
+    // Tay PHẢI vẽ ở lớp trên tay trái. Nhân vật nghỉ ở dáng đan tay trước bụng mà cầm đồ bằng tay TRÁI thì bàn tay phải
+    // đang nghỉ nằm đè lên mặt trước món đồ. Cho tay phải rảnh ấy buông xuôi. (Cầm tay phải thì bàn tay trái nằm SAU
+    // món đồ, đọc thành tay đỡ — để nguyên.)
+    const free = side === 'L' && !this.holds.R && this.NGHI.cangR < -40 ? { batR: NGHI.batR, cangR: NGHI.cangR, tayR: 'mo' } : {};
+    this.NGHI = Object.freeze({ ...this.NGHI, ...carry, ...free, ['item' + side]: shown ? 1 : 0 });
     this.#dungLai();
-    Object.assign(this.s, shown ? carry : { ['bat' + side]: NGHI['bat' + side], ['cang' + side]: NGHI['cang' + side], ['tay' + side]: 'mo' }, { ['item' + side]: shown ? 1 : 0 });
+    Object.assign(this.s, free, shown ? carry : { ['bat' + side]: NGHI['bat' + side], ['cang' + side]: NGHI['cang' + side], ['tay' + side]: 'mo' }, { ['item' + side]: shown ? 1 : 0 });
     this.apDung();
     return this;
   }
@@ -2899,8 +2903,13 @@ export class RigSVG {
     this.#khauHinh(t, soAm, nhip, tone.corner);
     // đầu và tay phụ hoạ theo câu nói
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
-    t.to(s, { ['bat' + arm]: 34, ['cang' + arm]: -70, than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
-     .to(s, { ['bat' + arm]: 40, ['cang' + arm]: -60, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
+    // Nhân vật nghỉ ở dáng ĐAN TAY trước bụng (cẳng tay đã gập sẵn) mà đưa về dáng "nâng tay lên ngang bụng" thì bàn tay
+    // gần như đứng yên, chỉ có khuỷu bạnh ra — đọc thành chống tay vào hông. Với họ cử chỉ là MỞ cẳng tay ra khỏi bụng
+    // sang bên một nhịp, bàn tay xoè (dáng nhỏ của `explain`).
+    const [restUpper, restFore] = this.#restArm(arm), folded = restFore <= -45;
+    const beat = folded ? [[26, 48], [30, 60]] : [[34, -70], [40, -60]];
+    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
+     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
     this.blinkTo = 0;
     t.to(s, { mieng: 0, duration: 0.15 }, dur);
