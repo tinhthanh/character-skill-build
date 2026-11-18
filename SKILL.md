@@ -8,7 +8,9 @@ description: Create custom 2D SVG characters (people, plus dogs and cats) on a s
 A library of **100% SVG characters driven by GSAP** and the tools to put them in a
 [HyperFrames](https://github.com/heygen-com/hyperframes) video. A character is a small JS
 definition on a shared skeleton, so every character can already wave, talk, walk, sit,
-cheer, drink, write, stroke a pet, hand an item to someone (28 actions) and hold a stance (sit down, face someone, put an item away).
+cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, show an app on
+the phone, type on a laptop (32 actions) and hold a stance (sit down, face someone, put an item
+away, keep the phone at the cheek).
 
 There are two jobs. Do the one you were asked for; most videos need both.
 

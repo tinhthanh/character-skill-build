@@ -32,6 +32,9 @@ const NGHI = Object.freeze({
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
   itemTiltL: 0, itemTiltR: 0,   // độ nghiêng thêm của đồ vật về phía mặt (độ) — nghiêng cốc khi uống
+  itemZoomL: 1, itemZoomR: 1,   // món đồ phóng to quanh lòng bàn tay — giơ điện thoại khoe màn hình cho người xem đọc được
+  itemBackL: 0, itemBackR: 0,
+  phoneL: 0, phoneR: 0,         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
   tayL: 'mo', tayR: 'mo',
@@ -197,6 +200,19 @@ const DAI = { canhTay: 62, cangTay: 58, dui: 78, ong: 78 };
 const CHOT_VAI = { x: 33, y: -90 };
 const UC_DON = { x: 6, y: -98 };
 const GOC_VAI_MAX = 16;
+// Dáng tay của các động tác với điện thoại / máy tính — [bắp, cẳng(, nghiêng món đồ)], đo trên trang thử dáng.
+// Điện thoại áp lên má (nghiêng 25°, phóng 1,4 cho cân với đầu chibi), đầu nghiêng 15° về phía máy (`CALL_TILT`).
+// BẮP TAY ĐƯA NGANG RA BÊN (100°), khuỷu ở ngang cằm phía ngoài, cẳng tay vòng lên má. Hai bản trước giơ khuỷu lên cao
+// (140 / −165 rồi 125 / −140): bắp tay chạy sát dưới hàm, đầu chibi to che mất vai — cánh tay như mọc ra từ cằm, người
+// xem đọc thành bà cụ mất tay phải.
+const CALL_POSE = [100, -152, 25, 1.4];
+const CALL_TILT = 15;
+const SHOW_POSE = [70, -125];                             // giơ điện thoại cạnh mặt, màn hình về người xem
+const TAP_POSE = { hold: [20, -110], finger: [24, -118] };   // tay cầm đưa lên trước ngực; tay kia chạm màn hình
+const TYPE_POSE = [14, -72];                              // hai tay đưa ra trước trên bàn phím
+// Cúi nhìn màn hình (gõ phím, bấm điện thoại): hạ đầu, đồng tử xuống đáy mắt, mí hạ nửa chừng. Mắt chibi to: đồng tử dịch
+// 2,8 đơn vị vẫn đọc ra nhìn thẳng ống kính (Gemini, lần audit thứ hai) — phải có MÍ HẠ mới thành ánh mắt nhìn xuống.
+const LOOK_DOWN = { head: 14, eyes: 4.5, lids: 0.5 };
 // Vùng xoá viền ở nắp vai: tâm hạ `CAP_DROP` dưới chốt vai, bán kính `CAP_RADIUS`, đặc hoàn toàn tới `CAP_SOLID` bán
 // kính rồi nhạt dần — viền dọc hai bên bắp tay hiện dần từ ngang nách xuống, không đứt cụt.
 const CAP_RADIUS = 24, CAP_DROP = 4, CAP_SOLID = 0.75;
@@ -675,15 +691,18 @@ export class RigSVG {
   // `wave` bỏ theo yêu cầu, không phải vì dịch ngang (nó dịch ngang 0).
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
+                     'call', 'typing'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
   static DI_NGANG = ['walk', 'enter', 'exit'];
   // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
-  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown'];
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
   static EXCHANGE = ['handOver', 'take'];
+  // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
@@ -1165,7 +1184,7 @@ export class RigSVG {
     // Mọi lúc tay ấy KHÔNG vươn ra (vươn ra = `aim` ≥ 0,5 với cẳng tay không gập vào — lớp `xaTruoc` nguyên cánh). Bản
     // đầu chỉ xét `aim` < 0,5: lúc bắt đầu đưa cốc, `aim` đã quá 0,5 mà cẳng tay còn gập (dáng bưng), cả cánh tay rơi về
     // lớp trước thân đúng một khung — ống tay vắt qua ngực, che bảng tên.
-    const carryFront = xa && !clasp && this.holds[xa] && s['item' + xa] > 0.5 && ah < 0.8
+    const carryFront = xa && !clasp && this.holds[xa] && s['item' + xa] > 0.5 && ah < 0.8 && s['phone' + xa] < 0.5
       && !(Math.abs(s['aim' + xa]) >= 0.5 && s['cang' + xa] > -30) ? xa : null;
     const front = clasp || carryFront;
     for (const ben of ['L', 'R']) {
@@ -1200,7 +1219,7 @@ export class RigSVG {
       // ưu tiên ở lớp trước thân, nên lúc đưa cốc cho người khác, đúng khung cái cốc rời tay cả cánh tay nhảy sang lớp có
       // mặt nạ — bắp tay biến mất sau thân áo trong một khung (đo được ở 2,9 s của cảnh đưa cốc). Món đồ ở đầu cánh tay
       // vươn ra nằm ngoài thân áo nên mặt nạ không che nó.
-      const cho = ben !== xa ? e.tren : ben === carryFront || (aimed >= 0.5 && !inward) ? e.xaTruoc : (carrying && ah < 0.8) || (aimed >= 0.9 && inward) ? e.tren : e.sauChan;
+      const cho = ben !== xa || s['phone' + ben] >= 0.5 ? e.tren : ben === carryFront || (aimed >= 0.5 && !inward) ? e.xaTruoc : (carrying && ah < 0.8) || (aimed >= 0.9 && inward) ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       // Tay đang HƯỚNG THEO MÀN HÌNH (`aim`) là tay đang diễn: không làm tối, dù nó là tay phía xa.
       const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
@@ -1395,7 +1414,9 @@ export class RigSVG {
     e.co.setAttribute('transform', `translate(${h * 3} 0) scale(${coHep} 1)`);
     e.coDa.setAttribute('d', `M -13 -130 L 13 -130 L 13.5 -106 Q ${eoCo} -100 ${chanCo} -96 L ${-chanCo} -96 Q ${-eoCo} -100 -13.5 -106 Z`);
     // Còng lưng: đầu chúi xuống giữa hai vai (cổ ngắn lại) và nhô ra trước khi quay nghiêng.
-    e.dau.setAttribute('transform', `translate(${s.dauX + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
+    // Đang áp điện thoại: đầu nghiêng về phía nó (cộng thêm, không ghi vào `dau` — các cử chỉ lúc nói vẫn lắc đầu được).
+    const onPhone = clamp(s.phoneR, 0, 1) - clamp(s.phoneL, 0, 1);
+    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau + onPhone * CALL_TILT}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
 
@@ -1570,6 +1591,14 @@ export class RigSVG {
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
+    // THẾ ÁP ĐIỆN THOẠI: tay ấy kéo về dáng áp má, theo góc TRÊN MÀN HÌNH (như `aim`) — mọi động tác khác (cử chỉ lúc
+    // nói, gật đầu) vẫn chạy, chỉ tay cầm máy là đứng yên ở má.
+    for (const [side, sign] of [['L', 1], ['R', -1]]) {
+      const phone = clamp(s['phone' + side], 0, 1);
+      if (!phone) continue;
+      rotation['bat' + side] += (sign * CALL_POSE[0] - rotation['bat' + side]) * phone;
+      rotation['cang' + side] += (sign * CALL_POSE[1] - rotation['cang' + side]) * phone;
+    }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
 
@@ -1602,14 +1631,22 @@ export class RigSVG {
       const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
       // `itemTilt` nghiêng món đồ về phía mặt và NHẤC nó lên một chút trong lòng bàn tay (0,6 đơn vị mỗi độ): tay nhân
       // vật ngắn, bàn tay chỉ lên tới ngực trên — không nhấc thì miệng cốc không tới được môi.
-      const tilt = s['itemTilt' + side];
+      const phone = clamp(s['phone' + side], 0, 1);
+      const tilt = s['itemTilt' + side] + CALL_POSE[2] * phone;
       const itemTurn = upright + (side === 'L' ? 1 : -1) * tilt;
-      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
+      const zoom = Math.max(0.05, s['itemZoom' + side] + (CALL_POSE[3] - 1) * phone);
+      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})` + (zoom !== 1 ? ` translate(0 10) scale(${zoom.toFixed(3)}) translate(0 -10)` : ''));
+      // Mặt LƯNG của món đồ (`data-back`) hiện theo `itemBack`, mặt trước (`data-front`) ẩn đi tương ứng — đổi hẳn ở nửa
+      // chừng, không hoà mờ (hai mặt chồng mờ lên nhau là một vệt xám).
+      const back = s['itemBack' + side] >= 0.5 || phone >= 0.5;
+      for (const face of e['item' + side].querySelectorAll('[data-back]')) face.style.display = back ? '' : 'none';
+      for (const face of e['item' + side].querySelectorAll('[data-front]')) face.style.display = back ? 'none' : '';
       // Các ngón ôm món đồ (`data-grip`) vẽ trong hệ của MÓN ĐỒ, mọc từ mép phía cổ tay. Món đồ được xoay cho đứng thẳng,
       // nên ở dáng bưng của một trong hai tay nó quay gần 180° so với cổ tay — và các ngón mọc ra từ mép BÊN KIA cái
       // cốc, rời hẳn khỏi cổ tay áo. Món đồ quay quá 90° thì lật nhóm ngón lại quanh lòng bàn tay.
-      const fingers = e['item' + side].querySelector('[data-grip]');
-      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
+      // Có thể có hai nhóm ngón (mặt trước / mặt lưng của điện thoại): lật cả hai.
+      const groups = e['item' + side].querySelectorAll('[data-grip]'), fingers = groups[0];
+      for (const group of groups) group.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = fingers ? clamp(s['item' + side], 0, 1) : 0;          // độ hiện của các ngón ôm món đồ (mờ theo món đồ)
     }
 
@@ -2024,6 +2061,7 @@ export class RigSVG {
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     so.seat = this.s.seat; so.huong = this.s.huong;
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
+    so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -2785,6 +2823,148 @@ export class RigSVG {
     return t;
   }
 
+  // Tay đang cầm ĐIỆN THOẠI (món đồ có mặt lưng `data-back`, hoặc bất kỳ món đồ nào nếu không tìm ra), hoặc tay rảnh.
+  #phoneHand(side = 'auto') {
+    if (side === 'L' || side === 'R') return side;
+    const held = ['R', 'L'].filter((k) => this.holds[k] && this.s['item' + k] > 0.5);
+    return held.find((k) => this.el['item' + k].querySelector('[data-back]')) || held[0] || this.#freeHand();
+  }
+
+  // Khẩu hình cho một câu nói CHÈN vào giữa một động tác (gọi điện), bắt đầu ở `at`.
+  #talkInto(t, text, dur, at, mood) {
+    const s = this.s, tone = this.#tone(mood), soAm = this.#soAm(text, dur), nhip = dur / soAm, talk = gsap.timeline();
+    t.to(s, { ...tone.start, duration: 0.2 }, at);
+    this.#khauHinh(talk, soAm, nhip, tone.corner);
+    t.add(talk, at);
+    t.to(s, { mieng: 0, duration: 0.15 }, at + dur);
+  }
+
+  /**
+   * GỌI ĐIỆN: áp điện thoại lên má (đầu nghiêng về phía nó, mặt lưng điện thoại quay ra ngoài), nói `text` trong `dur`
+   * giây rồi hạ xuống. `text` bỏ trống = đang NGHE: gật nhẹ, "ừ, ừ". Không cầm điện thoại thì làm điệu bộ bằng tay rảnh.
+   * Đầu chibi to, tay ngắn: nhìn thẳng thì bàn tay không với tới tai — áp lên MÁ, đầu nghiêng xuống đón, là cách vẽ
+   * quen thuộc của hoạt hình. Đang quay nghiêng thì quay về phía người xem như `drink`.
+   *   rig.call('Alo, phòng khám VetGo xin nghe.', 2.2)      rig.call(null, 2, { mood: 'worried' })
+   */
+  call(text = null, dur = 2.4, { mood = null, side = 'auto' } = {}) {
+    const t = this.tl(), s = this.s, k = this.#phoneHand(side), held = this.holds[k] && s['item' + k] > 0.5, was = s['phone' + k];
+    if (Math.abs(s.huong) > 0.02) t.to(s, { huong: 0, duration: 0.3, ease: 'sine.inOut' }, 0);
+    // Có điện thoại: dùng thế áp máy (kênh `phone`), rồi trả về như lúc bắt đầu — gọi khi đang `phoneUp` thì máy vẫn ở má.
+    // Tay không: làm điệu bộ — nắm tay áp lên má với đúng dáng ấy.
+    if (held) t.to(s, { ['phone' + k]: 1, ['carry' + k]: 0, vai: this.NGHI.vai - 3, nhinX: (k === 'L' ? 1 : -1) * 1.2, duration: was >= 1 ? 0.01 : 0.5, ease: 'power2.inOut' }, 0);
+    else {
+      const m = k === 'L' ? -1 : 1;
+      t.set(s, { ['tay' + k]: 'nam' }, 0);
+      t.to(s, { ['bat' + k]: CALL_POSE[0], ['cang' + k]: CALL_POSE[1], ['aim' + k]: 1, dau: this.NGHI.dau + m * CALL_TILT, dauX: m * CALL_TILT * 0.4, duration: 0.5, ease: 'power2.inOut' }, 0);
+    }
+    const at = 0.55;
+    if (text) this.#talkInto(t, text, dur, at, mood);
+    else {
+      // Đang nghe: gật nhẹ đều đều, mắt liếc xuống, miệng hé "ừ" ở mỗi cái gật.
+      const nods = Math.max(1, Math.round(dur / 0.9));
+      for (let n = 0; n < nods; n++) {
+        const a = at + 0.15 + n * dur / nods;
+        t.to(s, { dauY: 3, mieng: 0.12, duration: 0.22, ease: 'sine.out' }, a).to(s, { dauY: 0, mieng: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.22);
+      }
+      t.to(s, { nhinY: 0.8, mayL: mood ? 0 : 0.25, mayR: mood ? 0 : 0.25, duration: 0.3 }, at);
+    }
+    if (dur > 1.2) this.#chop(t, at + dur * 0.5);
+    this.#khep(t, 0.5, at + dur, held ? { ['phone' + k]: was } : {});
+    return t;
+  }
+
+  /**
+   * NHẤC MÁY và GIỮ: áp điện thoại (món đồ đang cầm) lên má rồi để nguyên đó — các động tác sau (nói, nói theo giọng
+   * đọc `speakCues`, gật đầu…) diễn trong lúc áp máy, tay kia vẫn cử chỉ được. `phoneDown()` để đặt máy xuống.
+   */
+  phoneUp(side = 'auto') {
+    const t = this.tl(), s = this.s, k = this.#phoneHand(side);
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] phoneUp: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    t.to(s, { ['phone' + k]: 1, ['carry' + k]: 0, duration: 0.5, ease: 'power2.inOut' }, 0);
+    t.to(s, { nhinX: (k === 'L' ? 1 : -1) * 1.2, duration: 0.3 }, 0.1);
+    return this.#khep(t, 0.3, 0.5, { ['phone' + k]: 1 });
+  }
+
+  /** ĐẶT MÁY xuống sau `phoneUp`: điện thoại về lại tay ở dáng cầm. */
+  phoneDown() {
+    const t = this.tl();
+    return this.#khep(t, 0.5, 0, { phoneL: 0, phoneR: 0 });
+  }
+
+  /**
+   * KHOE MÀN HÌNH điện thoại: giơ nó lên cạnh mặt, quay màn hình về người xem và PHÓNG TO cho đọc được (giao diện app
+   * — `items: { R: { kind: 'phone', image: 'app.png' } }`), cười, giữ `hold` giây rồi hạ xuống. Phải đang cầm một món đồ.
+   */
+  showPhone(hold = 1.8, { side = 'auto', zoom = 2.6 } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#phoneHand(side), m = k === 'L' ? -1 : 1;
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] showPhone: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    this.#stage(t, [k]);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    t.to(s, { ['bat' + k]: SHOW_POSE[0], ['cang' + k]: SHOW_POSE[1], ['itemZoom' + k]: zoom, dau: N.dau - m * 4, dauX: -m * 2, nhinX: m * 1.4, cuoi: 1, mayL: 0.5, mayR: 0.5,
+              duration: 0.5, ease: 'back.out(1.4)' }, 0);
+    // Một cái lắc nhẹ món đồ lúc vừa giơ lên — "đây này" — rồi đứng yên cho người xem đọc.
+    t.to(s, { ['itemTilt' + k]: 6, duration: 0.18, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
+    t.to(s, { nhinX: 0, duration: 0.3 }, 0.9);                 // liếc sang màn hình rồi nhìn lại người xem
+    if (hold > 1) this.#chop(t, 0.5 + hold * 0.6);
+    this.#khep(t, 0.5, 0.5 + hold);
+    return t;
+  }
+
+  /**
+   * DÙNG ĐIỆN THOẠI: đưa nó lên trước ngực (hơi phóng to, màn hình hướng ra ngoài cho người xem thấy), cúi nhìn, ngón
+   * trỏ tay kia chạm và vuốt màn hình trong `dur` giây. Đặt lịch, xem nhắc lịch… Phải đang cầm một món đồ.
+   */
+  tapPhone(dur = 1.6, { side = 'auto', zoom = 2, keep = false } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#phoneHand(side), pen = k === 'L' ? 'R' : 'L', m = pen === 'L' ? -1 : 1;
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] tapPhone: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    this.#openUp(t);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    // CÚI HẲN XUỐNG NHÌN MÀN HÌNH suốt lúc bấm (đầu hạ, mắt nhìn xuống, mí hơi khép): đầu chibi to, cúi ít là đọc thành
+    // nhìn thẳng ống kính — Gemini chấm "không nhìn màn hình khi bấm" ở bản đầu (đầu hạ 6, mắt 2,2).
+    t.to(s, { ['bat' + k]: TAP_POSE.hold[0], ['cang' + k]: TAP_POSE.hold[1], ['itemZoom' + k]: zoom, dauY: LOOK_DOWN.head, dau: N.dau + m * 3, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids,
+              nhinX: m * 0.6, cuoi: 0.5, duration: 0.4, ease: 'power2.out' }, 0);
+    t.set(s, { ['tay' + pen]: 'chi' }, 0.1);
+    t.to(s, { ['bat' + pen]: TAP_POSE.finger[0], ['cang' + pen]: TAP_POSE.finger[1], duration: 0.4, ease: 'power2.out' }, 0.05);
+    // Chạm (đầu ngón nhấn tới rồi nhấc) xen với vuốt (cẳng tay quét một đoạn): đọc ra đang bấm chọn trên app.
+    const taps = Math.max(2, Math.round(dur / 0.4));
+    for (let n = 0; n < taps; n++) {
+      const a = 0.45 + n * dur / taps, d = dur / taps, swipe = n % 3 === 2;
+      if (swipe) t.to(s, { ['cang' + pen]: TAP_POSE.finger[1] - 14, duration: d * 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+      else t.to(s, { ['bat' + pen]: TAP_POSE.finger[0] + 4, ['cang' + pen]: TAP_POSE.finger[1] + 6, dauY: LOOK_DOWN.head + 1, duration: d * 0.35, ease: 'sine.in', yoyo: true, repeat: 1 }, a);
+    }
+    if (dur > 1) t.to(s, { cuoi: 0.9, duration: 0.25 }, 0.45 + dur * 0.7);        // tìm được rồi: cười
+    // `keep`: tay cầm điện thoại Ở NGUYÊN dáng bấm (phóng to, trước ngực) cho động tác sau — `showPhone` nối thẳng từ đó
+    // ra cạnh mặt, không thu điện thoại về cỡ nhỏ rồi lại phóng to (khựng ở 17,4 s bản đầu). `sequence()` tự bật nó khi
+    // bước sau là `showPhone`.
+    this.#khep(t, 0.45, 0.5 + dur, keep ? { ['bat' + k]: TAP_POSE.hold[0], ['cang' + k]: TAP_POSE.hold[1], ['itemZoom' + k]: zoom, ['carry' + k]: 0 } : {});
+    return t;
+  }
+
+  /**
+   * GÕ PHÍM (máy tính đặt trên bàn hay quầy trước mặt — `createProp(host, 'laptop')`): hai tay đưa ra trước, các ngón
+   * nhấp liên tục, đầu cúi nhìn màn hình; thỉnh thoảng ngẩng lên đọc. `dur` = số giây gõ.
+   */
+  typing(dur = 2) {
+    const t = this.tl(), s = this.s;
+    this.#openUp(t);
+    t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
+    // CÚI NHÌN MÀN HÌNH rõ ràng: hai bàn tay khuất sau nắp máy, nên ĐẦU và VAI là thứ duy nhất kể chuyện "đang gõ".
+    // Bản đầu chỉ hạ đầu 5 đơn vị — nhìn ra vẫn đứng yên nhìn ống kính, như video bị đứng hình (Gemini chấm 1,5/5).
+    t.to(s, { batL: TYPE_POSE[0], batR: TYPE_POSE[0], cangL: TYPE_POSE[1], cangR: TYPE_POSE[1], carryL: 0, carryR: 0, dauY: LOOK_DOWN.head, nhinY: LOOK_DOWN.eyes,
+              matY: LOOK_DOWN.lids, dau: this.NGHI.dau + 3, cuoi: 0.35, mayL: 0.15, mayR: 0.15, duration: 0.4, ease: 'power2.out' }, 0);
+    const beats = Math.max(4, Math.round(dur / 0.12));
+    for (let n = 0; n < beats; n++) {
+      const side = n % 2 ? 'L' : 'R', a = 0.4 + n * dur / beats;
+      // Mỗi nhịp gõ: cẳng tay nảy, VAI bên ấy nhún theo, đầu gật rất nhẹ — nhìn từ trên nắp máy vẫn thấy đang gõ.
+      t.to(s, { ['cang' + side]: TYPE_POSE[1] + 6 + (n % 3), vai: (n % 2 ? 1.6 : -1.6) * (side === 'L' ? 1 : 1), dauY: LOOK_DOWN.head + (n % 4 === 0 ? 1.2 : 0),
+                duration: dur / beats * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+    }
+    // Ngẩng lên đọc màn hình ở giữa chừng (mắt vẫn nhìn xuống máy), rồi cúi xuống gõ tiếp.
+    if (dur > 1.4) t.to(s, { dauY: LOOK_DOWN.head * 0.4, nhinY: LOOK_DOWN.eyes * 0.6, matY: 0, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1, repeatDelay: 0.35 }, 0.4 + dur * 0.45);
+    this.#khep(t, 0.45, 0.45 + dur);
+    return t;
+  }
+
   /**
    * VUỐT VE một con vật (hay chạm vào một thứ gì thấp hơn mình): cúi người, đưa bàn tay tới `target` — một rig thú,
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
@@ -3103,7 +3283,11 @@ export class RigSVG {
     ];
     // Dáng nào gần trùng tư thế nghỉ của nhân vật thì bỏ: người nghỉ ở dáng đan tay (cẳng −97°) mà "đặt tay lên
     // ngực" (−112°) là cánh tay nhích 15° — cả câu nói không thấy một cử chỉ nào.
-    const POSES = ALL_POSES.filter((pose) => Math.abs(pose.lead[1] - base(lead)[1]) >= 45);
+    // Đang quay 3/4 mà tay chủ đạo là tay PHÍA XA (tay phía người nghe, nằm sau thân): bỏ các dáng GẬP CẲNG TAY VÀO
+    // TRONG (đặt tay lên ngực). Tay xa gập vào trong thì rig ẩn bắp tay của nó cho ống tay áo khỏi đè lên ngực — chỉ còn
+    // cẳng tay vắt ngang bụng, mọc ra từ mép áo: người xem đọc thành mất bắp tay (bà cụ vừa áp điện thoại vừa nói, giây 1).
+    const farLead = Math.abs(s.huong) > 0.1 && lead === (s.huong < 0 ? 'L' : 'R');
+    const POSES = ALL_POSES.filter((pose) => Math.abs(pose.lead[1] - base(lead)[1]) >= 45 && !(farLead && pose.lead[1] < 0));
     // Một cử chỉ trọn vẹn (lấy đà → đưa tay → giữ → về nền) cần gần hai giây. Mốc nào sát mốc trước quá thì bỏ:
     // hai cử chỉ gối lên nhau là hai tween cùng giành một khớp, và cánh tay nhảy cóc giữa chừng.
     const anchors = [];

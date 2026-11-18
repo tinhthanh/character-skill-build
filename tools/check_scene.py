@@ -245,6 +245,38 @@ with tempfile.TemporaryDirectory() as work:
         if html.count('set.target(vet, cat)') != 2: problems.append(f'3D point / stroke: expected set.target(vet, cat) twice, found {html.count("set.target(vet, cat)")}')
         if 'same z' not in done.stdout: problems.append('3D stroke of a cat at another depth: no note that a hand only reaches in its own plane')
 
+    # Điện thoại / máy tính: ảnh trên tấm phẳng, laptop đặt trên hộp có màn hình, điện thoại có ảnh, lượt nói qua điện thoại.
+    folder3d = os.path.dirname(stage)
+    picture = os.path.join(folder3d, '_check_screen.png')
+    devices = json.load(open(stage, encoding='utf-8'))
+    devices['set']['panels'].append({'wall': 'back', 'at': 100, 'y': 500, 'width': 300, 'height': 180, 'image': '_check_screen.png'})
+    devices['set']['cutouts'].append({'kind': 'monitor', 'x': 100, 'z': -500, 'y': 170, 'screen': '_check_screen.png'})
+    devices['set']['cutouts'].append({'kind': 'laptop', 'x': -100, 'z': -500})
+    devices['characters'][0]['holds'] = {'R': {'kind': 'phone', 'image': '_check_screen.png'}}
+    devices['script'].insert(0, {'who': 'vet', 'say': 'Alo, phòng khám xin nghe.', 'dur': 1.8, 'phone': True})
+    devices['script'].insert(1, {'who': 'vet', 'do': [['tapPhone', 1.2], ['showPhone', 1.2], ['typing', 1]], 'view': {'yaw': 10, 'distance': 900}})
+    devices['script'].insert(2, {'who': 'vet', 'say': 'Dạ chiều nay ba giờ được không ạ, cô cho em xin tên bé mèo nhé?', 'dur': 2, 'phone': True})
+    path = os.path.join(folder3d, '_check_devices.json')
+    try:
+        open(picture, 'wb').write(open(os.path.join(ROOT, 'docs', 'characters.png'), 'rb').read())
+        json.dump(devices, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'devices3d'))
+    finally:
+        for leftover in (path, picture):
+            if os.path.exists(leftover): os.remove(leftover)
+    if done.returncode != 0: problems.append('a 3D scene with screens and a phone call does not build: ' + done.stderr.strip()[:300])
+    else:
+        out3d = os.path.join(work, 'devices3d')
+        html = open(os.path.join(out3d, 'index.html'), encoding='utf-8').read()
+        if "url('_check_screen.png')" not in html: problems.append('panel image: the picture is not put on the panel')
+        if not re.search(r'createProp\(cutout\d+, "monitor", \{[^}]*"image": "_check_screen.png"', html): problems.append('monitor cutout: the screen picture is not passed to the prop')
+        if not re.search(r'createProp\(cutout\d+, "laptop", \{[^}]*"on": 0', html): problems.append('laptop cutout: it is not drawn at the foot of its own frame (on: 0)')
+        if not re.search(r'createCharacter\([^\n]*"kind": "phone", "image": "_check_screen.png"', html): problems.append('phone with a picture: the image is not passed to createCharacter')
+        if not os.path.isfile(os.path.join(out3d, '_check_screen.png')): problems.append('the screen picture is not copied next to index.html')
+        if not re.search(r"\['phoneUp'\],\s*\['explain', \"Alo, phòng khám xin nghe.\", 1.8\],\s*(?:[0-9.]+,\s*)?\['phoneDown'\]", html): problems.append('"phone": true does not wrap the line in phoneUp / phoneDown')
+        if not re.search(r"\['explain', \"Dạ chiều nay ba giờ được không ạ, cô cho em xin tên bé mèo nhé\?\", 2(?:\.0)?\],\s*([0-9.]+),\s*\['phoneDown'\]", html): problems.append('a long phone line with a short "dur": the phone is put down before its caption is gone (no pause before phoneDown)')
+        if not re.search(r'1\.5, \["tapPhone", 1\.2\]', html): problems.append('a turn without a line whose camera pans in: the hand action does not wait for the camera (expected a 1.5 s pause before tapPhone)')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -265,6 +297,12 @@ with tempfile.TemporaryDirectory() as work:
         ('a cutout with a missing picture', lambda s: s['set']['cutouts'].append({'image': 'nope.png', 'x': 0, 'z': 0}), 'nope.png'),
         ('a cutout without a position', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0}), '"z"'),
         ('too much blur', lambda s: s['script'][0]['view'].update({'blur': 50}), 'blur'),
+        ('a phone line for someone without a phone', lambda s: s['script'].insert(0, {'who': 'vet', 'say': 'Alo', 'phone': True}), 'holds'),
+        ('a phone turn without a line', lambda s: s['characters'][0].update({'holds': 'phone'}) or s['script'].insert(0, {'who': 'vet', 'do': ['nod'], 'phone': True}), '"say"'),
+        ('a screen on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0, 'z': 0, 'screen': 'a.png'}), 'laptop'),
+        ('a laptop facing up', lambda s: s['set']['cutouts'].append({'kind': 'laptop', 'x': 0, 'z': 0, 'facing': 'up'}), 'facing'),
+        ('a picture on a cup', lambda s: s['characters'][0].update({'holds': {'R': {'kind': 'cup', 'image': 'a.png'}}}), 'holds'),
+        ('a panel picture that is missing', lambda s: s['set']['panels'].append({'wall': 'back', 'at': 0, 'y': 400, 'width': 100, 'height': 100, 'image': 'nope.png'}), 'nope.png'),
         ('a box without a size', lambda s: s['set']['boxes'].append({'x': 0, 'z': 0}), 'width'),
         ('a view inside together', lambda s: s['script'].append({'together': [{'who': 'vet', 'do': ['nod'], 'view': {'yaw': 5}}, {'who': 'boy', 'do': ['nod']}]}), 'together'),
         ('z without a set', lambda s: s.pop('set') and [turn.pop('view', None) for turn in s['script']] and s['characters'][2].pop('on'), '"set"'),

@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.41.0
+
+Added — phones and computers, for videos about software
+- **`call(text, dur)`** — put the held phone to the cheek and say a line (or listen, nodding,
+  with no text). The phone turns its back to the viewer and the head tilts to it. A chibi's
+  short arm cannot reach the ear from the front, so the phone goes to the cheek. With empty
+  hands it mimes the call. The upper arm goes out to the side (100°), the elbow at chin level
+  outside the face, the forearm back up to the cheek, and the head tilts 15° to meet the phone.
+  With the elbow raised (two earlier tries), the upper arm ran under the jaw and the big head hid
+  the shoulder: the granny seemed to have lost her right arm.
+- **`phoneUp()` / `phoneDown()`** — the same, as a held stance: the steps in between (`explain`,
+  `speakCues` with a recorded voice, `nod`) play on the phone while the other hand gestures.
+  In a scene file, `"phone": true` on a turn with `say` wraps its line this way.
+- **A far arm no longer gestures with its upper arm hidden.** Turned three-quarter, the free hand
+  that gestures while speaking is the far one when the near one is busy (holding a phone at the
+  cheek). One of its poses folds the forearm in across the chest, and a far arm folded in hides
+  its upper arm (so the sleeve does not lie on the chest): only a forearm across the belly was
+  left, coming out of the side of the top. A far leading arm now only opens out toward the
+  listener. Applies to every spoken line, not only phone calls.
+- **`showPhone(hold)`** — hold the phone up beside the face with the screen to the viewer,
+  enlarged (2.6×) so an app on it reads. **`tapPhone(dur)`** — phone up in front of the chest,
+  the other index finger tapping and swiping.
+- **A picture on the phone's screen**: `items: { R: { kind: 'phone', image: 'app.png' } }`
+  (`"holds": { "R": { "kind": "phone", "image": "app.png" } }` in a scene file).
+- **`typing(dur)`** and two props: **`laptop`** (on a table or counter top; facing away, its lid
+  hides the typing hands, or facing the viewer with `image` on the screen) and **`monitor`**
+  (a desktop screen showing `image`). Both are also 3D-set cutouts (`"screen"`, `"facing"`).
+- **Pictures on 3D-set panels**: `"image"` fills a panel — a TV or wall screen with the app,
+  a poster, an X-ray, a sign.
+- After a Gemini audit of the first test video: `typing` and `tapPhone` bow the head and look
+  down at the screen (head down 14, pupils at the bottom of the eye, lids half down — a chibi's
+  big eyes need the lowered lids to read as looking down; the first version read as staring at
+  the lens, "frozen"), `typing` bobs the shoulders with the keystrokes, and the laptop lid is
+  lower. `tapPhone` followed by `showPhone` in a sequence keeps the phone up and enlarged, so it
+  goes straight from the chest to the face instead of shrinking back in between.
+  `tools/scene.py`: in a 3D set, a turn without a line whose camera pans in waits for the camera
+  before its hand action (the person was half out of the frame while tapping) — and
+  `conversation()` now starts a turn that opens with a pause at its scheduled time, so the
+  camera move tied to that turn is not delayed along with the action — and a
+  `"phone": true` line keeps the phone at the cheek until its caption is gone.
+- Held items got two state channels: `itemZoomL/R` (scale about the palm) and `itemBackL/R`
+  (show the item's `data-back` side, hide its `data-front` side).
+
+Fixed
+- **A box near the camera lost a piece of its front face when depth blur was on.** Chrome draws
+  a 3D plane with a CSS filter with pieces missing when it spills out of the frame: the front of
+  a reception counter vanished from the middle on, and the receptionist behind it showed her
+  legs as if she stood in front of it. Faces of a box that spill out of the frame are no longer
+  blurred (a sharp foreground box instead of a broken one). Present since 0.39.0.
+
 ## 0.40.0
 
 Added — 3D sets, after an audit of 0.39.0

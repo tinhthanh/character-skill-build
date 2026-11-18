@@ -119,11 +119,22 @@ export function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true
         </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
 
-/** Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ). */
-export function phone(c, { color = '#22262e', screen = '#8fd3ff', grip = true } = {}) {
+/**
+ * Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ).
+ * `image`: ảnh hiện trên màn hình (đường dẫn hay data URL — giao diện app chẳng hạn), lấp đầy màn hình, cắt theo góc bo.
+ * Có sẵn MẶT LƯNG (`data-back`, ẩn) — rig lật sang nó khi áp điện thoại lên má (`call`), xem trạng thái `itemBack`.
+ */
+export function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
+  const line = lineOf(c);
+  // Mã cắt riêng cho từng lần vẽ: hai nhân vật cùng cầm điện thoại có ảnh thì clipPath không được trùng id.
+  const clip = 'vgPhoneClip' + (phoneClipCount++);
+  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
+          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
   return `
         <g transform="translate(0 10) rotate(90)">
-          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}"/>
-          <rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>
-        </g>${grip ? gripThumb(c, { reach: 11, far: 18 }) : ''}`;
+          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
+          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
+          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
+        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}`;
 }
+let phoneClipCount = 0;

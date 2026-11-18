@@ -41,6 +41,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "boxes": [ { "name": "table", "x": 330, "z": -560, "width": 380, "depth": 200, "height": 170 } ],
            "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
+                      kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing")
+           panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
   characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
@@ -54,16 +56,19 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
                true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
-               `holds`: "cup" | "clipboard" | "phone" (right hand), or { "L": "cup" } — gives a person that item
+               `holds`: "cup" | "clipboard" | "phone" (right hand), { "L": "cup" }, or
+               { "R": { "kind": "phone", "image": "app.png" } } (a picture on the screen) — gives a person that item
                to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). Interaction steps: "drink", "write", ["stroke", "@pet"]
-               (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), and
+               (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), phone and
+               computer steps ["showPhone", 1.8], ["tapPhone", 1.6], ["typing", 2], ["call", null, 2] (listening), and
                ["handOver", "@other"] together with the other's ["take", "@giver"]. A character that strokes
                or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
+  script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
   layout       `"layout": "presenter"` is for explainer videos: the characters stand to one side and the other
@@ -120,7 +125,7 @@ def known(where, given, allowed):
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
@@ -128,9 +133,11 @@ BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset'
 SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin')
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
-PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter')
+PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor')
+SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
+ITEM_KINDS = ('cup', 'clipboard', 'phone')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
@@ -336,10 +343,14 @@ def main():
             if item.get('image') and not os.path.isfile(os.path.join(folder, item['image'])): fail(f'set.cutouts[{n}].image not found: {item["image"]} (looked in {folder})')
             for key in ('x', 'z'):
                 if not isinstance(item.get(key), (int, float)): fail(f'set.cutouts[{n}] needs a number "{key}"')
+            if ('screen' in item or 'facing' in item) and item.get('kind') not in SCREEN_KINDS: fail(f'set.cutouts[{n}]: "screen" and "facing" are for "laptop" and "monitor" only')
+            if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
+            if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
         for n, item in enumerate(stage_set.get('panels', [])):
             if item.get('wall', 'back') not in ('back', 'left', 'right'): fail(f'set.panels[{n}].wall must be "back", "left" or "right"')
             for key in ('at', 'y', 'width', 'height'):
                 if not isinstance(item.get(key), (int, float)): fail(f'set.panels[{n}] needs a number "{key}"')
+            if item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'set.panels[{n}].image not found: {item["image"]}')
         # Những thứ của cảnh PHẲNG không có nghĩa trong bối cảnh 3D — báo rõ thay vì lặng lẽ bỏ qua.
         for key, why in (('props', 'use set.boxes'), ('background', 'use set.sky and set.room'), ('camera', 'put "view" on the turns instead')):
             if scene.get(key): fail(f'"{key}" cannot be combined with "set" — {why}')
@@ -387,8 +398,14 @@ def main():
             if pet: fail(f'character "{name}": a pet cannot hold an item')
             held = who.get('holds')
             if isinstance(held, str): held = {'R': held}
-            if not isinstance(held, dict) or not held or any(side not in ('L', 'R') or item not in ('cup', 'clipboard', 'phone') for side, item in held.items()):
-                fail(f'character "{name}": "holds" must be "cup", "clipboard" or "phone", or an object such as {{"L": "cup"}} — got {js(who.get("holds"))}')
+            # Một món đồ: tên, hoặc { "kind": "phone", "image": "app.png" } (ảnh trên màn hình điện thoại).
+            def item_ok(item):
+                if isinstance(item, dict): return item.get('kind') in ITEM_KINDS and set(item) <= {'kind', 'image'} and (not item.get('image') or item['kind'] == 'phone')
+                return item in ITEM_KINDS
+            if not isinstance(held, dict) or not held or any(side not in ('L', 'R') or not item_ok(item) for side, item in held.items()):
+                fail(f'character "{name}": "holds" must be "cup", "clipboard" or "phone", an object such as {{"L": "cup"}}, or {{"R": {{"kind": "phone", "image": "app.png"}}}} — got {js(who.get("holds"))}')
+            for item in held.values():
+                if isinstance(item, dict) and item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'character "{name}": holds image not found: {item["image"]}')
             if who.get('holdsHidden') not in (None, False, True): fail(f'character "{name}": "holdsHidden" must be true or false')
             who['holds'] = held
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
@@ -465,6 +482,15 @@ def main():
         if mood and 'say' in turn: options.append(f'mood: {js(mood)}')
         if scene.get('layout') == 'presenter' and width >= height and not who['_pet']: options.append(f"hand: {js('L' if float(who['x']) > width / 2 else 'R')}")
         spoken_mood = (', { ' + ', '.join(options) + ' }') if options and 'say' in turn else ''
+        # `"phone": true` — câu nói của lượt này nói QUA ĐIỆN THOẠI: nhấc máy áp lên má trước, đặt xuống sau lượt.
+        phone = turn.get('phone')
+        if phone not in (None, False, True): fail(f'{where}: "phone" must be true or false')
+        if phone:
+            if who['_pet']: fail(f'{where}: a pet cannot talk on the phone')
+            if 'say' not in turn: fail(f'{where}: "phone": true needs a "say" line (for listening use "do": [["call", null, 2]])')
+            if not any((item if isinstance(item, str) else item.get('kind')) == 'phone' for item in (who.get('holds') or {}).values()):
+                fail(f'{where}: "phone": true needs "{who["name"]}" to hold a phone — "holds": "phone"')
+            steps.append("['phoneUp']")
         if 'say' in turn:
             if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet and cannot "say" — use "do": ["bark"]')
             words = str(turn['say']).strip()
@@ -483,6 +509,19 @@ def main():
             else:
                 seconds = float(turn.get('dur') or round(0.6 + 0.36 * len(words.split()), 1))
                 steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
+        if phone:
+            # Phụ đề ở lại tối thiểu 0,5 s + 0,3 s mỗi từ (+0,3 s giữ chữ) — câu ngắn mà nhiều chữ thì chữ còn trên màn hình
+            # sau khi tiếng đã dứt. Giữ máy trên má cho tới lúc ấy: đặt máy xuống mà phụ đề vẫn chạy là lệch hình với lời.
+            if not turn.get('audio'):
+                seconds = float(turn.get('dur') or round(0.6 + 0.36 * len(str(turn['say']).split()), 1))
+                linger = 0.5 + 0.3 * len(str(turn['say']).split()) + 0.3 - (seconds + 0.55)
+                if linger > 0.05: steps.append(f"{linger:.2f}")
+            steps.append("['phoneDown']")
+        # Lượt KHÔNG LỜI có máy quay LIA tới (không cắt): động tác tay đợi máy dừng rồi mới bắt đầu. Bắt đầu cùng lúc thì
+        # người diễn còn nằm ở mép khung khi động tác đang diễn (bản thử quầy lễ tân: bà cụ bấm điện thoại bị cắt nửa người).
+        view = turn.get('view')
+        if stage_set is not None and turn.get('do') and 'say' not in turn and isinstance(view, dict) and not view.get('cut') and not view.get('wide'):
+            steps.append(f"{float(view.get('dur', 1.5)):g}")
         for step in turn.get('do', []):
             steps.append(step_code(step, where, who['name']))
         if turn.get('exit'):
@@ -729,6 +768,11 @@ def main():
         for item in stage_set.get('panels', []):
             side = item.get('wall', 'back')
             look = f"background:{item.get('color', '#9fd0e6')};border:{item.get('border', '12px solid #f4f7f8')};box-sizing:border-box"
+            if item.get('image'):
+                # Ảnh trên tấm (màn hình TV, poster, phim X-quang, biển tên): lấp đầy tấm, cắt phần thừa.
+                name = os.path.basename(item['image'])
+                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
+                look += f";background-image:url('{name}');background-size:cover;background-position:center"
             at, turn = (([item['at'], item['y'], back + 1], 0) if side == 'back' else ([-half + 1, item['y'], item['at']], 90) if side == 'left' else ([half - 1, item['y'], item['at'] - item['width']], -90))
             setup.append(f"    set.panel({{ at: {js(at)}, size: [{item['width']:g}, {item['height']:g}], turn: {turn}, style: {js(look)} }});")
         for n, item in enumerate(stage_set.get('boxes', [])):
@@ -738,10 +782,21 @@ def main():
             setup.append(f"    const box{n + 1} = set.box({{ {numbers}, colors: {js(tone)} }});" + (f"          // {item['name']}" if item.get('name') else ''))
         for n, item in enumerate(stage_set.get('cutouts', [])):
             # Tấm hình phẳng đứng trong phòng (đạo cụ vẽ sẵn hay ảnh) — đặt sát máy quay là có tiền cảnh.
-            tall = float(item.get('height', round(person_default * 0.74)))
+            # Máy tính vẽ trong CÙNG khung với người (400 × 470): mặc định cao bằng người, để nó cùng tỉ lệ với nhân vật.
+            tall = float(item.get('height', round(person_default * (1 if item.get('kind') in SCREEN_KINDS else 0.74))))
             where_ = ', '.join(f"{key}: {float(item[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
             if item.get('kind'):
-                look = f", {{ color: {js(item['color'])} }}" if item.get('color') else ''
+                options = {'color': item.get('color')}
+                if item['kind'] in SCREEN_KINDS:
+                    # Đứng trên mặt hộp (`y`) hay trên sàn: đạo cụ tự đặt ở sàn khung của nó (on: 0), cutout lo phần nâng.
+                    options['on'] = 0
+                    if item.get('facing'): options['facing'] = item['facing']
+                    if item.get('screen'):
+                        name = os.path.basename(item['screen'])
+                        if os.path.abspath(os.path.join(base, item['screen'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['screen']), os.path.join(out, name))
+                        options['image'] = name
+                options = {key: value for key, value in options.items() if value is not None}
+                look = f", {js(options)}" if options else ''
                 setup.append(f"    const cutout{n + 1} = document.createElement('div'); VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});")
             else:
                 name = os.path.basename(item['image'])
@@ -849,7 +904,15 @@ def main():
         track[0] += 1
     for who in names.values():
         mount = "document.createElement('div')" if stage_set is not None else f"$('{who['_element']}')"
-        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(who['holds'])}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
+        held = {}
+        for side, item in (who.get('holds') or {}).items():
+            # Ảnh trên màn hình điện thoại đi theo bản dựng như mọi ảnh khác: chép vào thư mục ra, gọi bằng tên tệp.
+            if isinstance(item, dict) and item.get('image'):
+                name = os.path.basename(item['image'])
+                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
+                item = dict(item, image=name)
+            held[side] = item
+        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
         if stage_set is not None:
             boxes = [box.get('name') for box in stage_set.get('boxes', [])]

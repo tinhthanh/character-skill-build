@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.40.0';
+export const VERSION = '0.41.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -56,7 +56,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE, ...RigSVG.WITH_ITEM]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 
 /* ─────────────────────────────────────────────────────────────── bộ đồ nghề */
@@ -246,7 +246,7 @@ const ITEMS = { cup, clipboard, phone };
  * Dựng một nhân vật NGƯỜI vào `host`.
  *   id           id nhân vật ('vet' mặc định); `list()` liệt kê
  *   config       object bộ số. Bỏ trống → dùng bộ số đã nướng vào bản dựng (nếu có); `null` → không dùng
- *   items        { L | R: 'cup' | 'clipboard' | 'phone' | (p, colours) => svg } — cho nhân vật cầm thêm món đồ ấy
+ *   items        { L | R: 'cup' | 'clipboard' | 'phone' | { kind: 'phone', image } | (p, colours) => svg } — cho nhân vật cầm thêm món đồ ấy
  *   itemsHidden  true (hoặc ['R']) — món đồ có sẵn nhưng đang cất: để `take()` nhận nó, hay `showItem()` lấy ra
  */
 export function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false } = {}) {
@@ -259,8 +259,12 @@ export function createCharacter(host, { id = 'vet', config, items = null, itemsH
   applyConfig(rig, config);
   for (const [side, item] of Object.entries(items || {})) {
     if (side !== 'L' && side !== 'R') throw new Error(`[character] createCharacter: items keys must be 'L' or 'R', got ${JSON.stringify(side)}`);
-    const draw = typeof item === 'function' ? item : ITEMS[item] ? (p, colours) => ITEMS[item](colours) : null;
-    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, or a function returning SVG)`);
+    // Ba dạng: tên ('phone'), hàm vẽ, hoặc { kind, ...tuỳ chọn } — { kind: 'phone', image: 'app.png' } cho màn hình có ảnh.
+    const spec = item && typeof item === 'object' ? item : null, name = spec ? spec.kind : item;
+    if (spec && !ITEMS[name]) throw new Error(`[character] createCharacter: items.${side}.kind must be one of ${Object.keys(ITEMS).join(', ')}, got ${JSON.stringify(name)}`);
+    const { kind: _kind, ...itemOptions } = spec || {};
+    const draw = typeof item === 'function' ? item : ITEMS[name] ? (p, colours) => ITEMS[name](colours, itemOptions) : null;
+    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, { kind, ...options }, or a function returning SVG)`);
     rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
   }
   return { rig, id };
@@ -298,7 +302,7 @@ export function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE, ...RigSVG.WITH_ITEM],
     petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
@@ -324,7 +328,7 @@ export function list() {
  * `breathe`: nhịp thở và đung đưa nhẹ chồng lên cả chuỗi (mặc định bật).
  */
 // Các bước CÓ LỜI, và quãng "về chỗ" (miệng đã khép, tay đang thu về) ở cuối mỗi bước ấy.
-const SPEECH_STEPS = ['speak', 'explain', 'speakCues'];
+const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
 
 export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
@@ -335,9 +339,15 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
   const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
-  for (const step of stepList) {
+  for (const [stepIndex, step] of stepList.entries()) {
     if (typeof step === 'number') { at += step; continue; }
     const [name, ...args] = Array.isArray(step) ? step : [step];
+    // Bấm điện thoại rồi KHOE nó ngay: giữ điện thoại ở dáng bấm cho `showPhone` nối thẳng ra cạnh mặt (xem `tapPhone`).
+    const next = stepList.slice(stepIndex + 1).find((later) => typeof later !== 'number');
+    if (name === 'tapPhone' && next && (Array.isArray(next) ? next[0] : next) === 'showPhone' && !(args[1] && 'keep' in args[1])) {
+      args[0] = args[0] === undefined ? 1.6 : args[0];
+      args[1] = { ...(args[1] || {}), keep: true };
+    }
     if (typeof rig[name] !== 'function') throw new Error(`[character] no action "${name}" (available: ${rig.actions.join(', ')})`);
     // Dựng nháp một lần để biết động tác này BẮT ĐẦU từ trạng thái nào. Vài động tác mở đầu
     // bằng `set` (enter đặt nhân vật ra ngoài khung), mà GSAP KHÔNG vẽ `set` khi đầu phát nằm
@@ -811,7 +821,10 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       const last = real[real.length - 1];
       finish = Math.max(finish, mine.end - (overlap && last && SPEECH_STEPS.includes(last.name) ? SPEECH_SETTLE : 0));
       spokeLast = last && SPEECH_STEPS.includes(last.name) ? { rig, start: last.start } : null;
-      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
+      // Lượt mở đầu bằng một QUÃNG CHỜ (số) vẫn bắt đầu ở `begin`: máy quay và mọi thứ gắn vào giờ bắt đầu lượt chạy từ đó,
+      // còn động tác thì đợi — `tools/scene.py` chèn quãng chờ để động tác tay đợi máy quay lia xong. Lấy giờ của bước thật
+      // đầu tiên thì máy quay cũng bị dời theo, và lại lia đúng lúc động tác đang diễn.
+      turns.push({ rig, character: rig.publicId || '', start: real.length && typeof steps[0] !== 'number' ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     // Vị trí mới chỉ có hiệu lực SAU lượt này: các lượt diễn cùng lúc đều thấy nhau ở chỗ cũ.
     for (const [mine, centre] of moved) mine.centre = centre;

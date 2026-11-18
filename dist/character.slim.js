@@ -1,4 +1,4 @@
-/* VGCharacter v0.40.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.41.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -16,6 +16,9 @@ const NGHI = Object.freeze({
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
   itemTiltL: 0, itemTiltR: 0,   // độ nghiêng thêm của đồ vật về phía mặt (độ) — nghiêng cốc khi uống
+  itemZoomL: 1, itemZoomR: 1,   // món đồ phóng to quanh lòng bàn tay — giơ điện thoại khoe màn hình cho người xem đọc được
+  itemBackL: 0, itemBackR: 0,
+  phoneL: 0, phoneR: 0,         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
   tayL: 'mo', tayR: 'mo',
@@ -104,6 +107,12 @@ const DAI = { canhTay: 62, cangTay: 58, dui: 78, ong: 78 };
 const CHOT_VAI = { x: 33, y: -90 };
 const UC_DON = { x: 6, y: -98 };
 const GOC_VAI_MAX = 16;
+const CALL_POSE = [100, -152, 25, 1.4];
+const CALL_TILT = 15;
+const SHOW_POSE = [70, -125];                             // giơ điện thoại cạnh mặt, màn hình về người xem
+const TAP_POSE = { hold: [20, -110], finger: [24, -118] };   // tay cầm đưa lên trước ngực; tay kia chạm màn hình
+const TYPE_POSE = [14, -72];                              // hai tay đưa ra trước trên bàn phím
+const LOOK_DOWN = { head: 14, eyes: 4.5, lids: 0.5 };
 const CAP_RADIUS = 24, CAP_DROP = 4, CAP_SOLID = 0.75;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const chuanHoaGoc = (g) => ((((g + 180) % 360) + 360) % 360) - 180;
@@ -370,10 +379,12 @@ class RigSVG {
   static NGHI = NGHI;
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
-                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write'];
+                     'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
+                     'call', 'typing'];
   static DI_NGANG = ['walk', 'enter', 'exit'];
-  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown'];
   static EXCHANGE = ['handOver', 'take'];
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
   static COLOR_ALIASES = {};
@@ -710,7 +721,7 @@ class RigSVG {
     const atRest = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && ah < 0.8 ? clamp(2 - Math.max(Math.abs(s['bat' + xa] - restFar[0]), Math.abs(s['cang' + xa] - restFar[1])) / 10, 0, 1) : 0;
     const fold = restFar[1] <= -45 && Math.abs(s['aim' + xa]) < 0.9 ? atRest : 0;
     const clasp = fold >= 0.5 ? xa : null;
-    const carryFront = xa && !clasp && this.holds[xa] && s['item' + xa] > 0.5 && ah < 0.8
+    const carryFront = xa && !clasp && this.holds[xa] && s['item' + xa] > 0.5 && ah < 0.8 && s['phone' + xa] < 0.5
       && !(Math.abs(s['aim' + xa]) >= 0.5 && s['cang' + xa] > -30) ? xa : null;
     const front = clasp || carryFront;
     for (const ben of ['L', 'R']) {
@@ -726,7 +737,7 @@ class RigSVG {
       const carrying = ben === xa && this.holds[ben] && s['item' + ben] > 0.5;
       const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
       const tay = e['bat' + ben];
-      const cho = ben !== xa ? e.tren : ben === carryFront || (aimed >= 0.5 && !inward) ? e.xaTruoc : (carrying && ah < 0.8) || (aimed >= 0.9 && inward) ? e.tren : e.sauChan;
+      const cho = ben !== xa || s['phone' + ben] >= 0.5 ? e.tren : ben === carryFront || (aimed >= 0.5 && !inward) ? e.xaTruoc : (carrying && ah < 0.8) || (aimed >= 0.9 && inward) ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
       for (const [limb, dim] of [[e['chan' + ben], far ? ah : 0], [tay, mo]]) {
@@ -844,7 +855,8 @@ class RigSVG {
     const coHep = 1 - ah * 0.2, chanCo = 20 * (1 - ah * 0.5) / coHep, eoCo = 15 - ah * 4;
     e.co.setAttribute('transform', `translate(${h * 3} 0) scale(${coHep} 1)`);
     e.coDa.setAttribute('d', `M -13 -130 L 13 -130 L 13.5 -106 Q ${eoCo} -100 ${chanCo} -96 L ${-chanCo} -96 Q ${-eoCo} -100 -13.5 -106 Z`);
-    e.dau.setAttribute('transform', `translate(${s.dauX + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
+    const onPhone = clamp(s.phoneR, 0, 1) - clamp(s.phoneL, 0, 1);
+    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau + onPhone * CALL_TILT}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
     const tayTheoSau = (bat, cang, v) => {
@@ -939,6 +951,12 @@ class RigSVG {
       rotation['bat' + xa] += (inward * 12 * clamp(1 - ah * 1.3, 0, 1) - rotation['bat' + xa]) * tuck;      // quay càng nhiều thân càng hẹp: khép ít lại, kẻo bàn tay lòi ra phía sau lưng
       rotation['cang' + xa] += (0 - rotation['cang' + xa]) * tuck;                // …và duỗi cẳng tay theo, không thì bàn tay văng ra phía sau lưng
     }
+    for (const [side, sign] of [['L', 1], ['R', -1]]) {
+      const phone = clamp(s['phone' + side], 0, 1);
+      if (!phone) continue;
+      rotation['bat' + side] += (sign * CALL_POSE[0] - rotation['bat' + side]) * phone;
+      rotation['cang' + side] += (sign * CALL_POSE[1] - rotation['cang' + side]) * phone;
+    }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
     for (const ben of ['L', 'R']) {
@@ -957,11 +975,16 @@ class RigSVG {
     const gripping = { L: false, R: false };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       const upright = chuanHoaGoc(-90 - armTurn[side] - s.than);
-      const tilt = s['itemTilt' + side];
+      const phone = clamp(s['phone' + side], 0, 1);
+      const tilt = s['itemTilt' + side] + CALL_POSE[2] * phone;
       const itemTurn = upright + (side === 'L' ? 1 : -1) * tilt;
-      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})`);
-      const fingers = e['item' + side].querySelector('[data-grip]');
-      if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
+      const zoom = Math.max(0.05, s['itemZoom' + side] + (CALL_POSE[3] - 1) * phone);
+      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-tilt * 0.6).toFixed(2)})` + (zoom !== 1 ? ` translate(0 10) scale(${zoom.toFixed(3)}) translate(0 -10)` : ''));
+      const back = s['itemBack' + side] >= 0.5 || phone >= 0.5;
+      for (const face of e['item' + side].querySelectorAll('[data-back]')) face.style.display = back ? '' : 'none';
+      for (const face of e['item' + side].querySelectorAll('[data-front]')) face.style.display = back ? 'none' : '';
+      const groups = e['item' + side].querySelectorAll('[data-grip]'), fingers = groups[0];
+      for (const group of groups) group.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = fingers ? clamp(s['item' + side], 0, 1) : 0;          // độ hiện của các ngón ôm món đồ (mờ theo món đồ)
     }
     for (const ben of ['L', 'R']) {
@@ -1159,6 +1182,7 @@ class RigSVG {
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     so.seat = this.s.seat; so.huong = this.s.huong;
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
+    so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
     for (const side of ['L', 'R']) {
       if (!this.holds[side] || target['item' + side] > 0.5) continue;
@@ -1685,6 +1709,100 @@ class RigSVG {
     this.#khep(t, 0.45, 0.42 + dur);
     return t;
   }
+  #phoneHand(side = 'auto') {
+    if (side === 'L' || side === 'R') return side;
+    const held = ['R', 'L'].filter((k) => this.holds[k] && this.s['item' + k] > 0.5);
+    return held.find((k) => this.el['item' + k].querySelector('[data-back]')) || held[0] || this.#freeHand();
+  }
+  #talkInto(t, text, dur, at, mood) {
+    const s = this.s, tone = this.#tone(mood), soAm = this.#soAm(text, dur), nhip = dur / soAm, talk = gsap.timeline();
+    t.to(s, { ...tone.start, duration: 0.2 }, at);
+    this.#khauHinh(talk, soAm, nhip, tone.corner);
+    t.add(talk, at);
+    t.to(s, { mieng: 0, duration: 0.15 }, at + dur);
+  }
+  call(text = null, dur = 2.4, { mood = null, side = 'auto' } = {}) {
+    const t = this.tl(), s = this.s, k = this.#phoneHand(side), held = this.holds[k] && s['item' + k] > 0.5, was = s['phone' + k];
+    if (Math.abs(s.huong) > 0.02) t.to(s, { huong: 0, duration: 0.3, ease: 'sine.inOut' }, 0);
+    if (held) t.to(s, { ['phone' + k]: 1, ['carry' + k]: 0, vai: this.NGHI.vai - 3, nhinX: (k === 'L' ? 1 : -1) * 1.2, duration: was >= 1 ? 0.01 : 0.5, ease: 'power2.inOut' }, 0);
+    else {
+      const m = k === 'L' ? -1 : 1;
+      t.set(s, { ['tay' + k]: 'nam' }, 0);
+      t.to(s, { ['bat' + k]: CALL_POSE[0], ['cang' + k]: CALL_POSE[1], ['aim' + k]: 1, dau: this.NGHI.dau + m * CALL_TILT, dauX: m * CALL_TILT * 0.4, duration: 0.5, ease: 'power2.inOut' }, 0);
+    }
+    const at = 0.55;
+    if (text) this.#talkInto(t, text, dur, at, mood);
+    else {
+      const nods = Math.max(1, Math.round(dur / 0.9));
+      for (let n = 0; n < nods; n++) {
+        const a = at + 0.15 + n * dur / nods;
+        t.to(s, { dauY: 3, mieng: 0.12, duration: 0.22, ease: 'sine.out' }, a).to(s, { dauY: 0, mieng: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.22);
+      }
+      t.to(s, { nhinY: 0.8, mayL: mood ? 0 : 0.25, mayR: mood ? 0 : 0.25, duration: 0.3 }, at);
+    }
+    if (dur > 1.2) this.#chop(t, at + dur * 0.5);
+    this.#khep(t, 0.5, at + dur, held ? { ['phone' + k]: was } : {});
+    return t;
+  }
+  phoneUp(side = 'auto') {
+    const t = this.tl(), s = this.s, k = this.#phoneHand(side);
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] phoneUp: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    t.to(s, { ['phone' + k]: 1, ['carry' + k]: 0, duration: 0.5, ease: 'power2.inOut' }, 0);
+    t.to(s, { nhinX: (k === 'L' ? 1 : -1) * 1.2, duration: 0.3 }, 0.1);
+    return this.#khep(t, 0.3, 0.5, { ['phone' + k]: 1 });
+  }
+  phoneDown() {
+    const t = this.tl();
+    return this.#khep(t, 0.5, 0, { phoneL: 0, phoneR: 0 });
+  }
+  showPhone(hold = 1.8, { side = 'auto', zoom = 2.6 } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#phoneHand(side), m = k === 'L' ? -1 : 1;
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] showPhone: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    this.#stage(t, [k]);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    t.to(s, { ['bat' + k]: SHOW_POSE[0], ['cang' + k]: SHOW_POSE[1], ['itemZoom' + k]: zoom, dau: N.dau - m * 4, dauX: -m * 2, nhinX: m * 1.4, cuoi: 1, mayL: 0.5, mayR: 0.5,
+              duration: 0.5, ease: 'back.out(1.4)' }, 0);
+    t.to(s, { ['itemTilt' + k]: 6, duration: 0.18, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
+    t.to(s, { nhinX: 0, duration: 0.3 }, 0.9);                 // liếc sang màn hình rồi nhìn lại người xem
+    if (hold > 1) this.#chop(t, 0.5 + hold * 0.6);
+    this.#khep(t, 0.5, 0.5 + hold);
+    return t;
+  }
+  tapPhone(dur = 1.6, { side = 'auto', zoom = 2, keep = false } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#phoneHand(side), pen = k === 'L' ? 'R' : 'L', m = pen === 'L' ? -1 : 1;
+    if (!(this.holds[k] && s['item' + k] > 0.5)) throw new Error('[character] tapPhone: the character is not holding anything in hand ' + k + ' — give it a phone: createCharacter(host, { id, items: { R: "phone" } })');
+    this.#openUp(t);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    t.to(s, { ['bat' + k]: TAP_POSE.hold[0], ['cang' + k]: TAP_POSE.hold[1], ['itemZoom' + k]: zoom, dauY: LOOK_DOWN.head, dau: N.dau + m * 3, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids,
+              nhinX: m * 0.6, cuoi: 0.5, duration: 0.4, ease: 'power2.out' }, 0);
+    t.set(s, { ['tay' + pen]: 'chi' }, 0.1);
+    t.to(s, { ['bat' + pen]: TAP_POSE.finger[0], ['cang' + pen]: TAP_POSE.finger[1], duration: 0.4, ease: 'power2.out' }, 0.05);
+    const taps = Math.max(2, Math.round(dur / 0.4));
+    for (let n = 0; n < taps; n++) {
+      const a = 0.45 + n * dur / taps, d = dur / taps, swipe = n % 3 === 2;
+      if (swipe) t.to(s, { ['cang' + pen]: TAP_POSE.finger[1] - 14, duration: d * 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+      else t.to(s, { ['bat' + pen]: TAP_POSE.finger[0] + 4, ['cang' + pen]: TAP_POSE.finger[1] + 6, dauY: LOOK_DOWN.head + 1, duration: d * 0.35, ease: 'sine.in', yoyo: true, repeat: 1 }, a);
+    }
+    if (dur > 1) t.to(s, { cuoi: 0.9, duration: 0.25 }, 0.45 + dur * 0.7);        // tìm được rồi: cười
+    this.#khep(t, 0.45, 0.5 + dur, keep ? { ['bat' + k]: TAP_POSE.hold[0], ['cang' + k]: TAP_POSE.hold[1], ['itemZoom' + k]: zoom, ['carry' + k]: 0 } : {});
+    return t;
+  }
+  typing(dur = 2) {
+    const t = this.tl(), s = this.s;
+    this.#openUp(t);
+    t.set(s, { tayL: 'mo', tayR: 'mo' }, 0);
+    t.to(s, { batL: TYPE_POSE[0], batR: TYPE_POSE[0], cangL: TYPE_POSE[1], cangR: TYPE_POSE[1], carryL: 0, carryR: 0, dauY: LOOK_DOWN.head, nhinY: LOOK_DOWN.eyes,
+              matY: LOOK_DOWN.lids, dau: this.NGHI.dau + 3, cuoi: 0.35, mayL: 0.15, mayR: 0.15, duration: 0.4, ease: 'power2.out' }, 0);
+    const beats = Math.max(4, Math.round(dur / 0.12));
+    for (let n = 0; n < beats; n++) {
+      const side = n % 2 ? 'L' : 'R', a = 0.4 + n * dur / beats;
+      t.to(s, { ['cang' + side]: TYPE_POSE[1] + 6 + (n % 3), vai: (n % 2 ? 1.6 : -1.6) * (side === 'L' ? 1 : 1), dauY: LOOK_DOWN.head + (n % 4 === 0 ? 1.2 : 0),
+                duration: dur / beats * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+    }
+    if (dur > 1.4) t.to(s, { dauY: LOOK_DOWN.head * 0.4, nhinY: LOOK_DOWN.eyes * 0.6, matY: 0, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1, repeatDelay: 0.35 }, 0.4 + dur * 0.45);
+    this.#khep(t, 0.45, 0.45 + dur);
+    return t;
+  }
   stroke(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
     let tx = 300, ty = 400;
@@ -1862,7 +1980,8 @@ class RigSVG {
       { lead: [16, 50], other: [16, 50] },         // mở cả hai tay
       { lead: [18, 66], other: [12, 40] },         // hai tay, tay chủ đạo cao hơn
     ];
-    const POSES = ALL_POSES.filter((pose) => Math.abs(pose.lead[1] - base(lead)[1]) >= 45);
+    const farLead = Math.abs(s.huong) > 0.1 && lead === (s.huong < 0 ? 'L' : 'R');
+    const POSES = ALL_POSES.filter((pose) => Math.abs(pose.lead[1] - base(lead)[1]) >= 45 && !(farLead && pose.lead[1] < 0));
     const anchors = [];
     for (const a of moc) if (!anchors.length || a - anchors[anchors.length - 1] >= 2.1) anchors.push(a);
     const pulse = (arm, around, at, size) => {
@@ -3057,12 +3176,41 @@ const DRAW = {
     <path d="M ${x0} ${rim} H ${x1} L ${x1 - 14} ${F} H ${x0 + 14} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
     <rect x="${x0 - 6}" y="${rim - 6}" width="${w + 12}" height="18" rx="6" fill="${dark}" stroke="${line}" stroke-width="1.400"/>`;
   },
+  laptop: ({ w = 96, on = 150, facing = 'away', image, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.58;       // nắp thấp vừa đủ che bàn tay, để lộ vai và đầu đang cúi
+    const base = `<rect x="${x0 - 6}" y="${top - 5}" width="${w + 12}" height="6" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1.200"/>`;
+    if (facing === 'viewer') return `
+    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="#22262e" stroke="${line}" stroke-width="1.400"/>
+    ${screen(x0 + 5, top - h, w - 10, h - 10, image)}${base}`;
+    return `
+    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <circle cx="200" cy="${top - 5 - h / 2}" r="${w * 0.07}" fill="${shade(color, 0.45)}"/>${base}`;
+  },
+  monitor: ({ w = 150, on = 150, image, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.62, y0 = top - 26 - h;
+    return `
+    <path d="M 192 ${top - 28} h 16 l 5 24 h -26 z" fill="${dark}" stroke="${line}" stroke-width="1.200" stroke-linejoin="round"/>
+    <rect x="172" y="${top - 6}" width="56" height="6" rx="3" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
+    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}`;
+  },
 };
+let screenCount = 0;
+function screen(x, y, w, h, image) {
+  if (!image) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#8fd3ff"/><path d="M ${x + 8} ${y + 10} h ${w * 0.5} M ${x + 8} ${y + 20} h ${w * 0.35}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>`;
+  const id = 'vgScreen' + (screenCount++);
+  return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
+    <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+}
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36' };
 const PROP_KINDS = Object.keys(DRAW);
 function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
-  const { color = '#8a6245', width, height, back } = options;
+  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing } = options;
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
+  if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
+  if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
+  if (on !== undefined && !(typeof on === 'number' && on >= 0)) throw new Error(`[character] prop "${kind}": on must be a number ≥ 0 (frame units above the floor), got ${JSON.stringify(on)}`);
   for (const [name, value] of Object.entries({ width, height, back }))
     if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
   const sitter = options.for;
@@ -3072,6 +3220,9 @@ function createProp(host, kind, options = {}) {
   if (width !== undefined) o.w = width;
   if (height !== undefined) o.height = height;
   if (back !== undefined) o.back = back;
+  if (on !== undefined) o.on = on;
+  if (image !== undefined) o.image = image;
+  if (facing !== undefined) o.facing = facing;
   host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
@@ -3254,13 +3405,19 @@ function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}
           <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
         </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
-function phone(c, { color = '#22262e', screen = '#8fd3ff', grip = true } = {}) {
+function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
+  const line = lineOf(c);
+  const clip = 'vgPhoneClip' + (phoneClipCount++);
+  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
+          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
   return `
         <g transform="translate(0 10) rotate(90)">
-          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}"/>
-          <rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>
-        </g>${grip ? gripThumb(c, { reach: 11, far: 18 }) : ''}`;
+          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
+          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
+          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
+        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}`;
 }
+let phoneClipCount = 0;
 return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone };
 })();
 __m['runtime/schema.js'] = (function () {
@@ -3505,6 +3662,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
       face(group, depth, height, `translate3d(${x + width}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
       face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle);
+      for (const item of focused.slice(-4)) item.solid = true;
       const prop = { group, centre: middle, top: y + height };
       props.push(prop);
       return prop;
@@ -3618,7 +3776,15 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const depth = set.project(...prop.centre).depth, index = shown.filter(({ at }) => at.depth < depth).length;
         if (prop.group.parentNode !== layers[index]) layers[index].appendChild(prop.group);
       }
-      for (const item of focused) soften(item, item.element, item.filter, blurAt(set.project(...item.centre).depth));
+      const frameBox = view.getBoundingClientRect(), margin = 2;
+      for (const item of focused) {
+        let px = blurAt(set.project(...item.centre).depth);
+        if (px && item.solid) {
+          const r = item.element.getBoundingClientRect();
+          if (r.left < frameBox.left - margin || r.top < frameBox.top - margin || r.right > frameBox.right + margin || r.bottom > frameBox.bottom + margin) px = 0;
+        }
+        soften(item, item.element, item.filter, px);
+      }
       return frame;
     },
   };
@@ -3908,7 +4074,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.40.0';
+const VERSION = '0.41.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -3931,7 +4097,7 @@ for (const [Rig, table] of [[RigSVG, PERSON_STATE_KEYS], [RigThu, PET_STATE_KEYS
     setColors: { value(colors) { this.doiMau(colors); return this; } },
   });
 }
-Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE]; } });
+Object.defineProperty(RigSVG.prototype, 'actions', { get() { return [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE, ...RigSVG.WITH_ITEM]; } });
 Object.defineProperty(RigThu.prototype, 'actions', { get() { return [...this.DONG_TAC, ...RigThu.STANCE]; } });
 const publicOutfit = (outfit) => definitionToPublic(outfit);
 const kit = {
@@ -4067,8 +4233,11 @@ function createCharacter(host, { id = 'vet', config, items = null, itemsHidden =
   applyConfig(rig, config);
   for (const [side, item] of Object.entries(items || {})) {
     if (side !== 'L' && side !== 'R') throw new Error(`[character] createCharacter: items keys must be 'L' or 'R', got ${JSON.stringify(side)}`);
-    const draw = typeof item === 'function' ? item : ITEMS[item] ? (p, colours) => ITEMS[item](colours) : null;
-    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, or a function returning SVG)`);
+    const spec = item && typeof item === 'object' ? item : null, name = spec ? spec.kind : item;
+    if (spec && !ITEMS[name]) throw new Error(`[character] createCharacter: items.${side}.kind must be one of ${Object.keys(ITEMS).join(', ')}, got ${JSON.stringify(name)}`);
+    const { kind: _kind, ...itemOptions } = spec || {};
+    const draw = typeof item === 'function' ? item : ITEMS[name] ? (p, colours) => ITEMS[name](colours, itemOptions) : null;
+    if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, { kind, ...options }, or a function returning SVG)`);
     rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
   }
   return { rig, id };
@@ -4093,14 +4262,14 @@ function list() {
   return {
     people: Object.fromEntries(Object.entries(RigSVG.NHAN_VAT).map(([k, v]) => [k, displayName(k, v)])),
     pets: Object.fromEntries(Object.entries(RigThu.LOAI).map(([k, v]) => [k, displayName(k, v)])),
-    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE],
+    personActions: [...RigSVG.DONG_TAC, ...RigSVG.DI_NGANG, ...RigSVG.STANCE, ...RigSVG.EXCHANGE, ...RigSVG.WITH_ITEM],
     petActions: Object.fromEntries(Object.entries(RigThu.DONG_TAC).map(([kind, names]) => [kind, [...names, ...RigThu.STANCE]])),
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
     bakedConfigs: Object.keys(bakedConfigs),
   };
 }
-const SPEECH_STEPS = ['speak', 'explain', 'speakCues'];
+const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -4109,9 +4278,14 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
   const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
-  for (const step of stepList) {
+  for (const [stepIndex, step] of stepList.entries()) {
     if (typeof step === 'number') { at += step; continue; }
     const [name, ...args] = Array.isArray(step) ? step : [step];
+    const next = stepList.slice(stepIndex + 1).find((later) => typeof later !== 'number');
+    if (name === 'tapPhone' && next && (Array.isArray(next) ? next[0] : next) === 'showPhone' && !(args[1] && 'keep' in args[1])) {
+      args[0] = args[0] === undefined ? 1.6 : args[0];
+      args[1] = { ...(args[1] || {}), keep: true };
+    }
     if (typeof rig[name] !== 'function') throw new Error(`[character] no action "${name}" (available: ${rig.actions.join(', ')})`);
     restore(endState);
     const draft = rig[name](...args);
@@ -4410,7 +4584,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const last = real[real.length - 1];
       finish = Math.max(finish, mine.end - (overlap && last && SPEECH_STEPS.includes(last.name) ? SPEECH_SETTLE : 0));
       spokeLast = last && SPEECH_STEPS.includes(last.name) ? { rig, start: last.start } : null;
-      turns.push({ rig, character: rig.publicId || '', start: real.length ? real[0].start : begin, end: mine.end, steps: real, shot: own });
+      turns.push({ rig, character: rig.publicId || '', start: real.length && typeof steps[0] !== 'number' ? real[0].start : begin, end: mine.end, steps: real, shot: own });
     }
     for (const [mine, centre] of moved) mine.centre = centre;
     clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại

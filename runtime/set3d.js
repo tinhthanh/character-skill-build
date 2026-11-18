@@ -164,6 +164,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
       face(group, depth, height, `translate3d(${x + width}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
       face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle);
+      // Bốn mặt vừa dựng là mặt của một VẬT: đánh dấu để `update` không làm mờ chúng khi chúng tràn ra ngoài khung hình.
+      for (const item of focused.slice(-4)) item.solid = true;
       const prop = { group, centre: middle, top: y + height };
       props.push(prop);
       return prop;
@@ -337,7 +339,19 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const depth = set.project(...prop.centre).depth, index = shown.filter(({ at }) => at.depth < depth).length;
         if (prop.group.parentNode !== layers[index]) layers[index].appendChild(prop.group);
       }
-      for (const item of focused) soften(item, item.element, item.filter, blurAt(set.project(...item.centre).depth));
+      // MẶT CỦA KHỐI HỘP TRÀN RA NGOÀI KHUNG thì không làm mờ. Chrome vẽ hỏng một mặt phẳng 3D có `filter` (mờ, dù chỉ
+      // 0,4 px) khi nó tràn khỏi khung hình: cả một khúc mặt trước của cái quầy biến mất, người đứng sau quầy lộ nguyên
+      // chân như đứng trước quầy (đo ở cảnh quầy lễ tân, máy quay đặt gần). Vật ở sát máy quay mà nét thì còn hơn một cái
+      // hộp bị khuyết. Sàn và tường cũng tràn khung nhưng không hỏng như thế — chỉ xét mặt của vật.
+      const frameBox = view.getBoundingClientRect(), margin = 2;
+      for (const item of focused) {
+        let px = blurAt(set.project(...item.centre).depth);
+        if (px && item.solid) {
+          const r = item.element.getBoundingClientRect();
+          if (r.left < frameBox.left - margin || r.top < frameBox.top - margin || r.right > frameBox.right + margin || r.bottom > frameBox.bottom + margin) px = 0;
+        }
+        soften(item, item.element, item.filter, px);
+      }
       return frame;
     },
   };

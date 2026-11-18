@@ -24,6 +24,11 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
 | `drink` | `(side = 'auto')` | raise the held item (a cup) to the mouth, tilt it, eyes closed, then lower it with a smile; a turned character faces the viewer to drink. With empty hands it mimes the sip | 1.85 |
 | `write` | `(dur = 1.2)` | the other hand comes over to the held item (clipboard, phone) and writes a few lines, head down; with empty hands it writes on the left palm | `dur` + 0.87 |
+| `call` | `(text = null, dur = 2.4, { mood, side })` | put the held phone to the cheek (its back facing out, the head tilting to it), say `text` over `dur` seconds, put it down. No `text`: listening, small nods. With empty hands it mimes the call with a fist. A chibi's short arm cannot reach the ear in a front view, so the phone goes to the cheek — the usual cartoon shorthand | `dur` + 1.05 |
+| `phoneUp` / `phoneDown` | `(side = 'auto')` / — | **stance**: put the phone to the cheek and keep it there; the following steps (`explain`, `speakCues` with a recorded voice, `nod`…) play on the phone, the other hand still gestures. `phoneDown` puts it down. Needs a held phone | 0.8 / 0.5 |
+| `showPhone` | `(hold = 1.8, { side, zoom = 2.6 })` | hold the phone up beside the face, screen to the viewer and **enlarged** so the app on it reads, smile, hold, lower it. Needs a held item | `hold` + 1.0 |
+| `tapPhone` | `(dur = 1.6, { side, zoom = 2 })` | phone up in front of the chest (enlarged, screen out), head down, the other index finger taps and swipes for `dur` seconds — booking, checking a reminder. Needs a held item | `dur` + 0.95 |
+| `typing` | `(dur = 2)` | both hands forward on a keyboard, fingers going, head down at the screen, a glance up half-way. Pair it with a `laptop` prop on the table or counter in front: its lid hides the hands | `dur` + 0.9 |
 | `stroke` | `(target)` | lean toward a pet (a rig, an element, or `{ x, y }`) and stroke it three times with the hand on that side; crouches if the target is below the hips. Keep the pet within about 0.25 × host height of the person, arms are short | 2.2 |
 | `handOver` | `(target, side = 'auto')` | reach the held item toward `target` (a rig, `'left'`, `'right'`); it leaves the hand, which relaxes. Throws if nothing is held | 1.33 |
 | `take` | `(source, side = 'auto')` | reach toward `source` and receive an item into the hand: the character must already have it put away (`items` + `itemsHidden`, below). Run it `together` with the giver's `handOver` | 1.33 |
@@ -169,6 +174,8 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `table` | `color`, `width = 230`, `height = 150` | thin top on two legs |
 | `counter` | `color`, `width = 300`, `height = 150` | solid to the floor |
 | `plant` | `color` (the pot), `width = 120` | a potted plant; in a 3D set, a foreground cutout (`set.stand`, `set.cutouts`) |
+| `laptop` | `on = 150`, `facing = 'away'`, `image`, `color`, `width = 96` | a laptop on a surface `on` units above the floor (150 = the default table or counter top). `'away'`: the lid faces the viewer — the machine of someone behind the desk; put its host **after** the person's (in front) so the lid hides the typing hands. `'viewer'`: the screen faces out and shows `image` |
+| `monitor` | `on = 150`, `image`, `color`, `width = 150` | a desktop screen on a stand, facing the viewer, showing `image` (the app, a lab result, an X-ray) |
 
 The top of a table or counter is `(12 + height) × hostHeight / 470` px above the bottom of its
 host (the floor line sits 12 units above the host's bottom edge) — e.g. 262 px for the default
@@ -192,7 +199,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 
 | Call | Use |
 |---|---|
-| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
+| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |

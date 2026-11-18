@@ -143,7 +143,7 @@ try {
   { const sweep = (rig, label) => {
       const keys = Object.keys(rig.NGHI), read = () => JSON.stringify(keys.map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k])));
       for (const name of rig.actions) {
-        if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
+        if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name) || (rig.constructor.WITH_ITEM || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
         L.seed(3); rig.reset();
         const step = name === 'point' ? [name, { x: 60, y: 80 }] : (name === 'speak' || name === 'explain') ? [name, 'xin chào bạn nhé một hai ba', 2.4] : name;
         const t = L.sequence(rig, ['idle', step, 'idle']), D = t.duration();
@@ -163,7 +163,7 @@ try {
   { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
     const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
     for (const name of rig.actions) {
-      if (['walkAway', 'exit', 'handOver', 'take'].includes(name)) continue;
+      if (['walkAway', 'exit', 'handOver', 'take'].includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ — có bài kiểm riêng
       rig.reset();
       const t = name === 'point' ? rig.point({ x: 60, y: 80 }) : rig[name](); t.progress(1); rig.apDung();
       if (Math.abs(rig.state.headTilt - 4) > 1e-3 || rig.state.handR !== 'fist') hong('restPose', `${name}: ends with headTilt ${rig.state.headTilt}, handR ${rig.state.handR} instead of the character's rest pose (4, fist)`);
@@ -714,6 +714,22 @@ try {
           if (worst > limit) hong('smooth motion', `${name}: the forearm jumps ${worst.toFixed(1)}° in one frame at ${when.toFixed(2)} s`);
           motion.kill(); mover.svg.remove();
         }
+        // Bối cảnh 3D có độ sâu trường ảnh: mặt của một khối hộp TRÀN ra ngoài khung hình thì không được làm mờ — Chrome
+        // vẽ khuyết một mặt phẳng 3D có `filter` khi nó tràn khung (mặt trước cái quầy mất một khúc, người sau quầy lộ chân).
+        // Hộp nằm gọn trong khung, cách xa điểm lấy nét, thì vẫn mờ.
+        {
+          const view = document.createElement('div'); view.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:600px'; host.parentNode.appendChild(view);
+          const set = L.createSet(view, { origin: [500, 340], camera: { yaw: 0, pitch: 0, distance: 1700, lens: 1700, x: 0, y: 200, z: -300, blur: 6 } });
+          set.floor({});
+          const spilling = set.box({ x: -900, z: 1000, width: 1200, depth: 100, height: 300 }), inside = set.box({ x: -60, z: -1400, width: 120, depth: 60, height: 80 });
+          set.update();
+          const blurred = (box) => [...box.group.children].map((face) => face.style.filter).filter((filter) => filter.includes('blur')).length;
+          const frame = view.getBoundingClientRect(), front = spilling.group.children[3].getBoundingClientRect();
+          if (front.left >= frame.left) hong('3D set', 'depth blur check: the near box does not spill out of the frame — the test setup is wrong');
+          if (blurred(spilling)) hong('3D set', `depth blur: ${blurred(spilling)} faces of a box spilling out of the frame are blurred — Chrome then draws them with pieces missing`);
+          if (!blurred(inside)) hong('3D set', 'depth blur: a box far from the focus and inside the frame is not blurred');
+          view.remove();
+        }
         // BỐI CẢNH 3D (`createSet`): phép chiếu, xếp lớp che khuất, nhân vật xoay bù theo góc máy.
         {
           const view = document.createElement('div'); view.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:600px'; host.parentNode.appendChild(view);
@@ -1145,6 +1161,14 @@ try {
       const text = mk('cap-text', 'left:480px;top:520px;width:520px;padding:10px;font:600 26px/1.25 sans-serif;text-align:center;background:#000;color:#fff');
       document.body.appendChild(stage4);
       const p1 = L.createCharacter(h1, { id: 'vet' }).rig, pet = L.createPet(h2, { species: 'dog' }).rig;
+      // Lượt MỞ ĐẦU bằng một quãng chờ vẫn bắt đầu đúng giờ của nó (máy quay gắn vào giờ ấy); chỉ động tác là đợi.
+      {
+        const paused = L.conversation([[p1, ['nod']], [pet, 1.2, 'wagTail']]);
+        const second = paused.turns[1], firstEnd = paused.turns[0].end;
+        if (second.start > firstEnd + 0.5) hong('conversation', `a turn that opens with a 1.2 s pause starts at ${second.start.toFixed(2)} s — it should start when the previous one ends (${firstEnd.toFixed(2)} s) and only its action waits`);
+        if (!(second.steps[0].start >= second.start + 1.1)) hong('conversation', 'the action after an opening pause does not wait for the pause');
+        paused.sequences.forEach((sequence) => sequence.kill());
+      }
       const talk = L.conversation([[p1, ['explain', 'Xin chao cac ban, hom nay minh kham dinh ky cho be.', 3]], [pet, 'wagTail']]);
       const covers = (options) => {
         const words = L.captions(talk, text, options), reel = gsap.timeline({ paused: true }); talk.addTo(reel, 0); reel.add(words.paused(false), 0); reel.time(1.5);
@@ -1247,6 +1271,92 @@ try {
       away.progress(1); if (taker.s.itemL !== 0) hong('hideItem', 'the item is not put away');
       if (away.duration() < 0.6) hong('hideItem', `takes only ${away.duration().toFixed(2)}s — no room for a putting-away move`);
       away.kill(); giver.svg.remove(); taker.svg.remove();
+    }
+    // ĐIỆN THOẠI VÀ MÁY TÍNH: gọi điện (áp máy lên má, mặt lưng ra ngoài), thế áp máy giữ qua câu nói, khoe màn hình
+    // (phóng to), bấm điện thoại, gõ phím; điện thoại / máy tính có ảnh trên màn hình.
+    {
+      const caller = L.createCharacter(host, { id: 'vet', items: { R: { kind: 'phone', image: 'data:image/png;base64,iVBORw0KGgo=' } } }).rig;
+      if (!caller.el.itemR.querySelector('image[href^="data:image/png"]')) hong('phone', 'items: { R: { kind: "phone", image } } does not draw the picture on the screen');
+      const head = () => caller.el.dau.getBoundingClientRect(), wrist = () => caller.el.coTayR.getBoundingClientRect();
+      const ring = caller.call('Alo, phòng khám xin nghe', 1.6); ring.time(1.2);
+      const h = head(), w = wrist(), frontShown = [...caller.el.itemR.querySelectorAll('[data-front]')].some((el) => el.style.display !== 'none');
+      if (!(caller.s.phoneR > 0.99)) hong('call', `mid-call the phone stance is ${caller.s.phoneR}`);
+      if (frontShown) hong('call', 'the phone at the cheek should show its back, not the screen');
+      if (!(w.top < h.bottom && w.right > h.left + h.width * 0.55)) hong('call', 'the hand with the phone is not at the cheek on its own side');
+      let opened = 0; for (let time = 0.6; time < 2.1; time += 0.03) { ring.time(time); opened = Math.max(opened, caller.s.mieng); }
+      if (opened < 0.2) hong('call', `call(text) does not move the mouth (widest ${opened.toFixed(2)})`);
+      ring.progress(1); if (caller.s.phoneR !== 0 || caller.s.itemZoomR !== 1) hong('call', 'call does not put the phone down');
+      ring.kill();
+      // Thế áp máy: phoneUp → explain → phoneDown; giữa câu nói tay cầm máy vẫn ở má (tay kia cử chỉ).
+      const talk = L.sequence(caller, [['phoneUp'], ['explain', 'Dạ chiều nay ba giờ được không ạ?', 2.4], ['phoneDown']]);
+      talk.time(talk.data.steps[1].start + 1.2);
+      if (caller.s.phoneR < 0.99) hong('phoneUp', `the phone stance is ${caller.s.phoneR.toFixed(2)} in the middle of the next spoken line — it should be held`);
+      const angleR = parseFloat(/rotate\(([-\d.e]+)/.exec(caller.el.batR.getAttribute('transform'))[1]);
+      if (Math.abs(angleR + 100) > 1) hong('phoneUp', `while speaking on the phone the phone arm is at ${angleR.toFixed(0)}° — it should stay at the cheek (−100°)`);
+      // Cánh tay cầm máy phải thấy được là mọc ra từ VAI: khuỷu nằm ngoài mép đầu và không cao hơn cằm. Khuỷu giơ cao
+      // thì bắp tay chạy sát dưới hàm, đầu chibi che mất vai — cánh tay như mọc ra từ cằm (bà cụ "mất tay phải").
+      const headBox = caller.el.khuon.getBoundingClientRect(), elbowAt = new DOMPoint(0, 0).matrixTransform(caller.el.cangR.getScreenCTM());
+      const inFace = caller.el.khuon.isPointInFill(new DOMPoint(elbowAt.x, elbowAt.y).matrixTransform(caller.el.khuon.getScreenCTM().inverse()));
+      if (inFace) hong('call', 'the elbow of the arm holding the phone lies over the face — the arm seems to come out of the chin');
+      if (elbowAt.y < headBox.bottom - headBox.height * 0.2) hong('call', `the elbow of the arm holding the phone is raised to ${((headBox.bottom - elbowAt.y) / headBox.height * 100).toFixed(0)}% of the head height above the chin — the upper arm then runs under the jaw and the shoulder is hidden`);
+      talk.time(talk.duration()); if (caller.s.phoneR !== 0) hong('phoneDown', 'the phone is still at the cheek after phoneDown');
+      talk.kill();
+      // Quay 3/4 về phía người nghe, áp máy bằng tay GẦN, nói câu dài: tay rảnh là tay PHÍA XA và diễn cử chỉ — bắp tay
+      // của nó không bao giờ bị ẩn (dáng gập cẳng tay vào trong của tay xa ẩn bắp tay: cẳng tay mọc ra từ mép áo).
+      for (const seed of [1, 2, 3, 4, 5, 6]) {
+        L.seed(seed);
+        const granny = L.createCharacter(host, { id: 'granny', items: { R: 'phone' } }).rig; granny.state.facing = -0.55;
+        const line = L.sequence(granny, [['phoneUp'], ['explain', 'Alo, cho tôi đặt lịch tiêm cho mèo nhé, chiều nay có được không, cảm ơn nhiều.', 5]]);
+        let hidden = null;
+        for (let time = 0; time <= line.duration() && hidden === null; time += 1 / 20) { line.time(time); if (granny.el.canhHinhL.style.visibility === 'hidden') hidden = time; }
+        if (hidden !== null) hong('explain', `turned three-quarter on the phone (seed ${seed}): the free far arm gestures with its upper arm hidden at ${hidden.toFixed(2)} s — the forearm seems to come out of the side of the top`);
+        line.kill(); granny.svg.remove();
+      }
+      L.seed(1);
+      // Khoe màn hình: phóng to, màn hình (mặt trước) hướng ra; xong thì về cỡ cũ.
+      caller.reset(); const show = caller.showPhone(1.2); show.time(1);
+      if (!(caller.s.itemZoomR > 2) || [...caller.el.itemR.querySelectorAll('[data-front]')].some((el) => el.style.display === 'none')) hong('showPhone', `the phone is not shown screen-out and enlarged (zoom ${caller.s.itemZoomR.toFixed(2)})`);
+      show.progress(1); if (caller.s.itemZoomR !== 1) hong('showPhone', 'the phone does not return to its normal size');
+      show.kill();
+      // Bấm điện thoại: tay kia là ngón trỏ, đưa tới gần điện thoại.
+      const tap = caller.tapPhone(1.4); tap.time(0.9);
+      const phoneBox = caller.el.itemR.getBoundingClientRect(), finger = caller.el.coTayL.getBoundingClientRect();
+      if (caller.s.tayL !== 'chi') hong('tapPhone', `the other hand should point with the index finger (hand "${caller.s.tayL}")`);
+      if (Math.hypot((finger.left + finger.right - phoneBox.left - phoneBox.right) / 2, (finger.top + finger.bottom - phoneBox.top - phoneBox.bottom) / 2) > phoneBox.width * 1.5) hong('tapPhone', 'the tapping hand is not at the phone');
+      // …và CÚI NHÌN màn hình suốt lúc bấm (không nhìn ống kính).
+      if (!(caller.s.dauY >= 12 && caller.s.nhinY >= 4 && caller.s.matY >= 0.4)) hong('tapPhone', `the head should be down looking at the phone while tapping (head ${caller.s.dauY.toFixed(1)}, eyes ${caller.s.nhinY.toFixed(1)}, lids ${caller.s.matY.toFixed(2)})`);
+      tap.kill();
+      // Bấm rồi khoe NGAY (sequence): điện thoại không thu về cỡ nhỏ ở giữa hai bước.
+      caller.reset();
+      const tapShow = L.sequence(caller, [['tapPhone', 1.2], ['showPhone', 1.2]]);
+      let smallest = 9; const from = tapShow.data.steps[0].start + 0.6, to = tapShow.data.steps[1].start + 0.4;
+      for (let time = from; time <= to; time += 1 / 30) { tapShow.time(time); smallest = Math.min(smallest, caller.s.itemZoomR); }
+      if (smallest < 1.8) hong('tapPhone', `tapPhone then showPhone: the phone shrinks to ${smallest.toFixed(2)}× between the two — it should go straight from the chest to the face`);
+      tapShow.time(tapShow.duration()); if (caller.s.itemZoomR !== 1) hong('tapPhone', 'after tapPhone + showPhone the phone does not return to its normal size');
+      tapShow.kill();
+      // Không cầm gì: báo lỗi rõ ràng.
+      const empty = L.createCharacter(host, { id: 'boy' }).rig;
+      for (const action of ['showPhone', 'tapPhone', 'phoneUp']) {
+        let message = ''; try { empty[action](); } catch (error) { message = error.message; }
+        if (!message.includes('items: { R: "phone" }')) hong(action, 'with empty hands it should say how to give the character a phone');
+      }
+      // Gõ phím: hai cẳng tay đưa ra trước rồi về nghỉ.
+      const keys = empty.typing(1.6); keys.time(1);
+      if (!(empty.s.cangL < -50 && empty.s.cangR < -50)) hong('typing', `both forearms should come forward over the keyboard (${empty.s.cangL.toFixed(0)}°, ${empty.s.cangR.toFixed(0)}°)`);
+      if (!(empty.s.dauY >= 12 && empty.s.nhinY >= 4 && empty.s.matY >= 0.4)) hong('typing', `the head should be down at the screen while typing (head ${empty.s.dauY.toFixed(1)}, eyes ${empty.s.nhinY.toFixed(1)}) — with the hands hidden behind the lid, the head is what tells`);
+      keys.progress(1); if (Math.abs(empty.s.cangR - empty.NGHI.cangR) > 1e-6) hong('typing', 'does not return to rest');
+      keys.kill(); empty.svg.remove(); caller.svg.remove();
+      // Máy tính: ảnh trên màn hình; laptop quay lưng thì không có màn hình; tuỳ chọn sai bị từ chối.
+      const deviceHost = document.createElement('div'); document.body.appendChild(deviceHost);
+      L.createProp(deviceHost, 'monitor', { image: 'dash.png' });
+      if (!deviceHost.querySelector('image[href="dash.png"]')) hong('monitor', 'the screen picture is not drawn');
+      L.createProp(deviceHost, 'laptop', { image: 'dash.png' });
+      if (deviceHost.querySelector('image')) hong('laptop', 'a laptop facing away shows its lid, not the screen picture');
+      L.createProp(deviceHost, 'laptop', { facing: 'viewer', image: 'dash.png', on: 0 });
+      if (!deviceHost.querySelector('image[href="dash.png"]')) hong('laptop', 'facing: "viewer" should draw the screen picture');
+      let refused = ''; try { L.createProp(deviceHost, 'laptop', { facing: 'up' }); } catch (error) { refused = error.message; }
+      if (!refused.includes("'away' or 'viewer'")) hong('laptop', 'an unknown facing is not refused');
+      deviceHost.remove();
     }
     // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
     {
@@ -1436,7 +1546,9 @@ try {
       if (!prop.svg.querySelector('rect, path')) hong(`prop ${kind}`, 'draws nothing');
       const box = prop.svg.getBoundingClientRect(), drawn = [...prop.svg.children].map((el) => el.getBoundingClientRect());
       const bottom = Math.max(...drawn.map((r) => r.bottom)) - box.top;
-      if (Math.abs(bottom - 458) > 6) hong(`prop ${kind}`, `does not stand on the floor line (bottom at ${bottom.toFixed(0)}, floor 458)`);
+      // Máy tính đứng trên MẶT BÀN cao `on` (mặc định 150 — đúng mặt bàn, mặt quầy mặc định), không trên sàn.
+      const rests = ['laptop', 'monitor'].includes(kind) ? 458 - 150 : 458;
+      if (Math.abs(bottom - rests) > 6) hong(`prop ${kind}`, `does not stand on its ${rests === 458 ? 'floor line' : 'table top'} (bottom at ${bottom.toFixed(0)}, expected ${rests})`);
       propHost.remove();
     }
     // Mặt ghế phải nằm ngay dưới đùi người ngồi: giữa gấu áo và bàn chân.

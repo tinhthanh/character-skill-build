@@ -43,6 +43,11 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   (or `"clipboard"`, `"phone"`, or `{ "L": "cup" }` for the left hand) gives a person that item;
   `"holdsHidden": true` keeps it put away, so it can be received mid-scene:
   `{ "together": [ { "who": "barista", "do": [["handOver", "@granny"]] }, { "who": "granny", "do": [["take", "@barista"]] } ] }`.
+  `"holds": { "R": { "kind": "phone", "image": "app.png" } }` puts a picture (the app) on the
+  phone's screen. A turn with `"phone": true` says its line ON THE PHONE (phone to the cheek
+  before, down after; works with a recorded voice); listening is `"do": [["call", null, 2]]`.
+  Phone and computer steps: `["showPhone", 1.8]` (screen to the viewer, enlarged), `["tapPhone", 1.6]`,
+  `["typing", 2]` (with a laptop in front).
   Other interaction steps for `do`: `"drink"`, `"write"`, and `["stroke", "@pet"]` — in a turn
   without `say` the pet answers at the same time (a cat purrs, a dog wags its tail). A
   character that strokes or hands over walks up to the target first when it is out of reach
@@ -467,11 +472,15 @@ character facing right is seen more from the front as the camera moves to the ri
   stands on top of it.
 - **`set.panels`** — windows, boards, pictures on a wall: `wall` (`back` / `left` / `right`),
   `at` (x for the back wall, z of the near edge for a side wall), `y` (height of the top
-  edge), `width`, `height`, `color`, `border`.
+  edge), `width`, `height`, `color`, `border`, `image` (a picture file filling the panel: a TV
+  or wall screen showing the app, a poster, an X-ray, the clinic's sign).
 - **`set.cutouts`** — flat upright pictures that stand in the room like the characters (always
   facing the lens, sharp, stacked by depth with them): `kind` (a ready-made prop: `plant`,
-  `chair`, `stool`, `table`, `counter`) or `image` (a picture file), `x`, `z`, optional `y`,
-  `height`, `color`, `shadow: false`. Put one **close to the camera** (`z` near the open front of
+  `chair`, `stool`, `table`, `counter`, `laptop`, `monitor`) or `image` (a picture file), `x`, `z`, optional `y`,
+  `height`, `color`, `shadow: false`. `laptop` and `monitor` take `screen` (a picture on the
+  screen) and the laptop `facing` (`"away"`, the default, or `"viewer"`); stand them on a box
+  with `y` = the box's height, and leave `height` out so they keep a person's scale. A laptop
+  in front of a person behind a counter hides the hands of `["typing", 2]`. Put one **close to the camera** (`z` near the open front of
   the room) for a foreground: when the camera pans it slides across the frame faster than the
   room behind — parallax, the cheapest way to make the set read as 3D.
 - **Depth of field — `blur`** (a camera value, so it goes in `set.camera` or a `view`): things
