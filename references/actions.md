@@ -168,6 +168,7 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `stool` | `for`, `color`, `width = 84` | |
 | `table` | `color`, `width = 230`, `height = 150` | thin top on two legs |
 | `counter` | `color`, `width = 300`, `height = 150` | solid to the floor |
+| `plant` | `color` (the pot), `width = 120` | a potted plant; in a 3D set, a foreground cutout (`set.stand`, `set.cutouts`) |
 
 The top of a table or counter is `(12 + height) × hostHeight / 470` px above the bottom of its
 host (the floor line sits 12 units above the host's bottom edge) — e.g. 262 px for the default

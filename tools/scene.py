@@ -34,6 +34,19 @@ Scene file (every key except `characters` and `script` is optional):
     "captions": true           show the words, one line at a time, at the bottom centre of the frame (false = none)
   }
 
+A 3D SET — a room with depth and a camera that changes angle; the characters stay 2D and face the lens
+(sample: examples/scene-3d/scene.json; reference: references/hyperframes.md, "3D sets"):
+
+  "set": { "room": { "width": 1800, "depth": 1300, "height": 700 },
+           "boxes": [ { "name": "table", "x": 330, "z": -560, "width": 380, "depth": 200, "height": 170 } ],
+           "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
+           "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
+           "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
+  characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
+  a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
+  The camera stays near eye level: pitch −8…15°, yaw within ±60°.
+  Not combined with "props", "background", "camera", "layout": "presenter", "enter" / "exit" or seated people.
+
   characters   `id` = a registered person (see `VGCharacter.list()`), or `species` = a pet.
                `x` is where the character STANDS: the centre, in px from the left of the frame.
                `height` is the host height in px (default: 0.7 × the frame height for people — 760 at
@@ -78,7 +91,7 @@ clips and the total duration are out of date. Fix them in place with:
 
     python3 tools/scene.py --retime path/to/index.html
 """
-import argparse, difflib, hashlib, json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.parse
+import argparse, difflib, hashlib, json, math, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -104,13 +117,36 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on')
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
+# BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin')
+ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
+BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
+PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter')
+CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
+VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
+# Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
+# vòng xa hơn thì không có mặt sau để xoay tới.
+PITCH_LIMITS, YAW_LIMIT, NORMAL_LENS = (-8, 15), 60, 1700
+ROOM_DEFAULTS = {'width': 1800, 'depth': 1300, 'height': 700, 'front': 200, 'floor': '#b7ccd3', 'floor2': '#a9c1c9', 'tile': 200,
+                 'wall': 'linear-gradient(#d9e8ec, #c3d8de)', 'sideWall': 'linear-gradient(#cfdfe4, #b8ced5)'}
+
+
+def check_camera(values, where):
+    if 'pitch' in values and not PITCH_LIMITS[0] <= values['pitch'] <= PITCH_LIMITS[1]:
+        fail(f'{where}: pitch {values["pitch"]} is outside {PITCH_LIMITS[0]}…{PITCH_LIMITS[1]}° — from higher up the characters read as cards standing on the floor. For a view of the whole room use "wide": true')
+    if 'yaw' in values and abs(values['yaw']) > YAW_LIMIT:
+        fail(f'{where}: yaw {values["yaw"]} is beyond ±{YAW_LIMIT}° — the characters have no back to show')
+    if 'lens' in values and values['lens'] < 400: fail(f'{where}: lens {values["lens"]} is too short (at least 400)')
+    if 'blur' in values and not 0 <= values['blur'] <= 30: fail(f'{where}: blur {values["blur"]} must be within 0…30')
 
 
 def fingerprint(html):
@@ -276,6 +312,38 @@ def main():
     known('scene', scene, TOP_KEYS)
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
+    stage_set = scene.get('set')
+    if stage_set is not None:
+        if not isinstance(stage_set, dict): fail('"set" must be an object: { "room": {…}, "boxes": […], "camera": {…} }')
+        known('set', stage_set, SET_KEYS)
+        for key, allowed in (('room', ROOM_KEYS), ('camera', CAMERA_KEYS)):
+            if key in stage_set and not isinstance(stage_set[key], dict): fail(f'set.{key} must be an object')
+            known(f'set.{key}', stage_set.get(key, {}), allowed)
+        if any(not isinstance(value, (int, float)) for value in stage_set.get('camera', {}).values()): fail('set.camera: every value must be a number')
+        check_camera(stage_set.get('camera', {}), 'set.camera')
+        for key, allowed in (('boxes', BOX_KEYS), ('panels', PANEL_KEYS), ('cutouts', CUTOUT_KEYS)):
+            if not isinstance(stage_set.get(key, []), list): fail(f'set.{key} must be a list')
+            for n, item in enumerate(stage_set.get(key, [])):
+                if not isinstance(item, dict): fail(f'set.{key}[{n}] must be an object')
+                known(f'set.{key}[{n}]', item, allowed)
+        for n, item in enumerate(stage_set.get('boxes', [])):
+            for key in ('x', 'z', 'width', 'depth', 'height'):
+                if not isinstance(item.get(key), (int, float)): fail(f'set.boxes[{n}] needs a number "{key}"')
+        for n, item in enumerate(stage_set.get('cutouts', [])):
+            if bool(item.get('kind')) == bool(item.get('image')): fail(f'set.cutouts[{n}] needs either "kind" ({", ".join(CUTOUT_KINDS)}) or "image" (a picture file)')
+            if item.get('kind') and item['kind'] not in CUTOUT_KINDS: fail(f'set.cutouts[{n}].kind must be one of {", ".join(CUTOUT_KINDS)} — got {js(item["kind"])}')
+            folder = os.path.dirname(os.path.abspath(args.scene))
+            if item.get('image') and not os.path.isfile(os.path.join(folder, item['image'])): fail(f'set.cutouts[{n}].image not found: {item["image"]} (looked in {folder})')
+            for key in ('x', 'z'):
+                if not isinstance(item.get(key), (int, float)): fail(f'set.cutouts[{n}] needs a number "{key}"')
+        for n, item in enumerate(stage_set.get('panels', [])):
+            if item.get('wall', 'back') not in ('back', 'left', 'right'): fail(f'set.panels[{n}].wall must be "back", "left" or "right"')
+            for key in ('at', 'y', 'width', 'height'):
+                if not isinstance(item.get(key), (int, float)): fail(f'set.panels[{n}] needs a number "{key}"')
+        # Những thứ của cảnh PHẲNG không có nghĩa trong bối cảnh 3D — báo rõ thay vì lặng lẽ bỏ qua.
+        for key, why in (('props', 'use set.boxes'), ('background', 'use set.sky and set.room'), ('camera', 'put "view" on the turns instead')):
+            if scene.get(key): fail(f'"{key}" cannot be combined with "set" — {why}')
+        if scene.get('layout', 'stage') != 'stage': fail('"layout": "presenter" cannot be combined with "set"')
     base = os.path.dirname(os.path.abspath(args.scene))
     scene_id = slug(scene.get('id') or os.path.splitext(os.path.basename(args.scene))[0])
     width, height = int(scene.get('width', 1920)), int(scene.get('height', 1080))
@@ -311,6 +379,11 @@ def main():
         if not who.get('enter'): who.pop('enter', None)
         if late.get(name) is True: late[name] = nearer
         if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
+        if stage_set is None and ('z' in who or 'on' in who): fail(f'character "{name}": "z" and "on" place a character in a 3D set — add "set" at the top of the scene file')
+        if stage_set is not None:
+            if who.get('enter') or late.get(name): fail(f'character "{name}": "enter" is not supported in a 3D set yet — place the character with "x" and "z"')
+            if who.get('seated') and not pet: fail(f'character "{name}": "seated" is not supported in a 3D set yet')
+            if 'on' in who and who['on'] not in [box.get('name') for box in stage_set.get('boxes', [])]: fail(f'character "{name}": "on" must name one of set.boxes (got {js(who["on"])})')
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
@@ -323,7 +396,7 @@ def main():
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
         frame = PET if pet else PERSON
-        host_height = float(who.get('height', pet_default if pet else person_default))
+        host_height = float(who.get('height', (pet_default if pet else person_default) * (0.74 if stage_set is not None else 1)))
         host_width = host_height * frame[0] / frame[1]
         unit = host_height / frame[1]
         stand = float(who['x'])
@@ -444,6 +517,37 @@ def main():
     # Chỉ số "phẳng" của từng lượt trong talk.turns: các lượt mở đầu (thú ngồi sẵn, bước vào, quay mặt) đứng trước kịch bản.
     flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals)
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
+    # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
+    # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
+    views, emitted = [], [flat]
+    def view_of(turn, where):
+        view = turn.get('view')
+        if view is None: return
+        if stage_set is None: fail(f'{where}: "view" moves the camera of a 3D set — add "set" at the top of the scene file')
+        if not isinstance(view, dict) or not view: fail(f'{where}: "view" must be an object such as {{ "yaw": 20, "distance": 1200, "dur": 2 }}')
+        known(f'{where}.view', view, VIEW_KEYS)
+        values = {key: view[key] for key in CAMERA_KEYS if key in view}
+        if any(not isinstance(value, (int, float)) for value in values.values()): fail(f'{where}: every camera value in "view" must be a number')
+        if view.get('wide') not in (None, True, False): fail(f'{where}: "wide" must be true')
+        if not values and not view.get('wide'): fail(f'{where}: "view" changes nothing — give at least one of {", ".join(CAMERA_KEYS)}, or "wide": true')
+        check_camera(values, f'{where}.view')
+        wide = bool(view.get('wide'))
+        if wide:
+            # TOÀN CẢNH: ống kính dài ở góc thấp (OVERVIEW của runtime), ngắm giữa phòng, zoom vừa khung. Phần nào kịch bản
+            # tự cho (yaw, zoom…) thì giữ.
+            room = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))
+            yaw, pitch = float(values.get('yaw', 0)), float(values.get('pitch', 14))
+            across = room['width'] * math.cos(math.radians(yaw)) + room['depth'] * math.sin(math.radians(abs(yaw)))
+            tall = room['height'] * math.cos(math.radians(pitch)) + room['depth'] * math.sin(math.radians(pitch))
+            values = dict({'yaw': yaw, 'pitch': pitch, 'lens': 5000, 'distance': 5000, 'x': 0, 'y': round(room['height'] * 0.4),
+                           'z': round(room['front'] - room['depth'] / 2), 'zoom': round(min(0.95 * width / across, 0.82 * height / tall), 3)}, **values)
+        # Rời một cảnh toàn (ống kính dài) là một lần CẮT về ống kính thường: lia từ ống kính 5000 về 1700 thì phối cảnh
+        # của cả phòng co giãn trước mắt người xem (hiệu ứng "vertigo").
+        leaving = bool(views) and views[-1]['wide'] and not wide
+        if leaving:
+            values = dict({'lens': NORMAL_LENS, 'distance': float(stage_set.get('camera', {}).get('distance', 1750)), 'zoom': float(stage_set.get('camera', {}).get('zoom', 1))}, **values)
+        views.append({'turn': emitted[0], 'values': values, 'wide': wide, 'cut': bool(view.get('cut')) or wide or leaving,
+                      'dur': float(view.get('dur', 1.5)), 'ease': view.get('ease', 'sine.inOut'), 'where': where})
     for index, entry in enumerate(script):
         where = f'script[{index}]'
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
@@ -471,14 +575,19 @@ def main():
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                emitted[0] += 1
                 who['x'] = float(who['x']) + move
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
             known(where, entry, ('together',))
             if not isinstance(entry['together'], list) or not entry['together']: fail(f'{where}: "together" must be a non-empty list of turns')
+            if any(isinstance(turn, dict) and 'view' in turn for turn in entry['together']): fail(f'{where}: "view" cannot sit inside "together" — put it on a turn of its own, before or after')
+            emitted[0] += len(entry['together'])
             turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
         else:
             code = turn_code(entry, where)
+            view_of(entry, where)
+            if stage_set is not None and ('exit' in entry or 'enter' in entry): fail(f'{where}: "enter" and "exit" are not supported in a 3D set yet')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
             # tự viết `together`.
             stroked = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'stroke' and isinstance(step[1], str) and step[1].startswith('@')]
@@ -486,7 +595,23 @@ def main():
             if pets and 'say' not in entry and code.startswith('['):
                 pet = names[pets[0]]
                 code = '{ together: [' + code + f", [{pet['name']}, {js('purr' if 'cat' in pet['species'] else 'wagTail')}]] }}"
+                emitted[0] += 1
             turns.append((None, code))
+            emitted[0] += 1
+
+    camera_notes = []
+    # Máy quay vòng tới đâu thì người nhìn sang ngang được tới đó, không xa hơn: rig xoay tới nghiêng hẳn là hết (không
+    # có mặt sau). Báo những góc máy làm một nhân vật đang nhìn người kia bị đẩy quá dáng nghiêng.
+    if stage_set is not None:
+        yaw = float(stage_set.get('camera', {}).get('yaw', 0))
+        for view in views:
+            yaw = float(view['values'].get('yaw', yaw))
+            for who in names.values():
+                if who['_pet'] or not who.get('faces'): continue
+                toward = -0.55 if float(names[who['faces']]['x']) < float(who['x']) else 0.55
+                if abs(toward - yaw / 90) > 1.0 + 1e-6:
+                    low, high = max(-YAW_LIMIT, round(90 * (toward - 1))), min(YAW_LIMIT, round(90 * (toward + 1)))
+                    camera_notes.append(f'{view["where"]}: with the camera at yaw {yaw:g}°, "{who["name"]}" (facing {who["faces"]}) would have to turn past full profile — it stops at profile. Keep yaw between {low} and {high}° for this shot, or cut to the other side')
 
     # ── đạo cụ ──
     props = []
@@ -501,7 +626,7 @@ def main():
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
 
     # ── người NGỒI sau một đạo cụ "front" cao quá ngực thì chỉ còn thấy cái đầu: báo trước ──
-    notes = []
+    notes = list(camera_notes)
     for prop in props:
         if not prop['front'] or prop['kind'] not in ('counter', 'table'): continue
         unit = prop['host_height'] / PERSON[1]
@@ -566,7 +691,43 @@ def main():
 
     # Nền: một ẢNH phủ kín khung (thì không vẽ dải sàn đè lên, trừ khi kịch bản khai màu sàn), hoặc tường + sàn màu trơn.
     picture = scene.get('background', {}).get('image')
-    if picture:
+    if stage_set is not None:
+        # BỐI CẢNH 3D: một clip `view` phủ kín khung; phòng, đồ vật và host của nhân vật do `createSet` dựng bên trong nó.
+        clip('view', f'position: absolute; inset: 0; background: {stage_set.get("sky", "linear-gradient(#cfe3ea, #e9f1f3)")};')
+        room = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))
+        half, front, back = room['width'] / 2, room['front'], room['front'] - room['depth']
+        floor = (f"conic-gradient({room['floor']} 25%, {room['floor2']} 0 50%, {room['floor']} 0 75%, {room['floor2']} 0) 0 0 / {room['tile']}px {room['tile']}px"
+                 if room.get('tile') and room.get('floor2') else room['floor'])
+        start = dict({'yaw': 0, 'pitch': 6, 'distance': 1750, 'x': 0, 'y': round(room['height'] * 0.43), 'z': round((front + back) / 2 + room['depth'] * 0.08)}, **stage_set.get('camera', {}))
+        origin = f", origin: {js(stage_set['origin'])}" if stage_set.get('origin') else ''
+        setup.append(f"    // The 3D set: a room of flat planes; the characters stay 2D and always face the lens (references/hyperframes.md, \"3D sets\").")
+        setup.append(f"    const set = VGCharacter.createSet($('view'), {{ camera: {js(start)}{origin} }});")
+        setup.append(f"    set.floor({{ x: [{-half:g}, {half:g}], z: [{back:g}, {front:g}], style: {js('background:' + floor)} }});")
+        setup.append(f"    set.wall({{ from: [{-half:g}, {back:g}], to: [{half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['wall'])} }});")
+        setup.append(f"    set.wall({{ from: [{-half:g}, {front:g}], to: [{-half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
+        setup.append(f"    set.wall({{ from: [{half:g}, {back:g}], to: [{half:g}, {front:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
+        for item in stage_set.get('panels', []):
+            side = item.get('wall', 'back')
+            look = f"background:{item.get('color', '#9fd0e6')};border:{item.get('border', '12px solid #f4f7f8')};box-sizing:border-box"
+            at, turn = (([item['at'], item['y'], back + 1], 0) if side == 'back' else ([-half + 1, item['y'], item['at']], 90) if side == 'left' else ([half - 1, item['y'], item['at'] - item['width']], -90))
+            setup.append(f"    set.panel({{ at: {js(at)}, size: [{item['width']:g}, {item['height']:g}], turn: {turn}, style: {js(look)} }});")
+        for n, item in enumerate(stage_set.get('boxes', [])):
+            colour = item.get('color', '#8fb3bf')
+            tone = {'top': item.get('top', '#f1f4f5'), 'front': colour, 'side': item.get('side', colour)}
+            numbers = ', '.join(f"{key}: {item[key]:g}" for key in ('x', 'z', 'width', 'depth', 'height', 'y') if key in item)
+            setup.append(f"    const box{n + 1} = set.box({{ {numbers}, colors: {js(tone)} }});" + (f"          // {item['name']}" if item.get('name') else ''))
+        for n, item in enumerate(stage_set.get('cutouts', [])):
+            # Tấm hình phẳng đứng trong phòng (đạo cụ vẽ sẵn hay ảnh) — đặt sát máy quay là có tiền cảnh.
+            tall = float(item.get('height', round(person_default * 0.74)))
+            where_ = ', '.join(f"{key}: {float(item[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
+            if item.get('kind'):
+                look = f", {{ color: {js(item['color'])} }}" if item.get('color') else ''
+                setup.append(f"    const cutout{n + 1} = document.createElement('div'); VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});")
+            else:
+                name = os.path.basename(item['image'])
+                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
+                setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = ''; set.stand(cutout{n + 1}, {{ {where_} }});")
+    elif picture:
         source = os.path.join(base, picture)
         if not os.path.isfile(source): fail(f'background.image not found: {picture} (looked in {base})')
         if os.path.abspath(source) != os.path.abspath(os.path.join(out, os.path.basename(picture))): shutil.copy(source, os.path.join(out, os.path.basename(picture)))
@@ -577,7 +738,7 @@ def main():
         clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
     if preset:
         background['floor'] = scene.get('background', {}).get('floor', PRESETS[preset]['floor'])
-    if not picture or 'floor' in scene.get('background', {}):
+    if stage_set is None and (not picture or 'floor' in scene.get('background', {})):
         clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
     for prop in [item for item in props if not item['front']]:
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
@@ -585,6 +746,7 @@ def main():
         if who.get('_seat'):
             seat = who['_seat']
             clip(seat['element'], f'position: absolute; left: {seat["left"]:.0f}px; bottom: {ground}px; height: {seat["host_height"]:.0f}px;'); layers.append('#' + seat['element'])
+        if stage_set is not None: continue                 # host của nhân vật do set.place tạo và đặt
         clip(who['_element'], f'position: absolute; left: {who["_left"]:.0f}px; bottom: {ground}px; height: {who["_host_height"]:.0f}px;'); layers.append('#' + who['_element'])
     for prop in [item for item in props if item['front']]:           # "front": true — vẽ SAU nhân vật, tức che phía trước họ (đứng sau quầy)
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
@@ -666,8 +828,13 @@ def main():
         body.append(f'  <audio id="music" class="clip" src="{os.path.basename(music)}" data-role="music" data-start="0" data-duration="__TOTAL__" data-track-index="{track[0]}" data-volume="{float(scene.get("musicVolume", 0.15)):g}"></audio>')
         track[0] += 1
     for who in names.values():
-        make = f"VGCharacter.createPet($('{who['_element']}'), {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter($('{who['_element']}'), {{ id: {js(who['id'])}" + (f", items: {js(who['holds'])}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
+        mount = "document.createElement('div')" if stage_set is not None else f"$('{who['_element']}')"
+        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(who['holds'])}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
+        if stage_set is not None:
+            boxes = [box.get('name') for box in stage_set.get('boxes', [])]
+            lift = f", y: box{boxes.index(who['on']) + 1}.top" if who.get('on') else ''
+            setup.append(f"    set.place({who['name']}, {{ x: {float(who['x']):g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
@@ -681,7 +848,7 @@ def main():
             setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
         if who['_late']:
             setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")
-    camera = scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
+    camera = False if stage_set is not None else scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
@@ -703,6 +870,16 @@ def main():
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
     caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), 0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
+    # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
+    timeline_hook, view_code = '', ''
+    if stage_set is not None:
+        timeline_hook = ', onUpdate: set.update'
+        moves = []
+        for view in views:
+            values = ', '.join(f'{key}: {value:g}' for key, value in view['values'].items())
+            call = f"set.cut({{ {values} }})" if view['cut'] else f"set.move({{ {values} }}, {view['dur']:g}, {js(view['ease'])})"
+            moves.append(f"    tl.add({call}, talk.turns[{view['turn']}].start);")
+        if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
 <html lang="en">
@@ -732,9 +909,9 @@ def main():
 {chr(10).join(lines)}
     ], {{ {camera_code}gap: {float(scene.get('gap', 0.25))} }});
 
-    const tl = gsap.timeline({{ paused: true }});
+    const tl = gsap.timeline({{ paused: true{timeline_hook} }});
     talk.addTo(tl, 0);
-{caption_code}
+{caption_code}{view_code}
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.

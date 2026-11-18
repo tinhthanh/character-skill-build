@@ -1327,8 +1327,11 @@ export class RigSVG {
     const scaleAo = (1 + s.tho * 0.03) * (1 - ah * 0.4);
     if (e.phuKien) e.phuKien.setAttribute('transform', `translate(${h * 2 + Math.sign(h) * turnDetail * CHEST_SHIFT} ${nhacY}) scale(${scaleAo * (1 - 0.1 * turnDetail)} 1)`);
     if (e.phuKienRect) {
-      this._aoBox ||= e.ao.getBBox();
-      const half = ah > 0.02 ? Math.max(Math.abs(this._aoBox.x), Math.abs(this._aoBox.x + this._aoBox.width)) * scaleAo : 400;
+      // Bề rộng áo đo MỘT LẦN cho mỗi lần dựng SVG (`e` được tạo lại khi dựng lại, nên số đo cũ tự mất) — và CHỈ nhớ khi
+      // đo được: host đang `display: none` thì `getBBox()` trả về toàn 0; nhớ số 0 ấy là từ đó hễ xoay người là mọi chi
+      // tiết ngực bị cắt sạch. Chưa đo được thì khỏi cắt.
+      if (!e.aoBox) { const box = e.ao.getBBox(); if (box.width > 0) e.aoBox = box; }
+      const half = ah > 0.02 && e.aoBox ? Math.max(Math.abs(e.aoBox.x), Math.abs(e.aoBox.x + e.aoBox.width)) * scaleAo : 400;
       e.phuKienRect.setAttribute('x', (h * 2 - half).toFixed(2)); e.phuKienRect.setAttribute('width', (half * 2).toFixed(2));
     }
     // Cùng biến đổi với thân áo, trừ phần nhấc vai (nhóm `tren` đã mang sẵn). Cắt
@@ -1447,8 +1450,11 @@ export class RigSVG {
     for (const side of ['L', 'R']) {
       const upper = rotation['bat' + side], dir = Math.sign(upper) || 1, bend = rotation['cang' + side] * dir;
       const raised = clamp((Math.abs(upper) - 40) / 25, 0, 1);
-      if (!raised || Math.abs(bend) >= MIN_ELBOW) continue;
-      const add = (MIN_ELBOW - bend) * raised;
+      // Phần gập thêm là một hàm LIÊN TỤC của độ gập sẵn có: đủ `MIN_ELBOW` khi cẳng tay thẳng hàng, giảm đều về 0 khi nó
+      // đã gập `2 × MIN_ELBOW` về BẤT KỲ phía nào. Bản 0.38.2 bù cho đủ 9° hễ độ gập nằm trong ±9°: cẳng tay đang gập
+      // ngược −9° nhích thêm một chút là nhảy sang +9° — 18° trong một khung hình, thấy rõ lúc tay rút về sau khi chỉ.
+      const add = MIN_ELBOW * raised * Math.max(0, 1 - Math.abs(bend) / (2 * MIN_ELBOW));
+      if (!add) continue;
       rotation['cang' + side] += dir * add;
       rotation['bat' + side] -= dir * add * 0.45;
     }
@@ -2924,8 +2930,10 @@ export class RigSVG {
     // (bắp 34°, cẳng −70°): nhân vật đan tay thì bàn tay gần như đứng yên, nhân vật buông tay thì bàn tay dừng ở hông —
     // cả hai chỉ thấy khuỷu bạnh ra, đọc thành chống nạnh.
     const beat = toListener ? [[36, 12], [40, 22]] : [[26, 48], [30, 60]];      // tay phía người nghe: chéo xuống về phía họ, như cử chỉ một tay của `explain`
-    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
-     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
+    // Từ dáng đan tay, cẳng tay phải đi hơn 100° mới tới dáng mở: cho nó 0,5 s thay vì 0,35 s, kẻo thành một cú vung.
+    const reach = Math.abs(beat[0][1] - this.#restArm(arm)[1]) > 90 ? 0.5 : 0.35;
+    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: reach, ease: 'power2.out' }, 0.2)
+     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.2 + reach);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
     this.blinkTo = 0;
     t.to(s, { mieng: 0, duration: 0.15 }, dur);

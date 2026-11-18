@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.39.0
+
+Added
+- **3D sets.** `VGCharacter.createSet(view)` builds a room out of flat CSS 3D planes (floor,
+  walls, panels, boxes) with a camera you move — `yaw`, `pitch`, `distance`, `lens`, aim point,
+  `zoom` — while the characters stay the 2D rigs and always face the lens. A person turns to
+  compensate for the camera's angle; each character's shadow lies on the 3D floor under its
+  soles. In a scene file: `"set"` (room, boxes, panels, camera), `"z"` and `"on"` on characters,
+  `"view"` on turns, `"wide": true` for an overview of the whole room
+  (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
+- **Foregrounds and depth of field in 3D sets.** `set.stand(element)` stands a flat picture in
+  the room like a character — a ready-made prop, an image — and `"cutouts"` in a scene file
+  does the same; placed near the camera it slides past faster than the room when the camera
+  pans. A `blur` camera value blurs whatever lies away from the point the camera aims at (the
+  floor is built in strips so that it blurs with depth). New ready-made prop: `plant`.
+- **The camera stays near eye level.** `pitch` is limited to −8…15° and `yaw` to ±60°
+  (`VGCharacter.CAMERA_LIMITS`); a camera outside them is an error. A trial isometric view
+  (looking down 35°) showed the characters as cards standing on the floor. The wide shot is
+  `VGCharacter.OVERVIEW` instead: a very long lens at a low angle.
+
+How it is put together, and why
+- A rig placed inside a `preserve-3d` element is drawn once and then only stretched while the
+  camera moves, so it comes out pixelated in a close shot — nothing a page can do makes Chrome
+  redraw it. The set therefore projects each character's spot itself and places the host as a
+  plain 2D element, and gets occlusion by stacking copies of the 3D world between the
+  characters, each holding the boxes that lie at that depth.
+- The camera is a function of time: `move` and `cut` are markers on the timeline, replayed from
+  the starting camera every frame. Built as GSAP `set()` tweens, two cuts in a row recorded each
+  other's values, and HyperFrames rendered the frame at 3 s with the long lens of a shot at 10 s.
+- Limits: no view from behind a character, occlusion per box rather than per pixel, and the
+  backdrop should stay plain.
+
+## 0.38.7
+
+Fixed — two regressions from 0.38.2, found by auditing 0.38.2–0.38.6
+- **Chest details no longer vanish for a character created while its host is hidden.** The
+  width of the shirt, used to cut chest details at the edge of a turned body, was measured
+  once; inside a `display: none` host it measured 0, and from then on every pocket, zip and
+  stethoscope was cut away whenever the character turned. It is now measured only when it
+  can be, and again after the character is rebuilt. (A HyperFrames clip that starts late
+  was not affected.)
+- **`point`, `wave` and `cheer` no longer snap at the elbow.** The minimum bend of a raised
+  arm jumped from −9° to +9° as the forearm passed through a slight reverse bend: the largest
+  step between two frames at 60 fps went from 5.9° to 20.4° for `point`, 4.2° to 18.4° for
+  `wave` and 8.7° to 12.6° for `cheer`. The added bend is now a continuous function of the
+  bend already there, and the steps are back under 9°, 9° and 11°.
+
+Changed
+- `speak`: a character resting with folded hands takes 0.5 s instead of 0.35 s to open its
+  forearm (it travels more than 100°).
+
 ## 0.38.6
 
 Fixed

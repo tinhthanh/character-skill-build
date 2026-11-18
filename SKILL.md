@@ -129,6 +129,8 @@ clips for every voice file.
    "height": 1920`. **Explainer with one presenter:** `"layout": "presenter"` and
    `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
    beside the character as they speak (`examples/scene-presenter/scene.json`).
+   For a room with depth and a camera that changes angle (pan, push in, wide shot), add
+   `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
 2. **Build it.** `python3 tools/scene.py scene.json` → `<id>/index.html` next to the scene
    file, with the bundle, cues and audio beside it. Read its notes (lines starting `!`).
 3. **Preview and look.** `sh tools/peek.sh <id>/index.html` prints every step's timing and

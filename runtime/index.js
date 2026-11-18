@@ -19,9 +19,10 @@ import { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts
 import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
+import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.38.6';
+export const VERSION = '0.39.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -892,4 +893,4 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
 
-export { RigSVG, RigThu, createProp };
+export { RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS };

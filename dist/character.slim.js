@@ -1,4 +1,4 @@
-/* VGCharacter v0.38.6 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.39.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -807,8 +807,8 @@ class RigSVG {
     const scaleAo = (1 + s.tho * 0.03) * (1 - ah * 0.4);
     if (e.phuKien) e.phuKien.setAttribute('transform', `translate(${h * 2 + Math.sign(h) * turnDetail * CHEST_SHIFT} ${nhacY}) scale(${scaleAo * (1 - 0.1 * turnDetail)} 1)`);
     if (e.phuKienRect) {
-      this._aoBox ||= e.ao.getBBox();
-      const half = ah > 0.02 ? Math.max(Math.abs(this._aoBox.x), Math.abs(this._aoBox.x + this._aoBox.width)) * scaleAo : 400;
+      if (!e.aoBox) { const box = e.ao.getBBox(); if (box.width > 0) e.aoBox = box; }
+      const half = ah > 0.02 && e.aoBox ? Math.max(Math.abs(e.aoBox.x), Math.abs(e.aoBox.x + e.aoBox.width)) * scaleAo : 400;
       e.phuKienRect.setAttribute('x', (h * 2 - half).toFixed(2)); e.phuKienRect.setAttribute('width', (half * 2).toFixed(2));
     }
     e.phuKienTren.setAttribute('transform', `translate(${h * 2} 0) scale(${(1 + s.tho * 0.03) * (1 - ah * 0.4)} 1)`);
@@ -877,8 +877,8 @@ class RigSVG {
     for (const side of ['L', 'R']) {
       const upper = rotation['bat' + side], dir = Math.sign(upper) || 1, bend = rotation['cang' + side] * dir;
       const raised = clamp((Math.abs(upper) - 40) / 25, 0, 1);
-      if (!raised || Math.abs(bend) >= MIN_ELBOW) continue;
-      const add = (MIN_ELBOW - bend) * raised;
+      const add = MIN_ELBOW * raised * Math.max(0, 1 - Math.abs(bend) / (2 * MIN_ELBOW));
+      if (!add) continue;
       rotation['cang' + side] += dir * add;
       rotation['bat' + side] -= dir * add * 0.45;
     }
@@ -1782,8 +1782,9 @@ class RigSVG {
     this.#khauHinh(t, soAm, nhip, tone.corner);
     t.to(s, { dau: -3, dauY: 2, duration: dur * 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.1);
     const beat = toListener ? [[36, 12], [40, 22]] : [[26, 48], [30, 60]];      // tay phía người nghe: chéo xuống về phía họ, như cử chỉ một tay của `explain`
-    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: 0.35, ease: 'power2.out' }, 0.2)
-     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
+    const reach = Math.abs(beat[0][1] - this.#restArm(arm)[1]) > 90 ? 0.5 : 0.35;
+    t.to(s, { ['bat' + arm]: beat[0][0], ['cang' + arm]: beat[0][1], than: -1.5, duration: reach, ease: 'power2.out' }, 0.2)
+     .to(s, { ['bat' + arm]: beat[1][0], ['cang' + arm]: beat[1][1], duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.2 + reach);
     if (dur > 1.2) this.#chop(t, dur * 0.55);
     this.blinkTo = 0;
     t.to(s, { mieng: 0, duration: 0.15 }, dur);
@@ -3005,6 +3006,14 @@ const DRAW = {
     <path d="M ${x0 + 6 + (w - 12) / 3} ${top + 16} V ${F - 6} M ${x0 + 6 + (w - 12) * 2 / 3} ${top + 16} V ${F - 6}" stroke="${line}" stroke-width="1.200" opacity=".45"/>
     <rect x="${x0}" y="${top}" width="${w}" height="13" rx="4" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
   },
+  plant: ({ w = 120, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, rim = F - 92;
+    const leaf = (angle, length, tone) => `<path d="M 200 ${rim + 4} q ${Math.sin(angle) * length * 0.55 - 14} ${-Math.cos(angle) * length * 0.5} ${Math.sin(angle) * length} ${-Math.cos(angle) * length} q ${-Math.sin(angle) * length * 0.25 + 16} ${Math.cos(angle) * length * 0.55} ${-Math.sin(angle) * length} ${Math.cos(angle) * length} z" fill="${tone}" stroke="#2f5a3a" stroke-width="1.400" stroke-linejoin="round"/>`;
+    return `
+    ${leaf(-1.05, 170, '#5f9a68')}${leaf(1.0, 180, '#5f9a68')}${leaf(-0.45, 250, '#4f8a5b')}${leaf(0.5, 240, '#4f8a5b')}${leaf(0.02, 290, '#6aa873')}
+    <path d="M ${x0} ${rim} H ${x1} L ${x1 - 14} ${F} H ${x0 + 14} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
+    <rect x="${x0 - 6}" y="${rim - 6}" width="${w + 12}" height="18" rx="6" fill="${dark}" stroke="${line}" stroke-width="1.400"/>`;
+  },
 };
 const PROP_KINDS = Object.keys(DRAW);
 function createProp(host, kind, options = {}) {
@@ -3368,6 +3377,228 @@ function configToPublic(config, pet = false) {
 }
 return { DEFINITION_KEYS, FACE_SHAPE_KEYS, BROW_KEYS, COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, REQUIRED_IDS, colorsToInternal, colorsToPublic, stateToInternal, stateToPublic, DRAWING_SLOTS, definitionToInternal, definitionToPublic, configToInternal, configToPublic };
 })();
+__m['runtime/set3d.js'] = (function () {
+const { PROP_FRAME } = __m['runtime/props.js'];
+const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
+const CAMERA_LIMITS = Object.freeze({ pitch: [-8, 15], yaw: 60 });
+const OVERVIEW = Object.freeze({ pitch: 14, lens: 5000, distance: 5000 });
+function checkCamera(values, where) {
+  for (const key of Object.keys(values)) {
+    if (key === 'iso') throw new Error(`[character] ${where}: there is no isometric camera any more — a view from above shows the characters are flat cards. Use OVERVIEW (a long lens at a low angle)`);
+    if (!CAMERA_KEYS.includes(key)) throw new Error(`[character] ${where}: unknown camera key "${key}" (${CAMERA_KEYS.join(', ')})`);
+    if (typeof values[key] !== 'number' || !Number.isFinite(values[key])) throw new Error(`[character] ${where}: camera "${key}" must be a number`);
+  }
+  if ('pitch' in values && (values.pitch < CAMERA_LIMITS.pitch[0] || values.pitch > CAMERA_LIMITS.pitch[1]))
+    throw new Error(`[character] ${where}: pitch ${values.pitch}° is outside ${CAMERA_LIMITS.pitch[0]}…${CAMERA_LIMITS.pitch[1]}° — from higher up the characters read as cards standing on the floor`);
+  if ('yaw' in values && Math.abs(values.yaw) > CAMERA_LIMITS.yaw)
+    throw new Error(`[character] ${where}: yaw ${values.yaw}° is beyond ±${CAMERA_LIMITS.yaw}° — the characters have no back to show. Cut to another angle instead`);
+  if ('lens' in values && values.lens < 400) throw new Error(`[character] ${where}: lens ${values.lens} is too short (at least 400)`);
+  if ('distance' in values && values.distance <= 50) throw new Error(`[character] ${where}: distance must be more than 50`);
+  if ('blur' in values && (values.blur < 0 || values.blur > 30)) throw new Error(`[character] ${where}: blur ${values.blur} must be within 0…30`);
+}
+function createSet(view, { origin = null, camera: initial = {} } = {}) {
+  if (!view || !view.appendChild) throw new Error('[character] createSet(view): view must be an element');
+  if (getComputedStyle(view).position === 'static') view.style.position = 'relative';
+  view.style.overflow = 'hidden';
+  const base = { yaw: 0, pitch: 6, distance: 1700, lens: 1700, x: 0, y: 300, z: -350, zoom: 1, blur: 0 };
+  const camera = { ...base }, marks = [];
+  const backdrop = [], props = [], actors = [], layers = [], focused = [];
+  let frame = null;
+  const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
+  const layer = (index) => {
+    while (layers.length <= index) {
+      const element = document.createElement('div');
+      element.style.cssText = 'position:absolute;width:0;height:0;transform-style:preserve-3d';
+      element.style.zIndex = 2 * layers.length;
+      element.setAttribute('data-layout-ignore', '');
+      view.appendChild(element); layers.push(element);
+    }
+    return layers[index];
+  };
+  const face = (parent, width, height, transform, style, centre = null) => {
+    const element = document.createElement('div');
+    element.style.cssText = `position:absolute;left:0;top:0;transform-origin:0 0;width:${width}px;height:${height}px;transform:${transform};${style || ''}`;
+    parent.appendChild(element);
+    if (centre) focused.push({ element, centre, filter: element.style.filter || '', blur: 0 });
+    return element;
+  };
+  const paint = (style, fallback) => (typeof style === 'string' && style.trim() ? (/[:;]/.test(style) ? style : `background:${style}`) : `background:${fallback}`);
+  const set = {
+    camera,
+    view,
+    floor({ x = [-900, 900], z = [-1100, 200], y = 0, style = null } = {}) {
+      const depth = z[1] - z[0], strips = clamp(Math.round(depth / 150), 1, 12), each = depth / strips;
+      for (let k = 0; k < strips; k++) {
+        const strip = face(layer(0), x[1] - x[0], each + 0.5, `translate3d(${x[0]}px, ${-y}px, ${z[0] + k * each}px) rotateX(90deg)`,
+          paint(style, '#a9c4cb') + `;background-position-y:${(-k * each).toFixed(2)}px`, [(x[0] + x[1]) / 2, y, z[0] + (k + 0.5) * each]);
+        strip.dataset.floor = k;
+        backdrop.push(strip);
+      }
+      return set;
+    },
+    wall({ from, to, height = 700, y = 0, style = null } = {}) {
+      if (!Array.isArray(from) || !Array.isArray(to)) throw new Error('[character] set.wall({ from: [x, z], to: [x, z] }) needs both ends');
+      const length = Math.hypot(to[0] - from[0], to[1] - from[1]), turn = -Math.atan2(to[1] - from[1], to[0] - from[0]) * 180 / Math.PI;
+      backdrop.push(face(layer(0), length, height, `translate3d(${from[0]}px, ${-y - height}px, ${from[1]}px) rotateY(${turn}deg)`, paint(style, '#c9dce1') + ';backface-visibility:hidden',
+        [(from[0] + to[0]) / 2, y + height / 2, (from[1] + to[1]) / 2]));
+      return set;
+    },
+    panel({ at, size, turn = 0, style = null } = {}) {
+      const across = turn * Math.PI / 180;
+      backdrop.push(face(layer(0), size[0], size[1], `translate3d(${at[0]}px, ${-at[1]}px, ${at[2]}px) rotateY(${turn}deg)`, paint(style, '#f4f7f8'),
+        [at[0] + Math.cos(across) * size[0] / 2, at[1] - size[1] / 2, at[2] - Math.sin(across) * size[0] / 2]));
+      return set;
+    },
+    box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf' } = {}) {
+      for (const [name, value] of Object.entries({ x, z, width, depth, height })) if (typeof value !== 'number') throw new Error(`[character] set.box: ${name} must be a number`);
+      const tone = typeof colors === 'string' ? { top: colors, front: colors, side: colors } : colors;
+      const group = document.createElement('div');
+      group.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d';
+      layer(0).appendChild(group);
+      const top = -y - height, middle = [x + width / 2, y + height / 2, z - depth / 2];
+      face(group, width, depth, `translate3d(${x}px, ${top}px, ${z - depth}px) rotateX(90deg)`, paint(tone.top, '#f1f4f5'), middle);
+      face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
+      face(group, depth, height, `translate3d(${x + width}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
+      face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle);
+      const prop = { group, centre: middle, top: y + height };
+      props.push(prop);
+      return prop;
+    },
+    place(rig, { x = 0, z = 0, y = 0, height = null, turn = true } = {}) {
+      const host = rig && (rig.host || (rig.svg && rig.svg.parentNode));
+      if (!host || !rig.svg) throw new Error('[character] set.place(rig, …): pass a rig made by createCharacter / createPet — for a picture or a prop use set.stand(element, …)');
+      return stand(host, rig, { x, z, y, height, turn, ground: null, shadow: true });
+    },
+    stand(element, { x = 0, z = 0, y = 0, height = null, ground = null, shadow = true } = {}) {
+      if (!element || !element.style) throw new Error('[character] set.stand(element, …): pass an element');
+      const prop = element.querySelector && element.querySelector('svg[data-prop]');
+      return stand(element, null, { x, z, y, height, turn: false, shadow, ground: ground != null ? ground : prop ? PROP_FRAME.floor / PROP_FRAME.h : 1 });
+    },
+    project(x, y, z) {
+      const lens = frame || set.update(), point = lens.matrix.transformPoint(new DOMPoint(x, -y, z));
+      const scale = camera.lens / Math.max(1, camera.lens - point.z) * camera.zoom;
+      return { x: lens.cx + point.x * scale, y: lens.cy + point.y * scale, scale, depth: point.z };
+    },
+    look(values = {}) {
+      checkCamera(values, 'set.look');
+      Object.assign(base, values);
+      set.update();
+      return set;
+    },
+    move(values, duration = 1, ease = 'sine.inOut') {
+      checkCamera(values, 'set.move');
+      return mark(values, Math.max(0, duration), ease);
+    },
+    cut(values) {
+      checkCamera(values, 'set.cut');
+      return mark(values, 0, 'none');
+    },
+    update() {
+      Object.assign(camera, base);
+      const placed = marks.filter((entry) => entry.tween.parent && entry.tween.parent !== gsap.globalTimeline)
+        .sort((a, b) => a.tween.startTime() - b.tween.startTime() || a.order - b.order);
+      for (const entry of placed) {
+        const local = entry.tween.parent.time() - entry.tween.startTime();
+        if (local < 0) continue;
+        const done = entry.duration ? clamp(local / entry.duration, 0, 1) : 1, k = entry.curve(done);
+        for (const [key, value] of Object.entries(entry.values)) camera[key] += (value - camera[key]) * k;
+      }
+      const pull = camera.lens - camera.distance, [cx, cy] = centre();
+      const moves = `rotateX(${-camera.pitch}deg) rotateY(${-camera.yaw}deg) translate3d(${-camera.x}px, ${camera.y}px, ${-camera.z}px)`;
+      view.style.perspective = camera.lens + 'px';
+      view.style.perspectiveOrigin = `${cx}px ${cy}px`;
+      frame = { cx, cy, matrix: new DOMMatrix(`translateZ(${pull}px) ${moves}`) };
+      const shown = actors.map((actor) => ({ actor, at: set.project(actor.spot.x, actor.spot.y, actor.spot.z) })).sort((a, b) => a.at.depth - b.at.depth);     // xa → gần
+      for (let index = 0; index <= shown.length; index++) {
+        const element = layer(index);
+        element.style.left = cx + 'px'; element.style.top = cy + 'px';
+        element.style.transform = `scale(${camera.zoom}) translateZ(${pull}px) ${moves}`;
+      }
+      shown.forEach(({ actor, at }, rank) => {
+        const { host, rig } = actor;
+        if (!actor.width) { actor.width = host.offsetWidth; actor.height = host.offsetHeight; }        // host đang ẩn thì chưa đo được: đo lại ở khung sau
+        if (actor.ground === null && actor.width) actor.ground = groundOf(rig);
+        soften(actor, host, '', blurAt(at.depth));
+        host.style.zIndex = 2 * rank + 1;
+        if (!actor.content) actor.content = contentOf(host);
+        const [cx0, cy0, cx1, cy1] = actor.content, w = actor.width * at.scale, h = actor.height * at.scale;
+        const left = at.x - w / 2, top = at.y - h * (actor.ground || 1);
+        const away = camera.lens - at.depth < 60 || left + cx0 * w > view.clientWidth || left + cx1 * w < 0 || top + cy0 * h > view.clientHeight || top + cy1 * h < 0;
+        if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
+        host.style.transform = `translate(${(at.x - actor.width * at.scale / 2).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
+        if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
+        if (actor.shadow) {
+          if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
+          const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
+          Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: lifted.toFixed(3),
+            transform: `translate3d(${(actor.spot.x - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+        }
+        if (!actor.turn) return;
+        const own = rig.s.huong === actor.wrote ? actor.base : rig.s.huong;
+        actor.base = own; actor.wrote = clamp(own - camera.yaw / 90, -1, 1);
+        if (rig.s.huong !== actor.wrote) { rig.s.huong = actor.wrote; rig.render(); }
+      });
+      for (const prop of props) {
+        const depth = set.project(...prop.centre).depth, index = shown.filter(({ at }) => at.depth < depth).length;
+        if (prop.group.parentNode !== layers[index]) layers[index].appendChild(prop.group);
+      }
+      for (const item of focused) soften(item, item.element, item.filter, blurAt(set.project(...item.centre).depth));
+      return frame;
+    },
+  };
+  function stand(host, rig, { x, z, y, height, turn, ground, shadow: withShadow }) {
+    if (host.parentNode !== view) view.appendChild(host);
+    Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
+    if (height) { host.style.height = height + 'px'; host.style.width = ''; }
+    const spot = { x, y, z };
+    let shadow = null;
+    if (withShadow) {
+      shadow = document.createElement('div');
+      shadow.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.30),rgba(0,0,0,.16) 62%,rgba(0,0,0,0))';
+    }
+    actors.push({ rig, host, spot, ground, shadow, turn: turn && rig && rig.s && typeof rig.s.huong === 'number', blur: 0 });
+    return spot;
+  }
+  function contentOf(host) {
+    const svg = host.querySelector && host.querySelector('svg[data-prop]');
+    const frame = svg && svg.viewBox && svg.viewBox.baseVal;
+    if (!frame || !frame.width) return [0, 0, 1, 1];
+    try {
+      const box = svg.getBBox();
+      if (!box.width) return [0, 0, 1, 1];
+      return [(box.x - frame.x) / frame.width, (box.y - frame.y) / frame.height, (box.x + box.width - frame.x) / frame.width, (box.y + box.height - frame.y) / frame.height];
+    } catch (error) { return [0, 0, 1, 1]; }
+  }
+  const blurAt = (depth) => (camera.blur > 0 ? Math.min(16, camera.blur * Math.abs(camera.lens - depth - camera.distance) / camera.distance) : 0);
+  const soften = (item, element, filter, px) => {
+    const rounded = Math.round(px * 10) / 10;
+    if (rounded === item.blur) return;
+    item.blur = rounded;
+    element.style.filter = [filter, rounded ? `blur(${rounded}px)` : ''].filter(Boolean).join(' ');
+  };
+  function groundOf(rig) {
+    if (!rig) return 1;
+    const frame = rig.svg && rig.svg.getBoundingClientRect();
+    if (!frame || !frame.height) return null;
+    const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => rig.el && rig.el[key]).filter(Boolean)
+      .map((element) => element.getBoundingClientRect()).filter((box) => box.height > 0);
+    const size = rig.constructor && rig.constructor.KHUNG;
+    if (feet.length) return clamp((Math.max(...feet.map((box) => box.bottom)) - frame.top) / frame.height - 2 / (size ? size.h : 470), 0.5, 1);
+    const own = rig.el && rig.el.bong;
+    if (own) { const box = own.getBoundingClientRect(); if (box.height) return clamp((box.top + box.height / 2 - frame.top) / frame.height, 0.5, 1); }
+    return 1;
+  }
+  function mark(values, duration, ease) {
+    const tween = gsap.to({}, { duration: Math.max(duration, 0.001), immediateRender: false, ease: 'none' });
+    marks.push({ tween, values: { ...values }, duration, curve: gsap.parseEase(ease) || ((p) => p), order: marks.length });
+    return tween;
+  }
+  set.look(initial);
+  return set;
+}
+return { CAMERA_LIMITS, OVERVIEW, createSet };
+})();
 __m['characters/receptionist.js'] = (function () {
 const __default = {
   id: 'receptionist',
@@ -3598,8 +3829,9 @@ const { child, teen, adult, tall, stocky } = __m['runtime/bodies.js'];
 const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald } = __m['runtime/hair.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
+const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.38.6';
+const VERSION = '0.39.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -4162,7 +4394,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
 }
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

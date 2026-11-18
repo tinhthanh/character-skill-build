@@ -61,7 +61,10 @@ for scene in examples/*/scene.json; do
   if [ "$CHECK" = 1 ]; then
     (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" check > "$WORK/$name.check" 2>&1) || true
     grep -q "^Runtime" "$WORK/$name.check" || { echo "  ✗ $name  check did not run:"; sed 's/^/      /' "$WORK/$name.check" | tail -8; failed=1; continue; }
-    bad="$(grep -E '^[[:space:]]+(✗|⚠)' "$WORK/$name.check" | grep -vE "$(echo "$KNOWN" | tr ' ' '|')" || true)"
+    # Bối cảnh 3D: nhân vật đứng sát máy bị mép khung cắt ngang — host của nó (con trực tiếp của #view) chìa ra dưới
+    # khung vài px; vật tiền cảnh sát máy chỉ ló một mép vào khung, hộp của nó nằm phần lớn ngoài khung. Cả hai cố ý;
+    # không gắn data-layout-ignore được vì thế thì `check` thôi thấy chúng cử động.
+    bad="$(grep -E '^[[:space:]]+(✗|⚠)' "$WORK/$name.check" | grep -vE "$(echo "$KNOWN" | tr ' ' '|')" | grep -vE '⚠ .*(container_overflow|escaped_container) #view > div:nth-of-type\([0-9]+\) inside #view' || true)"
     if [ -n "$bad" ]; then echo "  ✗ $name  check:"; echo "$bad" | cut -c1-240 | sed 's/^/    /'; failed=1; else echo "  ✓ $name  check (no errors, no unexpected warnings)"; fi
   fi
 done

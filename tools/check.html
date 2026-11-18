@@ -636,6 +636,103 @@ try {
           if (first === null || first > 1) hong('speakCues gestures', `the first gesture starts ${first === null ? 'after 2.2 s' : 'at ' + first.toFixed(2) + ' s'} — the line opens with the arms at rest`);
           g7.kill(); opener.svg.remove();
         }
+        // Nhân vật TẠO RA KHI HOST ĐANG ẨN rồi mới hiện: xoay người vẫn còn chi tiết ngực (vùng cắt không được là 0).
+        {
+          const shell = document.createElement('div'); shell.style.cssText = 'width:300px;display:none'; host.parentNode.appendChild(shell);
+          const ghost = L.createCharacter(shell, { id: 'vet' }).rig; ghost.s.huong = 0.55; ghost.render();
+          shell.style.display = ''; ghost.render();
+          const cut = parseFloat(ghost.el.phuKienRect.getAttribute('width'));
+          if (!(cut > 20)) hong('3/4 stance', `created hidden, then shown and turned: the chest details are cut to a strip ${cut} units wide`);
+          ghost.svg.remove(); shell.remove();
+        }
+        // KHÔNG GIẬT: giữa hai khung liền nhau (60 fps) góc cẳng tay không nhảy quá ngưỡng trong các cử chỉ giơ tay.
+        // Ngưỡng lấy từ số đo ở 0.38.1 (point 5,9° · wave 4,2° · cheer 8,7°) cộng một khoảng nhỏ. `present` và `shrug` vốn bung
+        // tay rất nhanh — 20–23° mỗi khung từ trước 0.38.2 — nên không đưa vào đây.
+        for (const [name, build, limit] of [['point', (r) => r.point(), 9], ['wave', (r) => r.wave(), 9], ['cheer', (r) => r.cheer(), 11]]) {
+          const mover = L.createCharacter(host, { id: 'default' }).rig, motion = build(mover);
+          const angle = (k) => parseFloat(/rotate\(([-\d.e]+)/.exec(mover.el['cang' + k].getAttribute('transform'))[1]);
+          let worst = 0, when = 0, last = null;
+          for (let frame = 0; frame <= motion.duration() * 60; frame++) { mid(mover, motion, frame / 60); const now = [angle('L'), angle('R')];
+            if (last) now.forEach((value, n) => { let step = Math.abs(value - last[n]); if (step > 180) step = 360 - step; if (step > worst) { worst = step; when = frame / 60; } }); last = now; }
+          if (worst > limit) hong('smooth motion', `${name}: the forearm jumps ${worst.toFixed(1)}° in one frame at ${when.toFixed(2)} s`);
+          motion.kill(); mover.svg.remove();
+        }
+        // BỐI CẢNH 3D (`createSet`): phép chiếu, xếp lớp che khuất, nhân vật xoay bù theo góc máy.
+        {
+          const view = document.createElement('div'); view.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:600px'; host.parentNode.appendChild(view);
+          const set = L.createSet(view, { origin: [500, 340], camera: { yaw: 0, pitch: 0, distance: 1700, lens: 1700, x: 0, y: 200, z: -300 } });
+          set.floor({}).wall({ from: [-900, -1100], to: [900, -1100] });
+          set.wall({ from: [900, -1100], to: [900, 200] });
+          const far = L.createCharacter(document.createElement('div'), { id: 'vet' }).rig, near = L.createCharacter(document.createElement('div'), { id: 'boy' }).rig;
+          set.place(far, { x: -200, z: -600, height: 300 }); set.place(near, { x: 200, z: -100, height: 300 });
+          const between = set.box({ x: -100, z: -300, width: 200, depth: 100, height: 120 }), behind = set.box({ x: -100, z: -900, width: 200, depth: 100, height: 120 }), front = set.box({ x: -100, z: 150, width: 200, depth: 100, height: 120 });
+          set.update();
+          const aim = set.project(0, 200, -300);
+          if (Math.abs(aim.x - 500) > 0.5 || Math.abs(aim.y - 340) > 0.5 || Math.abs(aim.scale - 1) > 0.01) hong('3D set', `the point the camera aims at projects to ${aim.x.toFixed(1)}, ${aim.y.toFixed(1)} at scale ${aim.scale.toFixed(2)} — expected the origin 500, 340 at scale 1`);
+          const scaleOf = (rig) => parseFloat(/scale\(([\d.]+)/.exec(rig.host.style.transform)[1]);
+          if (!(scaleOf(near) > scaleOf(far))) hong('3D set', `perspective: the near character is drawn at ${scaleOf(near)} and the far one at ${scaleOf(far)}`);
+          if (!(+near.host.style.zIndex > +far.host.style.zIndex)) hong('3D set', 'the near character is not stacked above the far one');
+          const layerOf = (prop) => +prop.group.parentNode.style.zIndex;
+          if (!(layerOf(behind) < +far.host.style.zIndex && +far.host.style.zIndex < layerOf(between) && layerOf(between) < +near.host.style.zIndex && +near.host.style.zIndex < layerOf(front)))
+            hong('3D set', `occlusion order is wrong: box behind ${layerOf(behind)}, far character ${far.host.style.zIndex}, box between ${layerOf(between)}, near character ${near.host.style.zIndex}, box in front ${layerOf(front)}`);
+          // Đế giày (không phải mép dưới host) nằm đúng điểm chiếu của chỗ đứng.
+          const feet = set.project(-200, 0, -600), box = far.host.getBoundingClientRect(), frame = view.getBoundingClientRect();
+          const sole = Math.max(far.el.banL.getBoundingClientRect().bottom, far.el.banR.getBoundingClientRect().bottom);
+          if (Math.abs(sole - frame.top - feet.y) > 4 || Math.abs((box.left + box.right) / 2 - frame.left - feet.x) > 2) hong('3D set', `a placed character's soles are at ${(sole - frame.top).toFixed(1)}, ${((box.left + box.right) / 2 - frame.left).toFixed(1)} — its spot projects to ${feet.y.toFixed(1)}, ${feet.x.toFixed(1)}`);
+          // Xoay bù theo góc máy, không cộng dồn, và trả lại đúng khi máy quay về.
+          far.state.facing = 0.5; set.look({ yaw: 18 });
+          if (Math.abs(far.s.huong - 0.3) > 0.01) hong('3D set', `camera yaw 18° on a character facing 0.5: its turn is ${far.s.huong.toFixed(2)}, expected 0.30`);
+          set.update(); set.update();
+          if (Math.abs(far.s.huong - 0.3) > 0.01) hong('3D set', `calling update() again changes the turn to ${far.s.huong.toFixed(2)} — the compensation accumulates`);
+          set.look({ yaw: 0 });
+          if (Math.abs(far.s.huong - 0.5) > 0.01) hong('3D set', `back at yaw 0 the character's turn is ${far.s.huong.toFixed(2)}, not its own 0.50`);
+          // Toàn cảnh (ống kính dài): gần như không phối cảnh — xa gần gần cùng một cỡ.
+          set.look({ ...L.OVERVIEW, zoom: 0.7 });
+          if (Math.abs(scaleOf(near) / scaleOf(far) - 1) > 0.12) hong('3D set', `overview: the near character is drawn ${(scaleOf(near) / scaleOf(far)).toFixed(2)} × the far one — the long lens should flatten perspective`);
+          set.look({ lens: 1700, distance: 1700, zoom: 1, pitch: 0 });
+          // Tường một mặt: tường phải (kể theo chiều kim đồng hồ) quay mặt VÀO phòng — pháp tuyến hướng về −x.
+          const walls = [...view.querySelectorAll('div')].filter((element) => element.style.backfaceVisibility === 'hidden');
+          if (walls.length !== 2) hong('3D set', `${walls.length} one-sided walls, expected 2`);
+          else { const normal = new DOMMatrix(walls[1].style.transform).transformPoint(new DOMPoint(0, 0, 1, 0)); if (!(normal.x < -0.9)) hong('3D set', `the right wall faces x ${normal.x.toFixed(2)}, expected −1 (into the room)`); }
+          // Luật góc máy: chúc quá 15°, vòng quá 60°, chế độ isometric cũ, khoá lạ — đều bị từ chối.
+          for (const [label, values] of [['pitch 20', { pitch: 20 }], ['yaw 70', { yaw: 70 }], ['iso', { iso: 1 }], ['roll', { roll: 3 }]]) {
+            try { set.move(values, 1); hong('3D set', `camera ${label} should be refused`); } catch (error) { /* đúng */ }
+          }
+          // Bóng trên sàn nằm đúng dưới chân; bóng rig tự vẽ bị ẩn.
+          set.update();
+          const centreX = (element) => { const box = element.getBoundingClientRect(); return box.left + box.width / 2; };
+          const floorShadow = [...view.querySelectorAll('div')].find((element) => element.style.borderRadius === '50%' && Math.abs(centreX(element) - centreX(far.host)) < 4);
+          if (!floorShadow) hong('3D set', 'no floor shadow under the far character');
+          if (far.el.bong.style.display !== 'none') hong('3D set', "the rig's own upright shadow is still shown");
+          // Tấm hình đứng (đạo cụ vẽ sẵn): xếp lớp cùng nhân vật theo chiều sâu, chân đặt đúng đường sàn của khung đạo cụ.
+          const pot = document.createElement('div'); L.createProp(pot, 'plant');
+          set.stand(pot, { x: 0, z: 100, height: 300 }); set.update();
+          if (!(+pot.style.zIndex > +near.host.style.zIndex)) hong('3D set', 'a cutout standing nearest the camera is not stacked above the characters');
+          const potBase = set.project(0, 0, 100), potBox = pot.getBoundingClientRect(), viewBox = view.getBoundingClientRect();
+          const floorLine = potBox.top + potBox.height * (458 / 470) - viewBox.top;
+          if (Math.abs(floorLine - potBase.y) > 2) hong('3D set', `a prop cutout stands at ${floorLine.toFixed(1)}, its spot projects to ${potBase.y.toFixed(1)}`);
+          // Độ sâu trường ảnh: tắt thì không mờ gì; bật thì vật ở mặt phẳng lấy nét nét, vật xa hơn mờ, càng xa càng mờ.
+          const blurOf = (element) => +((/blur\(([\d.]+)px\)/.exec(element.style.filter || '') || [0, 0])[1]);
+          if (blurOf(far.host) || blurOf(pot)) hong('3D set', 'blur 0 still blurs something');
+          set.look({ blur: 8, x: -200, y: 150, z: -600, distance: 1700, yaw: 0 });
+          if (blurOf(far.host) > 0.3) hong('3D set', `the character at the focus point is blurred ${blurOf(far.host)} px`);
+          if (!(blurOf(pot) > blurOf(near.host) && blurOf(near.host) > 0.3)) hong('3D set', `depth blur does not grow with distance from the focus: near ${blurOf(near.host)} px, cutout ${blurOf(pot)} px`);
+          const strips = [...view.querySelectorAll('[data-floor]')];
+          if (strips.length < 2 || new Set(strips.map(blurOf)).size < 2) hong('3D set', `the floor is not blurred by depth (${strips.length} strips)`);
+          set.look({ blur: 0 });
+          try { set.look({ blur: 40 }); hong('3D set', 'blur 40 should be refused'); } catch (error) { /* đúng */ }
+          pot.remove();
+          // MÁY QUAY LÀ HÀM CỦA THỜI GIAN: tua tới cuối rồi lùi về phải ra đúng khung như tua thẳng tới đó, kể cả qua hai lần cắt.
+          const clock = gsap.timeline({ paused: true, onUpdate: set.update });
+          clock.add(set.move({ yaw: 20, distance: 1400 }, 2), 0).add(set.cut({ ...L.OVERVIEW, zoom: 0.8 }), 3).add(set.cut({ lens: 1700, distance: 1500, zoom: 1, yaw: -10 }), 5).to({}, { duration: 1 }, 5);
+          clock.time(1); const once = JSON.stringify(set.camera);
+          clock.time(6); clock.time(4); clock.time(1);
+          if (JSON.stringify(set.camera) !== once) hong('3D set', `seeking forward then back gives another camera at 1 s: ${JSON.stringify(set.camera)} vs ${once}`);
+          clock.time(4); if (set.camera.lens !== 5000) hong('3D set', `at 4 s (after the cut to the overview) the lens is ${set.camera.lens}`);
+          clock.time(5.5); if (set.camera.lens !== 1700 || set.camera.yaw !== -10) hong('3D set', `after the cut back the lens is ${set.camera.lens} and yaw ${set.camera.yaw}`);
+          clock.kill();
+          view.remove();
+        }
         // Khẩu hình đi TRƯỚC tiếng: đúng mốc bắt đầu của một âm mở to, miệng đã mở hơn nửa chừng.
         {
           const lips = L.createCharacter(host, { id: 'vet' }).rig;

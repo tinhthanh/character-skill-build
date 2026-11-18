@@ -183,6 +183,51 @@ with tempfile.TemporaryDirectory() as work:
         elif 'Traceback' in done.stderr: problems.append(f'{label}: the tool crashed instead of explaining — {done.stderr.strip().splitlines()[-1][:160]}')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
 
+    # ── BỐI CẢNH 3D ("set"): ví dụ dựng được, sinh đúng các lời gọi; kịch bản sai bị từ chối kèm lời giải thích.
+    stage = os.path.join(ROOT, 'examples', 'scene-3d', 'scene.json')
+    done = build(stage, os.path.join(work, 'built3d'))
+    if done.returncode != 0:
+        problems.append('the 3D example scene does not build: ' + (done.stderr.strip() or done.stdout.strip())[:300])
+    else:
+        html = open(os.path.join(work, 'built3d', 'index.html'), encoding='utf-8').read()
+        for needle, count in (('VGCharacter.createSet(', 1), ('set.place(', 3), ('set.box(', 2), ('set.panel(', 2), ('set.wall(', 3), ('onUpdate: set.update', 1), ('set.move(', 3), ('set.cut(', 2), ('y: box1.top', 1), ('lens: 5000', 1), ('lens: 1700', 1), ('set.stand(', 2), ("createProp(cutout1, \"plant\"", 1), ('blur: 9', 1)):
+            if html.count(needle) != count: problems.append(f'3D example: expected {count} × {needle!r} in index.html, found {html.count(needle)}')
+        if 'id="wall"' in html or 'id="floor"' in html: problems.append('3D example: the flat wall / floor clips are still written')
+        if re.search(r'id="(vet|boy|cat)" class="clip"', html): problems.append('3D example: character hosts are written as clips — set.place() makes them')
+    def variant3d(change):
+        scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
+    for label, change, needle in [
+        ('flat props in a 3D set', lambda s: s.update({'props': [{'kind': 'table', 'x': 300}]}), 'set.boxes'),
+        ('a flat background in a 3D set', lambda s: s.update({'background': {'wall': '#fff'}}), 'set.room'),
+        ('the 2D camera in a 3D set', lambda s: s.update({'camera': True}), 'view'),
+        ('enter in a 3D set', lambda s: s['characters'][0].update({'enter': 'left'}), 'enter'),
+        ('standing on a box that does not exist', lambda s: s['characters'][2].update({'on': 'shelf'}), 'shelf'),
+        ('an unknown camera key in a view', lambda s: s['script'][0]['view'].update({'roll': 5}), 'roll'),
+        ('a view that changes nothing', lambda s: s['script'][0].update({'view': {'dur': 2}}), 'changes nothing'),
+        ('an unknown set key', lambda s: s['set'].update({'lights': []}), 'lights'),
+        ('a camera looking down from too high', lambda s: s['script'][0]['view'].update({'pitch': 30}), 'pitch'),
+        ('a camera swung round too far', lambda s: s['script'][0]['view'].update({'yaw': 75}), 'yaw'),
+        ('the old isometric view', lambda s: s['script'][3].update({'view': {'isometric': True}}), 'wide'),
+        ('too high a starting camera', lambda s: s['set'].update({'camera': {'pitch': 25}}), 'pitch'),
+        ('a cutout of an unknown kind', lambda s: s['set']['cutouts'].append({'kind': 'lamp', 'x': 0, 'z': 0}), 'lamp'),
+        ('a cutout with a missing picture', lambda s: s['set']['cutouts'].append({'image': 'nope.png', 'x': 0, 'z': 0}), 'nope.png'),
+        ('a cutout without a position', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0}), '"z"'),
+        ('too much blur', lambda s: s['script'][0]['view'].update({'blur': 50}), 'blur'),
+        ('a box without a size', lambda s: s['set']['boxes'].append({'x': 0, 'z': 0}), 'width'),
+        ('a view inside together', lambda s: s['script'].append({'together': [{'who': 'vet', 'do': ['nod'], 'view': {'yaw': 5}}, {'who': 'boy', 'do': ['nod']}]}), 'together'),
+        ('z without a set', lambda s: s.pop('set') and [turn.pop('view', None) for turn in s['script']] and s['characters'][2].pop('on'), '"set"'),
+        ('a view without a set', lambda s: s.pop('set') and [who.pop('z', None) or who.pop('on', None) for who in s['characters']], '"set"'),
+    ]:
+        path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
+        try:
+            json.dump(variant3d(change), open(path, 'w', encoding='utf-8'))
+            done = build(path, os.path.join(work, 'bad3d'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
+        elif 'Traceback' in done.stderr: problems.append(f'{label}: the tool crashed instead of explaining — {done.stderr.strip().splitlines()[-1][:160]}')
+        elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
+
 for problem in problems: print(f'  ✗ scene: {problem}')
 print('scene: PASS' if not problems else f'scene: FAIL ({len(problems)} problems)')
 sys.exit(1 if problems else 0)

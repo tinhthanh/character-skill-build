@@ -415,6 +415,135 @@ tl.add(VGCharacter.shot(scene, null, 'wide').paused(false), speech.start + speec
 - The aim is computed once, when the timeline is built: the camera does not follow a
   character that walks during the shot.
 
+## 3D sets — a room of planes, a camera with angles, characters still 2D
+
+`VGCharacter.createSet(view)` builds a room out of flat CSS 3D planes inside one clip and gives
+it a camera you move like anything else. The characters stay the flat SVG rigs: each frame the
+set projects the spot a character stands on and places its host as an ordinary 2D element, so
+it always faces the lens and stays sharp at any distance. Its shadow lies on the 3D floor under
+its soles, so it flattens and turns with the camera.
+
+**The camera stays near eye level.** The characters are drawn at eye level and stand upright;
+from higher up they read as cards standing on the floor. So `pitch` is limited to −8…15° and
+`yaw` to ±60° (the rigs have no back), and a camera outside those limits is an error. For a view
+of the whole room use the **overview**: a very long lens from far away at a low angle, nearly
+without perspective — the wide shot of a stage, not a view from above. When the camera moves round, a person
+turns the other way by the same angle (their own `facing` minus the camera's `yaw` / 90°), so a
+character facing right is seen more from the front as the camera moves to the right.
+
+**The short way** — `"set"` in a scene file (`examples/scene-3d/scene.json`):
+
+```json
+{
+  "set": {
+    "room":   { "width": 1800, "depth": 1300, "height": 700 },
+    "boxes":  [ { "name": "table", "x": 330, "z": -560, "width": 380, "depth": 200, "height": 170 } ],
+    "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
+    "cutouts": [ { "kind": "plant", "x": -640, "z": 110, "height": 620 } ],
+    "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 }
+  },
+  "characters": [
+    { "name": "vet", "id": "vet", "x": -210, "z": -330, "height": 560, "faces": "boy" },
+    { "name": "boy", "id": "boy", "x": 190,  "z": -300, "height": 420, "faces": "vet" },
+    { "name": "cat", "species": "cat", "x": 520, "z": -660, "on": "table", "height": 210 }
+  ],
+  "script": [
+    { "who": "vet", "say": "…", "view": { "yaw": -24, "distance": 980, "dur": 2.2 } },
+    { "who": "boy", "do": ["cheer"], "view": { "wide": true } }
+  ]
+}
+```
+
+- **Coordinates.** `x` is left–right with 0 in the middle of the room, `z` is depth with
+  negative further in (the open front of the room is at `room.front`, 200 by default), and
+  heights are px above the floor. One unit is one pixel at the point the camera aims at when
+  `distance` equals `lens`.
+- **`set.room`** — `width`, `depth`, `height`, `front`; `floor` and `floor2` (two colours make
+  a checker of `tile` px; drop `floor2` for a plain floor), `wall`, `sideWall` (CSS colours or
+  gradients). `set.sky` is what shows beyond the room.
+- **`set.boxes`** — tables, counters, benches: `x`, `z` (front-left corner), `width`, `depth`,
+  `height`, optional `y`, `color`, `top`, `side`, `name`. A box hides a character standing
+  behind it and is hidden by one standing in front. A character with `"on": "<box name>"`
+  stands on top of it.
+- **`set.panels`** — windows, boards, pictures on a wall: `wall` (`back` / `left` / `right`),
+  `at` (x for the back wall, z of the near edge for a side wall), `y` (height of the top
+  edge), `width`, `height`, `color`, `border`.
+- **`set.cutouts`** — flat upright pictures that stand in the room like the characters (always
+  facing the lens, sharp, stacked by depth with them): `kind` (a ready-made prop: `plant`,
+  `chair`, `stool`, `table`, `counter`) or `image` (a picture file), `x`, `z`, optional `y`,
+  `height`, `color`, `shadow: false`. Put one **close to the camera** (`z` near the open front of
+  the room) for a foreground: when the camera pans it slides across the frame faster than the
+  room behind — parallax, the cheapest way to make the set read as 3D.
+- **Depth of field — `blur`** (a camera value, so it goes in `set.camera` or a `view`): things
+  away from the point the camera aims at are blurred, `blur` px for something as far from that
+  point as the camera is, at most 16 px; 0 (the default) turns it off. Blur the back of the room
+  in close shots (8–10) and keep it low or off in wide ones. It also hides the softness of the
+  backdrop planes in a close shot.
+- **`"view"` on a turn** moves the camera when that turn starts: any of `yaw` (camera round to
+  the right), `pitch` (looking down), `distance`, `lens`, `x` `y` `z` (the point it aims at),
+  `zoom`, `blur`, with `dur` (1.5) and `ease`. `"cut": true` jumps instead. `"wide": true` cuts to the
+  overview of the whole room (sized to fit the frame; add `yaw` or `zoom` to adjust it). The next
+  `view` after a wide shot is always a cut back to the normal lens — moving from the long lens to
+  the normal one in a tween would make the whole room's perspective stretch on screen.
+  A view that would make a character facing someone turn past full profile is reported.
+- Not available in a 3D set yet: `props`, `background`, the 2D `camera`, `layout: "presenter"`,
+  `enter` / `exit`, and seated people. The tool says so rather than ignoring them.
+
+**By hand** — the same thing in a composition:
+
+```html
+<div id="view" class="clip" data-start="0" data-duration="16" data-track-index="0"
+     style="position:absolute; inset:0; background:#dbe9ee"></div>
+<script>
+  const set = VGCharacter.createSet(document.getElementById('view'), { camera: { pitch: 6, distance: 1750 } });
+  set.floor({ x: [-900, 900], z: [-1100, 200], style: '#b7ccd3' });
+  set.wall({ from: [-900, -1100], to: [900, -1100], height: 700 });        // back wall
+  const table = set.box({ x: 330, z: -560, width: 380, depth: 200, height: 170 });
+  const vet = VGCharacter.createCharacter(document.createElement('div'), { id: 'vet' }).rig;
+  set.place(vet, { x: -210, z: -330, height: 560 });
+  const cat = VGCharacter.createPet(document.createElement('div'), { species: 'cat' }).rig;
+  set.place(cat, { x: 520, z: -660, y: table.top, height: 210 });
+
+  const tl = gsap.timeline({ paused: true, onUpdate: set.update });        // the set follows every seek
+  tl.add(VGCharacter.sequence(vet, ['wave', ['explain', 'Hello!', 3]]), 0);
+  tl.add(set.move({ yaw: 20, distance: 1300 }, 4), 0);                     // a tween of the camera
+  tl.add(set.cut({ ...VGCharacter.OVERVIEW, y: 280, z: -450, zoom: 0.9 }), 6);   // a cut to the wide shot
+</script>
+```
+
+| Call | What it does |
+|---|---|
+| `createSet(view, { origin, camera })` | the set; `origin` is where the aimed-at point falls in `view` (default: centre, 57% down) |
+| `set.floor({ x, z, style })` · `set.wall({ from, to, height, style })` · `set.panel({ at, size, turn, style })` | the backdrop. Walls are one-sided: list the corners clockwise seen from above (back wall left → right, right wall back → front, left wall front → back) and a wall between the camera and the room disappears |
+| `set.box({ x, z, width, depth, height, y, colors })` | a prop that takes part in occlusion; returns `{ top }` |
+| `set.place(rig, { x, z, y, height, turn })` | stand a person or pet in the set; returns its spot `{ x, y, z }`, which you may tween to move it |
+| `set.stand(element, { x, z, y, height, ground, shadow })` | stand a flat picture in the set — a `createProp(host, 'plant')` host, an `<img>`, any element; `ground` is where its base is (0…1 of its height; ready-made props find it themselves) |
+| `set.look(values)` · `set.move(values, duration, ease)` · `set.cut(values)` | the camera: `yaw`, `pitch`, `distance`, `lens`, `x`, `y`, `z`, `zoom`, `blur`. `look` sets where it starts; `move` and `cut` return a marker to `tl.add(…, at)`. Limits: `VGCharacter.CAMERA_LIMITS`; wide shot: `VGCharacter.OVERVIEW` |
+| `set.camera` | the camera as last computed (read-only) |
+| `set.update()` | apply the camera at the timeline's current time — pass it as the master timeline's `onUpdate`. Seek with `tl.time(t)`: GSAP's `tl.seek(t)` skips `onUpdate` |
+| `set.project(x, y, z)` | where a point of the set lands: `{ x, y, scale, depth }` |
+
+Limits to know before you plan a shot:
+
+- **No back view.** A rig turns from front to full profile, so the camera cannot go behind a
+  character: keep `yaw` within about ±60° of where the character faces.
+- **Occlusion is per object, not per pixel.** A box is in front of a character or behind it as
+  a whole (by the depth of its centre); a character cannot stand between the legs of a table.
+- **No view from above.** See the limits at the top of this section; the overview is the
+  substitute.
+- **Large swings of `yaw` are cuts, not pans.** Panning 40° or more shows the characters turning
+  on the spot to keep facing the lens.
+- **Keep the backdrop plain.** The planes are CSS 3D layers, and while the camera moves Chrome
+  stretches the picture it first drew of each one. Flat colours and soft gradients do not show
+  it; small text or fine patterns on a wall will look soft in a close shot.
+- The characters are deliberately *not* inside the 3D space for that same reason — a rig put
+  in a `preserve-3d` element comes out pixelated as soon as the camera gets close.
+- **The camera is a function of time.** `move` and `cut` are markers on the timeline; every
+  frame the set replays them from the starting camera up to the current time. GSAP's own
+  `set()` tweens remember the value they replaced when they were built, and two cuts in a row
+  remember each other's values — a renderer jumping to an earlier frame then gets the lens of a
+  later shot.
+
 ## Validate and render
 
 ```bash
@@ -431,6 +560,11 @@ npx hyperframes render -o out.mp4 .
   - `off_pivot_rotation` on arm parts (`#rig1-batR`, `#rig1-cangL`) or a pet's head
     (`#thu1-dau > path`): a dial-pointer heuristic misreading a limb that rotates about its
     joint. Several can appear. (Element ids inside the SVG use the rigs' internal names.)
+  - `container_overflow` or `escaped_container` on `#view > div:nth-of-type(n) inside #view` in a 3D set:
+    a character standing close to the camera, its host reaching past the bottom of the frame, or a
+    foreground cutout with only one edge in the frame and most of its box outside. Deliberate, like a
+    close shot. (`data-layout-ignore` cannot be used on them: `check` would then stop seeing them move.)
+    The set hides a character or cutout that is wholly outside the frame.
   - `rotation_pivot_drift` on a leg part (`#rig1-ongL`, the shin) or a pet's body part
     (`#thu1-gu`, the withers; `#thu1-thanE`, the trunk — any `#thuN-…` or `#rigN-…` id is a
     part of a character): the check expects a rotating element to spin about its own
