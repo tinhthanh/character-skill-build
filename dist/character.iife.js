@@ -1,4 +1,4 @@
-/* VGCharacter v0.39.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.40.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -204,6 +204,9 @@ const DAI = { canhTay: 62, cangTay: 58, dui: 78, ong: 78 };
 const CHOT_VAI = { x: 33, y: -90 };
 const UC_DON = { x: 6, y: -98 };
 const GOC_VAI_MAX = 16;
+// Vùng xoá viền ở nắp vai: tâm hạ `CAP_DROP` dưới chốt vai, bán kính `CAP_RADIUS`, đặc hoàn toàn tới `CAP_SOLID` bán
+// kính rồi nhạt dần — viền dọc hai bên bắp tay hiện dần từ ngang nách xuống, không đứt cụt.
+const CAP_RADIUS = 24, CAP_DROP = 4, CAP_SOLID = 0.75;
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const chuanHoaGoc = (g) => ((((g + 180) % 360) + 360) % 360) - 180;
@@ -944,6 +947,16 @@ class RigSVG {
   // nhóm thân, lúc nghỉ cùng hình với tay áo nên đã vẽ sẵn vòng viền đó.
   #Vda() { return ''; }
   #Vtay() { return this.nv.tayDai ? this.#V() : this.#Vda(); }
+  // CÁNH TAY + VIỀN TÁCH RỜI. Bộ lọc viền đặt thẳng lên nhóm tay thì bọc kín cả NẮP VAI: nắp tay áo nằm đè lên thân
+  // áo mà có một vòng nét đen quanh nó, nên nhìn nghiêng (tay gần ở giữa thân) cánh tay như mảnh giấy dán lên áo,
+  // chốt vai lộ thành cái núm. Ở đây viền là một bản sao (`use`) chỉ có nét, nằm dưới cánh tay, và bị MẶT NẠ xoá đi
+  // trong vùng nắp vai TRÙNG với thân áo — vai và tay áo liền một khối như ảnh mẫu (cách các rig dùng lưới có trọng
+  // số làm khớp vai, ở đây làm bằng mặt nạ). Phần nắp thò ra NGOÀI thân áo vẫn có viền, nên đường bao vai không hở.
+  #armBody(ben) {
+    const p = this.id;
+    if (!this.#Vtay()) return this.#canhTay(ben);
+    return `<use href="#${p}-arm${ben}" filter="url(#${p}-vienTay)" mask="url(#${p}-capMask${ben})"/><g id="${p}-arm${ben}">${this.#canhTay(ben)}</g>`;
+  }
 
   #dungSVG() {
     const p = this.id, V = this.#V();
@@ -954,6 +967,14 @@ class RigSVG {
     <feMorphology in="SourceAlpha" operator="dilate" radius="${this.nv.vienRong}" result="d"/>
     <feFlood flood-color="${this.mau.vien}" result="c"/><feComposite in="c" in2="d" operator="in" result="o"/>
     <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` : ''}
+    ${this.#Vtay() ? `<filter id="${p}-vienTay" x="-30%" y="-30%" width="160%" height="160%">
+    <feMorphology in="SourceAlpha" operator="dilate" radius="${this.nv.vienRong}" result="d"/>
+    <feFlood flood-color="${this.mau.vien}" result="c"/><feComposite in="c" in2="d" operator="in"/></filter>
+    <radialGradient id="${p}-capGrad"><stop offset="0" stop-color="#000"/><stop offset="${CAP_SOLID}" stop-color="#000"/><stop offset="1" stop-color="#fff"/></radialGradient>
+    <clipPath id="${p}-thanCat" clipPathUnits="userSpaceOnUse"><use href="#${p}-ao"/><use href="#${p}-vaiL"/><use href="#${p}-vaiR"/></clipPath>
+    ${['L', 'R'].map((ben) => `<mask id="${p}-capMask${ben}" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
+      <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
+      <g id="${p}-capInv${ben}"><circle id="${p}-cap${ben}" r="0" fill="url(#${p}-capGrad)" clip-path="url(#${p}-thanCat)"/></g></mask>`).join('')}` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
     <clipPath id="${p}-phuKienClip" clipPathUnits="userSpaceOnUse"><rect id="${p}-phuKienRect" x="-400" y="-500" width="800" height="1000"/></clipPath>
@@ -973,7 +994,7 @@ class RigSVG {
       ${this.nv.skirt ? `<path id="${p}-skirt" fill="${this.mau.skirt || this.mau.ao}" stroke-linejoin="round"${V}/>` : ''}
     </g>
     <g id="${p}-than">
-      <g id="${p}-sau"><g id="${p}-batL"${this.#Vtay()}>${this.#canhTay('L')}</g></g>
+      <g id="${p}-sau"><g id="${p}-batL">${this.#armBody('L')}</g></g>
       <g${V}>
       <path id="${p}-ao" d="${this.nv.ao(this.mau)}" fill="${this.mau.ao}"/>
       <path id="${p}-vaiL" d="${veDemVai(this.nv, 'L', 0)}" fill="${this.mau.ao}" transform="translate(${-CHOT_VAI.x} ${CHOT_VAI.y})"/>
@@ -1027,9 +1048,10 @@ class RigSVG {
             </g>
           </g>
         </g>
-        <g id="${p}-xaCang"${this.#Vtay()}></g>
+        <!-- xaCang SAU xaTruoc: bàn tay bưng đồ (ở xaCang) phải nằm trên phần cẳng tay ló ra ngoài mép áo của chính nó. -->
         <g id="${p}-xaTruoc" mask="url(#${p}-xaMask)"></g>
-        <g id="${p}-batR"${this.#Vtay()}>${this.#canhTay('R')}</g>
+        <g id="${p}-xaCang"${this.#Vtay()}></g>
+        <g id="${p}-batR">${this.#armBody('R')}</g>
         <g id="${p}-phuKienTren" clip-path="url(#${p}-vaiCat)">${this.nv.phuKienTren(p, this.mau, this.nv)}</g>
       </g>
     </g>
@@ -1047,7 +1069,7 @@ class RigSVG {
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
       chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
-      vaiL: q('vaiL'), vaiR: q('vaiR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
+      vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
       canhHinhL: q('canhHinhL'), canhHinhR: q('canhHinhR'), cangHinhL: q('cangHinhL'), cangHinhR: q('cangHinhR'),
       coTayL: q('coTayL'), coTayR: q('coTayR'),
@@ -1141,6 +1163,18 @@ class RigSVG {
     const atRest = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && ah < 0.8 ? clamp(2 - Math.max(Math.abs(s['bat' + xa] - restFar[0]), Math.abs(s['cang' + xa] - restFar[1])) / 10, 0, 1) : 0;
     const fold = restFar[1] <= -45 && Math.abs(s['aim' + xa]) < 0.9 ? atRest : 0;
     const clasp = fold >= 0.5 ? xa : null;
+    // Tay xa BƯNG ĐỒ ở dáng 3/4: cùng cách chia hai lớp như đan tay. Bản trước vẽ CẢ cánh tay trước thân — bắp tay chạy
+    // dọc qua ngực, che nửa bảng tên (thấy rõ ở giây 2 của cảnh đưa cốc, nhất là khi nắp vai đã bỏ viền: thành một dải
+    // áo cắt ngang bảng tên). Giờ bắp tay ở lớp `xaTruoc` (mặt nạ thân áo: chỉ phần ló ra ngoài mép áo còn thấy), còn
+    // chỉ BÀN TAY + món đồ ở `xaCang`, trước bụng. Cẳng tay cũng ở lớp có mặt nạ: ở dáng 3/4 khuỷu rơi vào giữa thân, đưa
+    // cẳng tay ra trước thì nó mọc ra giữa bụng với một đầu khuỷu tròn có viền. Đi ngang hẳn (ah ≥ 0,8) thì như cũ: cả
+    // tay sau chân.
+    // Mọi lúc tay ấy KHÔNG vươn ra (vươn ra = `aim` ≥ 0,5 với cẳng tay không gập vào — lớp `xaTruoc` nguyên cánh). Bản
+    // đầu chỉ xét `aim` < 0,5: lúc bắt đầu đưa cốc, `aim` đã quá 0,5 mà cẳng tay còn gập (dáng bưng), cả cánh tay rơi về
+    // lớp trước thân đúng một khung — ống tay vắt qua ngực, che bảng tên.
+    const carryFront = xa && !clasp && this.holds[xa] && s['item' + xa] > 0.5 && ah < 0.8
+      && !(Math.abs(s['aim' + xa]) >= 0.5 && s['cang' + xa] > -30) ? xa : null;
+    const front = clasp || carryFront;
     for (const ben of ['L', 'R']) {
       // Tay xa đang DIỄN một dáng gập cẳng tay vào trong (giơ ngón cái trước ngực, đặt tay lên ngực) nằm trước thân và ẩn
       // bắp tay: để nguyên thì ống tay áo đè lên ngực áo, như dán lên ngực.
@@ -1149,6 +1183,8 @@ class RigSVG {
       // Cẳng tay của tay đang đan sang lớp trước thân; không thì về lại trong cánh tay của nó.
       const fore = e['cang' + ben], home = ben === clasp ? e.xaCang : e['canh' + ben];
       if (fore.parentNode !== home) home.appendChild(fore);
+      const wrist = e['coTay' + ben], wristHome = ben === carryFront ? e.xaCang : fore;
+      if (wrist.parentNode !== wristHome) wristHome.appendChild(wrist);
     }
     e.xaCang.style.opacity = clasp && fold < 1 ? ((fold - 0.5) * 2).toFixed(3) : '';       // hai ba khung mờ dần lúc tay rời dáng nghỉ, thay cho biến mất đột ngột
     for (const ben of ['L', 'R']) {
@@ -1167,7 +1203,11 @@ class RigSVG {
       // phải nằm trước thân, không mặt nạ.
       const aimed = Math.abs(s['aim' + ben]), inward = s['cang' + ben] <= -30;
       const tay = e['bat' + ben];
-      const cho = ben !== xa || (carrying && ah < 0.8) ? e.tren : aimed >= 0.5 && !inward ? e.xaTruoc : aimed >= 0.9 && inward ? e.tren : e.sauChan;
+      // Tay xa đang VƯƠN RA (aim, cẳng tay không gập vào) thì ở lớp `xaTruoc` dù đang cầm đồ: trước đây tay cầm đồ được
+      // ưu tiên ở lớp trước thân, nên lúc đưa cốc cho người khác, đúng khung cái cốc rời tay cả cánh tay nhảy sang lớp có
+      // mặt nạ — bắp tay biến mất sau thân áo trong một khung (đo được ở 2,9 s của cảnh đưa cốc). Món đồ ở đầu cánh tay
+      // vươn ra nằm ngoài thân áo nên mặt nạ không che nó.
+      const cho = ben !== xa ? e.tren : ben === carryFront || (aimed >= 0.5 && !inward) ? e.xaTruoc : (carrying && ah < 0.8) || (aimed >= 0.9 && inward) ? e.tren : e.sauChan;
       if (tay.parentNode !== cho) cho.appendChild(tay);
       // Tay đang HƯỚNG THEO MÀN HÌNH (`aim`) là tay đang diễn: không làm tối, dù nó là tay phía xa.
       const far = ben === (h > 0 ? 'R' : 'L'), mo = far && !carrying ? ah * (1 - clamp(s['aim' + ben], 0, 1)) : 0;
@@ -1182,6 +1222,7 @@ class RigSVG {
       // Cẳng tay xa đang đan (ở lớp trước) tối đúng như bắp tay của nó ở lớp sau — và nhờ thế bàn tay xa sẫm hơn bàn
       // tay gần: hai bàn tay cùng màu da chồng lên nhau mà sáng như nhau thì dính thành một khối.
       if (ben === clasp) { const outline = e.xaCang.getAttribute('filter'); e.xaCang.style.filter = `${outline ? outline + ' ' : ''}brightness(${1 - ah * 0.28})`; }
+      else if (ben === carryFront) e.xaCang.style.filter = '';          // tay bưng đồ không tối đi (giữ màu món đồ), như khi nó cả cánh ở lớp trước
     }
     // Nhìn thẳng thì cả hai tay nằm trong `tren`, và tay nào vẽ SAU thì đè lên tay
     // kia. Tay đang LÀM ĐỘNG TÁC (giơ, gập nhiều hơn) phải nằm trên: bàn tay ấy là
@@ -1375,7 +1416,20 @@ class RigSVG {
         co: 1 - Math.abs(v) * 0.26,
       };
     };
-    const tL = tayTheoSau(s.batL, s.cangL, s.vungL), tR = tayTheoSau(s.batR, s.cangR, s.vungR);
+    // TAY GẦN THẢ XUÔI khi TAY XA đang bưng đồ ở dáng 3/4. Dáng nghỉ khoanh tay trước bụng (bác sĩ thú y) chỉ đọc được
+    // khi hai bàn tay gặp nhau; tay xa đang bưng cốc thì bàn tay gần lơ lửng giữa ngực, cả ống tay áo vắt chéo ngang
+    // áo khoác như dán lên đó. Pha dần sang dáng buông theo mức quay (0,1 → 0,25), chỉ khi tay gần ĐANG NGHỈ — tay gần
+    // đang diễn (chỉ, vẫy, giơ ngón cái) thì để nguyên.
+    const near = xa === 'R' ? 'L' : xa === 'L' ? 'R' : null, restNearArm = near ? this.#restArm(near) : null;
+    // Cũng vậy khi tay xa KHÔNG khoanh ở dáng nghỉ (đã trao món đồ đi: tay ấy về dáng buông) — một bàn tay gần một mình
+    // giữa ngực, không có bàn tay kia để đan vào.
+    const farFolded = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && this.#restArm(xa)[1] <= -45;
+    const hangNear = near && !farFolded && !(this.holds[near] && s['item' + near] > 0.5) && restNearArm[1] <= -45
+      // Nhả DẦN trong 10°…60° lệch khỏi dáng nghỉ (không phải 10…20°): bước đi bắt đầu từ dáng nghỉ, cánh tay rời nó từ
+      // từ — nhả gắt thì ở những khung đầu của bước đi cánh tay bật từ dáng buông về nửa dáng khoanh, gập ngang bụng.
+      ? clamp((ah - 0.1) / 0.15, 0, 1) * clamp(1 - (Math.max(Math.abs(s['bat' + near] - restNearArm[0]), Math.abs(s['cang' + near] - restNearArm[1])) - 10) / 50, 0, 1) : 0;
+    const armAngle = (side, key) => s[key + side] + (side === near && hangNear ? ((key === 'bat' ? NGHI.batL : NGHI.cangL) - s[key + side]) * hangNear : 0);
+    const tL = tayTheoSau(armAngle('L', 'bat'), armAngle('L', 'cang'), s.vungL), tR = tayTheoSau(armAngle('R', 'bat'), armAngle('R', 'cang'), s.vungR);
     // Nhịp vai–cánh tay: cánh tay tự giơ được tới ~45°, cao hơn là bờ vai phải
     // nhấc theo (người thật: xương bả vai xoay). Chốt vai và đệm vai cùng xoay
     // quanh khớp ức–đòn — đệm giữ vòm tay áo luôn có chỗ tựa, còn gấu đệm rút
@@ -1389,12 +1443,21 @@ class RigSVG {
       const gap = Math.max(0, -cang) * 0.75;        // gập vào trước bụng → nhìn nghiêng là gập ra TRƯỚC
       return { bat: 24 * v - gap * 0.2, cang: clamp(4 + gap + 6 * v + 16 * Math.max(0, v), 2, 150) };
     };
-    const nL = tayNghieng(s.cangL, s.vungL), nR = tayNghieng(s.cangR, s.vungR);
+    const nL = tayNghieng(armAngle('L', 'cang'), s.vungL), nR = tayNghieng(armAngle('R', 'cang'), s.vungR);
     // Tay đang CẦM ĐỒ thì nhìn nghiêng vẫn gập cẳng tay ngang trước bụng (bưng đồ). Nhân vật nghỉ ở dáng gập hờ thì
     // công thức trên chỉ gập ~50°: vừa quay người là cái cốc tụt từ ngang bụng xuống ngang hông trong hai khung hình.
     // Chỉ khi tay ấy đang Ở DÁNG CẦM: tay đang diễn (nâng cốc lên uống, vươn ra đưa đồ) mà vẫn bị ép về dáng bưng thì
     // cái cốc ở lại ngang bụng trong khi cánh tay đã lên tới cằm.
-    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) arm.cang += (Math.max(arm.cang, 86) - arm.cang) * clamp(s['carry' + side], 0, 1);
+    // …và BẮP TAY đưa ra trước ~26°: để bắp tay thẳng đứng sau thân thì khuỷu nằm khuất sau ngực, chỉ còn một mẩu cẳng tay
+    // nằm ngang thò ra từ giữa ngực — đọc thành cánh tay mọc ra từ ngực (Gemini chỉ ra trên cảnh đi ngang cầm cốc). Cẳng
+    // tay gập bớt tương ứng để cái cốc vẫn ở chừng ngang bụng.
+    for (const [side, arm] of [['L', nL], ['R', nR]]) if (this.holds[side] && s['item' + side] > 0.5) {
+      // Chỉ khi đã quay gần hẳn sang ngang (0,55 → 0,85): ở dáng 3/4 bắp tay đưa ra trước thành khuỷu bạnh ra ngoài hông,
+      // như chống nạnh cầm cốc.
+      const carry = clamp(s['carry' + side], 0, 1), profile = carry * clamp((ah - 0.55) / 0.3, 0, 1);
+      arm.bat += (Math.max(arm.bat, 26) - arm.bat) * profile;
+      arm.cang += (Math.max(arm.cang, 86 - 24 * profile) - arm.cang) * carry;
+    }
     // Bờ vai chỉ nhấc theo phần giơ tay CÒN THẤY trong mặt phẳng trán (× cos ψ):
     // nhìn nghiêng thì tay đánh trước–sau, không có gì đẩy vai lên.
     const gocVai = { L: GOC_VAI_MAX * mem((Math.abs(tL.bat) * cF - 40) / 110), R: GOC_VAI_MAX * mem((Math.abs(tR.bat) * cF - 40) / 110) };
@@ -1516,9 +1579,24 @@ class RigSVG {
     }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
-    if (clasp) e.xaCang.setAttribute('transform', e['bat' + clasp].getAttribute('transform'));        // cẳng tay ở lớp trước đi theo đúng cánh tay của nó
+
+    // Vùng xoá viền ở nắp vai (xem `#armBody`). Mặt nạ nằm trong hệ toạ độ CỦA CÁNH TAY (đã xoay, đã co), còn thân áo
+    // thì ở hệ `than`: nhóm nội dung mặt nạ mang phép biến đổi NGƯỢC của cánh tay, cộng độ nhấc `nhacY` nếu tay đang ở
+    // lớp `tren`. Tay sau chân (`sauChan`) nằm ngoài hệ `than` và khuất sau thân rồi: không xoá gì.
+    for (const ben of ['L', 'R']) {
+      const cap = e['cap' + ben];
+      if (!cap) continue;
+      const parent = e['bat' + ben].parentNode, lift = parent === e.tren || parent === e.xaTruoc ? nhacY : 0;
+      const sy = Math.max(0.05, (1 - (1 - (ben === 'L' ? tL : tR).co) * cF) * shrink[ben]);
+      e['capInv' + ben].setAttribute('transform', `scale(1 ${1 / sy}) rotate(${-rotation['bat' + ben]}) translate(${-pivot[ben].x} ${-pivot[ben].y - lift})`);
+      cap.setAttribute('cx', pivot[ben].x); cap.setAttribute('cy', pivot[ben].y + lift + CAP_DROP * daiCanhTay);
+      cap.setAttribute('r', parent === e.sauChan ? 0 : CAP_RADIUS * dayTay);
+    }
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
+    // Cẳng tay (đan tay) hay bàn tay (bưng đồ) ở lớp trước đi theo đúng cánh tay của nó — bàn tay thì cộng thêm phép
+    // biến đổi của cẳng tay.
+    if (front) e.xaCang.setAttribute('transform', e['bat' + front].getAttribute('transform') + (front === carryFront ? ' ' + e['cang' + front].getAttribute('transform') : ''));
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:
     // bắp + cẳng ≈ ±90°). Cánh tay lệch khỏi dáng ấy bao nhiêu — nghỉ ở dáng gập hờ, hay quay nghiêng người khiến
     // cẳng tay gập ra trước — thì cái cốc nghiêng theo bấy nhiêu, có lúc nằm ngang. Xoay ngược nó lại quanh LÒNG BÀN
@@ -1539,7 +1617,7 @@ class RigSVG {
       // cốc, rời hẳn khỏi cổ tay áo. Món đồ quay quá 90° thì lật nhóm ngón lại quanh lòng bàn tay.
       const fingers = e['item' + side].querySelector('[data-grip]');
       if (fingers) fingers.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
-      gripping[side] = !!fingers && s['item' + side] > 0.5;
+      gripping[side] = fingers ? clamp(s['item' + side], 0, 1) : 0;          // độ hiện của các ngón ôm món đồ (mờ theo món đồ)
     }
 
     for (const ben of ['L', 'R']) {
@@ -1549,7 +1627,7 @@ class RigSVG {
       const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s['tay' + ben];
       // Buông thõng → lòng bàn tay úp vào đùi, nhìn từ trước chỉ thấy cạnh tay (hẹp ~60%),
       // ngón hơi hướng vào thân. Tay càng giơ lên / vung xa thì bàn tay càng xoè phẳng ra.
-      const bat = Math.abs(s['bat' + ben]), cang = Math.abs(s['cang' + ben]), vung = Math.abs(s['vung' + ben]);
+      const bat = Math.abs(armAngle(ben, 'bat')), cang = Math.abs(armAngle(ben, 'cang')), vung = Math.abs(s['vung' + ben]);      // góc THẬT đang vẽ (kể cả tay gần thả xuôi)
       const xoe = chon !== 'mo' ? 1 : clamp(Math.max(bat - 30, cang - 44) / 22, 0, 1)   // chỉ xoè khi giơ tay cao hoặc gập cẳng tay lên; vung tay khi đi vẫn thả lỏng;
       // Bàn tay 'mo' = pha giữa ngón cong thả lỏng (khi buông) và xoè phẳng (khi giơ lên/vẫy).
       // Cong ↔ xoè ĐỔI HẲN, không hoà mờ. Bản trước cho hai hình mờ chéo nhau trong
@@ -1563,7 +1641,10 @@ class RigSVG {
       const guong = ben === 'L' ? -1 : 1;
       // Món đồ tự vẽ các ngón ôm nó (`data-grip`) thì nắm tay phía sau ẩn đi: chỉ còn ống tay áo → các ngón. Ẩn cả NHÓM
       // chứ không đổi hình: bàn tay vẫn ở dáng nắm, món đồ rời tay là nó hiện lại ngay.
-      e.tayG[ben].style.visibility = gripping[ben] ? 'hidden' : '';
+      // Món đồ đang mờ đi (vừa trao cho người khác, vừa cất): các ngón ôm nó mờ theo, bàn tay của rig hiện dần lên — hai
+      // thứ hoà chéo. Ẩn / hiện đột ngột ở ngưỡng 0,5 thì có những khung cái cốc mờ lơ lửng cạnh một bàn tay xoè.
+      e.tayG[ben].style.visibility = gripping[ben] >= 0.999 ? 'hidden' : '';
+      e.tayG[ben].style.opacity = gripping[ben] > 0.001 && gripping[ben] < 0.999 ? (1 - gripping[ben]).toFixed(3) : '';
       for (const [k, g] of Object.entries(e.tay[ben])) {
         const op = chon === 'mo' ? (k === (dangXoe ? 'xoe' : 'mo') ? 1 : 0) : (k === chon ? 1 : 0);
         g.setAttribute('opacity', op);
@@ -1572,7 +1653,7 @@ class RigSVG {
       // ngón cái phải nằm phía TRONG (về phía đầu). Tính "độ hướng lên" của cẳng tay,
       // rồi lật gương bàn tay; với tay xoè thì lật mượt (đi qua cạnh tay như đang xoay
       // cổ tay), với nắm tay/ngón chỉ thì lật thẳng vì hình gần đối xứng.
-      const huongTay = chuanHoaGoc(ben === 'L' ? 90 + s.batL + s.cangL : 90 - s.batR - s.cangR);   // 90 = xuống, -90 = lên (đã chuẩn hoá về ±180)
+      const huongTay = chuanHoaGoc(ben === 'L' ? 90 + armAngle('L', 'bat') + armAngle('L', 'cang') : 90 - armAngle('R', 'bat') - armAngle('R', 'cang'));   // 90 = xuống, -90 = lên (đã chuẩn hoá về ±180)
       const len = clamp((-huongTay - 15) / 45, 0, 1);
       // Bàn tay xoè: ngón cái nằm phía TRÊN mỗi khi cẳng tay nằm ngang trên màn hình, bất kể nó đưa ra ngoài hay
       // gập vào trong. Tính từ góc THẬT của cẳng tay (`armTurn`, đã gồm `aim` và dáng xoay), soi gương cho tay trái:
@@ -2267,9 +2348,14 @@ class RigSVG {
     const t = this.tl(), s = this.s, screen = RigSVG.SCREEN_AIM;
     if (!screen) this.#openUp(t);
     let tx = 380, ty = 165;
+    // Đích là một NHÂN VẬT / THÚ (rig): chỉ vào cái đầu của nó (thú: cả thân nếu không có đầu riêng). Bản trước chỉ nhận
+    // phần tử trang hay toạ độ — truyền một rig vào thì `getBoundingClientRect` không có, mọi góc thành NaN và cả hình
+    // nhân vật co rúm lại suốt động tác (tools/scene.py truyền đúng thế cho ["point", "@cat"]).
+    if (muc && muc.svg && muc.el) muc = (muc.el.dau || muc.svg);
     if (muc && typeof muc.x === 'number' && typeof muc.y === 'number' && !(muc instanceof Element)) {
       tx = muc.x - s.x; ty = muc.y - s.y - DOI_Y;      // toạ độ viewBox trực tiếp
     } else if (muc) {
+      if (!(muc instanceof Element) && typeof muc.left !== 'number') throw new Error('[character] point(target): target must be an element, a rig, { x, y } in the 400 × 470 frame, or a DOMRect');
       const r = muc instanceof Element ? muc.getBoundingClientRect() : muc;
       const sv = this.svg.getBoundingClientRect();
       const k = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;   // svg chưa có kích thước → coi như 1:1
@@ -2281,6 +2367,7 @@ class RigSVG {
     // (ngang vai người lớn): nhân vật trẻ con, vai thấp hơn, phải chỉ chếch lên — bàn tay chồng lên bím tóc và mép mặt.
     if (!muc) ty = (screen ? this.#shoulderY() : VAI.R.y) - 6;
     // Chỉ bằng tay ở PHÍA đích; góc tính từ chỗ cái vai ấy đang nằm trên màn hình (quay nghiêng thì vai dồn vào giữa).
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) { tx = 380; ty = (screen ? this.#shoulderY() : VAI.R.y) - 6; }      // đích chưa có kích thước (chưa gắn vào trang): chỉ ngang sang phải
     const ben = tx < HONG.x ? 'L' : 'R', v = screen ? { x: this.#shoulderX(ben), y: this.#shoulderY() } : VAI[ben];
     const goc = Math.atan2(ty - v.y, tx - v.x) * 180 / Math.PI;
     const bat = clamp(chuanHoaGoc(ben === 'L' ? goc - 90 : 90 - goc), -15, 172);
@@ -5359,7 +5446,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const base = { yaw: 0, pitch: 6, distance: 1700, lens: 1700, x: 0, y: 300, z: -350, zoom: 1, blur: 0 };
   const camera = { ...base }, marks = [];
   const backdrop = [], props = [], actors = [], layers = [], focused = [];
-  let frame = null;
+  let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
 
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
   const layer = (index) => {
@@ -5393,6 +5480,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // Sàn dựng thành NHIỀU DẢI theo chiều sâu (mỗi dải ~150 đơn vị): một mặt phẳng chỉ mờ được đều một mức, mà sàn thì
       // trải từ sát máy tới chân tường sau. Hoạ tiết nối liền qua các dải nhờ dời `background-position` cho khớp.
       const depth = z[1] - z[0], strips = clamp(Math.round(depth / 150), 1, 12), each = depth / strips;
+      room = room ? [Math.min(room[0], x[0]), Math.max(room[1], x[1])] : [x[0], x[1]];
       for (let k = 0; k < strips; k++) {
         const strip = face(layer(0), x[1] - x[0], each + 0.5, `translate3d(${x[0]}px, ${-y}px, ${z[0] + k * each}px) rotateX(90deg)`,
           paint(style, '#a9c4cb') + `;background-position-y:${(-k * each).toFixed(2)}px`, [(x[0] + x[1]) / 2, y, z[0] + (k + 0.5) * each]);
@@ -5476,6 +5564,35 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
 
 
     /**
+     * ĐÍCH cho `point` / `stroke` của nhân vật `from`, nhắm vào cái đầu của `to` (người, thú) — tính theo VỊ TRÍ TRONG
+     * PHÒNG, không theo màn hình. Hai động tác ấy tự tính hướng tay từ vị trí trên màn hình lúc DỰNG timeline, tức theo
+     * góc máy lúc đầu; trong bối cảnh 3D máy quay đổi góc sau đó (có khi ngay lượt ấy), và người chỉ còn bước đi trước
+     * lượt ấy. Đích trả về là { x, y } trong khung 400 × 470 của `from`, tính MUỘN — đúng lúc động tác đọc nó, sau khi
+     * các bước đi trước đã được dựng: `from.point(set.target(from, cat))`.
+     * Tay vươn trong mặt phẳng của `from`: đứng lệch nhau theo chiều sâu (z) thì bàn tay không chạm được.
+     */
+    target(from, to) {
+      const of = (rig) => actors.find((actor) => actor.rig === rig);
+      if (!of(from) || !of(to)) throw new Error('[character] set.target(from, to): both must be rigs placed with set.place()');
+      const frameOf = (rig) => (rig.constructor && rig.constructor.KHUNG) || { w: 400, h: 470 };
+      const facts = (actor) => {
+        if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
+        if (actor.ground === null) actor.ground = groundOf(actor.rig);
+        const size = frameOf(actor.rig), unit = actor.height / size.h, ground = (actor.ground || 1) * size.h;
+        return { size, unit, ground, x: actor.spot.x + (actor.rig.s.x || 0) * unit };
+      };
+      const head = () => {
+        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox('face') : null;
+        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height / 2 : f.ground * 0.6;
+        return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
+      };
+      return {
+        get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
+        get y() { const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
+      };
+    },
+
+    /**
      * Chiếu một điểm của bối cảnh lên `view`: { x, y } tính bằng px trong `view`, `scale` là độ phóng tại điểm ấy,
      * `depth` càng lớn càng gần máy quay.
      */
@@ -5527,7 +5644,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       view.style.perspective = camera.lens + 'px';
       view.style.perspectiveOrigin = `${cx}px ${cy}px`;
       frame = { cx, cy, matrix: new DOMMatrix(`translateZ(${pull}px) ${moves}`) };
-      const shown = actors.map((actor) => ({ actor, at: set.project(actor.spot.x, actor.spot.y, actor.spot.z) })).sort((a, b) => a.at.depth - b.at.depth);     // xa → gần
+      // BƯỚC ĐI TRONG PHÒNG. Rig đi bằng cách dời hình vẽ trong khung của chính nó (`s.x`, đơn vị khung). Ở đây quãng ấy
+      // được đổi thành quãng đi THẬT dọc trục x của căn phòng — vị trí 3D, xếp lớp và cái bóng đi theo — rồi bù ngược
+      // trong phép đặt host để hình không bị dời hai lần.
+      for (const actor of actors) {
+        // Đo kích thước TRƯỚC khi tính quãng đi: đo muộn (trong vòng đặt host bên dưới) thì khung đầu tiên được dựng tính
+        // quãng đi bằng 0 — khung ấy ra khác hẳn tuỳ nó có phải khung đầu hay không (bộ dựng tua không theo thứ tự).
+        if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
+        const size = actor.rig && actor.rig.constructor && actor.rig.constructor.KHUNG;
+        actor.step = size && actor.height && actor.rig.s && typeof actor.rig.s.x === 'number' ? actor.rig.s.x : 0;
+        actor.unit = size && actor.height ? actor.height / size.h : 0;
+        actor.where = actor.spot.x + actor.step * actor.unit;
+      }
+      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => a.at.depth - b.at.depth);     // xa → gần
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
@@ -5548,14 +5677,20 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const left = at.x - w / 2, top = at.y - h * (actor.ground || 1);
         const away = camera.lens - at.depth < 60 || left + cx0 * w > view.clientWidth || left + cx1 * w < 0 || top + cy0 * h > view.clientHeight || top + cy1 * h < 0;
         if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
-        host.style.transform = `translate(${(at.x - actor.width * at.scale / 2).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
+        // RA KHỎI PHÒNG (bước vào / bước ra qua tường bên): mờ dần trong khoảng một phần tư bề ngang người hai bên mép sàn —
+        // tường bên chỉ là một mặt phẳng nền, không che được ai đứng ngoài nó.
+        const margin = actor.width * 0.25, inside = room ? Math.min(actor.where - room[0], room[1] - actor.where) : Infinity;
+        const present = room ? clamp((inside + margin) / (2 * margin), 0, 1) : 1;
+        if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
+        host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
         // Bóng trên sàn: nằm ở lớp ngay SAU nhân vật — trên nền và trên những nhân vật ở xa hơn, dưới mọi đồ vật đứng trước.
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
           const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
-          Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: lifted.toFixed(3),
-            transform: `translate3d(${(actor.spot.x - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+          const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away ? 0 : 1);
+          Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
+            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         // Máy quay lệch đi thì nhân vật 2D quay BÙ: mức quay của rig = mức do động tác đặt − góc máy / 90°. Giá trị do
@@ -5578,6 +5713,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   // Đưa một phần tử phẳng (host của rig, hay một tấm hình) vào bối cảnh. `rig` = null với tấm hình.
   function stand(host, rig, { x, z, y, height, turn, ground, shadow: withShadow }) {
     if (host.parentNode !== view) view.appendChild(host);
+    host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
     Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
     if (height) { host.style.height = height + 'px'; host.style.width = ''; }
     const spot = { x, y, z };
@@ -5589,6 +5725,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shadow.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.30),rgba(0,0,0,.16) 62%,rgba(0,0,0,0))';
     }
     actors.push({ rig, host, spot, ground, shadow, turn: turn && rig && rig.s && typeof rig.s.huong === 'number', blur: 0 });
+    // Đặt ngay vào chỗ: không chờ timeline chạy. Công cụ xem trước (peek.sh) hay một trình duyệt mở trang mà chưa tua
+    // gì thì thấy đúng cảnh ở khung 0, chứ không phải các host chồng nhau ở góc trên trái.
+    set.update();
     return spot;
   }
 
@@ -5979,7 +6118,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.39.0';
+const VERSION = '0.40.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -6575,6 +6714,9 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
     const place = (node) => { let x = 0, y = 0; for (let n = node; n && n !== root; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y }; };
     for (const line of lines) {
       if (!line.rig || typeof line.rig.shotBox !== 'function') continue;
+      // Bong bóng đặt MỘT chỗ cho cả câu, tính từ vị trí host trong bố cục. Trong bối cảnh 3D host được máy quay đặt lại
+      // từng khung (và máy quay đi trong lúc nói) — một chỗ cố định sẽ lơ lửng sai chỗ. Báo rõ thay vì vẽ sai.
+      if (line.rig.host && line.rig.host.hasAttribute('data-set3d')) throw new Error('[character] captions({ follow: true }) is not available in a 3D set — the camera moves the speakers during a line. Use captions at a fixed place (follow: false)');
       const actions = line.rig.lastSequence, before = actions ? actions.time() : 0;
       if (actions) actions.time(Math.min((line.start + line.end) / 2, actions.duration()));
       const box = line.rig.shotBox('face');

@@ -486,8 +486,17 @@ character facing right is seen more from the front as the camera moves to the ri
   `view` after a wide shot is always a cut back to the normal lens — moving from the long lens to
   the normal one in a tween would make the whole room's perspective stretch on screen.
   A view that would make a character facing someone turn past full profile is reported.
-- Not available in a 3D set yet: `props`, `background`, the 2D `camera`, `layout: "presenter"`,
-  `enter` / `exit`, and seated people. The tool says so rather than ignoring them.
+- **Walking, entering, leaving.** `walk` with a distance moves the character along the room's x
+  axis (its shadow and depth go with it). `"enter"` / `"exit"` walk through a side wall — add a
+  door panel there (`"wall": "left"`); a character fades out as it crosses the wall line.
+  `walkForward` / `walkAway` still shrink and grow the drawing in place, as in a flat scene.
+- **Seated people:** `"seated": "chair"` or `"stool"` stands the seat behind the character.
+- **Vertical frames** (`"width": 1080, "height": 1920`): the camera starts closer and aims at
+  62 % of the frame height; captions sit at the top of the safe area.
+- Not available in a 3D set: `props` (use `set.boxes` and `set.cutouts`), `background`, the 2D
+  `camera` and `"shot"` (use `"view"`), `layout: "presenter"`, and speech bubbles
+  (`captions({ follow: true })` throws — use captions at a fixed place). The tool says so rather than
+  ignoring them.
 
 **By hand** — the same thing in a composition:
 
@@ -522,6 +531,7 @@ character facing right is seen more from the front as the camera moves to the ri
 | `set.camera` | the camera as last computed (read-only) |
 | `set.update()` | apply the camera at the timeline's current time — pass it as the master timeline's `onUpdate`. Seek with `tl.time(t)`: GSAP's `tl.seek(t)` skips `onUpdate` |
 | `set.project(x, y, z)` | where a point of the set lands: `{ x, y, scale, depth }` |
+| `set.target(from, to)` | aim for `from.point(…)` / `from.stroke(…)` at `to`'s head, from positions in the room — use it instead of passing the rig: those actions otherwise aim for the camera angle at build time. The hand reaches in `from`'s own plane only: give both the same `z` |
 
 Limits to know before you plan a shot:
 

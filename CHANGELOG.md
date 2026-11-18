@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.40.0
+
+Added — 3D sets, after an audit of 0.39.0
+- **Characters walk, enter and leave in a 3D set.** A rig's walk moved its drawing inside its
+  own frame, so in a 3D set its shadow stayed behind, its depth and stacking did not change,
+  and it could not leave the room. The set now turns the rig's walking offset into movement
+  along the room's x axis; the shadow, the depth order and the depth blur follow. `"enter"` and
+  `"exit"` in a scene file walk through a side wall (put a door panel there); a character
+  outside the room fades out over a quarter of its width either side of the wall.
+- **Seated people in a 3D set.** `"seated": "chair"` or `"stool"` stands the ready-made seat
+  right behind the character.
+- **Vertical frames in a 3D set.** The camera starts closer, aims lower in the frame (62 %),
+  and captions go to the top of the safe area, above the characters' heads — they covered the
+  faces. The wide shot in a vertical frame crops the sides of the room instead of shrinking it
+  to a strip, and the generated floor reaches 1500 units in front of the room so a camera far
+  back does not see an empty band under it.
+
+Fixed
+- `"shot"` on a turn of a 3D scene was accepted and did nothing; it is now an error pointing
+  to `"view"`.
+- **A character that steps closer (to hand over or stroke) no longer starts where it ends.**
+  `tools/scene.py` placed the character at the spot it reaches after the approach walk, then
+  walked it further — it ended up standing on the other person. The initial facing toward
+  `"faces"` used the same final spots; both now use the starting spot.
+- **A character is in place as soon as it is placed** (`set.place`, `set.stand`), not only once
+  the timeline runs: a preview of frame 0 (`tools/peek.sh`) showed the hosts piled in the top
+  left corner. Sizes are measured before the walking offset is applied, so the first frame
+  rendered no longer depends on which frame a renderer seeks to first.
+- **`point()` at a character or pet works.** It accepted only an element, a DOMRect or a frame
+  point; given a rig (as `tools/scene.py` passes for `["point", "@cat"]`) every arm angle
+  became NaN and the whole figure shrank and twisted for the length of the gesture — in flat
+  scenes as well as 3D. A rig now means its head; anything else unusable is an error.
+- **Handing over with the far arm in a three-quarter stance no longer pops.** The arm held out
+  stayed in the layer in front of the body while it held the item and moved to the masked far-arm
+  layer the frame the item left the hand, so the upper arm vanished behind the jacket for an
+  instant. An outstretched far arm now keeps the masked layer, item or not. And the hand fades in
+  as the held item (with the fingers drawn on it) fades out: they switched at half way, which left
+  a ghost cup floating next to an open hand for a few frames. Applies to flat scenes too.
+- **The free near arm hangs while the far hand carries something in a three-quarter stance.** A
+  character that rests with folded hands (the vet) kept its near arm folded across the chest
+  with nothing to fold into — the sleeve lay diagonally over the jacket, the hand floated at the
+  chest above the cup. The same after handing the item over, when the far arm rests hanging. The
+  near arm now blends to hanging as the body turns (only while it is at rest); with both hands
+  empty the folded hands stay as they were.
+- **Walking sideways with a cup, the cup arm comes from the shoulder.** The upper arm hung straight
+  down behind the torso, so the elbow was hidden and only a level stub of forearm stuck out of the
+  middle of the chest. Near full profile the upper arm now goes forward about 26° (the forearm folds
+  less, the cup stays at belly height); in a three-quarter stance it is unchanged, where a forward
+  upper arm would put the elbow out on the hip. The near arm's hang (above) also lets go
+  gradually over 10–60° instead of 10–20°, so the first steps of a walk no longer bend it across
+  the belly for a frame.
+- **The shoulder joins the jacket.** On an outlined character with long sleeves (the vet and
+  the other `tayDai` characters) the outline filter sat on the whole arm group, so the sleeve cap carried a closed
+  black ring wherever it lay over the jacket. Walking sideways, the near arm (in front of the
+  middle of the torso) looked like a paper cut-out pasted on, with a knob at the shoulder pivot.
+  The arm outline is now a separate copy under the arm, masked out over the shoulder cap where
+  it overlaps the jacket and fading in down the upper arm from the armpit; where the cap sticks
+  out past the jacket it keeps its outline, so the shoulder contour stays closed. The same idea
+  as a weighted-mesh shoulder in skeletal editors, done with a mask. Front views change by a few
+  pixels at the shoulders (`docs/characters.png` re-rendered).
+- **The far arm carrying an item in a three-quarter stance no longer runs down the chest.** The
+  whole arm was drawn in front of the torso so the item would not hide behind the body: the
+  sleeve ran straight down over the jacket and covered half the name badge (2 s into the
+  hand-over scene). Now only the hand and the item are in front; the upper arm and forearm are in
+  the masked far-arm layer and show only where they stick out past the jacket. The hand is placed
+  with the arm's and forearm's transforms, so it stays on the end of the forearm. This holds while
+  the arm starts to reach out (aim already past half, forearm still folded), where a single frame
+  used to drop the whole arm back over the chest. Side-on (walking)
+  is unchanged: the whole arm behind the body.
+- **`set.target(from, to)`** — an aim point for `point` / `stroke` taken from positions in the
+  room instead of the screen, and computed when the action reads it (after earlier walks).
+  Those actions aimed from screen positions at build time, i.e. for the first camera angle; a
+  camera that turns later (even on that turn) left the hand reaching for empty floor.
+  `tools/scene.py` uses it for `point` and `stroke` in a 3D set, and notes when the target
+  stands at another depth (z): a hand only reaches in the character's own plane.
+- `captions({ follow: true })` throws a clear error for a character in a 3D set: the bubble is
+  placed once per line from the page layout, and in a set the camera moves the speakers.
+
 ## 0.39.0
 
 Added

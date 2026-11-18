@@ -194,13 +194,65 @@ with tempfile.TemporaryDirectory() as work:
             if html.count(needle) != count: problems.append(f'3D example: expected {count} × {needle!r} in index.html, found {html.count(needle)}')
         if 'id="wall"' in html or 'id="floor"' in html: problems.append('3D example: the flat wall / floor clips are still written')
         if re.search(r'id="(vet|boy|cat)" class="clip"', html): problems.append('3D example: character hosts are written as clips — set.place() makes them')
+    # Bước vào / bước ra qua tường bên, người ngồi ghế: dựng được, và quãng đi đủ ra ngoài phòng.
+    moving = json.load(open(stage, encoding='utf-8'))
+    moving['characters'][0]['enter'] = 'left'; moving['characters'][1]['seated'] = 'chair'
+    moving['script'].append({'who': 'vet', 'exit': 'right'})
+    path = os.path.join(os.path.dirname(stage), '_check_moving.json')
+    try:
+        json.dump(moving, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'moving3d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a 3D scene with enter / exit / seated does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'moving3d', 'index.html'), encoding='utf-8').read()
+        unit = 560 / 470
+        enter = re.search(r"\['enter', \"left\", (\d+)\]", html); leave = re.search(r"\['exit', \"right\", (\d+)\]", html)
+        if not enter or float(enter.group(1)) * unit < -210 + 900: problems.append(f'3D enter: the walk-in distance does not start outside the room ({enter and enter.group(1)})')
+        if not leave or float(leave.group(1)) * unit < 900 + 210: problems.append(f'3D exit: the walk-out distance does not end outside the room ({leave and leave.group(1)})')
+        if 'createProp(seat_boy, "chair", { for: boy })' not in html or 'boy.state.seat = 1' not in html: problems.append('3D seated: no chair stood behind the seated boy, or he does not start seated')
+        if 'id="boy-chair"' in html: problems.append('3D seated: a flat chair clip is still written')
+    # Lượt "bước lại gần" (đưa đồ) không được dời chỗ đặt ban đầu của nhân vật.
+    closer = json.load(open(stage, encoding='utf-8'))
+    closer['characters'][0]['holds'] = 'cup'; closer['characters'][1]['holds'] = 'cup'; closer['characters'][1]['holdsHidden'] = True
+    closer['script'].insert(0, {'who': 'vet', 'do': [['handOver', '@boy']]})
+    path = os.path.join(os.path.dirname(stage), '_check_closer.json')
+    try:
+        json.dump(closer, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'closer3d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a 3D scene with an approach walk does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'closer3d', 'index.html'), encoding='utf-8').read()
+        x0 = closer['characters'][0]['x']
+        if f'set.place(vet, {{ x: {x0:g},' not in html: problems.append(f'3D approach walk: vet is placed at {re.search(r"set.place[(]vet, [{] x: ([-0-9.]+)", html).group(1)} instead of its starting x {x0}')
+        if not re.search(r"\[vet, \['walk', 4, \d+\]\]", html): problems.append('3D approach walk: the walk toward the boy is missing')
+    # Chỉ tay / vuốt ve trong bối cảnh 3D nhắm bằng set.target; con vật lệch độ sâu thì có lời nhắc.
+    aiming = json.load(open(stage, encoding='utf-8'))
+    aiming['characters'][2] = {'name': 'cat', 'species': 'cat', 'x': 20, 'z': -200, 'height': 200}
+    aiming['script'].append({'who': 'vet', 'do': [['point', '@cat']]}); aiming['script'].append({'who': 'vet', 'do': [['stroke', '@cat']]})
+    path = os.path.join(os.path.dirname(stage), '_check_aiming.json')
+    try:
+        json.dump(aiming, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'aiming3d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a 3D scene with point / stroke does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'aiming3d', 'index.html'), encoding='utf-8').read()
+        if html.count('set.target(vet, cat)') != 2: problems.append(f'3D point / stroke: expected set.target(vet, cat) twice, found {html.count("set.target(vet, cat)")}')
+        if 'same z' not in done.stdout: problems.append('3D stroke of a cat at another depth: no note that a hand only reaches in its own plane')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
         ('flat props in a 3D set', lambda s: s.update({'props': [{'kind': 'table', 'x': 300}]}), 'set.boxes'),
         ('a flat background in a 3D set', lambda s: s.update({'background': {'wall': '#fff'}}), 'set.room'),
         ('the 2D camera in a 3D set', lambda s: s.update({'camera': True}), 'view'),
-        ('enter in a 3D set', lambda s: s['characters'][0].update({'enter': 'left'}), 'enter'),
+        ('the 2D camera shot in a 3D set', lambda s: s['script'][0].update({'shot': 'face'}), 'view'),
+        ('seated without a chair kind', lambda s: s['characters'][0].update({'seated': 'sofa'}), 'seated'),
         ('standing on a box that does not exist', lambda s: s['characters'][2].update({'on': 'shelf'}), 'shelf'),
         ('an unknown camera key in a view', lambda s: s['script'][0]['view'].update({'roll': 5}), 'roll'),
         ('a view that changes nothing', lambda s: s['script'][0].update({'view': {'dur': 2}}), 'changes nothing'),

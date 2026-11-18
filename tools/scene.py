@@ -45,7 +45,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
   The camera stays near eye level: pitch −8…15°, yaw within ±60°.
-  Not combined with "props", "background", "camera", "layout": "presenter", "enter" / "exit" or seated people.
+  Not combined with "props", "background", "camera", "layout": "presenter" or "shot". "enter" / "exit" walk through a side wall.
 
   characters   `id` = a registered person (see `VGCharacter.list()`), or `species` = a pet.
                `x` is where the character STANDS: the centre, in px from the left of the frame.
@@ -374,15 +374,13 @@ def main():
         if 'x' not in who: fail(f'character "{name}" needs "x" (where it stands, px from the left)')
         if who.get('enter') not in (None, False, True, 'left', 'right'): fail(f'character "{name}": "enter" must be "left", "right" or true (the nearer edge)')
         # `true` = mép GẦN chỗ đứng hơn: đi vào từ mép xa là băng ngang qua những nhân vật đứng giữa đường.
-        nearer = 'left' if float(who['x']) < width / 2 else 'right'
+        nearer = 'left' if float(who['x']) < (0 if stage_set is not None else width / 2) else 'right'          # bối cảnh 3D: x = 0 là giữa phòng
         if who.get('enter') is True: who['enter'] = nearer
         if not who.get('enter'): who.pop('enter', None)
         if late.get(name) is True: late[name] = nearer
         if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
         if stage_set is None and ('z' in who or 'on' in who): fail(f'character "{name}": "z" and "on" place a character in a 3D set — add "set" at the top of the scene file')
         if stage_set is not None:
-            if who.get('enter') or late.get(name): fail(f'character "{name}": "enter" is not supported in a 3D set yet — place the character with "x" and "z"')
-            if who.get('seated') and not pet: fail(f'character "{name}": "seated" is not supported in a 3D set yet')
             if 'on' in who and who['on'] not in [box.get('name') for box in stage_set.get('boxes', [])]: fail(f'character "{name}": "on" must name one of set.boxes (got {js(who["on"])})')
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
@@ -408,8 +406,13 @@ def main():
         # cộng 0,39 × chiều cao host cho cái đầu và tóc (thú: 0,6 × — thân nằm ngang, dài hơn). Trước bản 0.29 host
         # được đặt sát mép rồi nối thêm một bước `walk` tới chỗ đứng — hai động tác cho một việc.
         reach = (stand if coming == 'left' else width - stand) + (0.39 if not pet else 0.6) * host_height if coming else 0
+        if stage_set is not None and coming:
+            # Bối cảnh 3D: bước vào qua TƯỜNG BÊN (gắn một tấm "panel" làm cửa ở đó cho dễ đọc). Xuất phát từ ngoài
+            # tường hẳn một nửa bề ngang người; set3d mờ dần nhân vật khi nó còn ở ngoài phòng.
+            half = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))['width'] / 2
+            reach = (stand + half if coming == 'left' else half - stand) + 0.55 * host_width
         # Số tính ra cất dưới khoá có gạch dưới ở đầu — khoá của người viết kịch bản không bao giờ trùng được.
-        names[name] = dict(who, _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
+        names[name] = dict(who, _x0=float(who['x']), _pet=pet, _host_height=host_height, _host_width=host_width, _unit=unit, _left=centre - host_width / 2,
                            _walk=0, _enter_distance=round(reach / unit), _element=f'{slug(name)}', _late=late.get(name), _nearer=nearer)
     for who in names.values():
         if who.get('faces') and who['faces'] not in names: fail(f'character "{who["name"]}" faces "{who["faces"]}", who is not in the scene')
@@ -419,7 +422,7 @@ def main():
     if not isinstance(script, list) or not script: fail('"script" must be a non-empty list of turns')
     voices = []                                             # { key, file, text }
 
-    def step_code(step, where):
+    def step_code(step, where, actor=None):
         if isinstance(step, (int, float)): return js(step)
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
@@ -427,7 +430,10 @@ def main():
         for item in step:
             if isinstance(item, str) and item.startswith('@'):
                 if item[1:] not in names: fail(f'{where}: "{item}" refers to a character that is not in the scene')
-                parts.append(item[1:])
+                # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
+                # máy quay còn đổi góc sau đó.
+                if stage_set is not None and actor and step[0] in ('point', 'stroke'): parts.append(f"set.target({actor}, {item[1:]})")
+                else: parts.append(item[1:])
             else:
                 parts.append(js(item))
         return '[' + ', '.join(parts) + ']'
@@ -478,10 +484,13 @@ def main():
                 seconds = float(turn.get('dur') or round(0.6 + 0.36 * len(words.split()), 1))
                 steps.append(f"['explain', {js(words)}, {seconds}{spoken_mood}]")
         for step in turn.get('do', []):
-            steps.append(step_code(step, where))
+            steps.append(step_code(step, where, who['name']))
         if turn.get('exit'):
             # Quãng đi ra tính sẵn như `enter`: tới mép khung cộng phần đầu / thân, để nhân vật khuất hẳn rồi mới ẩn.
             leaving = (float(who['x']) if turn['exit'] == 'left' else width - float(who['x'])) + (0.39 if not who['_pet'] else 0.6) * who['_host_height']
+            if stage_set is not None:
+                half = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))['width'] / 2
+                leaving = (float(who['x']) + half if turn['exit'] == 'left' else half - float(who['x'])) + 0.55 * who['_host_width']
             steps.append(f"['exit', {js(turn['exit'])}, {round(leaving / who['_unit'])}]")
         if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
@@ -519,7 +528,7 @@ def main():
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
-    views, emitted = [], [flat]
+    views, emitted, reach_notes = [], [flat], []
     def view_of(turn, where):
         view = turn.get('view')
         if view is None: return
@@ -539,8 +548,10 @@ def main():
             yaw, pitch = float(values.get('yaw', 0)), float(values.get('pitch', 14))
             across = room['width'] * math.cos(math.radians(yaw)) + room['depth'] * math.sin(math.radians(abs(yaw)))
             tall = room['height'] * math.cos(math.radians(pitch)) + room['depth'] * math.sin(math.radians(pitch))
-            values = dict({'yaw': yaw, 'pitch': pitch, 'lens': 5000, 'distance': 5000, 'x': 0, 'y': round(room['height'] * 0.4),
-                           'z': round(room['front'] - room['depth'] / 2), 'zoom': round(min(0.95 * width / across, 0.82 * height / tall), 3)}, **values)
+            values = dict({'yaw': yaw, 'pitch': pitch, 'lens': 5000, 'distance': 5000, 'x': 0, 'y': round(room['height'] * (0.15 if width < height else 0.4)),
+                           'z': round(room['front'] - room['depth'] / 2),
+                           # Khung dọc hẹp ngang: vừa cả bề ngang phòng thì nó chỉ còn một dải nhỏ giữa khung — cắt bớt hai bên.
+                           'zoom': round(min(0.95 * width / across * (1.5 if width < height else 1), (0.45 if width < height else 0.82) * height / tall), 3)}, **values)
         # Rời một cảnh toàn (ống kính dài) là một lần CẮT về ống kính thường: lia từ ống kính 5000 về 1700 thì phối cảnh
         # của cả phòng co giãn trước mắt người xem (hiệu ứng "vertigo").
         leaving = bool(views) and views[-1]['wide'] and not wide
@@ -570,6 +581,10 @@ def main():
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
+                    # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
+                    # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
+                    reach_notes.append(f'{where}: "{who["name"]}" {step[0]}s "{step[1][1:]}", which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
                 gap = float(names[step[1][1:]]['x']) - float(who['x'])
                 wanted = (0.24 if step[0] == 'stroke' else 0.45) * who['_host_height']
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
@@ -587,7 +602,7 @@ def main():
         else:
             code = turn_code(entry, where)
             view_of(entry, where)
-            if stage_set is not None and ('exit' in entry or 'enter' in entry): fail(f'{where}: "enter" and "exit" are not supported in a 3D set yet')
+            if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
             # tự viết `together`.
             stroked = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'stroke' and isinstance(step[1], str) and step[1].startswith('@')]
@@ -626,7 +641,7 @@ def main():
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
 
     # ── người NGỒI sau một đạo cụ "front" cao quá ngực thì chỉ còn thấy cái đầu: báo trước ──
-    notes = list(camera_notes)
+    notes = list(camera_notes) + reach_notes
     for prop in props:
         if not prop['front'] or prop['kind'] not in ('counter', 'table'): continue
         unit = prop['host_height'] / PERSON[1]
@@ -698,11 +713,16 @@ def main():
         half, front, back = room['width'] / 2, room['front'], room['front'] - room['depth']
         floor = (f"conic-gradient({room['floor']} 25%, {room['floor2']} 0 50%, {room['floor']} 0 75%, {room['floor2']} 0) 0 0 / {room['tile']}px {room['tile']}px"
                  if room.get('tile') and room.get('floor2') else room['floor'])
-        start = dict({'yaw': 0, 'pitch': 6, 'distance': 1750, 'x': 0, 'y': round(room['height'] * 0.43), 'z': round((front + back) / 2 + room['depth'] * 0.08)}, **stage_set.get('camera', {}))
-        origin = f", origin: {js(stage_set['origin'])}" if stage_set.get('origin') else ''
+        # Khung DỌC: hẹp ngang, nên máy quay vào gần hơn (người cao ~45% khung) và điểm ngắm hạ xuống 62% chiều cao — phụ
+        # đề nằm ở mép trên vùng an toàn, phía trên đầu nhân vật.
+        portrait = width < height
+        start = dict({'yaw': 0, 'pitch': 6, 'distance': 1300 if portrait else 1750, 'x': 0, 'y': round(room['height'] * 0.43), 'z': round((front + back) / 2 + room['depth'] * 0.08)}, **stage_set.get('camera', {}))
+        origin = f", origin: {js(stage_set['origin'])}" if stage_set.get('origin') else (f", origin: [{width // 2}, {round(height * 0.62)}]" if portrait else '')
         setup.append(f"    // The 3D set: a room of flat planes; the characters stay 2D and always face the lens (references/hyperframes.md, \"3D sets\").")
         setup.append(f"    const set = VGCharacter.createSet($('view'), {{ camera: {js(start)}{origin} }});")
-        setup.append(f"    set.floor({{ x: [{-half:g}, {half:g}], z: [{back:g}, {front:g}], style: {js('background:' + floor)} }});")
+        # Sàn kéo dài thêm 1500 đơn vị về phía máy quay (ra ngoài mép trước của phòng): ở cảnh toàn, nhất là khung dọc, máy
+        # quay lùi xa và nhìn thấy cả khoảng trước phòng — không có sàn ở đó là một dải trống dưới đáy khung.
+        setup.append(f"    set.floor({{ x: [{-half:g}, {half:g}], z: [{back:g}, {front + 1500:g}], style: {js('background:' + floor)} }});")
         setup.append(f"    set.wall({{ from: [{-half:g}, {back:g}], to: [{half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['wall'])} }});")
         setup.append(f"    set.wall({{ from: [{-half:g}, {front:g}], to: [{-half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
         setup.append(f"    set.wall({{ from: [{half:g}, {back:g}], to: [{half:g}, {front:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
@@ -743,7 +763,7 @@ def main():
     for prop in [item for item in props if not item['front']]:
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
     for who in names.values():
-        if who.get('_seat'):
+        if who.get('_seat') and stage_set is None:
             seat = who['_seat']
             clip(seat['element'], f'position: absolute; left: {seat["left"]:.0f}px; bottom: {ground}px; height: {seat["host_height"]:.0f}px;'); layers.append('#' + seat['element'])
         if stage_set is not None: continue                 # host của nhân vật do set.place tạo và đặt
@@ -808,7 +828,7 @@ def main():
         look = f'padding: 10px 30px; border-radius: 14px; box-sizing: border-box; white-space: nowrap; background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(min(width, height) * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;'
         # `data-layout-ignore`: phụ đề đi theo LỜI NÓI, mà người nói nhanh hơn tốc độ đọc mà `hyperframes check` đòi cho
         # chữ trên màn hình (0,5 s + 0,3 s mỗi từ) — khán giả nghe câu ấy chứ không chỉ đọc. Vị trí phụ đề do công cụ tính.
-        caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.52))
+        caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.15 if stage_set is not None else 0.52))
         if width >= height:
             clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.03)}px; transform: translateX(-50%); ' + look, extra=' data-layout-ignore=\"\"')
         else:
@@ -834,17 +854,23 @@ def main():
         if stage_set is not None:
             boxes = [box.get('name') for box in stage_set.get('boxes', [])]
             lift = f", y: box{boxes.index(who['on']) + 1}.top" if who.get('on') else ''
-            setup.append(f"    set.place({who['name']}, {{ x: {float(who['x']):g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
+            # Chỗ đứng LÚC ĐẦU (`_x0`): `who['x']` đã bị các lượt "bước lại gần" trong kịch bản cập nhật thành chỗ đứng sau
+            # cùng — đặt nhân vật ở đó rồi cho nó bước thêm là nó đi quá, đứng chồng lên người kia.
+            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
-        if who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
+        if who.get('_seat') and stage_set is not None:
+            # Ghế trong bối cảnh 3D: một tấm đạo cụ đứng ngay SAU người ngồi (lùi 2 đơn vị), cùng cỡ host.
+            seat = f"seat_{who['name']}"
+            setup.append(f"    const {seat} = document.createElement('div'); VGCharacter.createProp({seat}, {js(who['_seat']['kind'])}, {{ for: {who['name']} }}); set.stand({seat}, {{ x: {who['_x0']:g}, z: {float(who.get('z', -300)) - 2:g}, height: {who['_host_height']:g}, shadow: false }});")
+        elif who.get('_seat'): setup.append(f"    VGCharacter.createProp($('{who['_seat']['element']}'), {js(who['_seat']['kind'])}, {{ for: {who['name']} }});")
         if who.get('seated') and not who['_pet']:
             setup.append(f"    {who['name']}.state.seat = 1;                 // already seated in the first frame")
         # Người có mặt từ đầu thì ĐÃ quay về phía người mình nhìn ngay ở khung 0 — không tốn một nhịp quay mặt đầu cảnh.
         if who.get('faces') and not who.get('enter') and not who['_late']:
-            toward = -1 if float(names[who['faces']]['x']) < float(who['x']) else 1
+            toward = -1 if names[who['faces']]['_x0'] < who['_x0'] else 1          # chỗ đứng LÚC ĐẦU, không phải sau các lượt bước lại gần
             setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
         if who['_late']:
             setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")

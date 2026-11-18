@@ -600,6 +600,63 @@ try {
           }
           holder.svg.remove();
         }
+        // Đưa cốc bằng TAY XA ở dáng 3/4: cánh tay không đổi lớp đúng lúc cốc rời tay, và bàn tay hiện dần khi cốc mờ đi.
+        {
+          const giver = L.createCharacter(host, { id: 'vet', items: { R: 'cup' } }).rig; giver.face('right').progress(1);
+          const g9 = giver.handOver('right'); let layerBefore = null, popped = false, faded = null, crossed = null;
+          for (let time = 0; time <= 0.95; time += 0.02) {
+            mid(giver, g9, time); const layer = giver.el.batR.parentNode;
+            if (layerBefore && layer !== layerBefore && giver.s.aimR > 0.9) popped = `${layerBefore.id} → ${layer.id} at ${time.toFixed(2)} s (item ${giver.s.itemR.toFixed(2)})`;
+            layerBefore = layer;
+            if (giver.s.itemR > 0.3 && giver.s.itemR < 0.7) faded = giver.el.tayG.R.style.opacity;
+            // Không khung nào cả cánh tay xa đang cầm đồ nằm trước ngực (ống tay vắt qua ngực, che bảng tên) — kể cả lúc
+            // `aim` vừa quá 0,5 mà cẳng tay còn gập ở dáng bưng.
+            if (layer === giver.el.tren && giver.s.itemR > 0.5 && !crossed) crossed = `${time.toFixed(2)} s (aim ${giver.s.aimR.toFixed(2)}, forearm ${giver.s.cangR.toFixed(0)}°)`;
+          }
+          if (crossed) hong('hands', `handOver with the far arm: the whole arm holding the cup is drawn over the chest at ${crossed}`);
+          if (popped) hong('hands', `handOver with the far arm: the arm jumps layer while held out — ${popped}`);
+          if (!(+faded > 0.2 && +faded < 0.8)) hong('hands', `handOver: while the cup fades the hand is drawn at opacity ${faded} — it should fade in`);
+          g9.kill(); giver.svg.remove();
+        }
+        // Dáng 3/4, TAY XA bưng cốc: tay gần (dáng nghỉ khoanh trước bụng) thả xuôi, không vắt chéo ngực một mình.
+        // Không cầm gì thì vẫn khoanh, đan với tay xa như cũ.
+        {
+          const forearm = (rig, k) => Math.abs(parseFloat(/rotate\(([-\d.e]+)/.exec(rig.el['cang' + k].getAttribute('transform'))[1]));
+          const carrier = L.createCharacter(host, { id: 'vet', items: { R: 'cup' } }).rig; carrier.face('right').progress(1); carrier.render();
+          if (forearm(carrier, 'L') > 40) hong('hands', `turned right with the cup in the far hand: the near forearm is still folded ${forearm(carrier, 'L').toFixed(0)}° across the chest`);
+          carrier.svg.remove();
+          const empty = L.createCharacter(host, { id: 'vet' }).rig; empty.face('right').progress(1); empty.render();
+          if (forearm(empty, 'L') < 50) hong('hands', `turned right with empty hands: the near forearm is ${forearm(empty, 'L').toFixed(0)}° — folded hands should stay folded`);
+          empty.svg.remove();
+        }
+        // Đi NGANG cầm cốc: khuỷu tay cầm cốc nằm TRƯỚC vai (bắp tay đưa ra trước) — bắp tay thẳng đứng sau thân thì chỉ
+        // còn một mẩu cẳng tay thò ra từ giữa ngực.
+        {
+          const walker = L.createCharacter(host, { id: 'vet', items: { R: 'cup' } }).rig; walker.s.huong = 1; walker.render();
+          const origin = (element) => new DOMPoint(0, 0).matrixTransform(element.getScreenCTM());
+          const shoulder = origin(walker.el.batR), elbow = origin(walker.el.cangR), length = Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y);
+          if (!((elbow.x - shoulder.x) / length > 0.3)) hong('hands', `walking sideways with a cup: the elbow is only ${((elbow.x - shoulder.x) / length * 100).toFixed(0)}% of the upper arm in front of the shoulder — the forearm seems to come out of the chest`);
+          walker.s.huong = 0.3; walker.render();
+          const s2 = origin(walker.el.batR), e2 = origin(walker.el.cangR);
+          if ((e2.x - s2.x) / Math.hypot(e2.x - s2.x, e2.y - s2.y) > 0.45) hong('hands', 'three-quarter stance with a cup: the elbow swings out to the side (hand on the hip)');
+          walker.svg.remove();
+        }
+        // KHỚP VAI LIỀN: viền cánh tay là một bản sao riêng, có mặt nạ xoá nét ở nắp vai. Vùng xoá phải nằm đúng ở chốt
+        // vai trong hệ toạ độ CÁNH TAY — kể cả khi tay gần ở lớp `tren` đang nhấc vai (`nhacY` ≠ 0) và cánh tay đang xoay,
+        // co theo bước đi. Lệch hệ toạ độ thì nét vai vẫn còn, còn một lỗ hổng viền trôi đâu đó trên thân áo.
+        {
+          const walker = L.createCharacter(host, { id: 'vet' }).rig; walker.s.huong = 1; walker.s.vai = -6; walker.s.vungL = 0.6; walker.render();
+          const outline = walker.el.batL.querySelector('use[mask]'), cap = walker.el.capL;
+          if (!outline || !cap) hong('hands', 'long-sleeved outlined character: the arm outline is not a separate masked copy (shoulder seam returns)');
+          else {
+            const m = walker.el.capInvL.transform.baseVal.consolidate().matrix;
+            const local = new DOMPoint(+cap.getAttribute('cx'), +cap.getAttribute('cy')).matrixTransform(m);
+            if (walker.el.batL.parentNode !== walker.el.tren) hong('hands', 'walking sideways: the near arm is not in the front layer');
+            if (!(+cap.getAttribute('r') > 5)) hong('hands', `walking sideways: the shoulder-cap outline mask has radius ${cap.getAttribute('r')}`);
+            if (Math.abs(local.x) > 0.5 || Math.abs(local.y - 4 * walker.nv.daiCanhTay) > 0.5) hong('hands', `the shoulder-cap mask sits at (${local.x.toFixed(1)}, ${local.y.toFixed(1)}) in the arm's frame — it should sit on the shoulder pivot`);
+          }
+          walker.svg.remove();
+        }
         // Bìa hồ sơ và điện thoại cũng có ngón giữ; cầm đồ tay TRÁI thì tay phải rảnh không nằm đè lên món đồ.
         for (const item of ['clipboard', 'phone']) {
           const holder = L.createCharacter(host, { id: 'vet', items: { R: item } }).rig; holder.render();
@@ -722,6 +779,69 @@ try {
           set.look({ blur: 0 });
           try { set.look({ blur: 40 }); hong('3D set', 'blur 40 should be refused'); } catch (error) { /* đúng */ }
           pot.remove();
+          // Bước đi trong phòng: quãng đi của rig (s.x) thành vị trí 3D — bóng đi theo, hình không bị dời hai lần.
+          set.look({ yaw: 0, pitch: 0, lens: 1700, distance: 1700, zoom: 1, blur: 0, x: 0, y: 200, z: -300 });
+          const walker = far.host.getBoundingClientRect(), walkerShadow = floorShadow && floorShadow.getBoundingClientRect();
+          far.s.x = 100; far.render(); set.update();
+          const moved = far.host.getBoundingClientRect(), shadowMoved = floorShadow && floorShadow.getBoundingClientRect();
+          const expected = set.project(-200 + 100 * 300 / 470, 0, -600).x - set.project(-200, 0, -600).x;
+          const drawn = (box) => box.left + box.width / 2;
+          const figureShift = far.svg.querySelector('g').getBoundingClientRect().left - walker.left;
+          const shadowX = () => parseFloat(/translate3d\(([-\d.]+)px/.exec(floorShadow.style.transform)[1]) + parseFloat(floorShadow.style.width) / 2;
+          if (!floorShadow) hong('3D set', 'no floor shadow to follow the walk');
+          else if (Math.abs(shadowX() - (-200 + 100 * 300 / 470)) > 0.5) hong('3D set', `after walking 100 frame units the shadow is at x ${shadowX().toFixed(1)}, expected ${(-200 + 100 * 300 / 470).toFixed(1)} — it stayed behind`);
+          const body = (rig) => { const box = rig.el.than.getBoundingClientRect(); return box.left + box.width / 2; };
+          far.s.x = 0; far.render(); set.update(); const bodyBefore = body(far);
+          far.s.x = 100; far.render(); set.update();
+          if (Math.abs(body(far) - bodyBefore - expected) > 3) hong('3D set', `walking moves the drawing ${(body(far) - bodyBefore).toFixed(1)} px, expected ${expected.toFixed(1)} — moved twice or not at all`);
+          if (!(+far.host.style.zIndex > 0)) hong('3D set', 'the walking character lost its place in the stacking order');
+          // Ra ngoài sàn (bước qua tường bên): mờ dần, ra hẳn thì khuất; trong phòng thì rõ.
+          far.s.x = 0; far.render(); set.update();
+          if (far.host.style.opacity) hong('3D set', `a character inside the room is drawn at opacity ${far.host.style.opacity}`);
+          far.s.x = -(700 + 300) * 470 / 300; far.render(); set.update();
+          if (!(+(far.host.style.opacity || 1) < 0.05)) hong('3D set', `a character 300 units outside the room is drawn at opacity ${far.host.style.opacity || 1}`);
+          far.s.x = 0; far.render(); set.update();
+          // ĐẶT XONG LÀ ĐÚNG CHỖ, chưa cần timeline chạy.
+          {
+            const fresh = L.createCharacter(document.createElement('div'), { id: 'boy' }).rig;
+            set.place(fresh, { x: 300, z: -400, height: 300 });
+            const spotAt = set.project(300, 0, -400), drawnAt = fresh.host.getBoundingClientRect(), origin = view.getBoundingClientRect();
+            if (Math.abs((drawnAt.left + drawnAt.right) / 2 - origin.left - spotAt.x) > 2) hong('3D set', 'a character placed after the last update() is not where its spot projects until the timeline runs');
+          }
+          // KHÔNG PHỤ THUỘC THỨ TỰ TUA: một nhân vật đang bước vào (đang đi) ra cùng một khung dù khung ấy là khung dựng đầu
+          // tiên hay được tua tới sau nhiều khung khác — bộ dựng song song tua mỗi tiến trình từ một chỗ khác nhau.
+          {
+            const frameAt = (first) => {
+              const stage2 = document.createElement('div'); stage2.style.cssText = 'position:absolute;left:0;top:0;width:800px;height:450px'; host.parentNode.appendChild(stage2);
+              const set2 = L.createSet(stage2, { camera: { pitch: 4, distance: 1600 } }); set2.floor({});
+              const walker2 = L.createCharacter(document.createElement('div'), { id: 'vet' }).rig; set2.place(walker2, { x: -500, z: -300, height: 400 });
+              const film = gsap.timeline({ paused: true, onUpdate: set2.update }); film.add(L.sequence(walker2, [['enter', 'left', 600]]), 0);
+              for (const time of first) film.time(time);
+              const picture = walker2.host.style.transform + ' ' + walker2.host.style.opacity;
+              stage2.remove(); return picture;
+            };
+            const direct = frameAt([0.4]), wandered = frameAt([3, 1.5, 0.4]);
+            if (direct !== wandered) hong('3D set', `the same frame differs with the seek history: ${direct} vs ${wandered}`);
+          }
+          // Bong bóng theo người nói không dùng được trong bối cảnh 3D: báo lỗi, không vẽ sai chỗ.
+          {
+            const said = L.sequence(near, [['speak', 'xin chao', 1]]), bubble = document.createElement('div');
+            try { L.captions(said, bubble, { follow: true }); hong('3D set', 'captions({ follow: true }) on a character in a 3D set should throw'); } catch (error) { if (!/3D set/.test(error.message)) hong('3D set', `captions follow in a 3D set fails with an unclear message: ${error.message}`); }
+            said.kill();
+          }
+          // set.target: đích theo VỊ TRÍ TRONG PHÒNG — không đổi khi máy quay đổi góc, đúng phía, tính muộn (sau bước đi).
+          {
+            set.look({ yaw: 0, pitch: 4, distance: 1700, x: 0, y: 200, z: -300 });
+            const aimAt = set.target(far, near);
+            const first = [aimAt.x, aimAt.y];
+            set.look({ yaw: 30 });
+            if (Math.abs(aimAt.x - first[0]) > 0.01 || Math.abs(aimAt.y - first[1]) > 0.01) hong('3D set', `set.target changes with the camera angle: ${first.map((v) => v.toFixed(1))} → ${aimAt.x.toFixed(1)}, ${aimAt.y.toFixed(1)}`);
+            set.look({ yaw: 0 });
+            if (!(aimAt.x > 200 + 300 && aimAt.y > 0 && aimAt.y < 470)) hong('3D set', `set.target for a character 400 units to the right gives x ${aimAt.x.toFixed(0)}, y ${aimAt.y.toFixed(0)} in the pointer's frame`);
+            const before = aimAt.x; far.s.x = 50; const after = aimAt.x; far.s.x = 0;
+            if (Math.abs(before - after) > 0.01) hong('3D set', 'set.target is not in frame coordinates that already include the walk (it moves when the pointer walks)');
+            try { set.target(far, {}); hong('3D set', 'set.target with something that is not placed should throw'); } catch (error) { /* đúng */ }
+          }
           // MÁY QUAY LÀ HÀM CỦA THỜI GIAN: tua tới cuối rồi lùi về phải ra đúng khung như tua thẳng tới đó, kể cả qua hai lần cắt.
           const clock = gsap.timeline({ paused: true, onUpdate: set.update });
           clock.add(set.move({ yaw: 20, distance: 1400 }, 2), 0).add(set.cut({ ...L.OVERVIEW, zoom: 0.8 }), 3).add(set.cut({ lens: 1700, distance: 1500, zoom: 1, yaw: -10 }), 5).to({}, { duration: 1 }, 5);
@@ -759,6 +879,15 @@ try {
           for (const angle of [33, 38, 45]) { Object.assign(held.s, { batR: angle, cangR: 0, batL: angle, cangL: 0 }); held.render();
             for (const k of ['L', 'R']) { const w = widthOf(held.el.tayG[k]); if (w < 0.6) hong('hands', `arm held ${angle}° out: the ${k} hand is ${(w * 100).toFixed(0)}% wide — it sits in the thumb-flip zone`); } }
           held.svg.remove();
+          // `point` vào một NHÂN VẬT / THÚ (rig): góc tay là số thật, tay chỉ về phía con vật.
+          {
+            const pointer = L.createCharacter(host, { id: 'vet' }).rig, aside = document.createElement('div');
+            aside.style.cssText = 'position:absolute;left:520px;top:300px;width:160px'; host.parentNode.appendChild(aside);
+            const pet = L.createPet(aside, { species: 'cat' }).rig, g8 = pointer.point(pet); mid(pointer, g8, 0.8);
+            if (!Number.isFinite(pointer.s.batR) || !Number.isFinite(pointer.s.batL)) hong('gestures', `point(rig): the arm angle is ${pointer.s.batR} / ${pointer.s.batL}`);
+            else if (!(pointer.s.batR > 20)) hong('gestures', `point(rig): pointing at a cat to the right raises the right arm only ${pointer.s.batR.toFixed(0)}°`);
+            g8.kill(); pointer.svg.remove(); aside.remove();
+          }
           // `point` không đích: ngang vai của chính nhân vật, kể cả trẻ con.
           for (const id of ['girl', 'boy', 'vet']) {
             const kid = L.createCharacter(host, { id }).rig; const g6 = kid.point(); mid(kid, g6, 0.8);
@@ -1160,14 +1289,21 @@ try {
       line.time(line.duration()); if (late.s.itemL !== 1) hong('take', 'the item is not received after walking in');
       line.kill(); late.svg.remove();
     }
-    // Đứng dáng 3/4 mà món đồ ở tay XA: cánh tay vẫn ở lớp trước thân (không thì món đồ khuất sau người); quay hẳn
-    // sang ngang thì mới ra sau. Và vuốt ve con vật ở phía tay đang cầm đồ: tay kia vắt sang phía ấy.
+    // Đứng dáng 3/4 mà món đồ ở tay XA: bàn tay + món đồ ở lớp trước thân (không thì món đồ khuất sau người), còn bắp
+    // tay ở lớp có mặt nạ — vẽ cả cánh tay trước thân thì ống tay áo chạy dọc qua ngực, che bảng tên. Bàn tay ở lớp
+    // trước vẫn phải nằm ĐÚNG đầu cẳng tay. Quay hẳn sang ngang thì cả tay ra sau.
+    // Và vuốt ve con vật ở phía tay đang cầm đồ: tay kia vắt sang phía ấy.
     {
       const actor = L.createCharacter(host, { id: 'vet', items: { R: 'clipboard' } }).rig, arm = actor.el.batR;
       actor.s.huong = 0.55; actor.render();
-      if (arm.parentNode !== actor.el.tren) hong('held item', 'three-quarter stance: the far arm with the item is hidden behind the body');
+      if (actor.el.coTayR.parentNode !== actor.el.xaCang) hong('held item', 'three-quarter stance: the hand with the item is not in the layer in front of the body');
+      if (arm.parentNode !== actor.el.xaTruoc) hong('held item', `three-quarter stance: the far upper arm with the item is in "${arm.parentNode.id}" — over the chest it covers the badge`);
+      const wrist = new DOMPoint(0, 0).matrixTransform(actor.el.coTayR.getScreenCTM());
+      const reach = new DOMPoint(0, 58 * actor.nv.daiCangTay).matrixTransform(actor.el.cangR.getScreenCTM());
+      const scale = actor.svg.getScreenCTM().a;
+      if (Math.hypot(wrist.x - reach.x, wrist.y - reach.y) / scale > 0.5) hong('held item', `three-quarter stance: the hand in the front layer is ${(Math.hypot(wrist.x - reach.x, wrist.y - reach.y) / scale).toFixed(1)} units off the end of its forearm`);
       actor.s.huong = 1; actor.render();
-      if (arm.parentNode === actor.el.tren) hong('held item', 'side-on: the far arm with the item should be behind the body');
+      if (arm.parentNode === actor.el.tren || actor.el.coTayR.parentNode !== actor.el.cangR) hong('held item', 'side-on: the far arm with the item should be behind the body, hand included');
       actor.reset();
       const t = actor.stroke({ x: 330, y: 400 }); t.time(0.6);          // đích ở bên PHẢI, phía tay cầm bìa kẹp
       if (Math.abs(actor.s.cangR - actor.NGHI.cangR) > 1) hong('stroke', 'the hand holding the item moves');

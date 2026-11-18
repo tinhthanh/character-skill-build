@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.39.0';
+export const VERSION = '0.40.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -618,6 +618,9 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
     const place = (node) => { let x = 0, y = 0; for (let n = node; n && n !== root; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y }; };
     for (const line of lines) {
       if (!line.rig || typeof line.rig.shotBox !== 'function') continue;
+      // Bong bóng đặt MỘT chỗ cho cả câu, tính từ vị trí host trong bố cục. Trong bối cảnh 3D host được máy quay đặt lại
+      // từng khung (và máy quay đi trong lúc nói) — một chỗ cố định sẽ lơ lửng sai chỗ. Báo rõ thay vì vẽ sai.
+      if (line.rig.host && line.rig.host.hasAttribute('data-set3d')) throw new Error('[character] captions({ follow: true }) is not available in a 3D set — the camera moves the speakers during a line. Use captions at a fixed place (follow: false)');
       const actions = line.rig.lastSequence, before = actions ? actions.time() : 0;
       if (actions) actions.time(Math.min((line.start + line.end) / 2, actions.duration()));
       const box = line.rig.shotBox('face');
