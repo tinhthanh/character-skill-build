@@ -80,6 +80,21 @@ Fixed
 Not added
 - A high five was tried and left out: standing close, the big chibi heads sit exactly where the
   two hands would meet; standing further apart, the arms do not reach.
+## 0.42.1
+
+Fixed
+- **Pictures in a 3D set rendered in the wrong place.** `tools/scene.py` stood every `set.cutouts`
+  image as an `<img>` without a size; until the picture loaded it measured 0 wide, `set.update()`
+  centred it on that, and HyperFrames captured those frames with the picture half its width off to
+  the right (in a close shot, a bench at the back of the room landed across a person in front).
+  The tool now reads each picture's size from the file (PNG, JPEG, GIF, WebP) and writes `width` /
+  `height` on the element; a file it cannot read gets a note. `references/hyperframes.md` says to do
+  the same in a composition written by hand.
+- **Two pictures with the same file name overwrote each other.** Pictures are copied next to the
+  composition by file name, so `props/table/sprite.png` and `props/bench/sprite.png` became one
+  picture shown twice. A second file with a name already taken is now copied as `sprite-2.png`
+  (cutouts, panels, screens, phone screens and `show` images alike); the same file used twice is
+  still copied once.
 
 ## 0.42.0
 

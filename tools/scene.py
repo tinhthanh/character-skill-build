@@ -343,6 +343,41 @@ PRESETS = {
 }
 
 
+def image_size(path):
+    """(width, height) in px read from the file's header — PNG, JPEG, GIF or WebP; None for anything else."""
+    with open(path, 'rb') as fh: head = fh.read(64 * 1024)
+    if head[:8] == b'\x89PNG\r\n\x1a\n': return int.from_bytes(head[16:20], 'big'), int.from_bytes(head[20:24], 'big')
+    if head[:6] in (b'GIF87a', b'GIF89a'): return int.from_bytes(head[6:8], 'little'), int.from_bytes(head[8:10], 'little')
+    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
+        kind = head[12:16]
+        if kind == b'VP8X': return 1 + int.from_bytes(head[24:27], 'little'), 1 + int.from_bytes(head[27:30], 'little')
+        if kind == b'VP8 ': return int.from_bytes(head[26:28], 'little') & 0x3FFF, int.from_bytes(head[28:30], 'little') & 0x3FFF
+        if kind == b'VP8L':
+            bits = int.from_bytes(head[21:25], 'little'); return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+    if head[:2] == b'\xff\xd8':
+        i = 2
+        while i + 9 < len(head):
+            if head[i] != 0xFF: i += 1; continue
+            marker, length = head[i + 1], int.from_bytes(head[i + 2:i + 4], 'big')
+            if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                return int.from_bytes(head[i + 7:i + 9], 'big'), int.from_bytes(head[i + 5:i + 7], 'big')
+            i += 2 + length
+    return None
+
+
+def copy_asset(base, out, rel, copied):
+    """Copy a picture the scene names into the output folder and return the name to use for it.
+    Two different files with the same name (props/a/sprite.png, props/b/sprite.png) get distinct names
+    (sprite.png, sprite-2.png) instead of overwriting each other; the same file named twice is copied once."""
+    source = os.path.abspath(os.path.join(base, rel))
+    if source in copied: return copied[source]
+    stem, ext = os.path.splitext(os.path.basename(rel)); name, n = stem + ext, 1
+    while name in copied.values(): n += 1; name = f'{stem}-{n}{ext}'
+    copied[source] = name
+    if source != os.path.abspath(os.path.join(out, name)): shutil.copy(source, os.path.join(out, name))
+    return name
+
+
 def js(value):
     return json.dumps(value, ensure_ascii=False)
 
@@ -418,6 +453,7 @@ def main():
     scene_id = slug(scene.get('id') or os.path.splitext(os.path.basename(args.scene))[0])
     width, height = int(scene.get('width', 1920)), int(scene.get('height', 1080))
     out = os.path.abspath(args.output or os.path.join(base, scene_id))
+    copied = {}                                             # ảnh đã chép: nguồn → tên trong thư mục ra
     # Cỡ mặc định theo KHUNG HÌNH: người cao 0,7 khung ngang (760 px ở 1920×1080), nhưng không rộng quá
     # ba phần tư bề ngang của khung dọc; thú bằng 0,43 người.
     person_default = round(min(0.7 * height, 0.75 * width))
@@ -835,8 +871,7 @@ def main():
             look = f"background:{item.get('color', '#9fd0e6')};border:{item.get('border', '12px solid #f4f7f8')};box-sizing:border-box"
             if item.get('image'):
                 # Ảnh trên tấm (màn hình TV, poster, phim X-quang, biển tên): lấp đầy tấm, cắt phần thừa.
-                name = os.path.basename(item['image'])
-                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
+                name = copy_asset(base, out, item['image'], copied)
                 look += f";background-image:url('{name}');background-size:cover;background-position:center"
             at, turn = (([item['at'], item['y'], back + 1], 0) if side == 'back' else ([-half + 1, item['y'], item['at']], 90) if side == 'left' else ([half - 1, item['y'], item['at'] - item['width']], -90))
             setup.append(f"    set.panel({{ at: {js(at)}, size: [{item['width']:g}, {item['height']:g}], turn: {turn}, style: {js(look)} }});")
@@ -857,8 +892,7 @@ def main():
                     options['on'] = 0
                     if item.get('facing'): options['facing'] = item['facing']
                     if item.get('screen'):
-                        name = os.path.basename(item['screen'])
-                        if os.path.abspath(os.path.join(base, item['screen'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['screen']), os.path.join(out, name))
+                        name = copy_asset(base, out, item['screen'], copied)
                         options['image'] = name
                 for key in ('fill', 'reading'):
                     if key in item: options[key] = item[key]
@@ -866,9 +900,13 @@ def main():
                 look = f", {js(options)}" if options else ''
                 setup.append(f"    const cutout{n + 1} = document.createElement('div'); VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});")
             else:
-                name = os.path.basename(item['image'])
-                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
-                setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = ''; set.stand(cutout{n + 1}, {{ {where_} }});")
+                name = copy_asset(base, out, item['image'], copied)
+                # Kích thước ảnh ghi sẵn: set.stand đo phần tử để căn giữa và đặt chân — ảnh chưa tải xong thì rộng 0, nên khung
+                # hình chụp lúc ấy lệch nửa bề ngang (trình render chụp ngay, không đợi khung sau).
+                size = image_size(os.path.join(out, name))
+                dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
+                if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
+                setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} set.stand(cutout{n + 1}, {{ {where_} }});")
     elif picture:
         source = os.path.join(base, picture)
         if not os.path.isfile(source): fail(f'background.image not found: {picture} (looked in {base})')
@@ -936,8 +974,7 @@ def main():
                 piece('div', f'bullet{i + 1}', (i + (1 if show.get('title') else 0)) / (len(bullets) + (1 if show.get('title') else 0)), '• ' + text, y)
                 y += lines_of('• ' + text, bullet_px) * bullet_px * 1.3 + bullet_px * 0.5
             if show.get('image'):
-                name = os.path.basename(show['image'])
-                if os.path.abspath(os.path.join(base, show['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, show['image']), os.path.join(out, name))
+                name = copy_asset(base, out, show['image'], copied)
                 room = max(round(height * 0.14), panel_bottom - y)
                 piece('img', 'image', 0, name, y, f' height: {round(room)}px;')
                 y += room
@@ -975,8 +1012,7 @@ def main():
         for side, item in (who.get('holds') or {}).items():
             # Ảnh trên màn hình điện thoại đi theo bản dựng như mọi ảnh khác: chép vào thư mục ra, gọi bằng tên tệp.
             if isinstance(item, dict) and item.get('image'):
-                name = os.path.basename(item['image'])
-                if os.path.abspath(os.path.join(base, item['image'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['image']), os.path.join(out, name))
+                name = copy_asset(base, out, item['image'], copied)
                 item = dict(item, image=name)
             held[side] = item
         make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
