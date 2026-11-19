@@ -154,6 +154,8 @@ clips for every voice file.
    beside the character as they speak (`examples/scene-presenter/scene.json`).
    For a room with depth and a camera that changes angle (pan, push in, wide shot), add
    `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
+   Someone arriving on a scooter: a `scooter` cutout with `"drive"` and `"rides"` on the person
+   (`examples/scene-ride/scene.json`).
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
    Light: `"set": { "light": "night", "lamps": [ … ] }` (`day`, `evening`, `night`), `"window": true` on a
    back-wall panel, `"lamp": "on"` on a turn — lamps glow (and flicker when switched on), light the room and the

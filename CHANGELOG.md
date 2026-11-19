@@ -10,6 +10,14 @@ Added — riding a scooter
   nodding, looking keep the hands on the bars; `wave` / `point` let go of that hand and take it back.
   A new state channel `ride`; `#khep` keeps it like `seat`, so following actions play riding.
   In a scene file: `"do": ["ride"]`, … `"do": ["getOff", "wave"]`.
+- **Prop `scooter`** (side view, life size next to a person, `color`, `facing`): `rideLift(rig)` — how far to raise
+  a rider in the `ride` stance so the hips sit on the seat and the feet on the footboard; `roll(distance, duration,
+  ease)` — a timeline turning both wheels (spoked `[data-wheel]` groups). Also a scene-file cutout and 2D prop kind.
+- **Scene files — driving in and riding** (`examples/scene-ride/scene.json`): `"drive": { "from", "dur", "ease" }` on
+  a set cutout slides it in at the start, wheels turning; the conversation (turns, views, voice clips) starts when
+  every vehicle has stopped. `"rides": "<scooter>"` on a person seats them on it from the first frame, moving with it;
+  their `"getOff"` steps them down beside the scooter exactly when it plays.
+- `ride → getOff` in the action catalog (review sheet / reel).
 
 ## 0.73.0
 

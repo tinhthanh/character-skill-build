@@ -1,0 +1,21 @@
+{
+  "id": "scene-ride",
+  "seed": 7,
+  "set": {
+    "preset": "street",
+    "cutouts": [
+      { "kind": "scooter", "name": "scooter", "x": -380, "z": -500, "drive": { "from": -1500, "dur": 3.2 } }
+    ]
+  },
+  "characters": [
+    { "name": "vet", "id": "vet", "rides": "scooter", "height": 560 },
+    { "name": "owner", "id": "granny", "x": 250, "z": -470, "height": 540, "faces": "vet" },
+    { "name": "bella", "species": "dog", "x": 430, "z": -440, "height": 220, "faces": "vet" }
+  ],
+  "script": [
+    { "who": "vet", "do": ["getOff", "wave"] },
+    { "who": "owner", "do": ["wave"] },
+    { "who": "bella", "do": ["greet"] },
+    { "who": "vet", "do": ["nod"], "view": { "yaw": -14, "distance": 1250, "dur": 2 } }
+  ]
+}
