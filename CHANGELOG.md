@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.46.0
+
+Added — passing a pet, kneeling, play
+- **`handOverPet(other)` / `takePet(giver)`** — pass a carried pet from one person's arms to
+  another's, run `together`: the giver holds it out to the point half way between them, the taker
+  reaches, takes it and holds it (the `carry` stance). A new state channel `omGive`.
+- **`kneel`** — a stance: down on the knees, level with a pet on the floor (a new `kneel` channel
+  foreshortens the shins as `seat` does the thighs); `standUp` gets up.
+- **`throwBall(direction, distance)`** with a dog's **`fetch(distance)`**: a ball flies in an arc; the
+  dog runs out, brings it back in its mouth, wags.
+- **`rub`** for pets — rubbing against the legs of the person beside it.
+- **Prop `carrier`** (pet carrier, door left or right), also as a cutout and a scene prop.
+
+Fixed
+- **A pet's "home" could be recorded as someone's arms.** `carry` read where the pet's SVG was at
+  build time; with two people carrying the same pet, the draft of one could leave it in the other's
+  arms, and the pet then showed in that person's arms for the whole scene. `carry` now uses the pet's
+  own host (`pet.host`, `pet.homeAttrs`) and measures it at home.
+- `throwBall` and the generic action sweeps: a hand holding an item throws with the other hand.
+- CI: the check page yields during its long catalog loop, and `tools/chrome_run.py` waits up to
+  300 s for a reply (the runner timed out reading the page title).
+
 ## 0.45.0
 
 Added — do / don't gestures, aftercare and grooming

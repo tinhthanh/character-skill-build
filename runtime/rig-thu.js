@@ -76,6 +76,7 @@ const NGHI = Object.freeze({
   matY: 0, nhinX: 0, nhinY: 0, dongTu: 1, mieng: 0, luoi: 0, cuoi: 0.4,
   duoi: 0, duoiCong: 0,
   nuoc: 0,                 // 0…1 các giọt nước văng ra quanh thân (`shakeOff`)
+  ballMouth: 0,            // 1 = ngậm quả bóng (`fetch`)
   tnX: 0, tnY: 0, tnNhac: 0, tnGoc: 0, txX: 0, txY: 0, txNhac: 0, txGoc: 0,
   snX: 0, snY: 0, sxX: 0, sxY: 0,
 });
@@ -230,7 +231,7 @@ function khop(R, T, a, b, raTruoc) {
 }
 
 // Động tác TRIỆU CHỨNG và chăm sóc, chung cho chó và mèo (nội dung thú y: ngứa, khập khiễng, sợ hãi, biếng ăn, ho…).
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch'];
 // Phụ kiện đeo (`wear`): loa chống liếm sau mổ, băng ở chân trước phía người xem.
 const WEARABLES = ['cone', 'bandage'];
 
@@ -293,12 +294,14 @@ export class RigThu {
     this.host.innerHTML = this.#dungSVG();
     this.svg = this.host.querySelector('svg');
     if (khung) this.svg.setAttribute('viewBox', khung);
+    // Thuộc tính của SVG khi nó ở NHÀ (trong host của chính nó) — người bế (`carry`) trả con vật về đúng như thế.
+    this.homeAttrs = ['x', 'y', 'width', 'height'].map((name) => [name, this.svg.getAttribute(name)]);
     // Nối chuỗi, KHÔNG dùng template literal trong querySelector: bộ lint của HyperFrames
     // (và bộ đóng gói HTML của nó) từ chối selector có biến nội suy.
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi',
-      'duiN', 'duiX', 'nuoc', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
+      'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
     this.apDung();
   }
 
@@ -354,7 +357,9 @@ export class RigThu {
       <g id="${p}-cone" style="display:none"><ellipse rx="70" ry="63" fill="#e6f3fa" fill-opacity=".78" stroke="#8fb8cf" stroke-width="3"/>
         <ellipse rx="50" ry="45" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".55"/>
         <path d="M -70 0 Q -66 -30 -40 -50 M 66 22 Q 58 44 36 56" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
-      ${nv.veDau(p, m, nv)}</g>
+      ${nv.veDau(p, m, nv)}
+      <g id="${p}-ballM" style="display:none" transform="translate(0 ${(nv.mom.y + 7).toFixed(1)})"><circle r="10" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.4"/>
+        <path d="M -9 -3 Q 0 4 9 -3 M -9 4 Q 0 -3 9 4" stroke="#ffffff" stroke-width="1.6" fill="none" opacity=".9"/></g></g>
   </g>
 </svg>`;
   }
@@ -440,6 +445,7 @@ export class RigThu {
     dat('tn', xTruoc, false); dat('tx', xTruoc, true);
     const hn = dat('sn', xSau, false), hx = dat('sx', xSau, true);
     e.duiN.setAttribute('transform', `translate(${fx(hn.x + 3)} ${fx(hn.y)})`);
+    if (e.ballM) e.ballM.style.display = s.ballMouth >= 0.5 ? '' : 'none';
     // Giọt nước khi rũ mình: toả ra từ giữa thân theo `nuoc`, hiện rồi tắt theo nửa chu kỳ sin.
     if (e.nuoc) {
       const w = clamp(s.nuoc, 0, 1);
@@ -571,6 +577,7 @@ export class RigThu {
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
+    rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
@@ -914,6 +921,48 @@ export class RigThu {
     t.to(s, { dau: -10, dauY: -3, mieng: 0.95, luoi: 0.25, matY: 0.3, taiL: 0.3, taiR: 0.3, duration: 0.3, ease: 'power2.out' }, 0);
     t.to(s, { mieng: 0.85, duration: hold * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.3);
     this.#khep(t, 0.35, 0.3 + hold);
+    return t;
+  }
+
+  /**
+   * DỤI VÀO CHÂN (người đứng cạnh): đuôi dựng cong, đầu và má dụi qua dụi lại, thân lắc theo, mắt lim dim — làm nũng,
+   * mừng chủ. Đặt con vật sát chân người ấy.
+   */
+  rub(times = 4) {
+    const t = this.tl(), s = this.s;
+    const at = this.#dung(t, 0);
+    t.to(s, { duoi: 34, duoiCong: 0.7, matY: 0.75, cuoi: 1, taiL: 0.2, taiR: 0.2, duration: 0.3, ease: 'power2.out' }, at);
+    for (let i = 0; i < times * 2; i++) {
+      const g = i % 2 ? -1 : 1;
+      t.to(s, { dau: g * 13, dauX: g * 5, dauY: 3, truocX: g * 4, sauX: -g * 3, tho: i % 2 ? 0 : 1, duration: 0.24, ease: 'sine.inOut' }, at + 0.3 + i * 0.24);
+    }
+    this.#khep(t, 0.4, at + 0.3 + times * 0.48);
+    return t;
+  }
+
+  /**
+   * CHẠY NHẶT BÓNG: chạy ra `distance` đơn vị về phía đang quay mặt (bóng do người `throwBall` ném), cúi ngậm quả
+   * bóng, quay lại chạy về chỗ cũ, đứng vẫy đuôi khoe bóng rồi nhả. Đi cặp với `throwBall` của người: chạy `delay` giây
+   * sau khi bắt đầu (đợi bóng bay).
+   */
+  fetch(distance = 260, { delay = 0.7 } = {}) {
+    const t = this.tl(), s = this.s, x0 = s.x, dir = s.huong < 0 ? -1 : 1, d = Math.max(60, distance);
+    let at = this.#dung(t, 0);
+    t.to(s, { taiL: 0.9, taiR: 0.9, cuoi: 1, mieng: 0.4, luoi: 0.6, nhinX: dir * 2, duration: 0.25 }, at);
+    at = Math.max(at, delay);
+    const run = this.#pace(d);
+    at = this.#di(t, at, run.cycles, run.beat, { ra: false, quang: dir * d, x0, A: run.A, cao: run.lift });
+    // Cúi ngậm bóng.
+    t.to(s, { truocY: 14, dauX: 18, dauY: 34, dau: 14, mieng: 0.6, duration: 0.25, ease: 'power2.in' }, at);
+    t.set(s, { ballMouth: 1 }, at + 0.25);
+    t.to(s, { truocY: 0, dauX: 0, dauY: 0, dau: 0, mieng: 0.3, duration: 0.25, ease: 'power2.out' }, at + 0.28);
+    at += 0.55;
+    t.to(s, { huong: -dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22;
+    at = this.#di(t, at, run.cycles, run.beat, { vao: false, quang: -dir * d, x0: x0 + dir * d, A: run.A, cao: run.lift });
+    t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22;
+    at = this.#vay(t, at, 8, 40, 0.11);
+    t.set(s, { ballMouth: 0 }, at);
+    this.#khep(t, 0.35, at, { x: x0, huong: dir });
     return t;
   }
 

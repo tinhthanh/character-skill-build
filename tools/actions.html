@@ -39,7 +39,7 @@ for (const entry of entries) {
       let pet = null;
       // Con vật đặt trong TẦM TAY (ngang bàn khám), ở phía tay phải — như trong bài kiểm tra tools/check.html.
       if (entry.pet) {
-        const petHost = document.createElement('div'); petHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${118 * zoom}px;width:${100 * zoom}px;height:${82 * zoom}px`;
+        const petHost = document.createElement('div'); petHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${(entry.petOnFloor ? 162 : 118) * zoom}px;width:${100 * zoom}px;height:${82 * zoom}px`;     // petOnFloor: con vật đứng dưới sàn (quỳ xuống mới với tới)
         cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet, wear: entry.wear || [] }).rig;
       }
       const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;

@@ -57,6 +57,9 @@ the demo steps from `tools/action-catalog.json`.
 | `giveTreat` | `(target, { kind = 'treat' })` | bend and hold out a bone-shaped treat (it appears in the hand) to the pet's mouth; it disappears as the pet takes it; smile, pull back. `kind: 'pill'` gives a pill instead. Pair with the pet's `beg`, `wagTail` or `eat` in a `together` | 1.9 |
 | `brush` | `(target, strokes = 4)` | bend and brush along the pet's back with a brush that appears in the hand — grooming | 1.0 + 0.42 × `strokes` |
 | `leash` / `unleash` | `(pet)` / — | **stance**: clip a leash onto the pet; a line is drawn from the held leash handle (`items: { R: 'leash' }`) to the pet's collar and follows both of them — `walk` the person and the pet `together` to walk it. `unleash` removes the line. Throws without a leash in hand | 0.95 / 0.95 |
+| `handOverPet` / `takePet` | `(other)` / `(giver)` | pass a carried pet from one person to another — run both `together`: the giver holds the pet out to the point half way between them, the taker reaches out, the pet passes at 0.55 s and the taker holds it (the `carry` stance). The two should stand about 0.42 × host height apart (`tools/scene.py` walks the giver closer). The taker's `putDown()` returns the pet to its own spot | 1.1 / 1.55 |
+| `kneel` | — | **stance**: go down on the knees (thighs and shins both foreshortened toward the viewer), level with a pet on the floor; `stroke`, `examine`, `giveTreat` play kneeling. `standUp()` gets up | 0.65 |
+| `throwBall` | `(direction = 'right', distance = 420)` | wind up and throw a tennis ball in an arc toward `direction`; it lands `distance` units away (by default out of frame). Pair it with a dog's `fetch` | 2.15 |
 | `write` | `(dur = 1.2)` | the other hand comes over to the held item (clipboard, phone) and writes a few lines, head down; with empty hands it writes on the left palm | `dur` + 0.87 |
 | `call` | `(text = null, dur = 2.4, { mood, side })` | put the held phone to the cheek (its back facing out, the head tilting to it), say `text` over `dur` seconds, put it down. No `text`: listening, small nods. With empty hands it mimes the call with a fist. A chibi's short arm cannot reach the ear in a front view, so the phone goes to the cheek — the usual cartoon shorthand | `dur` + 1.05 |
 | `phoneUp` / `phoneDown` | `(side = 'auto')` / — | **stance**: put the phone to the cheek and keep it there; the following steps (`explain`, `speakCues` with a recorded voice, `nod`…) play on the phone, the other hand still gestures. `phoneDown` puts it down. Needs a held phone | 0.8 / 0.5 |
@@ -170,6 +173,8 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
 | `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
+| `rub` | `(times = 4)` | rub against the legs of the person beside it: tail up and curled, cheek and head rubbing side to side, eyes half shut | 0.7 + 0.48 × `times` |
+| `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down (front legs out); `sleep` lies down, head down, eyes closed, slow deep breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -200,6 +205,8 @@ stand them up first:
 | `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
 | `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
+| `rub` | `(times = 4)` | rub against the legs of the person beside it: tail up and curled, cheek and head rubbing side to side, eyes half shut | 0.7 + 0.48 × `times` |
+| `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -242,6 +249,7 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `laptop` | `on = 150`, `facing = 'away'`, `image`, `color`, `width = 96` | a laptop on a surface `on` units above the floor (150 = the default table or counter top). `'away'`: the lid faces the viewer — the machine of someone behind the desk; put its host **after** the person's (in front) so the lid hides the typing hands. `'viewer'`: the screen faces out and shows `image` |
 | `monitor` | `on = 150`, `image`, `color`, `width = 150` | a desktop screen on a stand, facing the viewer, showing `image` (the app, a lab result, an X-ray) |
 | `bowl` | `fill = 'food'` (`'water'`, `'empty'`), `color`, `width = 46` | a pet bowl on the floor. For `eat` / `drink`, give its host the pet's `bottom` and `height` and put it just in front of the muzzle: about 0.15 × the pet's host height toward the side its head is on |
+| `carrier` | `door = 'right'` (`'left'`), `color`, `width = 150` | a pet carrier seen from the side, a barred door on one end. Put its host **after** the pet's (in front): a pet standing behind it is "inside", seen through the door |
 | `scale` | `reading` (e.g. `'4.2 kg'`), `color`, `width = 210` | a low vet scale with a digital display. Stand the pet on it: raise the pet's host by the platform (about 0.03 × the host height) |
 
 The top of a table or counter is `(12 + height) × hostHeight / 470` px above the bottom of its

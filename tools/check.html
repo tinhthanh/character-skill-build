@@ -163,7 +163,7 @@ try {
   { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
     const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
     for (const name of rig.actions) {
-      if (['walkAway', 'exit', 'handOver', 'take', 'carry'].includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ — có bài kiểm riêng
+      if (['walkAway', 'exit'].includes(name) || L.RigSVG.EXCHANGE.includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ / một người khác — có bài kiểm riêng
       rig.reset();
       const t = name === 'point' ? rig.point({ x: 60, y: 80 }) : rig[name](); t.progress(1); rig.apDung();
       if (Math.abs(rig.state.headTilt - 4) > 1e-3 || rig.state.handR !== 'fist') hong('restPose', `${name}: ends with headTilt ${rig.state.headTilt}, handR ${rig.state.handR} instead of the character's rest pose (4, fist)`);
@@ -1706,6 +1706,32 @@ try {
         if (turned > 0.05) hong('walk', `a 40-unit step closer turns the body sideways (facing changes by ${turned.toFixed(2)})`);
         if (Math.abs(actor.s.x - x0 - 40) > 0.5) hong('walk', `a 40-unit step closer moves ${(actor.s.x - x0).toFixed(1)} units`);
         nudge.kill(); actor.datNghi(); }
+      // Đợt 6 — quỳ, trao con vật, ném bóng / nhặt bóng.
+      {
+        const top = () => actor.el.dau.getBoundingClientRect().top, standing = top();
+        const down = L.sequence(actor, ['kneel', ['idle', 0.5], 'standUp'], { breathe: false });
+        down.time(down.data.steps[1].start + 0.2);
+        const unit = actor.svg.getScreenCTM().a;
+        if (!((top() - standing) / unit > 45)) hong('kneel', `kneeling lowers the head only ${((top() - standing) / unit).toFixed(0)} units — it does not read as kneeling`);
+        down.progress(1); if (Math.abs(top() - standing) > 1 || actor.s.kneel !== 0) hong('kneel', 'standUp does not bring the character back up');
+        down.kill(); actor.datNghi();
+        const giver = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig, taker = L.createCharacter(spot('left:90px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+        const kitty = L.createPet(spot('left:60px;top:150px;width:100px;height:82px'), { species: 'cat' }).rig, home = kitty.host;
+        const give = L.sequence(giver, [['carry', kitty], ['handOverPet', taker]], { breathe: false }), take = L.sequence(taker, [['idle', give.data.steps[1].start - 0.1], ['takePet', giver]], { breathe: false });
+        const parentAt = (time) => { give.time(time); take.time(time); return kitty.svg.parentNode === giver.el.om ? 'giver' : kitty.svg.parentNode === taker.el.om ? 'taker' : kitty.svg.parentNode === home ? 'home' : 'elsewhere'; };
+        const handAt = give.data.steps[1].start + 0.55;
+        const route = [0, give.data.steps[0].start + 1.4, handAt - 0.1, handAt + 0.2, take.duration(), handAt - 0.1, 0].map(parentAt).join(' → ');
+        if (route !== 'home → giver → giver → taker → taker → giver → home') hong('handOverPet', `the pet goes ${route} (want home → giver → giver → taker → taker → giver → home, also when seeking back)`);
+        give.kill(); take.kill(); giver.svg.remove(); taker.svg.remove(); kitty.svg.remove();
+        const pitch = actor.throwBall('right', 300); pitch.time(0.9);
+        if (actor.el.ball.style.display === 'none') hong('throwBall', 'no ball in the air');
+        pitch.progress(1); if (actor.el.ball.style.display !== 'none') hong('throwBall', 'the ball stays after the throw'); pitch.kill(); actor.datNghi();
+        const runner = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog' }).rig, run = runner.fetch(160, { delay: 0.2 });
+        let carried = false; for (let time = 0; time <= run.duration(); time += 0.1) { run.time(time); if (runner.s.ballMouth >= 0.5 && runner.el.ballM.style.display !== 'none') carried = true; }
+        if (!carried) hong('fetch', 'the dog never carries the ball back');
+        run.progress(1); if (Math.abs(runner.s.x) > 0.5 || runner.s.ballMouth) hong('fetch', `the dog does not end back where it started without the ball (x ${runner.s.x.toFixed(1)})`);
+        run.kill(); runner.svg.remove();
+      }
       const brisk = actor.hurry(6), calm = actor.walk(6);
       if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
       brisk.kill(); calm.kill();

@@ -77,6 +77,9 @@
     { "label": "giveTreat (pet)", "steps": [["giveTreat", "@pet"]], "pet": "dog" },
     { "label": "giveTreat pill (pet)", "steps": [["giveTreat", "@pet", { "kind": "pill" }]], "pet": "cat" },
     { "label": "brush (pet)", "steps": [["brush", "@pet"]], "pet": "dog" },
+    { "label": "kneel → stroke → standUp (pet)", "steps": ["kneel", ["stroke", "@pet"], "standUp"], "pet": "cat", "petOnFloor": true },
+    { "label": "kneel (hold)", "steps": ["kneel", ["idle", 1.2], "standUp"] },
+    { "label": "throwBall", "steps": [["throwBall", "right", 300]] },
     { "label": "leash → nod → unleash (pet)", "steps": [["leash", "@pet"], "nod", "unleash"], "pet": "dog", "items": { "R": "leash" } }
   ],
   "pets": [
@@ -98,6 +101,8 @@
     { "label": "sneeze", "steps": ["sneeze"] },
     { "label": "pant", "steps": [["pant", 2]] },
     { "label": "yawn", "steps": ["yawn"] },
+    { "label": "rub", "steps": ["rub"] },
+    { "label": "fetch", "steps": [["fetch", 160, { "delay": 0.3 }]] },
     { "label": "wearing cone + bandage: limp", "steps": [["limp", 4]], "wear": ["cone", "bandage"] },
     { "label": "dog: wagTail", "steps": ["wagTail"], "species": "dog" },
     { "label": "dog: bark", "steps": ["bark"], "species": "dog" },

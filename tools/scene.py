@@ -42,7 +42,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
-                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg")
+                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left")
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "preset": "reception" | "exam" | "pharmacy" | "living-room" — a ready-made room (your boxes etc. are added)
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
@@ -81,6 +81,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
                A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene.
+               "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] together with the vet's
+               ["takePet", "@owner"] (a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
+               together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
+               A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -138,7 +142,7 @@ def known(where, given, allowed):
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
-PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading')
+PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
@@ -184,10 +188,10 @@ SET_PRESETS = {
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-FLOOR_KINDS = ('bowl', 'scale')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+FLOOR_KINDS = ('bowl', 'scale', 'carrier')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
@@ -446,6 +450,7 @@ def main():
             if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
             if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
+            if 'door' in item and (item.get('kind') != 'carrier' or item['door'] not in ('left', 'right')): fail(f'set.cutouts[{n}].door must be "left" or "right" (carrier only)')
             if 'reading' in item and (item.get('kind') != 'scale' or not isinstance(item['reading'], str)): fail(f'set.cutouts[{n}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         for n, item in enumerate(stage_set.get('panels', [])):
             if item.get('wall', 'back') not in ('back', 'left', 'right'): fail(f'set.panels[{n}].wall must be "back", "left" or "right"')
@@ -740,7 +745,7 @@ def main():
             who = names[turn['who']]
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
@@ -749,7 +754,7 @@ def main():
                 # Đưa đồ: hai cánh tay cùng vươn (0,45); bắt tay: bàn tay gặp nhau ở giữa, đứng gần hơn (0,38); chạm tới con vật: gần như vuốt ve.
                 # Soi đèn / đưa bánh thưởng tới ĐẦU con vật (cao hơn thân, xa vai hơn): đứng sát hơn nữa (0,16), không thì tay
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
-                wanted = {'handOver': 0.45, 'handshake': 0.38, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.45, 'handOverPet': 0.42, 'handshake': 0.38, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
@@ -794,13 +799,13 @@ def main():
     # ── đạo cụ ──
     props = []
     for index, prop in enumerate(scene.get('props', [])):
-        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale) and "x"')
+        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale, carrier) and "x"')
         if 'fill' in prop and (prop['kind'] != 'bowl' or prop['fill'] not in ('food', 'water', 'empty')): fail(f'props[{index}].fill must be "food", "water" or "empty" (bowl only)')
         if 'reading' in prop and (prop['kind'] != 'scale' or not isinstance(prop['reading'], str)): fail(f'props[{index}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         known(f'props[{index}]', prop, PROP_KEYS)
         host_height = float(prop.get('height', person_default))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
-                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back', 'fill', 'reading') if key in prop}})
+                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back', 'fill', 'reading', 'door') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
         if who.get('seated') in ('chair', 'stool'):
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
@@ -919,7 +924,7 @@ def main():
                     if item.get('screen'):
                         name = copy_asset(base, out, item['screen'], copied)
                         options['image'] = name
-                for key in ('fill', 'reading'):
+                for key in ('fill', 'reading', 'door'):
                     if key in item: options[key] = item[key]
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
@@ -1050,7 +1055,7 @@ def main():
             setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
-                   'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading')}
+                   'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
         if who.get('_seat') and stage_set is not None:

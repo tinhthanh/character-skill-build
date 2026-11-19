@@ -99,6 +99,20 @@ const DRAW = {
     <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
     ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
   },
+  // LỒNG VẬN CHUYỂN thú cưng, nhìn ngang: thân nhựa bo tròn, quai xách, cửa lưới ở phía `door` ('right' mặc định). Đặt
+  // host của lồng SAU host con vật trong HTML (lớp trên): con vật đi vào phía sau lồng là "ở trong lồng" — thân lồng che
+  // nó, chỉ còn thấy qua cửa lưới. Cỡ theo khung người (400 × 470): `width` 150 vừa một con chó / mèo cỡ mặc định của cảnh.
+  carrier: ({ w = 150, door = 'right', color, dark, line }) => {
+    const F = PROP_FRAME.floor, h = w * 0.66, x0 = 200 - w / 2, top = F - h, d = door === 'left' ? -1 : 1;
+    const dx = d > 0 ? 200 + w / 2 - 6 : x0 + 6, gate = Array.from({ length: 6 }, (_, n) => `M ${dx - d * (n + 1) * 1.6} ${top + 14 + n * 0} L ${dx - d * (n + 1) * 1.6} ${F - 10}`).join(' ');
+    const doorX = d > 0 ? 200 + w / 2 - w * 0.34 : x0;
+    return `
+    <path d="M ${x0 + 10} ${top} H ${x0 + w - 10} Q ${x0 + w} ${top} ${x0 + w} ${top + 10} V ${F - 6} Q ${x0 + w} ${F} ${x0 + w - 6} ${F} H ${x0 + 6} Q ${x0} ${F} ${x0} ${F - 6} V ${top + 10} Q ${x0} ${top} ${x0 + 10} ${top} Z
+             M ${doorX + 8} ${top + 12} V ${F - 10} H ${doorX + w * 0.34 - 8} V ${top + 12} Z" fill="${color}" fill-rule="evenodd" stroke="${line}" stroke-width="1.6"/>
+    <path d="${Array.from({ length: 5 }, (_, n) => `M ${doorX + 8 + (n + 1) * (w * 0.34 - 16) / 6} ${top + 12} V ${F - 10}`).join(' ')} M ${doorX + 8} ${top + 12 + (h - 22) / 2} H ${doorX + w * 0.34 - 8}" stroke="${dark}" stroke-width="2.2"/>
+    <path d="M ${x0 + 6} ${top + h * 0.55} H ${doorX + (d > 0 ? 0 : w * 0.34)}" stroke="${dark}" stroke-width="2" opacity=".6"/>
+    <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
+  },
 };
 
 // Mặt màn hình: nền sáng, hoặc ảnh lấp đầy (cắt theo khung). Mỗi lần vẽ một id cắt riêng.
@@ -111,13 +125,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
@@ -129,11 +143,13 @@ export const PROP_KINDS = Object.keys(DRAW);
  *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'
  *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
  *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
+ *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'
  * Trả về { svg, kind, seatY }. Host nên có cùng `bottom` và `height` với host của nhân vật.
  */
 export function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
-  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading } = options;
+  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading, door } = options;
+  if (door !== undefined && door !== 'left' && door !== 'right') throw new Error(`[character] prop "${kind}": door must be 'left' or 'right', got ${JSON.stringify(door)}`);
   if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
   if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
@@ -154,6 +170,7 @@ export function createProp(host, kind, options = {}) {
   if (facing !== undefined) o.facing = facing;
   if (fill !== undefined) o.fill = fill;
   if (reading !== undefined) o.reading = reading;
+  if (door !== undefined) o.door = door;
   host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
