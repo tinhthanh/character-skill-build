@@ -1574,6 +1574,7 @@ try {
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets]]) {
         const kind = id in RigThu.LOAI ? RigThu.LOAI[id].loai : null;
         for (const entry of list.filter((item) => item.steps.length === 1 && (!item.species || item.species === kind))) {
+          await new Promise((resolve) => setTimeout(resolve, 0));        // nhường lượt: trang vẫn trả lời chrome_run giữa chừng (CI chậm)
           stage.replaceChildren(); L.seed(5);
           const direct = build(id, entry, 0), keys = Object.keys(direct.rig.NGHI);
           // Bước dẫn dựng rồi bỏ: ăn đúng phần số ngẫu nhiên mà bước dẫn của chuỗi bên dưới ăn.

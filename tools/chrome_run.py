@@ -20,7 +20,9 @@ class DevTools:
 
     def __init__(self, url):
         host, port, path = re.match(r'ws://([^:/]+):(\d+)(/.*)', url).groups()
-        self.sock = socket.create_connection((host, int(port)), timeout=30)
+        # Chờ trả lời tới 300 s: trang kiểm tra có những đoạn chạy đồng bộ dài (hàng trăm rig dựng lại), trong lúc ấy trình
+        # duyệt không trả lời lệnh nào — trên máy CI chậm, 30 s là không đủ.
+        self.sock = socket.create_connection((host, int(port)), timeout=300)
         key = base64.b64encode(os.urandom(16)).decode()
         self.sock.sendall((f'GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
                            f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode())
