@@ -1,4 +1,4 @@
-/* VGCharacter v0.56.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.57.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -61,8 +61,50 @@ function markOff(t, m, at) {
 }
 return { MARKS, freshMark, attachMark, drawMark, markTweens, markOff };
 })();
+__m['runtime/shading.js'] = (function () {
+const NS = 'http://www.w3.org/2000/svg';
+let counter = 0;
+function attachShade(svg, root) {
+  if (!svg || !root || !root.id || typeof document === 'undefined') return null;
+  const id = `shade${++counter}`;
+  const defs = document.createElementNS(NS, 'defs');
+  defs.innerHTML = `
+    <filter id="${id}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+    <mask id="${id}-mask" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><use href="#${root.id}" filter="url(#${id}-white)"/></mask>
+    <linearGradient id="${id}-grad" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>`;
+  const cover = document.createElementNS(NS, 'rect');
+  for (const [key, value] of Object.entries({ x: -2000, y: -2000, width: 4400, height: 4400, fill: `url(#${id}-grad)`, mask: `url(#${id}-mask)`, 'pointer-events': 'none', 'data-shade': '' })) cover.setAttribute(key, value);
+  svg.appendChild(defs); svg.appendChild(cover);
+  const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
+  let box = null, last = '';
+  return {
+    cover,
+    set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0') {
+      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark}`;
+      if (key === last) return;
+      last = key;
+      if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
+      cover.style.display = '';
+      if (!box || !box.width) { try { box = root.getBBox(); } catch (error) { box = null; } }
+      const b = box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2, sx = (dx < 0 ? -1 : 1) * Math.max(Math.abs(dx), Math.abs(dy) * 0.6), sy = dy * 0.35, length = Math.hypot(sx, sy) || 1, ux = sx / length, uy = sy / length;
+      const half = b.width * 0.5;
+      grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
+      grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
+      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.5, glow).toFixed(3));
+      stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
+      stops[2].setAttribute('stop-opacity', Math.min(0.7, amount * 0.75).toFixed(3));        // nửa khuất: tối rõ ngay sau giữa thân
+      stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
+    },
+  };
+}
+return { attachShade };
+})();
 __m['runtime/rig-svg.js'] = (function () {
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
+const { attachShade } = __m['runtime/shading.js'];
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
 const NGHI = Object.freeze({
@@ -857,6 +899,7 @@ class RigSVG {
     };
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
     this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
+    this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
   }
   apDung() {
     const s = this.s, e = this.el;
@@ -1263,6 +1306,7 @@ class RigSVG {
     return t;
   }
   static MARKS = MARKS;
+  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
   #drawNote() {
     const e = this.el, s = this.s, n = this.noted;
     if (!e || !e.note) return;
@@ -3045,6 +3089,7 @@ return { veKhuonMat, beRongTaiY, veChanMay, RigSVG };
 })();
 __m['runtime/rig-thu.js'] = (function () {
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
+const { attachShade } = __m['runtime/shading.js'];
 const KHUNG = { w: 400, h: 330 };
 const LIE = { truocY: 48, sauY: 44, tnX: 46, txX: 46, snX: -8, sxX: -8 };
 const HELD = { truocY: 30, sauY: 38, tnX: -4, txX: 2, snX: -10, sxX: -10, dauY: -4 };
@@ -3328,6 +3373,7 @@ class RigThu {
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi', 'nanh', 'lanhL', 'lanhR', 'nhanL', 'nhanR',
       'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
     this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? 48 : 32, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
+    this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
     this.apDung();
   }
   #dungSVG() {
@@ -4174,6 +4220,7 @@ class RigThu {
     return t;
   }
   static MARKS = MARKS;
+  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
   static AUTO_MARKS = true;
   mood(name = null, { mark = null } = {}) {
     if (name !== null && !RigThu.EXPRESSIONS[name]) throw new Error(`[character] no pet mood "${name}" (available: ${Object.keys(RigThu.EXPRESSIONS).join(', ')})`);
@@ -5119,13 +5166,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const paint = (style, fallback) => (typeof style === 'string' && style.trim() ? (/[:;]/.test(style) ? style : `background:${style}`) : `background:${fallback}`);
   const MOODS = {
     day:     { dark: 0.06, keyShade: 0.16, key: [0.35, -0.8, -0.5],  shade: '20,28,40', tint: null,                       sun: [0.2, -0.6, 0.78],   sunColor: '255,244,214', sunAlpha: 0.62, lampsOn: false, warm: 0 },
-    evening: { dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
-    night:   { dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     sun: null,                                         lampsOn: true,  warm: 0 },
+    evening: { dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     fog: 'rgba(255,176,128,0.1)', sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
+    night:   { dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     fog: 'rgba(46,62,120,0.12)', sun: null,                                         lampsOn: true,  warm: 0 },
   };
   const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const rgbOf = (hex) => { const h = hex.replace('#', ''), full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h; return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(','); };
-  let lighting = null, litKey = '';
+  let lighting = null, litKey = '', driven = null;
   const lightSurface = (f) => {
     const mood = lighting.mood;
     if (!f.shadeEl) {
@@ -5150,7 +5197,20 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     const masks = mask.length ? mask.join(', ') : 'none';
     f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
     f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
-    const layers = [...glow, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
+    if (f.kind === 'floor' && lighting.gloss) {
+      for (const lamp of lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.kind === 'screen') continue;
+        const u = lamp.x - f.origin[0], v = lamp.z + 160 - f.origin[2];
+        glow.push(`radial-gradient(ellipse 46px 240px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(${lamp.rgb},${(0.26 * lamp.level).toFixed(3)}), rgba(${lamp.rgb},0))`);
+      }
+      for (const win of lighting.windows) {
+        if (!mood.sun) continue;
+        const u = win.x + win.width / 2 - f.origin[0], v = win.z + 220 - f.origin[2];
+        glow.push(`radial-gradient(ellipse ${(win.width * 0.42).toFixed(1)}px 260px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(255,255,255,0.22), rgba(255,255,255,0))`);
+      }
+    }
+    const fog = f.kind === 'wall' && mood.fog ? [`linear-gradient(${mood.fog}, ${mood.fog})`] : [];
+    const layers = [...glow, ...fog, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
     f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
   };
   const lightAt = (x, y, z) => {
@@ -5172,7 +5232,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (lighting && seen > 0.05 && !actor.lamp) {
       const tall = actor.height * 0.85, x = actor.where, z = actor.spot.z, y = actor.spot.y;
       for (const lamp of lighting.lamps) {
-        if (lamp.level <= 0.001 || lamp.y <= tall + y + 20) continue;
+        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= tall + y + 20) continue;
         const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
         if (d >= lamp.range * 1.3 || flat < 1) continue;
         const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
@@ -5200,15 +5260,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const set = {
     camera,
     view,
-    light({ mood = 'day', lamps = [], windows = [] } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
-      lighting = { mood: preset, key: norm(preset.key), lamps: [] };
+      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [] };
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
           power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
         const [r, g, b] = lamp.rgb.split(',').map(Number);
         lamp.warmth = clamp((r - b) / 255, 0, 1) * 0.35;
+        lamp.sprites = [];
+        if (lamp.kind === 'screen') { lighting.lamps.push(lamp); return; }
         const glow = document.createElement('div'), size = 150 * Math.sqrt(lamp.power);
         glow.style.cssText = `width:${size}px;height:${size}px;aspect-ratio:1;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side, rgba(255,255,255,.95), rgba(${lamp.rgb},.75) 18%, rgba(${lamp.rgb},.22) 48%, rgba(${lamp.rgb},0))`;
         stand(glow, null, { x: lamp.x, z: lamp.z + 2, y: lamp.y - size / 2, height: size, turn: false, ground: 1, shadow: false });
@@ -5229,12 +5291,25 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const reach = win.y / -sun[1], vx = sun[0], vy = -sun[1], vz = sun[2], nx = 0 * vz - 0 * vy, ny = 0 * vx - 1 * vz, nz = 1 * vy - 0 * vx;
         face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 2},1)`,
           `pointer-events:none;filter:blur(10px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.32).toFixed(2)}), rgba(${preset.sunColor},${(preset.sunAlpha * 0.12).toFixed(2)}) 70%, rgba(${preset.sunColor},0))`);
+        const motes = face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 3},1)`, 'pointer-events:none;overflow:hidden');
+        for (let n = 0; n < 26; n++) {
+          const dot = document.createElement('div'), r = 1.6 + ((n * 7) % 5) * 0.5;
+          dot.style.cssText = `position:absolute;left:0;top:0;width:${r * 2}px;height:${r * 2}px;border-radius:50%;background:rgba(255,252,236,.85);box-shadow:0 0 ${r * 2}px rgba(255,248,220,.7)`;
+          motes.appendChild(dot);
+          lighting.dust.push({ dot, bx: ((n * 37) % 100) / 100 * win.width, by: ((n * 61) % 100) / 100 * reach, phase: n * 1.7, w: win.width, h: reach });
+        }
         face(layer(0), w, h, `translate3d(${x0}px, -1px, ${z0}px) rotateX(90deg)`,
           `pointer-events:none;clip-path:polygon(${shape});filter:blur(6px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.55).toFixed(2)}), rgba(${preset.sunColor},${preset.sunAlpha}))`);
       }
       litKey = '';
       set.update();
       return set;
+    },
+    lampPoint(which = null) {
+      if (!lighting || !lighting.lamps.length) throw new Error('[character] set.lampPoint: the set has no lamps');
+      const lamp = which === null ? lighting.lamps[0] : typeof which === 'number' ? lighting.lamps[which] : lighting.lamps.find((item) => item.name === which);
+      if (!lamp) throw new Error(`[character] set.lampPoint: no lamp ${JSON.stringify(which)}`);
+      return [lamp.x, Math.min(lamp.y * 0.62, 330), lamp.z];
     },
     lamp(which, on = true, duration = 0.6) {
       if (!lighting) throw new Error('[character] set.lamp: call set.light({ lamps: […] }) first');
@@ -5321,6 +5396,20 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         get y() { const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
       };
     },
+    targetPoint(from, point) {
+      const actor = actors.find((item) => item.rig === from);
+      if (!actor) throw new Error('[character] set.targetPoint(from, [x, y, z]): from must be a rig placed in the set');
+      const size = (from.constructor && from.constructor.KHUNG) || { w: 400, h: 470 };
+      const facts = () => {
+        if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
+        if (actor.ground === null) actor.ground = groundOf(actor.rig);
+        const unit = actor.height / size.h; return { unit, ground: (actor.ground || 1) * size.h, x: actor.spot.x + (from.s.x || 0) * unit };
+      };
+      return {
+        get x() { const f = facts(); return size.w / 2 + (from.s.x || 0) + (point[0] - f.x) / f.unit; },
+        get y() { const f = facts(); return f.ground - (point[1] - actor.spot.y) / f.unit; },
+      };
+    },
     project(x, y, z) {
       const lens = frame || set.update(), point = lens.matrix.transformPoint(new DOMPoint(x, -y, z));
       const scale = camera.lens / Math.max(1, camera.lens - point.z) * camera.zoom;
@@ -5341,6 +5430,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return mark(values, 0, 'none');
     },
     drive(tl) {
+      driven = tl;                                       // thời gian của cảnh — cho những thứ trôi theo thời gian (bụi trong nắng)
       let queued = false;
       const driver = { _t: 0, get t() { return this._t; }, set t(value) {
         this._t = value;
@@ -5390,6 +5480,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (lighting && !actor.lamp) {
           const L = lightAt(actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z);
           if (Math.abs(L.level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${L.level.toFixed(3)}) sepia(${L.warm.toFixed(3)})`;
+          if (actor.rig && typeof actor.rig.lightShade === 'function') {
+            const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
+            let from, amount, glow = 0, rgb = '255,255,255';
+            if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34); rgb = L.rim.rgb; }
+            else { const key = mood.sun && mood === MOODS.evening ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood === MOODS.night ? 0.12 : mood === MOODS.evening ? 0.3 : 0.16; }
+            const a = set.project(...from), b = set.project(...centre);
+            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade);
+          }
           if (L.rim && L.rim.k > 0.08 && actor.rig) {
             const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (2.2 * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
             lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
@@ -5441,7 +5539,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
           castShadows(actor, rank, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
-            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         const own = rig.s.huong === actor.wrote ? actor.base : rig.s.huong;
@@ -5466,6 +5564,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
         soften(item, item.element, item.filter, px);
       }
+      if (lighting && lighting.dust.length) {
+        const time = driven ? driven.time() : 0;
+        for (const mote of lighting.dust) {
+          const y = (mote.by + time * 14) % mote.h, x = mote.bx + Math.sin(time * 0.45 + mote.phase) * 18;
+          mote.dot.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+          mote.dot.style.opacity = (0.35 + 0.65 * Math.abs(Math.sin(time * 1.3 + mote.phase))).toFixed(2);
+        }
+      }
       if (lighting) {
         const key = lighting.lamps.map((lamp) => lamp.level.toFixed(3)).join(',');
         if (key !== litKey) {
@@ -5476,7 +5582,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -5519,6 +5625,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
       let cam = solve(region);
+      if (lighting && size !== 'close') for (const lamp of lighting.lamps) {
+        if ((lamp.level < 0.5 && !lamps) || lamp.kind === 'screen' || lamp.x < region.x0 - 500 || lamp.x > region.x1 + 500) continue;      // `lamps`: lượt bật / tắt đèn — lấy cả đèn đang tắt
+        const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
+        if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3)) { region = wider; cam = test; }
+      }
       const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
         .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
       for (let pass = 0; pass < 3; pass++) {
@@ -5566,7 +5677,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const next = beats.slice(index + 1).find((later) => later.fixed);
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
         let values;
-        try { values = set.frameOn(beat.subjects, beat.size, { at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
@@ -5882,7 +5993,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.56.0';
+const VERSION = '0.57.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

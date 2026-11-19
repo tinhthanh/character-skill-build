@@ -529,7 +529,8 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('light: the scene does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'lit', 'index.html'), encoding='utf-8').read()
-        for needle in ('set.light({"mood": "night"', '"kind": "ceiling"', '"on": false', '"windows": [', 'set.lamp("tran", true, 0.6)', 'set.lamp("tran", false, 1)'):
+        for needle in ('set.light({"mood": "night"', '"kind": "ceiling"', '"on": false', '"windows": [', 'set.lamp("tran", true, 0.6)', 'set.lamp("tran", false, 1)',
+                       "['point', set.targetPoint(vet, set.lampPoint(\"tran\"))]", '.start + 0.85'):
             if needle not in html: problems.append(f'light: {needle} is not in the composition')
 
     def variant3d(change):

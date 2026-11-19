@@ -32,6 +32,7 @@
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
 import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
+import { attachShade } from './shading.js';
 
 const KHUNG = { w: 400, h: 330 };
 // DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
@@ -390,6 +391,7 @@ export class RigThu {
       'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
     // Dấu cảm xúc: góc trên, phía trước đầu (về phía mõm), trên chóp tai.
     this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? 48 : 32, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
+    this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
     this.apDung();
   }
 
@@ -1509,6 +1511,8 @@ export class RigThu {
     return t;
   }
   static MARKS = MARKS;
+  /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
+  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
   static AUTO_MARKS = true;
 
   /**

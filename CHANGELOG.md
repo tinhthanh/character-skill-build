@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.57.0
+
+Added — characters in the light, the air of the room
+- **Shading on the characters**: in a lit 3D set every person and pet is lit from the side of the nearest lamp
+  (or of the main light / evening sun) and darker on the other side, cut exactly to the drawing
+  (`runtime/shading.js`: a gradient masked by the figure itself; `rig.lightShade()`); the lamp's colour
+  tints the lit side.
+- **Switching a lamp by hand**: a turn with only `"lamp"` makes the person reach for the switch on the lamp
+  (`set.targetPoint`, `set.lampPoint`) and the light changes as the hand gets there; `"camera": "auto"`
+  frames the person with the lamp for that turn.
+- **The light source stays in the shot**: `set.frameOn` takes a lit lamp's bulb into the frame when that
+  widens the shot only a little (up to 30 %, 60 % for a full shot).
+- **Haze** on the walls in the evening and at night; **dust** sparkling in a shaft of sunlight (it follows
+  the timeline, so seeking is exact); **screens** (laptop, monitor) give a soft blue light in the evening
+  and at night (`"kind": "screen"` lamps).
+- **Shiny floors** (`"room": { "gloss": true }`, on in the exam room and the pharmacy): lamps and windows are
+  reflected as a soft streak on the floor.
+
 ## 0.56.0
 
 Added — light in 3D sets

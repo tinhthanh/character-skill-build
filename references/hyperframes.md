@@ -448,6 +448,11 @@ characters near it (brighter, warmer, a rim of its colour on the side facing it)
 from it. A `"lamp"` cutout is a light by itself. A back-wall panel with `"window": true` casts sunlight on
 the floor in the day and the evening. `"lamp": "on"` / `"off"` on a turn switches a lamp (a lamp switched on
 by the script starts off). In code: `set.light({ mood, lamps, windows })`, `tl.add(set.lamp('lamp', true), t)`.
+Characters are shaded too: the side toward the nearest lamp (or the main light) is lit and tinted, the other
+side darker (`rig.lightShade`, done by the set each frame). A turn with only `"lamp"` makes the person reach
+for the lamp's switch while it changes. Lit lamps stay in automatic shots when that costs little. Evenings
+and nights have haze on the walls, a sunlit window has dust in its shaft of light, a laptop or monitor glows
+blue in the dark, and `"room": { "gloss": true }` reflects lamps and windows on the floor.
 The light is drawn, not rendered: layers of colour over each plane, `filter` on the characters — it costs
 little (a 58 s film renders in about the same time as before).
 

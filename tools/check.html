@@ -2292,7 +2292,7 @@ try {
     const Slim = new Function(slimSource + '\nreturn VGCharacter;')();
     if (listOf(Slim) !== listAtStart) hong('dist', 'character.slim.js is out of date — run: python3 tools/build.py');
     const a = document.createElement('div'), b = document.createElement('div'); document.body.append(a, b);
-    const strip = (svg) => svg.innerHTML.replace(/rig\d+|thu\d+/g, 'ID');
+    const strip = (svg) => svg.innerHTML.replace(/rig\d+|thu\d+|shade\d+/g, 'ID');        // shade…: lớp đổ bóng (shading.js) đếm riêng trong mỗi bản
     const markup = (lib, host) => strip(lib.createCharacter(host, { id: 'doctor', config: null }).rig.svg);
     if (markup(Slim, a) !== markup(L, b)) hong('dist', 'the slim bundle renders differently from the full one');
     a.remove(); b.remove();

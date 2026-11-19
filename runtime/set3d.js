@@ -117,13 +117,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
    */
   const MOODS = {
     day:     { dark: 0.06, keyShade: 0.16, key: [0.35, -0.8, -0.5],  shade: '20,28,40', tint: null,                       sun: [0.2, -0.6, 0.78],   sunColor: '255,244,214', sunAlpha: 0.62, lampsOn: false, warm: 0 },
-    evening: { dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
-    night:   { dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     sun: null,                                         lampsOn: true,  warm: 0 },
+    evening: { dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     fog: 'rgba(255,176,128,0.1)', sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
+    night:   { dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     fog: 'rgba(46,62,120,0.12)', sun: null,                                         lampsOn: true,  warm: 0 },
   };
   const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const rgbOf = (hex) => { const h = hex.replace('#', ''), full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h; return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(','); };
-  let lighting = null, litKey = '';
+  let lighting = null, litKey = '', driven = null;
 
   // Một mặt: lớp tối + lớp sáng, theo trạng thái đèn hiện tại.
   const lightSurface = (f) => {
@@ -151,7 +151,22 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     const masks = mask.length ? mask.join(', ') : 'none';
     f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
     f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
-    const layers = [...glow, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
+    // SÀN BÓNG (gạch phòng khám): bóng đèn và ô cửa phản chiếu thành một vệt sáng dọc trên sàn, kéo về phía máy quay.
+    if (f.kind === 'floor' && lighting.gloss) {
+      for (const lamp of lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.kind === 'screen') continue;
+        const u = lamp.x - f.origin[0], v = lamp.z + 160 - f.origin[2];
+        glow.push(`radial-gradient(ellipse 46px 240px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(${lamp.rgb},${(0.26 * lamp.level).toFixed(3)}), rgba(${lamp.rgb},0))`);
+      }
+      for (const win of lighting.windows) {
+        if (!mood.sun) continue;
+        const u = win.x + win.width / 2 - f.origin[0], v = win.z + 220 - f.origin[2];
+        glow.push(`radial-gradient(ellipse ${(win.width * 0.42).toFixed(1)}px 260px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(255,255,255,0.22), rgba(255,255,255,0))`);
+      }
+    }
+    // SƯƠNG MỜ trên tường lúc chiều / tối: không khí giữa máy quay và tường xa có màu — căn phòng có chiều sâu.
+    const fog = f.kind === 'wall' && mood.fog ? [`linear-gradient(${mood.fog}, ${mood.fog})`] : [];
+    const layers = [...glow, ...fog, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
     f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
   };
 
@@ -179,7 +194,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (lighting && seen > 0.05 && !actor.lamp) {
       const tall = actor.height * 0.85, x = actor.where, z = actor.spot.z, y = actor.spot.y;
       for (const lamp of lighting.lamps) {
-        if (lamp.level <= 0.001 || lamp.y <= tall + y + 20) continue;
+        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= tall + y + 20) continue;
         const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
         if (d >= lamp.range * 1.3 || flat < 1) continue;
         const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
@@ -218,15 +233,18 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * mặc định bật khi trời tối / chiều. `windows`: [{ x, y, width, height, z }] — ô cửa trên tường sau (góc trên-trái), hắt
      * vệt nắng lên sàn ban ngày / chiều. Gọi một lần sau khi dựng phòng; `lamp(name, on)` bật / tắt trên timeline.
      */
-    light({ mood = 'day', lamps = [], windows = [] } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
-      lighting = { mood: preset, key: norm(preset.key), lamps: [] };
+      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [] };
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
           power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
         const [r, g, b] = lamp.rgb.split(',').map(Number);
         lamp.warmth = clamp((r - b) / 255, 0, 1) * 0.35;
+        lamp.sprites = [];
+        // MÀN HÌNH (laptop, máy tính, TV) trong phòng tối: chiếu ánh xanh nhẹ lên người ngồi trước nó — không có quầng bóng đèn.
+        if (lamp.kind === 'screen') { lighting.lamps.push(lamp); return; }
         // QUẦNG SÁNG ở bóng đèn: một tấm luôn quay về máy quay (như nhân vật), sáng ấm ở giữa, tan ra ngoài.
         const glow = document.createElement('div'), size = 150 * Math.sqrt(lamp.power);
         // `aspect-ratio`: stand() chỉ đặt chiều cao (bề ngang của host do nội dung — ở đây không có nội dung).
@@ -252,12 +270,29 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const reach = win.y / -sun[1], vx = sun[0], vy = -sun[1], vz = sun[2], nx = 0 * vz - 0 * vy, ny = 0 * vx - 1 * vz, nz = 1 * vy - 0 * vx;
         face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 2},1)`,
           `pointer-events:none;filter:blur(10px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.32).toFixed(2)}), rgba(${preset.sunColor},${(preset.sunAlpha * 0.12).toFixed(2)}) 70%, rgba(${preset.sunColor},0))`);
+        // BỤI lấp lánh trôi chậm trong luồng nắng: các hạt nằm trên chính mặt phẳng của luồng nắng (không mờ), vị trí là hàm
+        // của thời gian timeline (`drive`) — tua tới đâu cũng đúng.
+        const motes = face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 3},1)`, 'pointer-events:none;overflow:hidden');
+        for (let n = 0; n < 26; n++) {
+          const dot = document.createElement('div'), r = 1.6 + ((n * 7) % 5) * 0.5;
+          dot.style.cssText = `position:absolute;left:0;top:0;width:${r * 2}px;height:${r * 2}px;border-radius:50%;background:rgba(255,252,236,.85);box-shadow:0 0 ${r * 2}px rgba(255,248,220,.7)`;
+          motes.appendChild(dot);
+          lighting.dust.push({ dot, bx: ((n * 37) % 100) / 100 * win.width, by: ((n * 61) % 100) / 100 * reach, phase: n * 1.7, w: win.width, h: reach });
+        }
         face(layer(0), w, h, `translate3d(${x0}px, -1px, ${z0}px) rotateX(90deg)`,
           `pointer-events:none;clip-path:polygon(${shape});filter:blur(6px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.55).toFixed(2)}), rgba(${preset.sunColor},${preset.sunAlpha}))`);
       }
       litKey = '';
       set.update();
       return set;
+    },
+
+    /** Chỗ CÔNG TẮC của một đèn (tên, số thứ tự, hay null = đèn đầu tiên): [x, y, z] — trên thân cột đèn, ngang tầm tay. */
+    lampPoint(which = null) {
+      if (!lighting || !lighting.lamps.length) throw new Error('[character] set.lampPoint: the set has no lamps');
+      const lamp = which === null ? lighting.lamps[0] : typeof which === 'number' ? lighting.lamps[which] : lighting.lamps.find((item) => item.name === which);
+      if (!lamp) throw new Error(`[character] set.lampPoint: no lamp ${JSON.stringify(which)}`);
+      return [lamp.x, Math.min(lamp.y * 0.62, 330), lamp.z];
     },
 
     /** BẬT / TẮT một đèn (tên hay số thứ tự) — một tween để thêm vào timeline: `tl.add(set.lamp('den', true), 3)`. */
@@ -399,6 +434,23 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
     },
 
+    /** Một ĐIỂM của bối cảnh [x, y, z] nhìn từ nhân vật `from`, trong khung 400 × 470 của nó — đích cho `point` (với tay tới
+     *  công tắc / cây đèn). */
+    targetPoint(from, point) {
+      const actor = actors.find((item) => item.rig === from);
+      if (!actor) throw new Error('[character] set.targetPoint(from, [x, y, z]): from must be a rig placed in the set');
+      const size = (from.constructor && from.constructor.KHUNG) || { w: 400, h: 470 };
+      const facts = () => {
+        if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
+        if (actor.ground === null) actor.ground = groundOf(actor.rig);
+        const unit = actor.height / size.h; return { unit, ground: (actor.ground || 1) * size.h, x: actor.spot.x + (from.s.x || 0) * unit };
+      };
+      return {
+        get x() { const f = facts(); return size.w / 2 + (from.s.x || 0) + (point[0] - f.x) / f.unit; },
+        get y() { const f = facts(); return f.ground - (point[1] - actor.spot.y) / f.unit; },
+      };
+    },
+
     /**
      * Chiếu một điểm của bối cảnh lên `view`: { x, y } tính bằng px trong `view`, `scale` là độ phóng tại điểm ấy,
      * `depth` càng lớn càng gần máy quay.
@@ -441,6 +493,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * lượt (microtask) — SAU khi mọi nhân vật đã nhận trạng thái của khung, như rig tự vẽ lại (xem `rig.s`).
      */
     drive(tl) {
+      driven = tl;                                       // thời gian của cảnh — cho những thứ trôi theo thời gian (bụi trong nắng)
       let queued = false;
       const driver = { _t: 0, get t() { return this._t; }, set t(value) {
         this._t = value;
@@ -509,6 +562,16 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (Math.abs(L.level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${L.level.toFixed(3)}) sepia(${L.warm.toFixed(3)})`;
           // VIỀN SÁNG (rim light): một viền màu đèn ở mép phía nguồn sáng — nhân vật 2D "ăn" ánh sáng của phòng thay vì
           // như dán lên (Gemini soát ánh sáng đợt 16). Phía nào: theo vị trí đèn TRÊN MÀN HÌNH so với nhân vật.
+          // ĐỔ BÓNG TRÊN THÂN: hướng ánh sáng trên màn hình (từ nguồn sáng tới nhân vật) — đèn gần nhất, hay hướng sáng
+          // chính / nắng khi không có đèn đủ mạnh. Ban ngày nhẹ, tối có đèn thì rõ.
+          if (actor.rig && typeof actor.rig.lightShade === 'function') {
+            const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
+            let from, amount, glow = 0, rgb = '255,255,255';
+            if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34); rgb = L.rim.rgb; }
+            else { const key = mood.sun && mood === MOODS.evening ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood === MOODS.night ? 0.12 : mood === MOODS.evening ? 0.3 : 0.16; }
+            const a = set.project(...from), b = set.project(...centre);
+            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade);
+          }
           if (L.rim && L.rim.k > 0.08 && actor.rig) {
             const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (2.2 * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
             lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
@@ -572,7 +635,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
           castShadows(actor, rank, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
-            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+            // Đứng trên một hộp (mèo trên bàn khám): nhấc bóng lên khỏi mặt hộp rõ hơn — cùng mặt phẳng thì mặt bàn vẽ đè lên bóng.
+            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         // Máy quay lệch đi thì nhân vật 2D quay BÙ: mức quay của rig = mức do động tác đặt − góc máy / 90°. Giá trị do
@@ -614,6 +678,15 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
         soften(item, item.element, item.filter, px);
       }
+      // Bụi trong luồng nắng: trôi xuống chậm, lắc ngang nhẹ, lấp lánh — theo thời gian của timeline.
+      if (lighting && lighting.dust.length) {
+        const time = driven ? driven.time() : 0;
+        for (const mote of lighting.dust) {
+          const y = (mote.by + time * 14) % mote.h, x = mote.bx + Math.sin(time * 0.45 + mote.phase) * 18;
+          mote.dot.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+          mote.dot.style.opacity = (0.35 + 0.65 * Math.abs(Math.sin(time * 1.3 + mote.phase))).toFixed(2);
+        }
+      }
       // Các mặt của bối cảnh chỉ tính lại ánh sáng khi mức sáng của một đèn đổi (bật / tắt dần).
       if (lighting) {
         const key = lighting.lamps.map((lamp) => lamp.level.toFixed(3)).join(',');
@@ -639,7 +712,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào. `{ at: [t0, t1], seek }`: chủ thể đi lại — khung chứa
      * mọi chỗ họ đứng ở các lúc ấy (`seek(t)` tua cảnh tới lúc t).
      */
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -692,6 +765,14 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
       let cam = solve(region);
+      // NGUỒN SÁNG TRONG KHUNG: một đèn đang sáng gần chủ thể — lấy cả bóng đèn vào khung nếu chỉ phải lùi máy thêm ≤ 30 %
+      // (góc toàn thân: ≤ 60 %)
+      // (ánh sáng có nguồn thấy được, Gemini soát ánh sáng đợt 16). Góc cận thì không.
+      if (lighting && size !== 'close') for (const lamp of lighting.lamps) {
+        if ((lamp.level < 0.5 && !lamps) || lamp.kind === 'screen' || lamp.x < region.x0 - 500 || lamp.x > region.x1 + 500) continue;      // `lamps`: lượt bật / tắt đèn — lấy cả đèn đang tắt
+        const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
+        if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3)) { region = wider; cam = test; }
+      }
       const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
         .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
       for (let pass = 0; pass < 3; pass++) {
@@ -762,7 +843,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         let values;
         // Đo ở cả ĐẦU và CUỐI nhịp: nhịp có người đi (lại gần con vật để đưa thuốc, rồi lùi về) thì khung phải chứa cả hai
         // chỗ đứng — đo một lúc thì người đi ra khỏi khung (Gemini soát cảnh thử đợt 14).
-        try { values = set.frameOn(beat.subjects, beat.size, { at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);

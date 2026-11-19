@@ -19,6 +19,7 @@
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
 
 import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
+import { attachShade } from './shading.js';
 
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
@@ -1219,6 +1220,7 @@ export class RigSVG {
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
     // Dấu cảm xúc: cạnh góc trên bên phải đầu (toạ độ trong nhóm đầu, tâm mặt ở 0, −62) — cao hơn nữa thì ra khỏi khung SVG.
     this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
+    this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
   }
 
   /* ------------------------------------------------------ đổ trạng thái */
@@ -1944,6 +1946,8 @@ export class RigSVG {
     return t;
   }
   static MARKS = MARKS;
+  /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
+  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {
