@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.53.0
+
+Added — automatic camera, emotion marks, sounds on actions
+- **Automatic views** in a 3D set: `"view": "close"` (or `"medium"`, `"full"`) on a turn frames that turn's
+  character and cuts back to the previous view on the next turn; `"view": { "on": ["vet", "dog"], "size":
+  "medium" }` frames several. The camera is worked out when the scene is built, from the drawn figures where
+  they stand at that moment (`set.frameOn(subjects, size)`), and moves so that nobody else is cut in half by
+  the frame edge (fully out, or taken in).
+- **Emotion marks** over the head, for people and pets: `!`, `?`, heart, `zzz`, sweat drop, anger vein, music
+  note — readable in a wide shot where a face is too small. `rig.mark(kind)` / `rig.mark(null)`; `"mark"` on
+  a turn holds it through that turn. A pet's expression brings its own mark (scared `!`, curious `?`, sleepy
+  `zzz`, happy heart, angry vein, guilty / pain sweat); `"marks": false` in the scene file turns that off.
+- **Sounds on actions**: `"sounds": { "bark": "bark.wav", "cat.meow": { "file": "meow.wav", "volume": 0.8,
+  "at": 0.1 } }` places the sound each time that step plays (of anyone, or of that character), at its start.
+- `pet.mood(name, { mark })` holds a mark with the face.
+
+Fixed (Gemini review of the trial scene)
+- In a 3D set a mark is drawn on top of everything: a person standing in front of a pet no longer hides the
+  pet's `!` or heart.
+- `mood(null)` always takes the mood's mark away (a heart stayed over a dog for ten seconds: `sequence()`
+  builds every step twice, and a flag flipped in the draft).
+- A blink returns to the held face: a sleepy cat no longer opens its eyes wide under its `zzz`.
+- A sad or guilty pet's mouth turns down instead of still curving like a smile.
+- A pet's expression keeps its mark until the expression ends.
+- `"sounds"` no longer plays when `mood` / `mark` ends (`mood(null)`).
+
 ## 0.52.0
 
 Added — pet expressions

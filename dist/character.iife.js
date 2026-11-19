@@ -1,7 +1,89 @@
-/* VGCharacter v0.52.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.53.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
+
+/* ───── runtime/marks.js ───── */
+__m['runtime/marks.js'] = (function () {
+// DẤU CẢM XÚC kiểu truyện tranh trên đầu nhân vật / con vật: ! ? tim zzz giọt mồ hôi gân giận nốt nhạc.
+// Đọc được cả ở cỡ toàn cảnh, nơi nét mặt quá nhỏ để thấy. Vẽ trong NHÓM ĐẦU của rig (đi theo đầu khi nghiêng, gục),
+// viền trắng dày (paint-order) nên nổi trên mọi nền. Trạng thái nằm ngoài `rig.s` (`rig.m = { kind, a, p }`) — các động
+// tác khác khép về tư thế nghỉ không xoá mất dấu đang hiện.
+
+const MARKS = ['!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music'];
+
+const OUT = 'stroke="#ffffff" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round"';
+const ART = {
+  '!': `<path d="M -5.500 -36 L 5.500 -36 L 3.200 -8 L -3.200 -8 Z" fill="#e53935" ${OUT}/><circle cy="3" r="4.800" fill="#e53935" ${OUT}/>`,
+  '?': `<path d="M -10 -25 Q -10 -37 1 -37 Q 12 -37 12 -26 Q 12 -18 4 -14 Q 0.500 -12 0.500 -6" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M -10 -25 Q -10 -37 1 -37 Q 12 -37 12 -26 Q 12 -18 4 -14 Q 0.500 -12 0.500 -6" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="0.500" cy="4" r="4.400" fill="#1e88e5" ${OUT}/>`,
+  heart: `<path d="M 0 2 C -4 -2 -16 -8 -16 -19 C -16 -27 -9 -31 -4 -28 C -2 -27 -0.500 -25 0 -23 C 0.500 -25 2 -27 4 -28 C 9 -31 16 -27 16 -19 C 16 -8 4 -2 0 2 Z" fill="#ef476f" ${OUT}/>
+        <ellipse cx="-8" cy="-20" rx="3.200" ry="2" fill="#ffffff" opacity=".7" transform="rotate(-35 -8 -20)"/>`,
+  zzz: [[-12, -2, 1], [0, -16, 0.8], [10, -28, 0.62]].map(([x, y, k], n) => `<path class="z${n}" transform="translate(${x} ${y}) scale(${k})" d="M -7 -7 H 7 L -7 7 H 7" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path class="z${n}" transform="translate(${x} ${y}) scale(${k})" d="M -7 -7 H 7 L -7 7 H 7" fill="none" stroke="#5c6bc0" stroke-width="3.800" stroke-linecap="round" stroke-linejoin="round"/>`).join(''),
+  sweat: `<path d="M 0 -26 Q 9 -12 9 -5 Q 9 4 0 4 Q -9 4 -9 -5 Q -9 -12 0 -26 Z" fill="#64b5f6" ${OUT}/><ellipse cx="-3.500" cy="-6" rx="2" ry="3.400" fill="#ffffff" opacity=".75"/>`,
+  anger: [0, 90, 180, 270].map((r) => `<path transform="rotate(${r})" d="M -11 -4 Q -5 -5 -4 -11" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+        <path transform="rotate(${r})" d="M -11 -4 Q -5 -5 -4 -11" fill="none" stroke="#e53935" stroke-width="4" stroke-linecap="round"/>`).join(''),
+  music: `<path d="M -6 -30 L 10 -35 L 10 -8" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+        <path d="M -6 -30 L 10 -35 L 10 -8 M -6 -30 L -6 -3" fill="none" stroke="#7e57c2" stroke-width="3.400" stroke-linejoin="round"/>
+        <ellipse cx="-10" cy="-2" rx="5.600" ry="4.400" fill="#7e57c2" ${OUT} transform="rotate(-20 -10 -2)"/>
+        <ellipse cx="6" cy="-7" rx="5.600" ry="4.400" fill="#7e57c2" ${OUT} transform="rotate(-20 6 -7)"/>`,
+};
+
+/** Trạng thái dấu mới cho một rig. */
+const freshMark = () => ({ kind: '', a: 0, p: 0 });
+
+/** Thêm nhóm vẽ dấu vào nhóm đầu `head` (một lần sau mỗi lần dựng SVG). Trả về phần tử nhóm. */
+function attachMark(head, at, size = 1) {
+  if (!head) return null;
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('data-mark', '');
+  g.dataset.x = at[0]; g.dataset.y = at[1]; g.dataset.size = size;
+  head.appendChild(g);
+  return g;
+}
+
+/**
+ * Vẽ dấu theo trạng thái `m`: `kind` (tên, '' = không), `a` 0…1 hiện ra (bật lên bằng cách phóng to), `p` 0…1 pha của
+ * nhịp riêng (tim / zzz / nốt nhạc bay lên, giọt mồ hôi trượt xuống, ! và gân giận đập nhẹ).
+ */
+function drawMark(g, m) {
+  if (!g) return;
+  const kind = m && m.a > 0.01 ? m.kind : '';
+  if (g.dataset.kind !== kind) { g.innerHTML = kind ? ART[kind] || '' : ''; g.dataset.kind = kind; }
+  if (!kind) return;
+  const a = Math.min(1, Math.max(0, m.a)), p = m.p || 0, wave = Math.sin(p * Math.PI * 4);
+  let dx = 0, dy = 0, turn = 0, size = (0.45 + 0.55 * a) * (+g.dataset.size || 1);
+  if (kind === 'heart' || kind === 'music') { dy = -12 * p; turn = 8 * Math.sin(p * Math.PI * 3); size *= 1 + 0.06 * wave; }
+  else if (kind === 'zzz') { dy = -8 * p; dx = 3 * p; }
+  else if (kind === 'sweat') { dy = 6 * p; }
+  else if (kind === '!' || kind === 'anger' || kind === '?') { size *= 1 + 0.07 * Math.max(0, wave); }
+  g.setAttribute('opacity', a.toFixed(3));
+  g.setAttribute('transform', `translate(${(+g.dataset.x + dx).toFixed(2)} ${(+g.dataset.y + dy).toFixed(2)}) rotate(${turn.toFixed(2)}) scale(${size.toFixed(3)})`);
+  if (kind === 'zzz') g.querySelectorAll('[class^="z"]').forEach((el) => { const n = +el.getAttribute('class').slice(1); el.setAttribute('opacity', (p > 0 ? Math.min(1, Math.max(0, p * 3 - n * 0.6 + 0.4)) : 1).toFixed(3)); });      // giữ tĩnh (p = 0): cả ba chữ
+}
+
+/**
+ * Các tween của dấu, thêm vào timeline `t` của rig: hiện `kind` ở mốc `at`, giữ `hold` giây (pha `p` chạy suốt), rồi tắt.
+ * `hold = null`: hiện và GIỮ (không tắt — `markOff` tắt sau).
+ */
+function markTweens(t, m, kind, at = 0, hold = 1.2) {
+  t.set(m, { kind }, at);
+  t.fromTo(m, { a: 0 }, { a: 1, duration: 0.28, ease: 'back.out(2.4)', immediateRender: false }, at);
+  if (hold === null) return t;
+  t.fromTo(m, { p: 0 }, { p: 1, duration: hold + 0.28, ease: 'none', immediateRender: false }, at);
+  markOff(t, m, at + 0.28 + hold);
+  return t;
+}
+function markOff(t, m, at) {
+  t.to(m, { a: 0, duration: 0.22, ease: 'power2.in' }, at);
+  t.set(m, { kind: '' }, at + 0.22);
+  return t;
+}
+
+return { MARKS, freshMark, attachMark, drawMark, markTweens, markOff };
+})();
 
 /* ───── runtime/rig-svg.js ───── */
 __m['runtime/rig-svg.js'] = (function () {
@@ -24,6 +106,8 @@ __m['runtime/rig-svg.js'] = (function () {
 //    đúng bằng ba kênh [mở, rộng, tròn] quen thuộc của các bộ viseme, nên bảng khẩu hình
 //    của công cụ nhép miệng khác dùng lại được.
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
+
+const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
 
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
@@ -800,6 +884,7 @@ class RigSVG {
     this.NGHI = Object.freeze({ ...NGHI, ...(this.nv.nghi || {}) });
     this.id = `rig${++RigSVG.#dem}`;
     this.s = this.#theoDoi({ ...this.NGHI });
+    this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
   }
 
@@ -1221,6 +1306,8 @@ class RigSVG {
       },
     };
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
+    // Dấu cảm xúc: cạnh góc trên bên phải đầu (toạ độ trong nhóm đầu, tâm mặt ở 0, −62) — cao hơn nữa thì ra khỏi khung SVG.
+    this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
   }
 
   /* ------------------------------------------------------ đổ trạng thái */
@@ -1931,7 +2018,21 @@ class RigSVG {
     this.#drawLeash();
     this.#drawBall();
     this.#drawNote();
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
   }
+
+  /**
+   * DẤU CẢM XÚC trên đầu, giữ cho tới khi tắt: `mark('!')` · `mark('?')` · `mark('heart')` · `mark('zzz')` · `mark('sweat')`
+   * · `mark('anger')` · `mark('music')`; `mark(null)` tắt. Hiện song song với các động tác sau (nói, gật, đi).
+   */
+  mark(kind = null) {
+    if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);
+    const t = this.tl();
+    if (kind) markTweens(t, this.m, kind, 0, null); else markOff(t, this.m, 0);
+    t.to({}, { duration: 0.3 }, 0);
+    return t;
+  }
+  static MARKS = MARKS;
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {
@@ -4761,6 +4862,8 @@ __m['runtime/rig-thu.js'] = (function () {
 //     tnNhac txNhac 0..1  chân trước rời đất, treo theo vai;  tnGoc txGoc góc treo
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
+const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
+
 const KHUNG = { w: 400, h: 330 };
 // DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
 // THẾ GIỮ (như `ngoi`): đang nằm thì mọi động tác khép về dáng này chứ không về dáng đứng.
@@ -5082,6 +5185,7 @@ class RigThu {
     this.id = `thu${++RigThu.#dem}`;
     this.wearing = new Set();
     this.s = this.#theoDoi({ ...this.NGHI });
+    this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
   }
 
@@ -5115,6 +5219,8 @@ class RigThu {
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi', 'nanh', 'lanhL', 'lanhR', 'nhanL', 'nhanR',
       'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
+    // Dấu cảm xúc: góc trên, phía trước đầu (về phía mõm), trên chóp tai.
+    this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? 48 : 32, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
     this.apDung();
   }
 
@@ -5321,6 +5427,7 @@ class RigThu {
       if (e['nhan' + b]) e['nhan' + b].setAttribute('opacity', fx(clamp(s.nhan, 0, 1)));
     }
     this.#veMom();
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
     // Ai đó cần vẽ lại theo con vật (dây dắt của người dắt nó — `leash` của rig người) thì gọi họ sau mỗi lần vẽ.
     if (this.onDraw) this.onDraw();
   }
@@ -5329,7 +5436,10 @@ class RigThu {
   #veMom() {
     const s = this.s, e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y;
     const mo = clamp(s.mieng, 0, 1), cu = s.cuoi * 2.6 * k, w = 9.5 * k, f = (v) => v.toFixed(2);
-    e.moi.setAttribute('d', `M 0 ${f(y0 - 3.4 * k)} V ${f(y0)} M ${f(-w)} ${f(y0 - cu)} Q ${f(-w / 2)} ${f(y0 + 5 * k)} 0 ${f(y0)} Q ${f(w / 2)} ${f(y0 + 5 * k)} ${f(w)} ${f(y0 - cu)}`);
+    // Nét môi chữ "w": khi `cuoi` âm (buồn, hối lỗi, đau) hai vòng cung dẹt lại rồi úp xuống — giữ nguyên vòng cung thì
+    // khoé môi có trễ xuống mõm vẫn như đang cười (Gemini soát cảnh thử đợt 13).
+    const bow = 5 * k * (s.cuoi >= 0 ? 1 : Math.max(-0.6, 1 + s.cuoi * 1.6));
+    e.moi.setAttribute('d', `M 0 ${f(y0 - 3.4 * k)} V ${f(y0)} M ${f(-w)} ${f(y0 - cu)} Q ${f(-w / 2)} ${f(y0 + bow)} 0 ${f(y0)} Q ${f(w / 2)} ${f(y0 + bow)} ${f(w)} ${f(y0 - cu)}`);
     // NANH (`nanh`): hai răng nanh nhọn chĩa xuống ở hai bên dưới môi trên — nhe răng gầm gừ. Môi trên kéo xệch lên theo.
     const fang = clamp(s.nanh, 0, 1);
     if (e.nanh) e.nanh.setAttribute('d', fang < 0.03 ? '' : [-1, 1].map((g) => { const x = g * w * 0.5, top = y0 + 1.2 * k, len = (2.2 + 4.2 * fang) * k;
@@ -5423,7 +5533,9 @@ class RigThu {
     return t;
   }
   #chop(t, at) {
-    t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
+    // Mở lại tới độ mở của nét mặt nghỉ (đang `mood('sleepy')` thì mắt díp), không phải mở to — con mèo buồn ngủ chớp
+    // mắt một cái là tỉnh hẳn dưới dấu "zzz" (cảnh thử đợt 13).
+    t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: this.NGHI.matY, duration: 0.11, ease: 'power1.out' }, at + 0.07);
   }
   // Đứng dậy nếu đang ngồi (mèo nghỉ ở dáng ngồi; chó sau `sitDown`); trả về thời điểm đứng xong.
   #dung(t, at = 0) {
@@ -6113,11 +6225,11 @@ class RigThu {
   static EXPRESSIONS = {
     happy:   { taiL: 0.8, taiR: 0.8, matY: 0.45, cuoi: 1, mieng: 0.45, luoi: 0.7, dau: -4, dongTu: 1.1 },
     excited: { taiL: 1, taiR: 1, matY: 0.1, cuoi: 1, mieng: 0.6, luoi: 0.9, dau: -8, dauY: -3, dongTu: 1.35 },
-    sad:     { taiL: -1.1, taiR: -1.1, matY: 0.12, nhinY: -1.3, dongTu: 1.45, lanh: 1, cuoi: -0.7, mieng: 0, dau: 7, dauY: 9 },
+    sad:     { taiL: -1.1, taiR: -1.1, matY: 0.12, nhinY: -1.3, dongTu: 1.45, lanh: 1, cuoi: -1, mieng: 0, dau: 7, dauY: 9 },
     scared:  { taiL: -1.6, taiR: -1.6, matY: -0.1, dongTu: 1.8, nhinY: -0.6, cuoi: -0.6, mieng: 0, dau: 6, dauY: 8, dauX: -4 },
     angry:   { taiL: -0.5, taiR: -0.5, matY: 0.35, dongTu: 0.5, cuoi: -0.9, mieng: 0.32, nanh: 1, dau: -4, dauY: 4 },
     curious: { taiL: 1, taiR: 0.25, matY: -0.08, dongTu: 1.55, nhinY: -0.5, cuoi: 0.25, mieng: 0, dau: 18, dauX: 4 },
-    guilty:  { taiL: -1.3, taiR: -1.3, matY: 0.1, nhinY: -1.9, nhinX: 1.4, dongTu: 1.4, lanh: 0.7, cuoi: -0.3, mieng: 0, dau: 9, dauY: 12 },
+    guilty:  { taiL: -1.3, taiR: -1.3, matY: 0.1, nhinY: -1.9, nhinX: 1.4, dongTu: 1.4, lanh: 0.7, cuoi: -0.6, mieng: 0, dau: 9, dauY: 12 },
     pain:    { taiL: -1.3, taiR: -1.3, matY: 1, nhan: 1, cuoi: -0.8, mieng: 0.18, dau: 5, dauY: 7 },
     sleepy:  { taiL: -0.5, taiR: -0.5, matY: 0.78, nhinY: 1, cuoi: 0, mieng: 0, dau: 5, dauY: 9 },
   };
@@ -6140,7 +6252,7 @@ class RigThu {
    * Làm một BIỂU CẢM `hold` giây rồi trở về: `express('happy')`, `express('sad', 2)`. Tên: happy · excited · sad ·
    * scared · angry · curious · guilty · pain · sleepy (`RigThu.EXPRESSIONS`). Đang giữ `mood` thì trở về nét mặt ấy.
    */
-  express(name = 'happy', hold = 1.4) {
+  express(name = 'happy', hold = 1.4, { mark = null } = {}) {
     const face = RigThu.EXPRESSIONS[name];
     if (!face) throw new Error(`[character] no pet expression "${name}" (available: ${Object.keys(RigThu.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, N = this.NGHI, loai = this.nv.loai, dog = loai === 'dog', cat = loai === 'cat';
@@ -6190,15 +6302,34 @@ class RigThu {
        .to(s, { dauY: face.dauY - 1, matY: 0.6, duration: 0.18, ease: 'power2.out' }, at + into + Math.min(1.2, hold * 0.5));
       if (hold > 2) t.to(s, { mieng: 0.9, luoi: 0.3, matY: 1, duration: 0.35, ease: 'power2.out' }, at + hold * 0.7).to(s, { mieng: 0, luoi: 0, matY: face.matY, duration: 0.3, ease: 'power2.in' }, at + hold * 0.7 + 0.5);
     }
+    // DẤU CẢM XÚC đi kèm (đọc được cả ở toàn cảnh, nơi nét mặt quá nhỏ): sợ "!", tò mò "?", buồn ngủ "zzz", vui tim,
+    // giận gân giận, hối lỗi / đau giọt mồ hôi. `RigThu.AUTO_MARKS = false` (hay `{ mark: false }`) để tắt.
+    const autoMark = { scared: '!', curious: '?', sleepy: 'zzz', happy: 'heart', excited: 'heart', angry: 'anger', guilty: 'sweat', pain: 'sweat' }[name];
+    if (mark !== false && (mark || (RigThu.AUTO_MARKS && autoMark))) markTweens(t, this.m, mark || autoMark, at + 0.1, Math.max(0.3, end - 0.35));
     this.#khep(t, 0.45, stop);
     return t;
   }
 
   /**
+   * DẤU CẢM XÚC trên đầu, giữ cho tới khi tắt: `mark('!')` · `mark('?')` · `mark('heart')` · `mark('zzz')` · `mark('sweat')`
+   * · `mark('anger')` · `mark('music')`; `mark(null)` tắt. Hiện song song với các động tác sau (ngủ, đi, ăn).
+   */
+  mark(kind = null) {
+    if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);
+    const t = this.tl();
+    if (kind) markTweens(t, this.m, kind, 0, null); else markOff(t, this.m, 0);
+    t.to({}, { duration: 0.3 }, 0);
+    return t;
+  }
+  static MARKS = MARKS;
+  static AUTO_MARKS = true;
+
+  /**
    * GIỮ một nét mặt cho tới khi đổi: `mood('sad')` — mọi động tác sau (đi khập khiễng, nằm, ăn) khép về nét mặt ấy chứ
    * không về nét mặt nghỉ. `mood(null)` thôi giữ. Chỉ giữ nét MẶT, tai và đuôi — dáng người vẫn do từng động tác.
+   * `mood('scared', { mark: '!' })`: kèm dấu cảm xúc trên đầu suốt lúc giữ; `mood(null)` tắt mọi dấu đang hiện.
    */
-  mood(name = null) {
+  mood(name = null, { mark = null } = {}) {
     if (name !== null && !RigThu.EXPRESSIONS[name]) throw new Error(`[character] no pet mood "${name}" (available: ${Object.keys(RigThu.EXPRESSIONS).join(', ')})`);
     if (!this.baseRest) this.baseRest = this.NGHI;
     const face = name ? { ...RigThu.EXPRESSIONS[name], ...this.#duoiCua(name) } : {};
@@ -6206,7 +6337,13 @@ class RigThu {
     const keep = Object.fromEntries(Object.entries(face).filter(([key]) => !['dauX'].includes(key)).map(([key, value]) => [key, ['dau', 'dauY'].includes(key) ? value * 0.6 : value]));
     this.NGHI = Object.freeze({ ...this.baseRest, ...keep });
     this.moodName = name;
-    return this.#khep(this.tl(), 0.4, 0);
+    const t = this.#khep(this.tl(), 0.4, 0);
+    // `{ mark: '!' }`: dấu cảm xúc giữ cùng nét mặt; `mood(null)` tắt luôn dấu do `mood` bật.
+    // (Không dùng cờ "dấu do mood bật": `sequence()` gọi mỗi bước HAI lần — bản nháp rồi bản thật — cờ bị lật ở bản
+    // nháp và bản thật không tắt dấu nữa; trái tim ở lại trên đầu suốt mười giây, cảnh thử đợt 13.)
+    if (name && mark) markTweens(t, this.m, mark, 0, null);
+    else if (!name) markOff(t, this.m, 0);
+    return t;
   }
 }
 
@@ -7809,6 +7946,34 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const present = room ? clamp((inside + margin) / (2 * margin), 0, 1) : 1;
         if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
         host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
+        // DẤU CẢM XÚC LUÔN Ở TRÊN CÙNG (! ? tim zzz — marks.js): dấu vẽ trong SVG của chính nhân vật, nên người đứng trước
+        // con vật (bác sĩ cạnh chó trên bàn) che mất dấu của nó (Gemini soát cảnh thử đợt 13). Khi có dấu: chép nó ra một
+        // lớp phủ riêng trên mọi lớp của bối cảnh, đúng chỗ dấu gốc trên màn hình, và ẩn dấu gốc.
+        const markEl = rig && rig.markEl;
+        if (markEl) {
+          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
+          if (lit) {
+            if (!actor.markLayer) {
+              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              actor.markLayer.setAttribute('data-mark-layer', '');
+              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
+              view.appendChild(actor.markLayer);
+            }
+            markEl.style.visibility = '';
+            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
+            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
+            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
+            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
+            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
+            layer.style.opacity = markEl.getAttribute('opacity');
+            layer.style.display = '';
+            layer.innerHTML = markEl.innerHTML;
+            markEl.style.visibility = 'hidden';
+          } else {
+            markEl.style.visibility = '';
+            if (actor.markLayer) actor.markLayer.style.display = 'none';
+          }
+        }
         // Bóng trên sàn: nằm ở lớp ngay SAU nhân vật — trên nền và trên những nhân vật ở xa hơn, dưới mọi đồ vật đứng trước.
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
@@ -7868,6 +8033,68 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * `edge` là mép cắt ('left' | 'right' | 'top' | 'bottom'). Chỉ nhân vật / con vật (có rig), không tính đồ vật hay
      * người đã ra hẳn ngoài khung. Dùng để soát góc máy: `tools/scene.py` quét cả cảnh và nhắc chỗ nào cắt người làm đôi.
      */
+    /**
+     * GÓC MÁY TỰ ĐỘNG: giá trị máy quay `{ x, y, z, distance, lens, zoom }` để lấy vừa `subjects` (một rig hay mảng rig) —
+     * `size` = 'close' (người: cận mặt; thú: cả con, to), 'medium' (người: ngang ngực), 'full' (cả người). Đo HÌNH VẼ
+     * THẬT trên màn hình lúc gọi (ai đang đứng đâu, cao thấp, ngồi trên bàn), nên gọi sau khi đã tua timeline tới lúc
+     * cần quay. Những nhân vật khác (`avoid`, mặc định: mọi người còn lại) không bị mép khung cắt đôi: máy dời để họ ra
+     * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào.
+     */
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1 } = {}) {
+      set.update();
+      const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
+      const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
+      if (!wanted.length) throw new Error('[character] set.frameOn: none of the subjects stands in this set');
+      // Hình vẽ của một nhân vật, đổi về toạ độ bối cảnh: x0 / x1 (ngang), base / top (cao), z.
+      const measure = (actor) => {
+        const host = actor.host, hidden = host.style.display === 'none', part = (actor.rig.el && actor.rig.el.goc) || actor.rig.svg;
+        if (!part || !host.contains(part)) return null;                                   // đang được bế: trong tay người khác
+        if (hidden) host.style.display = '';
+        // Dấu cảm xúc trên đầu (! ? zzz) không phải là người / con vật: ẩn đi lúc đo, không thì có dấu là khung lùi xa hơn.
+        const mark = actor.rig.markEl, shown = mark && mark.style.display;
+        if (mark) mark.style.display = 'none';
+        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = part.getBoundingClientRect();
+        if (mark) mark.style.display = shown || '';
+        if (hidden) host.style.display = 'none';
+        if (!r.width || !at.scale) return null;
+        const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function') };
+      };
+      // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
+      const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
+      const regionOf = (m) => {
+        const h = m.top - m.base;
+        if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
+        return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
+      };
+      const shots = wanted.map(measure).filter(Boolean);
+      if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
+      const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
+      const k = lens * zoom;
+      const solve = (region) => {
+        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (0.75 * W)));
+        // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung.
+        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - 0.07 * H * distance / k, distance };
+      };
+      let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
+      let cam = solve(region);
+      const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
+        .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
+      for (let pass = 0; pass < 3; pass++) {
+        const half = (W / 2) * cam.distance / k;
+        const edge = half * 0.06;
+        const cut = others.find((m) => { const seen = Math.max(0, Math.min(m.x1, cam.x + half + edge) - Math.max(m.x0, cam.x - half - edge)); return seen > 0 && seen < (m.x1 - m.x0) * 0.98; });
+        if (!cut) break;
+        // Dời cho người ấy ra HẲN ngoài khung, nếu chủ thể vẫn trọn trong khung; không thì nới khung lấy trọn người ấy.
+        const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
+        const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
+        if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
+      }
+      const z = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+      return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
+    },
+
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
       for (const actor of actors) {
@@ -8301,7 +8528,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.52.0';
+const VERSION = '0.53.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -8618,8 +8845,10 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
-  const snapshot = () => keys.map((k) => rig.s[k]);
-  const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
+  // Dấu cảm xúc (`rig.m`, marks.js) nằm ngoài `rig.s` — chụp kèm ở ba ô cuối: tên, độ hiện, pha.
+  const marked = !!(rig.m && typeof rig.m === 'object'), K = keys.length;
+  const snapshot = () => { const values = keys.map((k) => rig.s[k]); if (marked) values.push(rig.m.kind, rig.m.a, rig.m.p); return values; };
+  const restore = (values) => { keys.forEach((k, n) => { rig.s[k] = values[n]; }); if (marked && values.length > K) { rig.m.kind = values[K]; rig.m.a = values[K + 1]; rig.m.p = values[K + 2]; } };
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
   for (const [stepIndex, step] of stepList.entries()) {
@@ -8653,6 +8882,8 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
     child.paused(false);
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    // `mood(null)` / `mark(null)`: bước THÔI giữ — tools/scene.py không đặt tiếng ("sounds") cho nó.
+    if ((name === 'mood' || name === 'mark') && (args[0] === null || args[0] === undefined)) entry.off = true;
     // `face` về phía một nhân vật / phần tử: ghi lại đích để tools/peek.sh soát xem về sau nó có còn ở phía ấy không.
     if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0].live || args[0];
     // LỜI của bước nói — để `captions()` hiện chữ đúng giờ. `speak` / `explain` nhận lời ở tham số
@@ -8705,6 +8936,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
     const a = frames[lo], b = frames[hi];
     // Số thì nội suy giữa hai khung mẫu; chuỗi (hình bàn tay) lấy của khung trước.
     keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
+    if (marked) { rig.m.kind = a[K] || b[K]; rig.m.a = a[K + 1] + (b[K + 1] - a[K + 1]) * mix; rig.m.p = a[K + 2] + (b[K + 2] - a[K + 2]) * mix; }
     rig.apDung();
   };
   // Phát lại qua SETTER của thuộc tính đang tween: GSAP ghi thuộc tính ở mọi lần vẽ, kể cả khi

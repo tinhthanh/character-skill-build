@@ -348,6 +348,34 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const present = room ? clamp((inside + margin) / (2 * margin), 0, 1) : 1;
         if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
         host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
+        // DẤU CẢM XÚC LUÔN Ở TRÊN CÙNG (! ? tim zzz — marks.js): dấu vẽ trong SVG của chính nhân vật, nên người đứng trước
+        // con vật (bác sĩ cạnh chó trên bàn) che mất dấu của nó (Gemini soát cảnh thử đợt 13). Khi có dấu: chép nó ra một
+        // lớp phủ riêng trên mọi lớp của bối cảnh, đúng chỗ dấu gốc trên màn hình, và ẩn dấu gốc.
+        const markEl = rig && rig.markEl;
+        if (markEl) {
+          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
+          if (lit) {
+            if (!actor.markLayer) {
+              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              actor.markLayer.setAttribute('data-mark-layer', '');
+              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
+              view.appendChild(actor.markLayer);
+            }
+            markEl.style.visibility = '';
+            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
+            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
+            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
+            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
+            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
+            layer.style.opacity = markEl.getAttribute('opacity');
+            layer.style.display = '';
+            layer.innerHTML = markEl.innerHTML;
+            markEl.style.visibility = 'hidden';
+          } else {
+            markEl.style.visibility = '';
+            if (actor.markLayer) actor.markLayer.style.display = 'none';
+          }
+        }
         // Bóng trên sàn: nằm ở lớp ngay SAU nhân vật — trên nền và trên những nhân vật ở xa hơn, dưới mọi đồ vật đứng trước.
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
@@ -407,6 +435,68 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * `edge` là mép cắt ('left' | 'right' | 'top' | 'bottom'). Chỉ nhân vật / con vật (có rig), không tính đồ vật hay
      * người đã ra hẳn ngoài khung. Dùng để soát góc máy: `tools/scene.py` quét cả cảnh và nhắc chỗ nào cắt người làm đôi.
      */
+    /**
+     * GÓC MÁY TỰ ĐỘNG: giá trị máy quay `{ x, y, z, distance, lens, zoom }` để lấy vừa `subjects` (một rig hay mảng rig) —
+     * `size` = 'close' (người: cận mặt; thú: cả con, to), 'medium' (người: ngang ngực), 'full' (cả người). Đo HÌNH VẼ
+     * THẬT trên màn hình lúc gọi (ai đang đứng đâu, cao thấp, ngồi trên bàn), nên gọi sau khi đã tua timeline tới lúc
+     * cần quay. Những nhân vật khác (`avoid`, mặc định: mọi người còn lại) không bị mép khung cắt đôi: máy dời để họ ra
+     * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào.
+     */
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1 } = {}) {
+      set.update();
+      const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
+      const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
+      if (!wanted.length) throw new Error('[character] set.frameOn: none of the subjects stands in this set');
+      // Hình vẽ của một nhân vật, đổi về toạ độ bối cảnh: x0 / x1 (ngang), base / top (cao), z.
+      const measure = (actor) => {
+        const host = actor.host, hidden = host.style.display === 'none', part = (actor.rig.el && actor.rig.el.goc) || actor.rig.svg;
+        if (!part || !host.contains(part)) return null;                                   // đang được bế: trong tay người khác
+        if (hidden) host.style.display = '';
+        // Dấu cảm xúc trên đầu (! ? zzz) không phải là người / con vật: ẩn đi lúc đo, không thì có dấu là khung lùi xa hơn.
+        const mark = actor.rig.markEl, shown = mark && mark.style.display;
+        if (mark) mark.style.display = 'none';
+        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = part.getBoundingClientRect();
+        if (mark) mark.style.display = shown || '';
+        if (hidden) host.style.display = 'none';
+        if (!r.width || !at.scale) return null;
+        const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function') };
+      };
+      // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
+      const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
+      const regionOf = (m) => {
+        const h = m.top - m.base;
+        if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
+        return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
+      };
+      const shots = wanted.map(measure).filter(Boolean);
+      if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
+      const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
+      const k = lens * zoom;
+      const solve = (region) => {
+        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (0.75 * W)));
+        // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung.
+        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - 0.07 * H * distance / k, distance };
+      };
+      let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
+      let cam = solve(region);
+      const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
+        .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
+      for (let pass = 0; pass < 3; pass++) {
+        const half = (W / 2) * cam.distance / k;
+        const edge = half * 0.06;
+        const cut = others.find((m) => { const seen = Math.max(0, Math.min(m.x1, cam.x + half + edge) - Math.max(m.x0, cam.x - half - edge)); return seen > 0 && seen < (m.x1 - m.x0) * 0.98; });
+        if (!cut) break;
+        // Dời cho người ấy ra HẲN ngoài khung, nếu chủ thể vẫn trọn trong khung; không thì nới khung lấy trọn người ấy.
+        const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
+        const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
+        if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
+      }
+      const z = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+      return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
+    },
+
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
       for (const actor of actors) {

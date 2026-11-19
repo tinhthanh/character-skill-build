@@ -451,6 +451,25 @@ with tempfile.TemporaryDirectory() as work:
     notes = scene_tool.framing_notes(samples)
     if len(notes) != 1 or '"boy"' not in notes[0] or 'left edge' not in notes[0]: problems.append(f'framing notes: expected one note about "boy" at the left edge — got {notes}')
 
+    # Đợt 13: góc máy tự động ("view": "close" / { "on": … }), dấu cảm xúc ("mark"), âm thanh theo động tác ("sounds").
+    auto = json.load(open(stage, encoding='utf-8'))
+    auto['script'][1]['view'] = 'close'
+    auto['script'][2]['view'] = {'on': ['vet', 'boy'], 'size': 'medium'}
+    auto['script'][2]['mark'] = '?'
+    auto['script'].append({'who': 'cat', 'mood': 'scared', 'do': [['idle', 1]]})
+    auto['sounds'] = {'thumbsUp': '../voiceover/voice.wav', 'cat.mood': {'file': '../voiceover/voice.wav', 'volume': 0.5}}
+    path = os.path.join(os.path.dirname(stage), '_check_auto.json')
+    try:
+        json.dump(auto, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'auto'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('automatic views / marks / sounds: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'auto', 'index.html'), encoding='utf-8').read()
+        for needle in ('frameAt(', '"close")', '"medium")', "['mark', \"?\"]", "{ mark: \"!\" }", 'id="sound-1"', 'data-volume="0.5"'):
+            if needle not in html: problems.append(f'automatic views / marks / sounds: {needle} is not in the composition')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -486,6 +505,12 @@ with tempfile.TemporaryDirectory() as work:
         ('a view inside together', lambda s: s['script'].append({'together': [{'who': 'vet', 'do': ['nod'], 'view': {'yaw': 5}}, {'who': 'boy', 'do': ['nod']}]}), 'together'),
         ('z without a set', lambda s: s.pop('set') and [turn.pop('view', None) for turn in s['script']] and s['characters'][2].pop('on'), '"set"'),
         ('a view without a set', lambda s: s.pop('set') and [who.pop('z', None) or who.pop('on', None) for who in s['characters']], '"set"'),
+        ('a view word that is not a size', lambda s: s['script'][1].update({'view': 'tight'}), 'medium'),
+        ('an automatic view on nobody', lambda s: s['script'][1].update({'view': {'on': 'ghost'}}), 'view.on'),
+        ('an automatic view of a wrong size', lambda s: s['script'][1].update({'view': {'on': 'vet', 'size': 'huge'}}), 'view.size'),
+        ('an unknown mark', lambda s: s['script'][1].update({'mark': 'star'}), '"mark"'),
+        ('"marks" that is not true / false', lambda s: s.update({'marks': 'no'}), '"marks"'),
+        ('a missing sound file', lambda s: s.update({'sounds': {'wave': 'nope.wav'}}), 'nope.wav'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:

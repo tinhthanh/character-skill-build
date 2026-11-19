@@ -75,7 +75,13 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
                crying, embarrassed, sleepy. A PET's "mood": happy, excited, sad, scared, angry, curious, guilty,
                pain, sleepy — alone it is one beat of that face; with "do" the pet keeps the face through those
-               actions (`{ "who": "dog", "mood": "pain", "do": [["limp", 4, 120]] }`). Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
+               actions (`{ "who": "dog", "mood": "pain", "do": [["limp", 4, 120]] }`) with its mark over the head
+               (scared "!", curious "?", sleepy "zzz", happy heart…; `"marks": false` at the top: none).
+               `"mark"` on a turn: "!", "?", "heart", "zzz", "sweat", "anger" or "music" over the head for the turn.
+               In a 3D set `"view": "close"` (or "medium", "full") frames the turn's character and cuts back after;
+               `"view": { "on": ["vet", "dog"], "size": "medium" }` frames several. `"sounds"` at the top:
+               `{ "bark": "bark.wav", "cat.meow": { "file": "meow.wav", "volume": 0.8, "at": 0.1 } }` — a sound each
+               time that step plays (`mood` / `mark` only when they start, not when they end). Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
                "headInHands", "bow", "wai", ["handshake", "@other"] (with the other's ["handshake", "@you"] in "together").
                "ponder", "crossArms", "handsOnHips", "introduce", "callOut", "relief", "startle", "lookAround",
                ["hurry", 6, 200]. Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
@@ -156,13 +162,15 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds')
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark')
+MARKS = ('!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music')         # runtime/marks.js
+PET_MOOD_MARKS = {'scared': '!', 'curious': '?', 'sleepy': 'zzz', 'happy': 'heart', 'excited': 'heart', 'angry': 'anger', 'guilty': 'sweat', 'pain': 'sweat'}
 SHOW_KEYS = ('title', 'bullets', 'image')
 PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 'pain', 'sleepy')      # RigThu.EXPRESSIONS
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
@@ -236,7 +244,8 @@ CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
 CAMERA_SPEED = {'x': 220, 'y': 160, 'z': 220, 'yaw': 18, 'pitch': 8, 'distance': 420, 'zoom': 0.4}
 CAMERA_START = {'yaw': 0, 'pitch': 6, 'distance': 1700, 'x': 0, 'y': 300, 'z': -350, 'zoom': 1}   # máy mặc định của createSet (runtime/set3d.js, `base`)
-VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
+VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide', 'on', 'size', 'back')
+VIEW_SIZES = ('close', 'medium', 'full')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
 # vòng xa hơn thì không có mặt sau để xoay tới.
 PITCH_LIMITS, YAW_LIMIT, NORMAL_LENS = (-8, 15), 60, 1700
@@ -291,6 +300,36 @@ def quiet_notes(timings, shown_turns, longest=8.0):
         if begin - at > longest: notes.append(f'{at:.1f}–{begin:.1f} s: nothing is said or shown for {begin - at:.0f} s — viewers drift off; add a line, a "toast", or shorten what happens there')
         at = max(at, finish)
     return notes
+
+
+def audio_length(path):
+    """Độ dài (giây) của một tệp tiếng: WAV đọc thẳng, dạng khác hỏi ffprobe; không đo được thì 1 s."""
+    try:
+        import wave
+        with wave.open(path) as clip: return clip.getnframes() / clip.getframerate()
+    except Exception: pass
+    try:
+        done = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True)
+        return float(done.stdout.strip())
+    except Exception: return 1.0
+
+
+def place_sounds(html, timings, sounds, base, out, copied):
+    """Một clip <audio> cho mỗi lần một động tác có trong "sounds" diễn — đúng lúc nó bắt đầu. Khoá "who.action" thắng
+    khoá "action". Mỗi clip một rãnh riêng (hai tiếng sủa gối nhau vẫn kêu đủ)."""
+    if not sounds: return html, 0
+    track = max([int(n) for n in re.findall(r'data-track-index="(\d+)"', html)] + [0]) + 1
+    clips = []
+    for number, action in enumerate(timings.get('actions', [])):
+        spec = sounds.get(f"{action['who']}.{action['name']}") or sounds.get(action['name'])
+        if not spec: continue
+        name = copy_asset(base, out, spec['file'], copied)
+        start, length = float(action['start']) + float(spec.get('at', 0)), audio_length(os.path.join(out, name))
+        clips.append(f'  <audio id="sound-{len(clips) + 1}" class="clip" src="{name}" data-start="{start:.2f}" data-duration="{length:.2f}" data-track-index="{track + len(clips)}" data-volume="{float(spec.get("volume", 1)):g}"></audio>')
+    if not clips: return html, 0
+    marker = '\n\n  <script src="https://cdn.jsdelivr.net/npm/gsap'
+    if marker not in html: fail('could not place the "sounds" clips (the composition has no gsap <script> after its clips)')
+    return html.replace(marker, '\n  <!-- "sounds": one clip each time the action plays -->\n' + '\n'.join(clips) + marker, 1), len(clips)
 
 
 def read_timings(folder, target):
@@ -693,8 +732,12 @@ def main():
                 # Thú cưng: nét mặt của con vật (tai, mắt, đuôi). Lượt có động tác thì GIỮ nét mặt suốt các động tác ấy
                 # (`mood`, thôi giữ ở cuối lượt); lượt chỉ có mood thì là một nhịp biểu cảm.
                 if mood not in PET_MOODS: fail(f'{where}: "mood" of a pet must be one of {", ".join(PET_MOODS)} — got {js(mood)}')
-                if not turn.get('do'): steps.append(f"['express', {js(mood)}, 1.4]")
-                else: steps.append(f"['mood', {js(mood)}]")
+                if not turn.get('do'): steps.append(f"['express', {js(mood)}, 1.4" + ("]" if marks_on else ", { mark: false }]"))
+                else:
+                    # Nét mặt GIỮ qua các động tác; dấu cảm xúc của nét mặt ấy cũng giữ suốt lượt (trừ khi lượt tự cho "mark")
+                    # — cùng một bước với `mood`, không thêm thời gian.
+                    held_mark = PET_MOOD_MARKS.get(mood) if marks_on and 'mark' not in turn else None
+                    steps.append(f"['mood', {js(mood)}" + (f", {{ mark: {js(held_mark)} }}]" if held_mark else "]"))
             else:
                 if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
                 if 'say' not in turn: steps.append(f"['express', {js(mood)}, 0.9]")
@@ -742,11 +785,17 @@ def main():
         # Lượt KHÔNG LỜI có máy quay LIA tới (không cắt): động tác tay đợi máy dừng rồi mới bắt đầu. Bắt đầu cùng lúc thì
         # người diễn còn nằm ở mép khung khi động tác đang diễn (bản thử quầy lễ tân: bà cụ bấm điện thoại bị cắt nửa người).
         view = turn.get('view')
-        if stage_set is not None and turn.get('do') and 'say' not in turn and isinstance(view, dict) and not view.get('cut') and not view.get('wide'):
+        if stage_set is not None and turn.get('do') and 'say' not in turn and isinstance(view, dict) and 'on' not in view and not view.get('cut') and not view.get('wide'):
             steps.append(f"{float(view.get('dur', 1.5)):g}")
         for step in turn.get('do', []):
             steps.append(step_code(step, where, who['name']))
         if who['_pet'] and mood and turn.get('do'): steps.append("['mood', null]")
+        if 'mark' in turn:
+            # DẤU CẢM XÚC trên đầu suốt lượt: bật lên trước lời / động tác, tắt ở cuối lượt. Lượt chỉ có dấu: giữ 1,4 s.
+            if turn['mark'] not in MARKS: fail(f'{where}: "mark" must be one of {", ".join(MARKS)} — got {js(turn["mark"])}')
+            steps.insert(1 if 'enter' in turn else 0, f"['mark', {js(turn['mark'])}]")
+            if len(steps) == 1: steps.append('1.4')
+            steps.append("['mark', null]")
         if turn.get('exit'):
             # Quãng đi ra tính sẵn như `enter`: tới mép khung cộng phần đầu / thân, để nhân vật khuất hẳn rồi mới ẩn.
             leaving = (float(who['x']) if turn['exit'] == 'left' else width - float(who['x'])) + (0.39 if not who['_pet'] else 0.6) * who['_host_height']
@@ -784,6 +833,20 @@ def main():
     if arrivals: turns.append(('  // ' + ', '.join(who['name'] for who in entering) + (' walk' if len(entering) > 1 else ' walks') + ' in from outside the frame to the mark',
                                '{ together: [' + ', '.join(arrivals) + '] }' if len(arrivals) > 1 else arrivals[0]))
     layout = scene.get('layout', 'stage')
+    if scene.get('marks', True) not in (True, False): fail('"marks" must be true or false (false: no automatic marks over a pet\'s head for its "mood")')
+    marks_on = scene.get('marks', True)
+    # ÂM THANH THEO ĐỘNG TÁC: `"sounds": { "bark": "gau.wav", "cat.meow": { "file": "meo.wav", "volume": 0.8, "at": 0.1 } }` —
+    # mỗi lần động tác ấy diễn (của mọi nhân vật, hay chỉ của "cat"), một đoạn tiếng đặt đúng lúc nó bắt đầu (+ "at" giây).
+    sounds = scene.get('sounds', {})
+    if not isinstance(sounds, dict): fail('"sounds" must be an object: { "bark": "bark.wav", "dog.bark": { "file": "…", "volume": 0.8, "at": 0.1 } }')
+    for key, value in list(sounds.items()):
+        spec = {'file': value} if isinstance(value, str) else value
+        if not isinstance(spec, dict) or not isinstance(spec.get('file'), str) or set(spec) - {'file', 'volume', 'at'}: fail(f'sounds["{key}"] must be a file name or {{ "file": "…", "volume": 0.8, "at": 0.1 }} — got {js(value)}')
+        if not os.path.isfile(os.path.join(base, spec['file'])): fail(f'sounds["{key}"]: file not found: {spec["file"]} (looked in {base})')
+        if not all(isinstance(spec.get(k, 0), (int, float)) for k in ('volume', 'at')): fail(f'sounds["{key}"]: "volume" and "at" must be numbers')
+        if '.' in key and key.split('.', 1)[0] not in [c.get('name') for c in scene.get('characters', [])]: fail(f'sounds["{key}"]: "{key.split(".", 1)[0]}" is not a character in the scene ("who.action", or just "action")')
+        sounds[key] = spec
+    sound_actions = sorted({key.split('.', 1)[-1] for key in sounds})
     if layout not in ('stage', 'presenter', 'split'): fail(f'"layout" must be "stage", "presenter" or "split", got {js(layout)}')
     if 'sides' in scene and layout != 'split': fail('"sides" (a background for each half) needs "layout": "split"')
     speakers = []                                           # màn hình chia đôi: (chỉ số lượt, nửa của người nói) — nửa kia tối đi
@@ -801,7 +864,25 @@ def main():
         view = turn.get('view')
         if view is None: return
         if stage_set is None: fail(f'{where}: "view" moves the camera of a 3D set — add "set" at the top of the scene file')
-        if not isinstance(view, dict) or not view: fail(f'{where}: "view" must be an object such as {{ "yaw": 20, "distance": 1200, "dur": 2 }}')
+        # GÓC MÁY TỰ ĐỘNG: `"view": "close"` (cận vào chính người / con vật của lượt, rồi trở lại góc trước ở lượt sau),
+        # hay `{ "on": "dog" | ["vet", "dog"], "size": "close" | "medium" | "full", "back": true }`. Máy tính lúc dựng, trong
+        # trình duyệt (set.frameOn): đo hình vẽ thật của từng nhân vật, dời để không ai bị mép khung cắt đôi.
+        if isinstance(view, str):
+            if view not in VIEW_SIZES: fail(f'{where}: "view" as a word must be {", ".join(VIEW_SIZES)} (a close / medium / full shot of "{turn.get("who")}") — got {js(view)}')
+            view = {'on': turn.get('who'), 'size': view, 'back': True}
+        if isinstance(view, dict) and 'on' in view:
+            known(f'{where}.view', view, VIEW_KEYS)
+            subjects = view['on'] if isinstance(view['on'], list) else [view['on']]
+            if not subjects or any(name not in names for name in subjects): fail(f'{where}: "view.on" must name characters in the scene — got {js(view["on"])}')
+            if view.get('size', 'medium') not in VIEW_SIZES: fail(f'{where}: "view.size" must be {", ".join(VIEW_SIZES)} — got {js(view.get("size"))}')
+            extra = {key: view[key] for key in ('yaw', 'pitch') if key in view}
+            if any(not isinstance(value, (int, float)) for value in extra.values()): fail(f'{where}: every camera value in "view" must be a number')
+            check_camera(extra, f'{where}.view')
+            views.append({'turn': emitted[0], 'auto': {'on': subjects, 'size': view.get('size', 'medium')}, 'values': extra, 'wide': False,
+                          'cut': view.get('cut', True) is not False, 'dur': float(view.get('dur', 1.5)), 'ease': view.get('ease', 'sine.inOut'), 'where': where, 'back': bool(view.get('back'))})
+            camera_now.clear(); camera_now.update({key: float(value) for key, value in extra.items()})       # giá trị thật chỉ biết lúc dựng
+            return
+        if not isinstance(view, dict) or not view: fail(f'{where}: "view" must be an object such as {{ "yaw": 20, "distance": 1200, "dur": 2 }}, or "close" / "medium" / "full"')
         known(f'{where}.view', view, VIEW_KEYS)
         values = {key: view[key] for key in CAMERA_KEYS if key in view}
         if any(not isinstance(value, (int, float)) for value in values.values()): fail(f'{where}: every camera value in "view" must be a number')
@@ -839,6 +920,12 @@ def main():
                       'dur': seconds, 'ease': view.get('ease', 'sine.inOut'), 'where': where})
     for index, entry in enumerate(script):
         where = f'script[{index}]'
+        # TRỞ LẠI góc máy trước (view có "back"): cắt về đúng nó ở lượt đầu tiên của mục sau — trừ khi mục ấy tự có "view".
+        if views and views[-1].get('back') and not views[-1].get('back_done'):
+            views[-1]['back_done'] = True
+            if not (isinstance(entry, dict) and 'view' in entry):
+                before = views[-2] if len(views) > 1 else None
+                views.append(dict(before, turn=emitted[0], cut=True, back=False, back_done=True, returned=True) if before else {'turn': emitted[0], 'start': True, 'values': {}, 'wide': False, 'cut': True, 'dur': 1.5, 'ease': 'sine.inOut', 'where': where, 'back': False})
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or 'show' not in turn: continue
             show = turn['show']
@@ -1362,11 +1449,22 @@ def main():
         timeline_hook = ', onUpdate: set.update'
         # Máy quay áp ở MỌI khung kể cả khi bộ dựng tua bằng seek() (tắt onUpdate) — không có thì hình chớp lúc máy lia.
         drive_code = "\n    set.drive(tl);       // the camera is applied on every frame, also when the renderer seeks without callbacks"
-        moves = []
+        moves, autos = [], False
         for view in views:
             values = ', '.join(f'{key}: {value:g}' for key, value in view['values'].items())
-            call = f"set.cut({{ {values} }})" if view['cut'] else f"set.move({{ {values} }}, {view['dur']:g}, {js(view['ease'])})"
+            if view.get('start'): aim = js(start)
+            elif view.get('auto'):
+                # Góc tự động: tính lúc dựng, ở đúng lúc lượt (gốc) của nó bắt đầu — vị trí của mọi người lúc ấy.
+                autos = True
+                first = next(v for v in views if v.get('auto') is view['auto'] and not v.get('returned')) if view.get('returned') else view
+                aim = f"{{ ...frameAt(T0 + talk.turns[{first['turn']}].start, [{', '.join(view['auto']['on'])}], {js(view['auto']['size'])})" + (f", {values}" if values else '') + ' }'
+            else: aim = f'{{ {values} }}'
+            call = f"set.cut({aim})" if view['cut'] else f"set.move({aim}, {view['dur']:g}, {js(view['ease'])})"
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
+        if autos:
+            moves.insert(0, "    // Automatic views (\"view\": \"close\", { \"on\": … }): measured at build time, at the moment of their turn.\n"
+                            "    const frameAt = (time, subjects, size) => { tl.seek(time, false); set.update(); return set.frameOn(subjects, size); };")
+            moves.append("    tl.seek(0, false); set.update();")
         if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
     # SOÁT GÓC MÁY (bối cảnh 3D): tua cả cảnh, mỗi 0,25 s hỏi set.framing() ai đang bị mép khung cắt dở. tools/scene.py gọi
     # hàm này một lần khi dựng (read_timings) rồi nhắc; lúc render không ai gọi nó.
@@ -1375,6 +1473,7 @@ def main():
         framing_code = ("    // Read by tools/scene.py: who the frame edge cuts through, every 0.25 s (not called in a render).\n"
                         "    window.__framing = () => { const cut = []; for (let t = T0; t < (T1 || tl.duration()); t += 0.25) { tl.seek(t, false); set.update(); "
                         "set.framing().forEach((c) => cut.push(Object.assign({ t: +t.toFixed(2) }, c))); } tl.seek(0, false); set.update(); return cut; };\n")
+    cast_list = ', '.join(names)                             # { vet, dog, … } — tên nhân vật của mỗi lượt (âm thanh theo động tác)
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
 <html lang="en">
@@ -1412,7 +1511,8 @@ def main():
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
     window.__sceneTimings = {{ duration: tl.duration(), outro: T1, turns: talk.turns.map((turn) => [T0 + turn.start, T0 + turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: T0 + step.start, sound: step.sound, length: step.speech }}))),
-      lines: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.text).map((step) => ({{ start: T0 + step.start, end: T0 + step.start + (step.speech || step.duration), text: step.text }}))) }};
+      lines: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.text).map((step) => ({{ start: T0 + step.start, end: T0 + step.start + (step.speech || step.duration), text: step.text }}))),
+      actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))) }};
   </script>
 </div>
 </body>
@@ -1428,6 +1528,7 @@ def main():
         final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
     final = place_shows(final, timings, total)
     final = place_toasts(final, timings, total)
+    final, sound_count = place_sounds(final, timings, sounds, base, out, copied)
     # Thời gian của cảnh cho tools/film.py (phụ đề .srt của cả phim): tổng độ dài và từng câu thoại.
     json.dump({'duration': total, 'lines': timings.get('lines', [])}, open(os.path.join(out, 'timings.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     if outro: final = final.replace('__OUTRO_START__', f'{timings["outro"]:.2f}').replace('__OUTRO_DUR__', f'{max(0.5, total - timings["outro"]):.2f}')

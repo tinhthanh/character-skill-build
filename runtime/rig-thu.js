@@ -31,6 +31,8 @@
 //     tnNhac txNhac 0..1  chân trước rời đất, treo theo vai;  tnGoc txGoc góc treo
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
+import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
+
 const KHUNG = { w: 400, h: 330 };
 // DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
 // THẾ GIỮ (như `ngoi`): đang nằm thì mọi động tác khép về dáng này chứ không về dáng đứng.
@@ -352,6 +354,7 @@ export class RigThu {
     this.id = `thu${++RigThu.#dem}`;
     this.wearing = new Set();
     this.s = this.#theoDoi({ ...this.NGHI });
+    this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
   }
 
@@ -385,6 +388,8 @@ export class RigThu {
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi', 'nanh', 'lanhL', 'lanhR', 'nhanL', 'nhanR',
       'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
+    // Dấu cảm xúc: góc trên, phía trước đầu (về phía mõm), trên chóp tai.
+    this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? 48 : 32, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
     this.apDung();
   }
 
@@ -591,6 +596,7 @@ export class RigThu {
       if (e['nhan' + b]) e['nhan' + b].setAttribute('opacity', fx(clamp(s.nhan, 0, 1)));
     }
     this.#veMom();
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
     // Ai đó cần vẽ lại theo con vật (dây dắt của người dắt nó — `leash` của rig người) thì gọi họ sau mỗi lần vẽ.
     if (this.onDraw) this.onDraw();
   }
@@ -599,7 +605,10 @@ export class RigThu {
   #veMom() {
     const s = this.s, e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y;
     const mo = clamp(s.mieng, 0, 1), cu = s.cuoi * 2.6 * k, w = 9.5 * k, f = (v) => v.toFixed(2);
-    e.moi.setAttribute('d', `M 0 ${f(y0 - 3.4 * k)} V ${f(y0)} M ${f(-w)} ${f(y0 - cu)} Q ${f(-w / 2)} ${f(y0 + 5 * k)} 0 ${f(y0)} Q ${f(w / 2)} ${f(y0 + 5 * k)} ${f(w)} ${f(y0 - cu)}`);
+    // Nét môi chữ "w": khi `cuoi` âm (buồn, hối lỗi, đau) hai vòng cung dẹt lại rồi úp xuống — giữ nguyên vòng cung thì
+    // khoé môi có trễ xuống mõm vẫn như đang cười (Gemini soát cảnh thử đợt 13).
+    const bow = 5 * k * (s.cuoi >= 0 ? 1 : Math.max(-0.6, 1 + s.cuoi * 1.6));
+    e.moi.setAttribute('d', `M 0 ${f(y0 - 3.4 * k)} V ${f(y0)} M ${f(-w)} ${f(y0 - cu)} Q ${f(-w / 2)} ${f(y0 + bow)} 0 ${f(y0)} Q ${f(w / 2)} ${f(y0 + bow)} ${f(w)} ${f(y0 - cu)}`);
     // NANH (`nanh`): hai răng nanh nhọn chĩa xuống ở hai bên dưới môi trên — nhe răng gầm gừ. Môi trên kéo xệch lên theo.
     const fang = clamp(s.nanh, 0, 1);
     if (e.nanh) e.nanh.setAttribute('d', fang < 0.03 ? '' : [-1, 1].map((g) => { const x = g * w * 0.5, top = y0 + 1.2 * k, len = (2.2 + 4.2 * fang) * k;
@@ -693,7 +702,9 @@ export class RigThu {
     return t;
   }
   #chop(t, at) {
-    t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: 0, duration: 0.11, ease: 'power1.out' }, at + 0.07);
+    // Mở lại tới độ mở của nét mặt nghỉ (đang `mood('sleepy')` thì mắt díp), không phải mở to — con mèo buồn ngủ chớp
+    // mắt một cái là tỉnh hẳn dưới dấu "zzz" (cảnh thử đợt 13).
+    t.to(this.s, { matY: 1, duration: 0.07, ease: 'power1.in' }, at).to(this.s, { matY: this.NGHI.matY, duration: 0.11, ease: 'power1.out' }, at + 0.07);
   }
   // Đứng dậy nếu đang ngồi (mèo nghỉ ở dáng ngồi; chó sau `sitDown`); trả về thời điểm đứng xong.
   #dung(t, at = 0) {
@@ -1383,11 +1394,11 @@ export class RigThu {
   static EXPRESSIONS = {
     happy:   { taiL: 0.8, taiR: 0.8, matY: 0.45, cuoi: 1, mieng: 0.45, luoi: 0.7, dau: -4, dongTu: 1.1 },
     excited: { taiL: 1, taiR: 1, matY: 0.1, cuoi: 1, mieng: 0.6, luoi: 0.9, dau: -8, dauY: -3, dongTu: 1.35 },
-    sad:     { taiL: -1.1, taiR: -1.1, matY: 0.12, nhinY: -1.3, dongTu: 1.45, lanh: 1, cuoi: -0.7, mieng: 0, dau: 7, dauY: 9 },
+    sad:     { taiL: -1.1, taiR: -1.1, matY: 0.12, nhinY: -1.3, dongTu: 1.45, lanh: 1, cuoi: -1, mieng: 0, dau: 7, dauY: 9 },
     scared:  { taiL: -1.6, taiR: -1.6, matY: -0.1, dongTu: 1.8, nhinY: -0.6, cuoi: -0.6, mieng: 0, dau: 6, dauY: 8, dauX: -4 },
     angry:   { taiL: -0.5, taiR: -0.5, matY: 0.35, dongTu: 0.5, cuoi: -0.9, mieng: 0.32, nanh: 1, dau: -4, dauY: 4 },
     curious: { taiL: 1, taiR: 0.25, matY: -0.08, dongTu: 1.55, nhinY: -0.5, cuoi: 0.25, mieng: 0, dau: 18, dauX: 4 },
-    guilty:  { taiL: -1.3, taiR: -1.3, matY: 0.1, nhinY: -1.9, nhinX: 1.4, dongTu: 1.4, lanh: 0.7, cuoi: -0.3, mieng: 0, dau: 9, dauY: 12 },
+    guilty:  { taiL: -1.3, taiR: -1.3, matY: 0.1, nhinY: -1.9, nhinX: 1.4, dongTu: 1.4, lanh: 0.7, cuoi: -0.6, mieng: 0, dau: 9, dauY: 12 },
     pain:    { taiL: -1.3, taiR: -1.3, matY: 1, nhan: 1, cuoi: -0.8, mieng: 0.18, dau: 5, dauY: 7 },
     sleepy:  { taiL: -0.5, taiR: -0.5, matY: 0.78, nhinY: 1, cuoi: 0, mieng: 0, dau: 5, dauY: 9 },
   };
@@ -1410,7 +1421,7 @@ export class RigThu {
    * Làm một BIỂU CẢM `hold` giây rồi trở về: `express('happy')`, `express('sad', 2)`. Tên: happy · excited · sad ·
    * scared · angry · curious · guilty · pain · sleepy (`RigThu.EXPRESSIONS`). Đang giữ `mood` thì trở về nét mặt ấy.
    */
-  express(name = 'happy', hold = 1.4) {
+  express(name = 'happy', hold = 1.4, { mark = null } = {}) {
     const face = RigThu.EXPRESSIONS[name];
     if (!face) throw new Error(`[character] no pet expression "${name}" (available: ${Object.keys(RigThu.EXPRESSIONS).join(', ')})`);
     const t = this.tl(), s = this.s, N = this.NGHI, loai = this.nv.loai, dog = loai === 'dog', cat = loai === 'cat';
@@ -1460,15 +1471,34 @@ export class RigThu {
        .to(s, { dauY: face.dauY - 1, matY: 0.6, duration: 0.18, ease: 'power2.out' }, at + into + Math.min(1.2, hold * 0.5));
       if (hold > 2) t.to(s, { mieng: 0.9, luoi: 0.3, matY: 1, duration: 0.35, ease: 'power2.out' }, at + hold * 0.7).to(s, { mieng: 0, luoi: 0, matY: face.matY, duration: 0.3, ease: 'power2.in' }, at + hold * 0.7 + 0.5);
     }
+    // DẤU CẢM XÚC đi kèm (đọc được cả ở toàn cảnh, nơi nét mặt quá nhỏ): sợ "!", tò mò "?", buồn ngủ "zzz", vui tim,
+    // giận gân giận, hối lỗi / đau giọt mồ hôi. `RigThu.AUTO_MARKS = false` (hay `{ mark: false }`) để tắt.
+    const autoMark = { scared: '!', curious: '?', sleepy: 'zzz', happy: 'heart', excited: 'heart', angry: 'anger', guilty: 'sweat', pain: 'sweat' }[name];
+    if (mark !== false && (mark || (RigThu.AUTO_MARKS && autoMark))) markTweens(t, this.m, mark || autoMark, at + 0.1, Math.max(0.3, end - 0.35));
     this.#khep(t, 0.45, stop);
     return t;
   }
 
   /**
+   * DẤU CẢM XÚC trên đầu, giữ cho tới khi tắt: `mark('!')` · `mark('?')` · `mark('heart')` · `mark('zzz')` · `mark('sweat')`
+   * · `mark('anger')` · `mark('music')`; `mark(null)` tắt. Hiện song song với các động tác sau (ngủ, đi, ăn).
+   */
+  mark(kind = null) {
+    if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);
+    const t = this.tl();
+    if (kind) markTweens(t, this.m, kind, 0, null); else markOff(t, this.m, 0);
+    t.to({}, { duration: 0.3 }, 0);
+    return t;
+  }
+  static MARKS = MARKS;
+  static AUTO_MARKS = true;
+
+  /**
    * GIỮ một nét mặt cho tới khi đổi: `mood('sad')` — mọi động tác sau (đi khập khiễng, nằm, ăn) khép về nét mặt ấy chứ
    * không về nét mặt nghỉ. `mood(null)` thôi giữ. Chỉ giữ nét MẶT, tai và đuôi — dáng người vẫn do từng động tác.
+   * `mood('scared', { mark: '!' })`: kèm dấu cảm xúc trên đầu suốt lúc giữ; `mood(null)` tắt mọi dấu đang hiện.
    */
-  mood(name = null) {
+  mood(name = null, { mark = null } = {}) {
     if (name !== null && !RigThu.EXPRESSIONS[name]) throw new Error(`[character] no pet mood "${name}" (available: ${Object.keys(RigThu.EXPRESSIONS).join(', ')})`);
     if (!this.baseRest) this.baseRest = this.NGHI;
     const face = name ? { ...RigThu.EXPRESSIONS[name], ...this.#duoiCua(name) } : {};
@@ -1476,6 +1506,12 @@ export class RigThu {
     const keep = Object.fromEntries(Object.entries(face).filter(([key]) => !['dauX'].includes(key)).map(([key, value]) => [key, ['dau', 'dauY'].includes(key) ? value * 0.6 : value]));
     this.NGHI = Object.freeze({ ...this.baseRest, ...keep });
     this.moodName = name;
-    return this.#khep(this.tl(), 0.4, 0);
+    const t = this.#khep(this.tl(), 0.4, 0);
+    // `{ mark: '!' }`: dấu cảm xúc giữ cùng nét mặt; `mood(null)` tắt luôn dấu do `mood` bật.
+    // (Không dùng cờ "dấu do mood bật": `sequence()` gọi mỗi bước HAI lần — bản nháp rồi bản thật — cờ bị lật ở bản
+    // nháp và bản thật không tắt dấu nữa; trái tim ở lại trên đầu suốt mười giây, cảnh thử đợt 13.)
+    if (name && mark) markTweens(t, this.m, mark, 0, null);
+    else if (!name) markOff(t, this.m, 0);
+    return t;
   }
 }

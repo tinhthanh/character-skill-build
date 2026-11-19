@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.52.0';
+export const VERSION = '0.53.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -339,8 +339,10 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
-  const snapshot = () => keys.map((k) => rig.s[k]);
-  const restore = (values) => keys.forEach((k, n) => { rig.s[k] = values[n]; });
+  // Dấu cảm xúc (`rig.m`, marks.js) nằm ngoài `rig.s` — chụp kèm ở ba ô cuối: tên, độ hiện, pha.
+  const marked = !!(rig.m && typeof rig.m === 'object'), K = keys.length;
+  const snapshot = () => { const values = keys.map((k) => rig.s[k]); if (marked) values.push(rig.m.kind, rig.m.a, rig.m.p); return values; };
+  const restore = (values) => { keys.forEach((k, n) => { rig.s[k] = values[n]; }); if (marked && values.length > K) { rig.m.kind = values[K]; rig.m.a = values[K + 1]; rig.m.p = values[K + 2]; } };
   let at = 0, endState = snapshot(), firstFrame = null;
   const steps = [];
   for (const [stepIndex, step] of stepList.entries()) {
@@ -374,6 +376,8 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
     child.paused(false);
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    // `mood(null)` / `mark(null)`: bước THÔI giữ — tools/scene.py không đặt tiếng ("sounds") cho nó.
+    if ((name === 'mood' || name === 'mark') && (args[0] === null || args[0] === undefined)) entry.off = true;
     // `face` về phía một nhân vật / phần tử: ghi lại đích để tools/peek.sh soát xem về sau nó có còn ở phía ấy không.
     if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0].live || args[0];
     // LỜI của bước nói — để `captions()` hiện chữ đúng giờ. `speak` / `explain` nhận lời ở tham số
@@ -426,6 +430,7 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
     const a = frames[lo], b = frames[hi];
     // Số thì nội suy giữa hai khung mẫu; chuỗi (hình bàn tay) lấy của khung trước.
     keys.forEach((k, n) => { rig.s[k] = numeric[n] ? a[n] + (b[n] - a[n]) * mix : a[n]; });
+    if (marked) { rig.m.kind = a[K] || b[K]; rig.m.a = a[K + 1] + (b[K + 1] - a[K + 1]) * mix; rig.m.p = a[K + 2] + (b[K + 2] - a[K + 2]) * mix; }
     rig.apDung();
   };
   // Phát lại qua SETTER của thuộc tính đang tween: GSAP ghi thuộc tính ở mọi lần vẽ, kể cả khi

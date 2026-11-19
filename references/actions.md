@@ -265,6 +265,14 @@ the ears, eyes, pupils, mouth, head and tail:
 New face channels on `rig.s` (0…1): `lanh` (wet, shining eyes), `nhan` (eyes squeezed shut > <) and
 `nanh` (bared fangs).
 
+**Emotion marks** (people and pets): `rig.mark(kind)` shows a comic mark over the head and keeps it
+through the actions that follow; `rig.mark(null)` takes it away. Kinds: `!` (alarm), `?` (puzzled),
+`heart`, `zzz`, `sweat` (drop — nervous, guilty), `anger` (vein), `music` (note). It follows the head as it
+tilts or droops. A pet's `express` shows a matching mark by itself (scared `!`, curious `?`, sleepy `zzz`,
+happy / excited heart, angry vein, guilty / pain sweat) — `express(name, hold, { mark: false })` or
+`RigThu.AUTO_MARKS = false` to leave it out, `{ mark: '?' }` to choose another. In a scene file: `"mark"`
+on a turn (held through it), and `"marks": false` at the top for no automatic marks.
+
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything
 over 160 units (about 155 units a second).

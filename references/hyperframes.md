@@ -432,6 +432,14 @@ set projects the spot a character stands on and places its host as an ordinary 2
 it always faces the lens and stays sharp at any distance. Its shadow lies on the 3D floor under
 its soles, so it flattens and turns with the camera.
 
+**Automatic views.** `"view": "close"` on a turn (or `"medium"`, `"full"`) frames that turn's character
+and cuts back to the view before it on the next turn — the easy way to show a pet's expression. `"view": {
+"on": ["vet", "dog"], "size": "medium", "back": true }` frames several characters (`"cut": false` with
+`"dur"` pans instead of cutting; `"yaw"` / `"pitch"` may be added). The values are worked out when the scene
+is built, by `set.frameOn(subjects, size, { avoid })`: it measures the drawn figures where they stand at the
+start of the turn and moves the camera so nobody else is cut in half by the frame edge. Sizes: a person
+`close` = head, `medium` = from the waist, `full` = whole; a pet is always shown whole (`close` biggest).
+
 **Framing.** `set.framing()` lists who the frame edge cuts through at the current frame
 (`[{ name, shown, edge, pet }]`, `shown` = the part of the head and body still in the frame).
 `tools/scene.py` sweeps the whole scene with it and warns when a `"view"` leaves a character half in

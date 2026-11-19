@@ -18,6 +18,8 @@
 //    của công cụ nhép miệng khác dùng lại được.
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
 
+import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
+
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
 
@@ -793,6 +795,7 @@ export class RigSVG {
     this.NGHI = Object.freeze({ ...NGHI, ...(this.nv.nghi || {}) });
     this.id = `rig${++RigSVG.#dem}`;
     this.s = this.#theoDoi({ ...this.NGHI });
+    this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
   }
 
@@ -1214,6 +1217,8 @@ export class RigSVG {
       },
     };
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
+    // Dấu cảm xúc: cạnh góc trên bên phải đầu (toạ độ trong nhóm đầu, tâm mặt ở 0, −62) — cao hơn nữa thì ra khỏi khung SVG.
+    this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
   }
 
   /* ------------------------------------------------------ đổ trạng thái */
@@ -1924,7 +1929,21 @@ export class RigSVG {
     this.#drawLeash();
     this.#drawBall();
     this.#drawNote();
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
   }
+
+  /**
+   * DẤU CẢM XÚC trên đầu, giữ cho tới khi tắt: `mark('!')` · `mark('?')` · `mark('heart')` · `mark('zzz')` · `mark('sweat')`
+   * · `mark('anger')` · `mark('music')`; `mark(null)` tắt. Hiện song song với các động tác sau (nói, gật, đi).
+   */
+  mark(kind = null) {
+    if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);
+    const t = this.tl();
+    if (kind) markTweens(t, this.m, kind, 0, null); else markOff(t, this.m, 0);
+    t.to({}, { duration: 0.3 }, 0);
+    return t;
+  }
+  static MARKS = MARKS;
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {
