@@ -440,6 +440,15 @@ is built, by `set.frameOn(subjects, size, { avoid })`: it measures the drawn fig
 start of the turn and moves the camera so nobody else is cut in half by the frame edge. Sizes: a person
 `close` = head, `medium` = from the waist, `full` = whole; a pet is always shown whole (`close` biggest).
 
+**Automatic direction.** `"camera": "auto"` at the top of a scene file with a `"set"`: no `"view"` needed.
+The scene opens wide; each speaker is framed with the one they answer (with whoever acts with them in a
+`together`); a strong mood (angry, worried, sad, surprised…) is a close shot of the speaker; a pet's
+`"mood"` is a close shot of the pet; an action toward someone frames both. A shot lasts at least 2.5 s
+(1.2 s before a line, so the speaker is always on screen); a change of size on the same people pans. A
+turn with its own `"view"` keeps it. In code: `set.direct(tl, [{ time, end, subjects: [rig…], size,
+speech }, { time, fixed: true }, …])` returns the times it cut; pass them to `captions({ cuts })` so a line
+does not linger over the next shot.
+
 **Framing.** `set.framing()` lists who the frame edge cuts through at the current frame
 (`[{ name, shown, edge, pet }]`, `shown` = the part of the head and body still in the frame).
 `tools/scene.py` sweeps the whole scene with it and warns when a `"view"` leaves a character half in

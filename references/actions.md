@@ -239,6 +239,9 @@ shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `wear`) plus:
 | `hop` | `(times = 2)` | hops on the spot: a crouch, a leap with the hind legs out and the ears swept back, a landing | 0.7 + 0.66 × `times` |
 | `thump` | `(times = 2)` | alert: ears straight up, eyes wide, the hind feet thump the ground | 0.85 + 0.4 × `times` |
 
+`chew(times = 4)`: munch what it was just given, eyes half shut, then lick the lips twice (≈ 0.8 + 0.24 ×
+`times` s). In a scene file a turn `["giveTreat", "@dog"]` on its own adds it for the pet by itself.
+
 **Pet expressions** (every species and breed). A pet has no eyebrows, so its feelings are in
 the ears, eyes, pupils, mouth, head and tail:
 

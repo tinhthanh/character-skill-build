@@ -148,7 +148,8 @@ clips for every voice file.
    For a room with depth and a camera that changes angle (pan, push in, wide shot), add
    `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
-   Easier: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
+   Easiest: `"camera": "auto"` at the top — the camera chooses every shot (speaker with listener, close on
+   a pet's expression, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
    "size": "medium" }` — worked out for you. `"mark": "?"` puts a comic mark over a head; `"sounds": { "bark":
    "bark.wav" }` plays a sound each time an action plays.
    **Look at the moves first.** Before you write the script, see what each action looks like on the

@@ -101,6 +101,7 @@
     { "label": "sitDown → standUp", "steps": ["sitDown", ["idle", 0.6], "standUp"] },
     { "label": "lieDown → standUp", "steps": ["lieDown", ["idle", 0.6], "standUp"] },
     { "label": "sleep", "steps": [["sleep", 2.5], "standUp"] },
+    { "label": "chew", "steps": [["chew", 4]] },
     { "label": "mark zzz → sleep", "steps": [["mark", "zzz"], ["sleep", 2], ["mark", null], "standUp"] },
     { "label": "express happy", "steps": [["express", "happy", 1.6]] },
     { "label": "express excited", "steps": [["express", "excited", 1.6]] },

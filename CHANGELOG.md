@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.54.0
+
+Added — automatic direction
+- **`"camera": "auto"`** in a 3D set: the camera chooses every shot. The scene opens on a wide shot; a speaker
+  is framed with the one they answer (or with whoever acts with them in a `together`); a strong mood is a
+  close shot of the speaker; a pet's expression is a close shot of the pet; an action toward someone frames
+  both. A shot lasts at least 2.5 s (1.2 s before someone speaks — the speaker is always shown), turns that
+  want the same shot share it, and a change of size on the same people pans instead of cutting. Turns with
+  their own `"view"` keep it. Runs as `set.direct(tl, beats)` when the scene is built.
+- **`chew`** for pets (munch, then lick the lips). A turn `["giveTreat", "@dog"]` on its own makes the pet
+  chew what it was given, at the moment it leaves the hand.
+- `captions({ cuts })`: the extra time a caption stays on screen for reading ends at the next camera cut —
+  `tools/scene.py` passes every cut, so a line no longer lingers over the next shot.
+
+Fixed (Gemini review of the trial scene)
+- A person who walks up to a pet (to give a pill) and back stays in the shot: the steps closer and back
+  belong to that turn's shot, and the shot is measured at its start and its end (`frameOn(…, { at, seek })`).
+- The listener of a line is whoever the speaker just acted with (the dog just given a pill), else the
+  last other speaker, else whoever just acted (the vet calming the frightened dog).
+- A pet's `chew` opens the mouth wider and bobs the head, so it reads in a medium shot.
+
+Changed
+- `set.frameOn` also keeps others from peeking in at the bottom of the frame (a dog's ears under a close
+  shot of the vet): it raises the frame, moves sideways, or tightens the shot. `set.lastFrame` holds the
+  measurements of the last call.
+
 ## 0.53.0
 
 Added — automatic camera, emotion marks, sounds on actions

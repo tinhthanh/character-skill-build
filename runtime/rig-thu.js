@@ -315,7 +315,7 @@ function khop(R, T, a, b, raTruoc) {
 }
 
 // Động tác TRIỆU CHỨNG và chăm sóc, chung cho chó và mèo (nội dung thú y: ngứa, khập khiễng, sợ hãi, biếng ăn, ho…).
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play', 'chew'];
 // Phụ kiện đeo (`wear`): loa chống liếm sau mổ, băng ở chân trước phía người xem.
 const WEARABLES = ['cone', 'bandage'];
 
@@ -680,7 +680,7 @@ export class RigThu {
     rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng', greet: 'Mừng chủ', play: 'Rủ chơi', goIn: 'Vào lồng', comeOut: 'Ra khỏi lồng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     express: 'Biểu cảm', mood: 'Giữ nét mặt',
-    scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
+    chew: 'Nhai', scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
 
   /* ------------------------------------------------------------ tiện ích */
@@ -1383,6 +1383,24 @@ export class RigThu {
     t.to(s, { y: 0, truocY: 9, sauY: 0, tnX: 14, txX: 14, tnY: 0, txY: 0, snY: 0, sxY: 0, mieng: 0, duration: 0.18, ease: 'power2.in' }, b + 0.22);
     t.to(s, { truocY: 4, dongTu: 1, duration: 0.25, ease: 'power2.out' }, b + 0.42);
     this.#khep(t, 0.45, b + 0.75);
+    return t;
+  }
+
+  /**
+   * NHAI: vừa đớp được bánh thưởng / viên thuốc — hàm nhóp nhép `times` nhịp, mắt híp khoái chí, rồi liếm mép hai cái.
+   * `scene.py` tự cho con vật nhai khi người `giveTreat` nó.
+   */
+  chew(times = 4) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    t.to(s, { dau: N.dau - 4, dauY: N.dauY - 2, matY: 0.4, cuoi: 0.8, taiL: 0.5, taiR: 0.5, duration: 0.15, ease: 'power2.out' }, 0);
+    for (let i = 0; i < times; i++) {
+      const a = 0.15 + i * 0.24;
+      // Đủ rõ ở cỡ trung cảnh: hàm há 0,5 và cả đầu nhấp theo (bản trước há 0,32 — Gemini không thấy con chó nhai).
+      t.to(s, { mieng: 0.5, dauY: N.dauY + 1.5, dau: N.dau - 1, duration: 0.1, ease: 'sine.out' }, a).to(s, { mieng: 0.04, dauY: N.dauY - 2.5, dau: N.dau - 5, duration: 0.12, ease: 'sine.in' }, a + 0.11);
+    }
+    const end = 0.15 + times * 0.24;
+    for (let i = 0; i < 2; i++) t.to(s, { luoi: 0.55, mieng: 0.22, duration: 0.1, ease: 'power2.out' }, end + i * 0.3).to(s, { luoi: 0, mieng: 0, duration: 0.14, ease: 'power2.in' }, end + i * 0.3 + 0.12);
+    this.#khep(t, 0.35, end + 0.65);
     return t;
   }
 

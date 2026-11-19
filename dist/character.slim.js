@@ -1,4 +1,4 @@
-/* VGCharacter v0.53.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.54.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -3270,7 +3270,7 @@ function khop(R, T, a, b, raTruoc) {
   if (J.y > DAT - 4) J = j1.y < j2.y ? j1 : j2;
   return { J, T };
 }
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play', 'chew'];
 const WEARABLES = ['cone', 'bandage'];
 class RigThu {
   static KHUNG = KHUNG;
@@ -3563,7 +3563,7 @@ class RigThu {
     rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng', greet: 'Mừng chủ', play: 'Rủ chơi', goIn: 'Vào lồng', comeOut: 'Ra khỏi lồng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     express: 'Biểu cảm', mood: 'Giữ nét mặt',
-    scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
+    chew: 'Nhai', scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
   tl() { return gsap.timeline({ paused: true, defaults: { lazy: false }, onUpdate: () => this.apDung(), onComplete: () => this.apDung() }); }
   #khep(t, d = 0.4, at = '>', giu = {}) {
@@ -4080,6 +4080,18 @@ class RigThu {
     t.to(s, { y: 0, truocY: 9, sauY: 0, tnX: 14, txX: 14, tnY: 0, txY: 0, snY: 0, sxY: 0, mieng: 0, duration: 0.18, ease: 'power2.in' }, b + 0.22);
     t.to(s, { truocY: 4, dongTu: 1, duration: 0.25, ease: 'power2.out' }, b + 0.42);
     this.#khep(t, 0.45, b + 0.75);
+    return t;
+  }
+  chew(times = 4) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    t.to(s, { dau: N.dau - 4, dauY: N.dauY - 2, matY: 0.4, cuoi: 0.8, taiL: 0.5, taiR: 0.5, duration: 0.15, ease: 'power2.out' }, 0);
+    for (let i = 0; i < times; i++) {
+      const a = 0.15 + i * 0.24;
+      t.to(s, { mieng: 0.5, dauY: N.dauY + 1.5, dau: N.dau - 1, duration: 0.1, ease: 'sine.out' }, a).to(s, { mieng: 0.04, dauY: N.dauY - 2.5, dau: N.dau - 5, duration: 0.12, ease: 'sine.in' }, a + 0.11);
+    }
+    const end = 0.15 + times * 0.24;
+    for (let i = 0; i < 2; i++) t.to(s, { luoi: 0.55, mieng: 0.22, duration: 0.1, ease: 'power2.out' }, end + i * 0.3).to(s, { luoi: 0, mieng: 0, duration: 0.14, ease: 'power2.in' }, end + i * 0.3 + 0.12);
+    this.#khep(t, 0.35, end + 0.65);
     return t;
   }
   static EXPRESSIONS = {
@@ -5313,7 +5325,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1 } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -5337,7 +5349,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
         return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
       };
-      const shots = wanted.map(measure).filter(Boolean);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
+      let shots = wanted.map(measure);
+      if (Array.isArray(at) && seek) {
+        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); }
+        seek(at[0]);
+      }
+      shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
       const k = lens * zoom;
@@ -5359,8 +5377,48 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
+      {
+        const half = (W / 2) * cam.distance / k, above = 0.57 * H * cam.distance / k, below = 0.43 * H * cam.distance / k;
+        for (const m of others) {
+          if (Math.min(m.x1, cam.x + half) <= Math.max(m.x0, cam.x - half)) continue;                 // ngoài khung theo chiều ngang
+          const bottom = cam.y - below, slack = (above + below) * 0.05;
+          if (m.top > bottom - slack && m.top < region.y0 && m.base < bottom) {
+            const lift = m.top - bottom + slack;
+            if (region.y1 <= cam.y + above + lift - (above + below) * 0.02) { cam = { ...cam, y: cam.y + lift }; continue; }
+            const margin = half * 0.06, x = (m.x0 + m.x1) / 2 < cam.x ? m.x1 + half + margin : m.x0 - half - margin;
+            if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+            const pad = (region.y1 - region.y0) * 0.04, frame = region.y1 + pad - (m.top + slack);
+            if (frame >= (region.y1 - region.y0) * 1.05) {
+              const distance = frame * k / H, top = region.y1 + pad;
+              cam = { ...cam, distance, y: top - 0.57 * H * distance / k };
+            }
+          }
+        }
+      }
       const z = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+      set.lastFrame = { region, cam, others, shots };                                    // để soát: số đo của lần gọi gần nhất
       return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
+    },
+    direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
+      const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
+      let shot = null;
+      for (const [index, beat] of beats.entries()) {
+        if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
+        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects)) continue;
+        let at = beat.time;
+        const hold = beat.speech ? Math.min(minShot, 1.0) : minShot;
+        if (shot && at - shot.at < hold) at = shot.at + hold;
+        const next = beats.slice(index + 1).find((later) => later.fixed);
+        if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
+        let values;
+        try { values = set.frameOn(beat.subjects, beat.size, { at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
+        tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
+        if (!glide) cuts.push(at);
+        shot = { subjects: beat.subjects, size: beat.size, at };
+      }
+      tl.seek(0, false); set.update();
+      return cuts;
     },
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
@@ -5669,7 +5727,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.53.0';
+const VERSION = '0.54.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -6012,7 +6070,7 @@ function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'power2.in
   timeline.data = { type: 'character-shot', kind, target, subjects };
   return timeline;
 }
-function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0, avoid = true } = {}) {
+function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0, avoid = true, cuts = [] } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -6046,9 +6104,11 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
     return parts.map((text) => { const piece = { ...line, text, start: at, end: at + span * text.length / total }; at = piece.end; return piece; });
   });
   if (readable) lines.forEach((line, index) => {
-    const words = line.text.trim().split(/\s+/).length, next = lines[index + 1];
+    const words = line.text.trim().split(/\s+/).length, next = lines[index + 1], spoken = line.end;
     const wanted = line.start + Math.max(0.5 + 0.3 * words, next ? 0 : 3);
     line.end = Math.max(line.end, next ? Math.min(wanted, next.start - 2 * fade - hold) : wanted);
+    const cut = cuts.filter((time) => time > spoken - 0.05 && time < line.end).sort((a, b) => a - b)[0];
+    if (cut !== undefined) line.end = Math.max(spoken, cut - fade);
   });
   if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
   const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;

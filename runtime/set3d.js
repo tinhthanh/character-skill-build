@@ -440,9 +440,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * `size` = 'close' (người: cận mặt; thú: cả con, to), 'medium' (người: ngang ngực), 'full' (cả người). Đo HÌNH VẼ
      * THẬT trên màn hình lúc gọi (ai đang đứng đâu, cao thấp, ngồi trên bàn), nên gọi sau khi đã tua timeline tới lúc
      * cần quay. Những nhân vật khác (`avoid`, mặc định: mọi người còn lại) không bị mép khung cắt đôi: máy dời để họ ra
-     * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào.
+     * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào. `{ at: [t0, t1], seek }`: chủ thể đi lại — khung chứa
+     * mọi chỗ họ đứng ở các lúc ấy (`seek(t)` tua cảnh tới lúc t).
      */
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1 } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -469,7 +470,14 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
         return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
       };
-      const shots = wanted.map(measure).filter(Boolean);
+      // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
+      let shots = wanted.map(measure);
+      if (Array.isArray(at) && seek) {
+        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); }
+        seek(at[0]);
+      }
+      shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
       const k = lens * zoom;
@@ -493,8 +501,68 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
+      // Theo CHIỀU DỌC: ai đó chỉ ló lên ở đáy khung (tai con chó trên bàn dưới góc cận mặt bác sĩ) — nâng khung lên cho họ
+      // ra hẳn, nếu chủ thể vẫn trọn trong khung. Điểm ngắm nằm ở 57 % chiều cao khung (`centre`).
+      {
+        const half = (W / 2) * cam.distance / k, above = 0.57 * H * cam.distance / k, below = 0.43 * H * cam.distance / k;
+        for (const m of others) {
+          if (Math.min(m.x1, cam.x + half) <= Math.max(m.x0, cam.x - half)) continue;                 // ngoài khung theo chiều ngang
+          // Lề 5 % chiều cao khung: máy chúc xuống vài độ (pitch) nên đáy khung thật thấp hơn phép tính phẳng này một chút.
+          const bottom = cam.y - below, slack = (above + below) * 0.05;
+          if (m.top > bottom - slack && m.top < region.y0 && m.base < bottom) {
+            const lift = m.top - bottom + slack;
+            if (region.y1 <= cam.y + above + lift - (above + below) * 0.02) { cam = { ...cam, y: cam.y + lift }; continue; }
+            // Không nâng được (chủ thể sẽ bị cụt đầu): dời NGANG cho người ấy ra hẳn, nếu chủ thể vẫn trọn trong khung.
+            const margin = half * 0.06, x = (m.x0 + m.x1) / 2 < cam.x ? m.x1 + half + margin : m.x0 - half - margin;
+            if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+            // Không dời được (người ấy đứng sát chủ thể): SIẾT khung — vào gần hơn, đỉnh khung ngay trên chủ thể, cho tới khi
+            // đáy khung qua khỏi người ấy; chỉ khi chủ thể vẫn chiếm không quá 95 % chiều cao khung.
+            const pad = (region.y1 - region.y0) * 0.04, frame = region.y1 + pad - (m.top + slack);
+            if (frame >= (region.y1 - region.y0) * 1.05) {
+              const distance = frame * k / H, top = region.y1 + pad;
+              cam = { ...cam, distance, y: top - 0.57 * H * distance / k };
+            }
+          }
+        }
+      }
       const z = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+      set.lastFrame = { region, cam, others, shots };                                    // để soát: số đo của lần gọi gần nhất
       return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
+    },
+
+    /**
+     * ĐẠO DIỄN TỰ ĐỘNG: đặt máy cho cả cảnh từ danh sách NHỊP `beats` — mỗi nhịp `{ time, end, subjects: [rig…], size, speech }`
+     * (góc mong muốn từ `time`), hay `{ time, fixed: true }` (kịch bản tự đặt máy ở đây: không đụng tới). Luật:
+     *   • một góc giữ ít nhất `minShot` giây (trước một nhịp có lời `speech`: 1 s) — nhịp tới sớm hơn thì đổi góc muộn lại;
+     *     nhịp quá ngắn để kịp đổi thì bỏ qua;
+     *   • nhịp muốn đúng góc đang có thì giữ nguyên (không cắt sang chính nó);
+     *   • cùng nhân vật, chỉ đổi cỡ cảnh: LIA (`move`) thay vì cắt.
+     * Góc của từng lần đổi là `frameOn` ở đúng lúc ấy (tua `tl` tới đó để đo). Trả về các thời điểm CẮT (cho phụ đề).
+     */
+    direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
+      const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
+      let shot = null;
+      for (const [index, beat] of beats.entries()) {
+        if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
+        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects)) continue;
+        // Nhịp CÓ LỜI được ưu tiên: người đang nói phải lên hình — góc trước chỉ cần giữ 1 s (không thì câu của cậu bé
+        // hiện chữ trên cảnh cận con mèo, cảnh thử đợt 14).
+        let at = beat.time;
+        const hold = beat.speech ? Math.min(minShot, 1.0) : minShot;
+        if (shot && at - shot.at < hold) at = shot.at + hold;
+        const next = beats.slice(index + 1).find((later) => later.fixed);
+        if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
+        let values;
+        // Đo ở cả ĐẦU và CUỐI nhịp: nhịp có người đi (lại gần con vật để đưa thuốc, rồi lùi về) thì khung phải chứa cả hai
+        // chỗ đứng — đo một lúc thì người đi ra khỏi khung (Gemini soát cảnh thử đợt 14).
+        try { values = set.frameOn(beat.subjects, beat.size, { at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
+        tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
+        if (!glide) cuts.push(at);
+        shot = { subjects: beat.subjects, size: beat.size, at };
+      }
+      tl.seek(0, false); set.update();
+      return cuts;
     },
 
     framing() {

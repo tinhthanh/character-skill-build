@@ -470,6 +470,24 @@ with tempfile.TemporaryDirectory() as work:
         for needle in ('frameAt(', '"close")', '"medium")', "['mark', \"?\"]", "{ mark: \"!\" }", 'id="sound-1"', 'data-volume="0.5"'):
             if needle not in html: problems.append(f'automatic views / marks / sounds: {needle} is not in the composition')
 
+    # Đợt 14: đạo diễn tự động ("camera": "auto"), phụ đề dừng ở lần cắt cảnh, con vật nhai khi được cho ăn.
+    directed = json.load(open(stage, encoding='utf-8'))
+    directed['camera'] = 'auto'
+    for turn in directed['script']:
+        if isinstance(turn, dict): turn.pop('view', None)
+    directed['script'].append({'who': 'vet', 'do': [['giveTreat', '@cat']]})
+    path = os.path.join(os.path.dirname(stage), '_check_directed.json')
+    try:
+        json.dump(directed, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'directed'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('"camera": "auto": the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'directed', 'index.html'), encoding='utf-8').read()
+        for needle in ('set.direct(tl,', 'speech: true', 'const CUTS = [', 'cuts: (typeof CUTS', "0.95, ['chew', 3]"):
+            if needle not in html: problems.append(f'"camera": "auto": {needle} is not in the composition')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -511,6 +529,7 @@ with tempfile.TemporaryDirectory() as work:
         ('an unknown mark', lambda s: s['script'][1].update({'mark': 'star'}), '"mark"'),
         ('"marks" that is not true / false', lambda s: s.update({'marks': 'no'}), '"marks"'),
         ('a missing sound file', lambda s: s.update({'sounds': {'wave': 'nope.wav'}}), 'nope.wav'),
+        ('a camera other than "auto" in a set', lambda s: s.update({'camera': 'close'}), '"auto"'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:

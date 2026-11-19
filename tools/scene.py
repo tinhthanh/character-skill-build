@@ -78,7 +78,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                actions (`{ "who": "dog", "mood": "pain", "do": [["limp", 4, 120]] }`) with its mark over the head
                (scared "!", curious "?", sleepy "zzz", happy heart…; `"marks": false` at the top: none).
                `"mark"` on a turn: "!", "?", "heart", "zzz", "sweat", "anger" or "music" over the head for the turn.
-               In a 3D set `"view": "close"` (or "medium", "full") frames the turn's character and cuts back after;
+               In a 3D set `"camera": "auto"` at the top lets the camera choose every shot (turns with a "view" keep
+               theirs); `"view": "close"` (or "medium", "full") frames the turn's character and cuts back after;
                `"view": { "on": ["vet", "dog"], "size": "medium" }` frames several. `"sounds"` at the top:
                `{ "bark": "bark.wav", "cat.meow": { "file": "meow.wav", "volume": 0.8, "at": 0.1 } }` — a sound each
                time that step plays (`mood` / `mark` only when they start, not when they end). Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
@@ -593,7 +594,7 @@ def main():
             if item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'set.panels[{n}].image not found: {item["image"]}')
         # Những thứ của cảnh PHẲNG không có nghĩa trong bối cảnh 3D — báo rõ thay vì lặng lẽ bỏ qua.
         for key, why in (('props', 'use set.boxes'), ('background', 'use set.sky and set.room'), ('camera', 'put "view" on the turns instead')):
-            if scene.get(key): fail(f'"{key}" cannot be combined with "set" — {why}')
+            if scene.get(key) and not (key == 'camera' and scene[key] == 'auto'): fail(f'"{key}" cannot be combined with "set" — {why}' + (' — or "camera": "auto" to let the camera choose every shot' if key == 'camera' else ''))
         if scene.get('layout', 'stage') != 'stage': fail('"layout": "presenter" cannot be combined with "set"')
     base = os.path.dirname(os.path.abspath(args.scene))
     scene_id = slug(scene.get('id') or os.path.splitext(os.path.basename(args.scene))[0])
@@ -918,6 +919,43 @@ def main():
         camera_now.update({key: float(value) for key, value in values.items()})
         views.append({'turn': emitted[0], 'values': values, 'wide': wide, 'cut': cut,
                       'dur': seconds, 'ease': view.get('ease', 'sine.inOut'), 'where': where})
+    # ĐẠO DIỄN TỰ ĐỘNG (`"camera": "auto"`, bối cảnh 3D): mỗi mục của kịch bản là một NHỊP với góc máy mong muốn;
+    # set.direct() (lúc dựng, trong trình duyệt) giữ mỗi góc ≥ 2,5 s, bỏ những lần đổi góc quá dày, lia khi chỉ đổi cỡ cảnh.
+    director = stage_set is not None and scene.get('camera') == 'auto'
+    beats, spoken = [], []
+    STRONG = ('angry', 'crying', 'surprised', 'worried', 'sad', 'laughing', 'embarrassed')
+    def beat_of(entry, first, last):
+        span = {'first': first, 'last': last}
+        if isinstance(entry, dict) and 'view' in entry: return dict(span, fixed=True)
+        group = entry['together'] if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]
+        group = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in names]
+        if not group: return dict(span, fixed=True)
+        talker = next((turn for turn in group if turn.get('say')), None)
+        if talker:
+            who = names[talker['who']]
+            # NGƯỜI NGHE: (1) người nói vừa làm gì với ai ở nhịp trước (đưa thuốc cho con chó) — người ấy; (2) không thì người
+            # nói gần nhất; (3) chưa ai nói thì ai vừa diễn ở nhịp trước (bác sĩ trấn an con chó vừa run sợ).
+            before = next((beat for beat in reversed(beats) if beat.get('subjects')), None) if len(beats) > 1 else None
+            others = [name for name in (before['subjects'] if before else []) if name != who['name']]
+            listener = (others[0] if before and who['name'] in before['subjects'] and others else None) \
+                or next((name for name in reversed(spoken) if name != who['name']), None) or (others[0] if others else None)
+            spoken.append(who['name'])
+            # Lượt `together` có lời: người nói cùng những ai diễn với họ trong lượt ấy (bác sĩ khen — con chó vẫy đuôi).
+            company = [names[turn['who']]['name'] for turn in group if turn is not talker]
+            if company: return dict(span, subjects=[who['name']] + company, size='medium', speech=True)
+            if talker.get('mood') in STRONG or not listener: return dict(span, subjects=[who['name']], size='close' if talker.get('mood') in STRONG else 'medium', speech=True)
+            return dict(span, subjects=[who['name'], listener], size='medium', speech=True)
+        if len(group) == 1:
+            turn, who = group[0], names[group[0]['who']]
+            if who['_pet']: return dict(span, subjects=[who['name']], size='close')
+            targets = [step[1][1:] for step in turn.get('do', []) if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names]
+            return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='medium' if targets else 'full')
+        moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
+        subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
+        return dict(span, subjects=subjects, size='medium' if not moods else 'full')
+    if director:
+        # Mở cảnh: toàn cảnh mọi người (giữ ≥ 2,5 s rồi mới vào nhịp đầu).
+        beats.append({'first': 0, 'last': 0, 'subjects': [who['name'] for who in names.values()], 'size': 'full'})
     for index, entry in enumerate(script):
         where = f'script[{index}]'
         # TRỞ LẠI góc máy trước (view có "back"): cắt về đúng nó ở lượt đầu tiên của mục sau — trừ khi mục ấy tự có "view".
@@ -938,6 +976,7 @@ def main():
             shows.append(dict(show, turn=flat))
         flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
         backs = []                                          # (người, quãng) — lùi lại sau lượt này
+        first_turn = emitted[0]                             # nhịp của đạo diễn tự động: gồm cả các bước lại gần / lùi lại
         # LẠI GẦN trước khi vuốt ve / đưa đồ: tay nhân vật ngắn (với tới chừng 0,2 × chiều cao host). Đích đứng xa hơn tầm
         # ấy thì chèn một lượt bước tới trước — người vuốt ve dừng cách con vật 0,24 × chiều cao, người đưa đồ dừng cách
         # người nhận 0,45 × chiều cao (hai cánh tay cùng vươn). Chỗ đứng mới được ghi lại cho các lượt sau.
@@ -1018,12 +1057,22 @@ def main():
                 pet = names[pets[0]]
                 code = '{ together: [' + code + f", [{pet['name']}, {js('purr' if 'cat' in pet['species'] else 'wagTail')}]] }}"
                 emitted[0] += 1
+            # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
+            # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).
+            fed = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'giveTreat' and isinstance(step[1], str) and step[1].startswith('@')]
+            fed = [name for name in fed if name in names and names[name]['_pet']]
+            if fed and not pets and 'say' not in entry and code.startswith('['):
+                lead = sum(1 for step in entry.get('do', []) if not (isinstance(step, list) and step and step[0] == 'giveTreat'))
+                if lead == 0:
+                    code = '{ together: [' + code + f", [{names[fed[0]]['name']}, 0.95, ['chew', 3]]] }}"
+                    emitted[0] += 1
             turns.append((None, code))
             emitted[0] += 1
         for who, move in backs:
             turns.append((f'  // {who["name"]} steps back after reaching close', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
             emitted[0] += 1
             who['x'] = float(who['x']) + move
+        if director: beats.append(beat_of(entry, first_turn, emitted[0] - 1))
 
     camera_notes = []
     # Máy quay vòng tới đâu thì người nhìn sang ngang được tới đó, không xa hơn: rig xoay tới nghiêng hẳn là hết (không
@@ -1433,7 +1482,7 @@ def main():
     # nào hiện đúng lúc lời nói tới cụm ấy. Hộp chữ hai ba dòng che mất nhân vật thấp và cử chỉ tay. Bề ngang một chữ
     # ≈ 0,55 cỡ chữ; trừ lề trong 60px.
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
-    caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), T0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
+    caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false, cuts: (typeof CUTS === 'undefined' ? [] : CUTS.map((time) => time - T0)) }}).paused(false), T0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
     if popups:
         caption_code += "\n    // Notifications on the screens of props in the set (they follow the camera with the prop)."
         for pop in popups:
@@ -1461,6 +1510,15 @@ def main():
             else: aim = f'{{ {values} }}'
             call = f"set.cut({aim})" if view['cut'] else f"set.move({aim}, {view['dur']:g}, {js(view['ease'])})"
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
+        # Các lần CẮT CẢNH của kịch bản (và của đạo diễn tự động): phụ đề không sót qua chúng.
+        moves.append('    const CUTS = [' + ', '.join(f'T0 + talk.turns[{view["turn"]}].start' for view in views if view['cut']) + '];')
+        if director:
+            items = []
+            for beat in beats:
+                time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + ' }')
+            moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n"
+                         "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
             moves.insert(0, "    // Automatic views (\"view\": \"close\", { \"on\": … }): measured at build time, at the moment of their turn.\n"
                             "    const frameAt = (time, subjects, size) => { tl.seek(time, false); set.update(); return set.frameOn(subjects, size); };")
@@ -1506,7 +1564,7 @@ def main():
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
     const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
     talk.addTo(tl, T0);
-{caption_code}{view_code}{card_code}{drive_code}
+{view_code}{caption_code}{card_code}{drive_code}
 {framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.

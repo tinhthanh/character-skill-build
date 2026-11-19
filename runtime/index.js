@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.53.0';
+export const VERSION = '0.54.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -589,7 +589,7 @@ export function shot(scene, subject, kind = 'face', { duration = 0.6, ease = 'po
  * Trả về một timeline (paused). Chữ và độ mờ là HÀM CỦA THỜI GIAN (một tween, tra bảng) nên tua
  * tới đâu cũng ra đúng một khung hình. `timeline.data.lines` giữ danh sách câu.
  */
-export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0, avoid = true } = {}) {
+export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, follow = false, offsetY = 12, readable = true, maxChars = 0, avoid = true, cuts = [] } = {}) {
   if (!element || element.nodeType !== 1) throw new Error('[character] captions(source, element): element must be the DOM element that shows the text');
   const fromSteps = (steps, rig, shift = 0) => steps.filter((step) => step.text).map((step) => ({ start: step.start + shift, end: step.start + shift + (step.speech ?? step.duration), text: step.text, rig }));
   let lines;
@@ -631,10 +631,15 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
   });
   // ĐỦ GIỜ ĐỂ ĐỌC: một câu ở lại ít nhất 0,5 s + 0,3 s mỗi từ (câu cuối của phim: ít nhất 3 s), kể cả
   // khi tiếng nói ngắn hơn thế — nhưng không lấn sang câu kế tiếp.
+  // `cuts`: thời điểm MÁY CẮT CẢNH (cùng thang giờ với các câu). Phần chữ ở lại thêm cho đủ giờ đọc dừng ở lần cắt kế
+  // tiếp — chữ của câu trước không sót sang cảnh cận con vật (Gemini soát cảnh thử đợt 13). Lúc câu đang được nói thì
+  // không cắt chữ.
   if (readable) lines.forEach((line, index) => {
-    const words = line.text.trim().split(/\s+/).length, next = lines[index + 1];
+    const words = line.text.trim().split(/\s+/).length, next = lines[index + 1], spoken = line.end;
     const wanted = line.start + Math.max(0.5 + 0.3 * words, next ? 0 : 3);
     line.end = Math.max(line.end, next ? Math.min(wanted, next.start - 2 * fade - hold) : wanted);
+    const cut = cuts.filter((time) => time > spoken - 0.05 && time < line.end).sort((a, b) => a - b)[0];
+    if (cut !== undefined) line.end = Math.max(spoken, cut - fade);
   });
   if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
   const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;
