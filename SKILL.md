@@ -156,7 +156,9 @@ clips for every voice file.
    `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
    Light: `"set": { "light": "night", "lamps": [ … ] }` (`day`, `evening`, `night`), `"window": true` on a
-   back-wall panel, `"lamp": "on"` on a turn — lamps glow, light the room and the characters, cast shadows.
+   back-wall panel, `"lamp": "on"` on a turn — lamps glow (and flicker when switched on), light the room and the
+   characters, cast shadows; windows light the characters too (backlight, sunlight patch, passing clouds); a
+   `"tv"` cutout flickers in the evening / at night.
    Easiest: `"camera": "auto"` at the top — the camera chooses every shot (speaker with listener, close on
    a pet's expression, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
    "size": "medium" }` — worked out for you. `"mark": "?"` puts a comic mark over a head; `"sounds": { "bark":

@@ -1947,7 +1947,7 @@ export class RigSVG {
   }
   static MARKS = MARKS;
   /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
-  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
+  lightShade(dx, dy, amount, rgb, glow, dark, fill, fillAmount) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark, fill, fillAmount); }
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {

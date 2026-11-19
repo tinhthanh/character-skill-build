@@ -1,4 +1,4 @@
-/* VGCharacter v0.58.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.59.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -105,7 +105,7 @@ function attachShade(svg, root) {
     <filter id="${id}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
     <mask id="${id}-mask" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><use href="#${root.id}" filter="url(#${id}-white)"/></mask>
     <linearGradient id="${id}-grad" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="0.86" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
     </linearGradient>`;
   const cover = document.createElementNS(NS, 'rect');
   for (const [key, value] of Object.entries({ x: -2000, y: -2000, width: 4400, height: 4400, fill: `url(#${id}-grad)`, mask: `url(#${id}-mask)`, 'pointer-events': 'none', 'data-shade': '' })) cover.setAttribute(key, value);
@@ -117,10 +117,11 @@ function attachShade(svg, root) {
     /**
      * `dx, dy`: hướng ánh sáng đi TRÊN MÀN HÌNH (từ nguồn sáng tới nhân vật, vector bất kỳ); `amount` 0…1 độ tối phía
      * khuất; `rgb` màu nguồn sáng ("255,213,154") và `glow` 0…1 độ nhuốm màu ấy ở phía được chiếu; `dark` màu phía khuất.
-     * amount = 0 tắt lớp.
+     * `fill`, `fillAmount`: ÁNH SÁNG PHỤ ở phía khuất (cửa sổ lạnh bên kia đèn bàn ấm) — mép phía khuất nhuốm màu ấy thay vì
+     * tối hẳn. amount = 0 tắt lớp.
      */
-    set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0') {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark}`;
+    set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
+      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)}`;
       if (key === last) return;
       last = key;
       if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
@@ -138,6 +139,10 @@ function attachShade(svg, root) {
       stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
       stops[2].setAttribute('stop-opacity', Math.min(0.7, amount * 0.75).toFixed(3));        // nửa khuất: tối rõ ngay sau giữa thân
       stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
+      // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
+      const lift = fill && fillAmount > 0.003;
+      stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
+      stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
     },
   };
 }
@@ -2096,7 +2101,7 @@ class RigSVG {
   }
   static MARKS = MARKS;
   /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
-  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
+  lightShade(dx, dy, amount, rgb, glow, dark, fill, fillAmount) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark, fill, fillAmount); }
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {
@@ -6407,7 +6412,7 @@ class RigThu {
   }
   static MARKS = MARKS;
   /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
-  lightShade(dx, dy, amount, rgb, glow, dark) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark); }
+  lightShade(dx, dy, amount, rgb, glow, dark, fill, fillAmount) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark, fill, fillAmount); }
   static AUTO_MARKS = true;
 
   /**
@@ -6992,6 +6997,20 @@ const DRAW = {
     <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
     <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
   },
+  // TV trên KỆ THẤP, màn hình quay ra người xem, đang chiếu (màn hình sáng xanh nhạt). Trong bối cảnh 3D lúc chiều / tối nó
+  // là một nguồn sáng nhấp nháy đổi màu (`set.light` lamp `kind: 'screen'`).
+  tv: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, cab = F - 54, y0 = cab - 12 - 96;
+    return `
+    <rect x="118" y="${cab}" width="164" height="50" rx="4" fill="#a47551" stroke="#6e4a30" stroke-width="1.4"/>
+    <path d="M 200 ${cab} V ${cab + 50}" stroke="${line}" stroke-width="1" opacity=".35"/>
+    <rect x="124" y="${F - 6}" width="10" height="6" fill="${dark}"/><rect x="266" y="${F - 6}" width="10" height="6" fill="${dark}"/>
+    <rect x="186" y="${cab - 12}" width="28" height="12" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <rect x="112" y="${y0}" width="176" height="100" rx="5" fill="${color}" stroke="${line}" stroke-width="1.4"/>
+    <defs><linearGradient id="tvglow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8f0ff"/><stop offset=".55" stop-color="#8cc4ee"/><stop offset="1" stop-color="#5a8fc4"/></linearGradient></defs>
+    <rect x="118" y="${y0 + 6}" width="164" height="88" rx="2" fill="url(#tvglow)"/>
+    <path d="M 118 ${y0 + 70} L 160 ${y0 + 46} L 190 ${y0 + 64} L 226 ${y0 + 36} L 282 ${y0 + 72} V ${y0 + 94} H 118 Z" fill="#ffffff" opacity=".22"/>`;
+  },
   lamp: ({ color, dark, line }) => {
     const F = PROP_FRAME.floor;
     return `
@@ -7041,13 +7060,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 
 const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
@@ -7836,13 +7855,15 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       if (lamp.level <= 0.001) continue;
       const p = [lamp.x - f.origin[0], lamp.y - f.origin[1], lamp.z - f.origin[2]], d = dot(p, f.n);
       if (d < -20 || Math.abs(d) >= lamp.range) continue;                                        // đèn ở sau mặt này, hay quá xa
-      const strength = lamp.power * lamp.level * Math.pow(1 - Math.abs(d) / lamp.range, 0.8), R = Math.sqrt(lamp.range * lamp.range - d * d);
+      const strength = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - Math.abs(d) / lamp.range, 0.8), R = Math.sqrt(lamp.range * lamp.range - d * d);
       const u = dot(p, f.u).toFixed(1), v = dot(p, f.v).toFixed(1), c = lamp.rgb;
       glow.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(${c},${Math.min(0.66, 0.7 * strength).toFixed(3)}) 0, rgba(${c},${Math.min(0.34, 0.3 * strength).toFixed(3)}) ${(R * 0.4).toFixed(1)}px, rgba(${c},0) ${R.toFixed(1)}px)`);
       mask.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(0,0,0,${Math.max(0, 1 - 1.9 * strength).toFixed(3)}) 0, rgba(0,0,0,${Math.max(0, 1 - 0.7 * strength).toFixed(3)}) ${(R * 0.45).toFixed(1)}px, rgba(0,0,0,1) ${R.toFixed(1)}px)`);
     }
-    f.shadeEl.style.background = darkness > 0.004 ? `rgba(${mood.shade},${darkness.toFixed(3)})` : 'none';
-    const masks = mask.length ? mask.join(', ') : 'none';
+    // Ô CỬA lúc tối: kính xanh thẫm (trời đêm), không giữ màu trời ngày như các mặt khác (Gemini soát ánh sáng đợt 19).
+    const night = f.window && mood === MOODS.night;
+    f.shadeEl.style.background = night ? 'linear-gradient(rgba(6,12,38,.9), rgba(18,30,70,.82))' : darkness > 0.004 ? `rgba(${mood.shade},${darkness.toFixed(3)})` : 'none';
+    const masks = mask.length && !night ? mask.join(', ') : 'none';                       // kính đêm: đèn trong phòng không làm trời sáng ra
     f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
     f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
     // SÀN BÓNG (gạch phòng khám): bóng đèn và ô cửa phản chiếu thành một vệt sáng dọc trên sàn, kéo về phía máy quay.
@@ -7864,22 +7885,52 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
   };
 
+  // TRONG VỆT NẮNG (hình bình hành nắng qua ô cửa trên sàn): 0…1 — ba điểm dưới chân (giữa, hai bên) có bao nhiêu điểm
+  // nằm trong vệt, nhân với độ che của mây.
+  const inside = (poly, x, z) => { let hit = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) hit = !hit; } return hit; };
+  const sunAt = (x, z) => {
+    if (!lighting || !lighting.patches.length) return 0;
+    const hits = [-45, 0, 45].filter((dx) => lighting.patches.some((poly) => inside(poly, x + dx, z))).length;
+    return hits / 3 * lighting.cloud;
+  };
+
   // Ánh sáng tại một điểm: { level (độ sáng, 1 = bình thường), warm (0…1 sắc ấm) } — cho nhân vật, đồ vật.
   const lightAt = (x, y, z) => {
     const mood = lighting.mood;
-    let level = 1 - (mood.dark > 0.1 ? mood.dark * 0.85 : 0), warm = mood.warm, rim = null;
+    let level = 1 - (mood.dark > 0.1 ? mood.dark * 0.85 : 0), warm = mood.warm;
+    const sources = [];
     for (const lamp of lighting.lamps) {
       if (lamp.level <= 0.001) continue;
       const d = Math.hypot(lamp.x - x, lamp.y - y, lamp.z - z);
       if (d >= lamp.range * 1.15) continue;
-      const k = lamp.power * lamp.level * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
-      level += k * 0.6; warm += k * lamp.warmth;
-      if (!rim || k > rim.k) rim = { k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb };
+      const k = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
+      // Đèn ở TRƯỚC nhân vật (phía máy quay) chiếu vào mặt ta thấy; đèn ở SAU lưng chỉ cho viền sáng — không làm mặt trước
+      // sáng bừng (bà đứng trước cây đèn lúc chiều: tóc cháy trắng, cảnh thử đợt 19).
+      const front = clamp(0.55 + 0.45 * (lamp.z - z) / Math.max(1, Math.hypot(lamp.x - x, lamp.z - z)), 0.15, 1);
+      level += k * 0.6 * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
+      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front });
     }
+    // CỬA SỔ ban ngày / chiều cũng là một nguồn sáng: ánh trời xanh nhạt (chiều: màu nắng) hắt vào từ phía ô cửa — người
+    // đứng giữa cửa sổ và cây đèn có HAI phía hai màu (ấm / lạnh), không còn một phía sáng một phía tối.
+    if (mood.sun) for (const win of lighting.windows) {
+      const wx = win.x + win.width / 2, wy = win.y - win.height / 2, d = Math.hypot(wx - x, wy - y, win.z - z);
+      if (d >= 1500) continue;
+      sources.push({ k: 0.42 * lighting.cloud * (1 - d / 1500), x: wx, y: wy, z: win.z + 40, rgb: mood === MOODS.evening ? mood.sunColor : '206,226,255', window: true });
+    }
+    // Đứng TRONG VỆT NẮNG: nắng chiếu thẳng lên người — sáng và ấm hẳn lên, viền nắng gắt phía cửa sổ (Gemini đợt 19: mèo
+    // ngồi giữa vệt nắng mà tối xỉn như dán lên).
+    const sunlit = sunAt(x, z);
+    if (sunlit > 0) {
+      const sun = norm(mood.sun);
+      level += 0.16 * sunlit; warm += (mood === MOODS.evening ? 0.16 : 0.06) * sunlit;
+      sources.push({ k: 0.75 * sunlit, x: x - sun[0] * 1000, y: y - sun[1] * 1000, z: z - sun[2] * 1000, rgb: mood.sunColor, front: 0.6, sun: true });
+    }
+    sources.sort((a, b) => b.k - a.k);
+    let rim = sources[0] || null;
     // Nắng chiều: viền sáng cam phía mặt trời (ngược phía bóng đổ).
-    if (mood === MOODS.evening && (!rim || rim.k < 0.35)) rim = { k: 0.55, x: x - mood.sun[0] * 1000, y: y - mood.sun[1] * 1000, z: z - mood.sun[2] * 1000, rgb: mood.sunColor };
+    if (mood === MOODS.evening && (!rim || rim.k < 0.35)) { rim = { k: 0.55, x: x - mood.sun[0] * 1000, y: y - mood.sun[1] * 1000, z: z - mood.sun[2] * 1000, rgb: mood.sunColor }; sources.unshift(rim); }
     // Trần 1,06: sáng hơn nữa thì nhân vật đứng sát đèn bạc trắng như cháy sáng (đo ở phòng khách đêm, đợt 16).
-    return { level: clamp(level, 0.28, 1.06), warm: clamp(warm, 0, 0.42), rim };
+    return { level: clamp(level, 0.28, 1.06), warm: clamp(warm, 0, 0.42), rim, sources };
   };
 
   // Bóng đổ dài trên sàn của một nhân vật, ngược phía mỗi đèn / nắng chiều (mảng phần tử, dùng lại qua các khung).
@@ -7896,8 +7947,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // qua cột đèn (Gemini soát ánh sáng đợt 16).
         casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * 0.25, tall * 2.2), alpha: (lighting.mood === MOODS.evening ? 0.3 : 0.85) * strength * seen });
       }
-      const sun = lighting.mood.sun;
-      if (sun && lighting.mood === MOODS.evening) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: tall * 1.7, alpha: 0.34 * seen });
+      const sun = lighting.mood.sun, sunlit = sunAt(x, z);
+      // Nắng chiều: bóng dài khắp nơi; ĐỨNG TRONG VỆT NẮNG (cả ban ngày): bóng đậm, đổ theo hướng nắng.
+      if (sun && (lighting.mood === MOODS.evening || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: tall * (lighting.mood === MOODS.evening ? 1.7 : 1.3), alpha: Math.max(lighting.mood === MOODS.evening ? 0.34 : 0, 0.55 * sunlit) * seen });
     }
     actor.casts = actor.casts || [];
     while (actor.casts.length < casts.length) {
@@ -7916,6 +7968,29 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     });
   };
 
+  // BÓNG TRÊN TƯỜNG SAU LƯNG: người / con vật đứng gần tường sau làm mảng tường sau lưng tối đi một vệt mềm, lệch ngược
+  // phía nguồn sáng chính — đứng sát tường mà tường sau lưng sáng đều thì nhân vật như dán lên ảnh nền.
+  const wallShadow = (actor, seen) => {
+    const wall = surfaces.find((f) => f.kind === 'wall' && f.n[2] > 0.9);
+    const gap = wall ? actor.spot.z - wall.origin[2] : Infinity, reach = 420;
+    const strength = lighting && wall && actor.width && !actor.lamp ? clamp(1 - gap / reach, 0, 1) * seen : 0;
+    if (!actor.wallShade) {
+      if (strength <= 0) return;
+      actor.wallShade = document.createElement('div');
+      actor.wallShade.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:50%;filter:blur(14px)';
+      layer(0).appendChild(actor.wallShade);
+    }
+    const el = actor.wallShade;
+    if (strength <= 0) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
+    const L = lightAt(actor.where, actor.spot.y + actor.height * 0.45, actor.spot.z), src = L.rim;
+    // Nguồn sáng ở bên trái thì bóng lệch sang phải, càng xa tường càng lệch và càng loang.
+    const shift = src ? clamp((actor.where - src.x) * gap / Math.max(200, Math.abs(src.z - wall.origin[2])), -160, 160) : 0;
+    const w = actor.width * (0.55 + gap / 900), h = actor.height * 0.8;
+    Object.assign(el.style, { width: w.toFixed(1) + 'px', height: h.toFixed(1) + 'px', opacity: (strength * (lighting.mood.dark > 0.2 ? 0.5 : 0.34)).toFixed(3),
+      background: `radial-gradient(closest-side, rgba(${lighting.mood.shade},.55), rgba(${lighting.mood.shade},0))`,
+      transform: `translate3d(${(actor.where + shift - w / 2).toFixed(1)}px, ${(-actor.spot.y - h * 0.95).toFixed(1)}px, ${(wall.origin[2] + 1.5).toFixed(1)}px)` });
+  };
+
   const set = {
     camera,
     view,
@@ -7927,10 +8002,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * mặc định bật khi trời tối / chiều. `windows`: [{ x, y, width, height, z }] — ô cửa trên tường sau (góc trên-trái), hắt
      * vệt nắng lên sàn ban ngày / chiều. Gọi một lần sau khi dựng phòng; `lamp(name, on)` bật / tắt trên timeline.
      */
-    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true, clouds = true } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
-      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [], shading };
+      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [], shading, clouds: clouds && !!preset.sun, cloud: 1, sunFaces: [], patches: [] };
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
           power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
@@ -7958,11 +8033,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       if (preset.sun) for (const win of windows) {
         const sun = norm(preset.sun), corners = [[win.x, win.y], [win.x + win.width, win.y], [win.x + win.width, win.y - win.height], [win.x, win.y - win.height]]
           .map(([x, y]) => { const t = -y / sun[1]; return [x + t * sun[0], win.z + t * sun[2]]; });
+        lighting.patches.push(corners);
         const xs = corners.map((c) => c[0]), zs = corners.map((c) => c[1]), x0 = Math.min(...xs), z0 = Math.min(...zs), w = Math.max(...xs) - x0, h = Math.max(...zs) - z0;
         const shape = corners.map(([x, z]) => `${((x - x0) / w * 100).toFixed(2)}% ${((z - z0) / h * 100).toFixed(2)}%`).join(', ');
         // LUỒNG NẮNG trong không khí: mặt phẳng quét từ mép trên ô cửa theo hướng nắng xuống tới sàn — mờ, tan dần.
         const reach = win.y / -sun[1], vx = sun[0], vy = -sun[1], vz = sun[2], nx = 0 * vz - 0 * vy, ny = 0 * vx - 1 * vz, nz = 1 * vy - 0 * vx;
-        face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 2},1)`,
+        const shaft = face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 2},1)`,
           `pointer-events:none;filter:blur(10px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.32).toFixed(2)}), rgba(${preset.sunColor},${(preset.sunAlpha * 0.12).toFixed(2)}) 70%, rgba(${preset.sunColor},0))`);
         // BỤI lấp lánh trôi chậm trong luồng nắng: các hạt nằm trên chính mặt phẳng của luồng nắng (không mờ), vị trí là hàm
         // của thời gian timeline (`drive`) — tua tới đâu cũng đúng.
@@ -7973,9 +8049,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           motes.appendChild(dot);
           lighting.dust.push({ dot, bx: ((n * 37) % 100) / 100 * win.width, by: ((n * 61) % 100) / 100 * reach, phase: n * 1.7, w: win.width, h: reach });
         }
-        face(layer(0), w, h, `translate3d(${x0}px, -1px, ${z0}px) rotateX(90deg)`,
+        const patch = face(layer(0), w, h, `translate3d(${x0}px, -1px, ${z0}px) rotateX(90deg)`,
           `pointer-events:none;clip-path:polygon(${shape});filter:blur(6px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.55).toFixed(2)}), rgba(${preset.sunColor},${preset.sunAlpha}))`);
+        lighting.sunFaces.push(shaft, motes, patch);
       }
+      // Tấm nào là Ô CỬA: tấm nền có góc trên-trái trùng ô cửa đã khai.
+      for (const f of surfaces) f.window = f.kind === 'panel' && windows.some((win) => Math.abs(f.origin[0] - win.x) < 30 && Math.abs(f.origin[1] - win.y) < 30);
       litKey = '';
       set.update();
       return set;
@@ -7990,11 +8069,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     },
 
     /** BẬT / TẮT một đèn (tên hay số thứ tự) — một tween để thêm vào timeline: `tl.add(set.lamp('den', true), 3)`. */
-    lamp(which, on = true, duration = 0.6) {
+    lamp(which, on = true, duration = 0.6, { flicker = true } = {}) {
       if (!lighting) throw new Error('[character] set.lamp: call set.light({ lamps: […] }) first');
       const lamp = typeof which === 'number' ? lighting.lamps[which] : lighting.lamps.find((item) => item.name === which);
       if (!lamp) throw new Error(`[character] set.lamp: no lamp ${JSON.stringify(which)} (lamps: ${lighting.lamps.map((item) => item.name).join(', ')})`);
-      return gsap.fromTo(lamp, { level: on ? 0 : 1 }, { level: on ? 1 : 0, duration, ease: 'power2.inOut', immediateRender: false, onUpdate: () => set.update() });
+      if (!on || !flicker) return gsap.fromTo(lamp, { level: on ? 0 : 1 }, { level: on ? 1 : 0, duration, ease: 'power2.inOut', immediateRender: false, onUpdate: () => set.update() });
+      // BẬT ĐÈN: chớp một hai nhịp rồi mới sáng hẳn (bóng đèn / đèn huỳnh quang mồi) — bật trơn từ 0 lên 1 như vặn dimmer.
+      // Ít nhất 0,9 giây: ngắn hơn thì mỗi nhịp chớp chưa tới hai khung hình, mắt không kịp thấy.
+      const total = Math.max(duration, 0.9), steps = [[0.7, 0.1], [0.04, 0.12], [0.9, 0.1], [0.2, 0.1], [1, 0.58]], tl = gsap.timeline({ onUpdate: () => set.update() });
+      tl.fromTo(lamp, { level: 0 }, { level: steps[0][0], duration: total * steps[0][1], ease: 'none', immediateRender: false });
+      for (const [level, part] of steps.slice(1)) tl.to(lamp, { level, duration: total * part, ease: level === 1 ? 'power2.out' : 'none' });
+      return tl;
     },
 
     /** SÀN: hình chữ nhật trên mặt y = 0, từ `x[0]`…`x[1]` và `z[0]`…`z[1]`. `style` là màu, hoặc CSS (`background: …`). */
@@ -8212,6 +8297,24 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const done = entry.duration ? clamp(local / entry.duration, 0, 1) : 1, k = entry.curve(done);
         for (const [key, value] of Object.entries(entry.values)) camera[key] += (value - camera[key]) * k;
       }
+      // ÁNH SÁNG SỐNG theo thời gian của timeline (tua tới đâu cũng đúng): mây thỉnh thoảng che nắng — vệt nắng, luồng nắng,
+      // bụi và ánh cửa sổ trên người dịu đi rồi sáng lại; màn hình TV / laptop nhấp nháy, đổi màu theo "cảnh" trên màn hình.
+      if (lighting) {
+        const time = driven ? driven.time() : 0;
+        if (lighting.clouds) {
+          const pass = Math.max(0, Math.sin(time * 0.57 + 0.6)) ** 2;                   // một đám mây qua mỗi ~11 giây
+          lighting.cloud = 1 - 0.62 * pass;                                              // nhẹ hơn thì mắt không nhận ra (Gemini, đợt 19)
+          const opacity = lighting.cloud.toFixed(3);
+          for (const el of lighting.sunFaces) if (el.style.opacity !== opacity) el.style.opacity = opacity;
+        }
+        for (const lamp of lighting.lamps) {
+          if (lamp.kind !== 'screen') continue;
+          lamp.baseRgb = lamp.baseRgb || lamp.rgb;
+          const shot = Math.floor((time + lamp.x * 0.001) / 2.3), tones = [lamp.baseRgb, '255,196,160', '168,214,255', '214,255,220'];
+          lamp.rgb = tones[(shot * 7 + 3) % tones.length];
+          lamp.pulse = 0.78 + 0.12 * Math.sin(time * 9.1) * Math.sin(time * 3.7 + 1) + 0.1 * Math.sin(time * 23);
+        }
+      }
       const pull = camera.lens - camera.distance, [cx, cy] = centre();
       const moves = `rotateX(${-camera.pitch}deg) rotateY(${-camera.yaw}deg) translate3d(${-camera.x}px, ${camera.y}px, ${-camera.z}px)`;
       view.style.perspective = camera.lens + 'px';
@@ -8253,7 +8356,37 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         let lit = '';
         if (lighting && !actor.lamp) {
           const L = lightAt(actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z);
-          if (Math.abs(L.level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${L.level.toFixed(3)}) sepia(${L.warm.toFixed(3)})`;
+          const sideOf = (src) => (set.project(src.x, src.y, src.z).x < at.x ? -1 : 1);
+          // ÁNH SÁNG PHỤ: nguồn mạnh thứ hai ở PHÍA BÊN KIA màn hình so với nguồn chính (đèn bàn ấm một bên, cửa sổ lạnh bên
+          // kia) — phía khuất không tối đen mà nhuốm màu nguồn ấy, có viền mảnh màu ấy.
+          const fill = L.rim && L.sources.find((src) => src !== L.rim && src.k > 0.1 && src.rgb !== L.rim.rgb && sideOf(src) !== sideOf(L.rim)) || null;
+          // NGƯỢC SÁNG: nguồn sáng (ô cửa ban ngày, bóng đèn đang sáng) ở SAU nhân vật và nằm ngay sau đầu / thân trên màn
+          // hình — mặt trước tối lại, viền sáng hai bên vai và tóc (hình bóng ngược sáng của điện ảnh).
+          let back = 0, backRgb = '255,250,236', dim = 0, backLamp = 0;
+          if (actor.width) {
+            const w = actor.width * at.scale, h = actor.height * at.scale, top = at.y - h * (actor.ground || 1);
+            for (const win of lighting.mood.sun ? lighting.windows : []) {
+              if (win.z > actor.spot.z - 80) continue;
+              const a = set.project(win.x, win.y, win.z), b = set.project(win.x + win.width, win.y - win.height, win.z);
+              const across = Math.max(0, Math.min(b.x, at.x + w * 0.2) - Math.max(a.x, at.x - w * 0.2)) / (w * 0.4);
+              const up = Math.max(0, Math.min(b.y, top + h * 0.6) - Math.max(a.y, top)) / (h * 0.6);
+              const k = across * up * lighting.cloud * (lighting.mood === MOODS.day ? 1 : 0.8);
+              if (k > back) { back = k; backRgb = lighting.mood === MOODS.evening ? lighting.mood.sunColor : '255,250,236'; }
+              dim = Math.max(dim, k);
+            }
+            for (const lamp of lighting.lamps) {
+              if (lamp.kind === 'screen' || lamp.level < 0.3 || lamp.z > actor.spot.z - 80) continue;
+              const p = set.project(lamp.x, lamp.y, lamp.z), near = Math.hypot((p.x - at.x) / (w * 0.5), (p.y - (top + h * 0.35)) / (h * 0.5));
+              const k = clamp(1.2 - near, 0, 1) * lamp.level * 0.9;
+              if (k > back) { back = k; backRgb = lamp.rgb; }
+              backLamp = Math.max(backLamp, k);
+            }
+          }
+          // Chỉ ô cửa sáng lớn mới làm mặt trước TỐI đi (máy đo sáng theo khoảng trời sau lưng); bóng đèn nhỏ sau lưng chỉ cho
+          // viền sáng — làm tối theo nó thì bà đứng trước cây đèn lúc chiều xám xịt (cảnh thử đợt 19).
+          const level = L.level * (1 - 0.38 * dim);
+          // Sắc ấm: `sepia` một mình làm bạc màu (bà lúc chiều xám xỉn — Gemini đợt 19): bù lại độ bão hoà.
+          if (Math.abs(level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${level.toFixed(3)}) sepia(${(L.warm * 0.7).toFixed(3)}) saturate(${(1 + L.warm * 0.9).toFixed(3)})`;
           // VIỀN SÁNG (rim light): một viền màu đèn ở mép phía nguồn sáng — nhân vật 2D "ăn" ánh sáng của phòng thay vì
           // như dán lên (Gemini soát ánh sáng đợt 16). Phía nào: theo vị trí đèn TRÊN MÀN HÌNH so với nhân vật.
           // ĐỔ BÓNG TRÊN THÂN: hướng ánh sáng trên màn hình (từ nguồn sáng tới nhân vật) — đèn gần nhất, hay hướng sáng
@@ -8261,18 +8394,32 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (actor.rig && typeof actor.rig.lightShade === 'function' && lighting.shading) {
             const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
             let from, amount, glow = 0, rgb = '255,255,255';
-            if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34); rgb = L.rim.rgb; }
+            if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34) * (L.rim.front ?? 1); rgb = L.rim.rgb; }
             else { const key = mood.sun && mood === MOODS.evening ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood === MOODS.night ? 0.12 : mood === MOODS.evening ? 0.3 : 0.16; }
             const a = set.project(...from), b = set.project(...centre);
             // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
-            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade);
+            // Ngược sáng: phía trước tối đều, không còn một phía được chiếu rõ.
+            if (dim > 0) glow *= 1 - dim;
+            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
           }
+          const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
           if (L.rim && L.rim.k > 0.08 && actor.rig) {
             // Phòng tối: viền dày hơn (3,4 px trên màn hình) — viền sáng là thứ tách nhân vật khỏi nền tối.
-            const width = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
-            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (width * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
-            lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
+            const px = (wide * Math.min(1, L.rim.k * 1.6) / scale).toFixed(2);
+            lit += ` drop-shadow(${sideOf(L.rim) * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
+          }
+          if (fill && actor.rig) {
+            const px = (1.6 * Math.min(1, fill.k * 1.8) / scale).toFixed(2);
+            lit += ` drop-shadow(${sideOf(fill) * px}px 0px 0 rgba(${fill.rgb},${Math.min(0.55, fill.k * 1.1).toFixed(3)}))`;
+          }
+          if (back > 0.08 && actor.rig) {
+            // Ô CỬA sáng sau lưng: viền rõ hai bên (5 px trên màn hình) và một quầng mềm loang quanh tóc, vai — ánh trời tràn
+            // qua mép hình. BÓNG ĐÈN nhỏ sau lưng: chỉ viền mảnh — quầng màu đèn trên tường sáng thành viền cam bẩn quanh đầu
+            // (Gemini soát ánh sáng đợt 19).
+            const lampOnly = backLamp >= back - 0.001, px = ((lampOnly ? 2.4 : 5) * Math.min(1, back * 1.3) / scale).toFixed(2), alpha = Math.min(lampOnly ? 0.6 : 0.9, back * 1.1).toFixed(3);
+            lit += ` drop-shadow(${px}px ${(-px * 0.3).toFixed(2)}px 0 rgba(${backRgb},${alpha})) drop-shadow(-${px}px ${(-px * 0.3).toFixed(2)}px 0 rgba(${backRgb},${alpha}))`;
+            if (!lampOnly) lit += ` drop-shadow(0 0 ${(14 / scale).toFixed(2)}px rgba(${backRgb},${(0.55 * back).toFixed(3)}))`;
           }
         }
         soften(actor, host, lit, blurAt(at.depth));
@@ -8332,6 +8479,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
           castShadows(actor, rank, seen);
+          wallShadow(actor, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
             // Đứng trên một hộp (mèo trên bàn khám): nhấc bóng lên khỏi mặt hộp rõ hơn — cùng mặt phẳng thì mặt bàn vẽ đè lên bóng.
             transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
@@ -8387,7 +8535,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       // Các mặt của bối cảnh chỉ tính lại ánh sáng khi mức sáng của một đèn đổi (bật / tắt dần).
       if (lighting) {
-        const key = lighting.lamps.map((lamp) => lamp.level.toFixed(3)).join(',');
+        // Màn hình TV: mức nhấp nháy (làm tròn) và màu cũng vào khoá — vệt sáng TV trên tường, sàn nhấp nháy theo.
+        const key = lighting.lamps.map((lamp) => (lamp.kind === 'screen' ? `${(lamp.level * (lamp.pulse ?? 1)).toFixed(2)}${lamp.rgb}` : lamp.level.toFixed(3))).join(',');
         if (key !== litKey) {
           litKey = key;
           surfaces.forEach(lightSurface);
@@ -9008,7 +9157,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.58.0';
+const VERSION = '0.59.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

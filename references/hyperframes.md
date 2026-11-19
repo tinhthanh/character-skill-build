@@ -448,6 +448,14 @@ characters near it (brighter, warmer, a rim of its colour on the side facing it)
 from it. A `"lamp"` cutout is a light by itself. A back-wall panel with `"window": true` casts sunlight on
 the floor in the day and the evening. `"lamp": "on"` / `"off"` on a turn switches a lamp (a lamp switched on
 by the script starts off). In code: `set.light({ mood, lamps, windows })`, `tl.add(set.lamp('lamp', true), t)`.
+A lamp switched on flickers once or twice before it comes up (`set.lamp(name, true, dur, { flicker: false })`
+for a smooth fade). A window is a second, cool light in the day (warm in the evening): a character between it
+and a lamp has a warm side and a cool side. Standing in the patch of sunlight makes a character brighter,
+with a rim of sunlight and a hard shadow along the sun. A bright window right behind a character darkens
+them a little and gives them a rim and a soft glow of light (backlight). Clouds pass over the sun every ~11 s
+(`set.light({ clouds: false })` to keep it steady). A `"tv"` cutout (in the living room) and the screens
+light the room with a flicker that changes colour in the evening and at night. Someone standing near the back
+wall darkens the wall behind them. At night the window glass is dark blue.
 Characters are shaded too: the side toward the nearest lamp (or the main light) is lit and tinted, the other
 side darker (`rig.lightShade`, done by the set each frame). A turn with only `"lamp"` makes the person reach
 for the lamp's switch while it changes. Lit lamps stay in automatic shots when that costs little. Evenings

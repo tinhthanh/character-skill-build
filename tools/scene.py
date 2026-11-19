@@ -235,8 +235,9 @@ SET_PRESETS = {
         'room': {'floor': '#d9c4a8', 'floor2': '#cdb596', 'wall': '#f3ead9', 'sideWall': '#eadfcb'},
         'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 110, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
                   {'name': 'coffee-table', 'x': 80, 'z': -700, 'width': 220, 'depth': 120, 'height': 80, 'color': '#a47551', 'top': '#b88a63', 'side': '#8c6243'}],
-        'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff'}],
-        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'floorlamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470}],
+        'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff', 'window': True}],
+        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'floorlamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470},
+                    {'kind': 'tv', 'x': 540, 'z': -900}],
         'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
@@ -244,9 +245,9 @@ ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wa
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
 CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
@@ -1300,9 +1301,11 @@ def main():
         # MÀN HÌNH (laptop, máy tính) lúc chiều / tối: một nguồn sáng xanh nhạt ở mặt màn hình (không có quầng bóng đèn).
         if stage_set.get('light', 'day') != 'day':
             for n, item in enumerate(stage_set.get('cutouts', [])):
-                if item.get('kind') not in SCREEN_KINDS: continue
+                if item.get('kind') not in SCREEN_KINDS + ('tv',): continue
                 tall = float(item.get('height', round(person_default * 1)))
-                lamps.append({'name': f'screen{n + 1}', 'kind': 'screen', 'x': item['x'], 'z': float(item['z']) + 30, 'y': round(float(item.get('y', 0)) + tall * 0.3), 'color': '#a8d8ff', 'power': 0.5, 'range': 420, 'on': True})
+                # TV to hơn màn hình laptop: sáng xa hơn (tới sofa bên kia phòng), nhấp nháy đổi màu theo "cảnh" đang chiếu.
+                tv = item['kind'] == 'tv'
+                lamps.append({'name': f'screen{n + 1}', 'kind': 'screen', 'x': item['x'], 'z': float(item['z']) + 30, 'y': round(float(item.get('y', 0)) + tall * (0.25 if tv else 0.3)), 'color': '#a8d8ff', 'power': 0.9 if tv else 0.5, 'range': 1300 if tv else 420, 'on': True})
         light = {'mood': stage_set.get('light', 'day')}
         if room.get('gloss'): light['gloss'] = True
         if stage_set.get('shading') is False: light['shading'] = False        # không đổ bóng trên thân nhân vật: render nhanh hơn

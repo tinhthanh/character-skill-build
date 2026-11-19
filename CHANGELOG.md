@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.59.0
+
+Added — light that lives in the room
+- **Two lights on a character**: a window is a light too (cool sky in the day, sunlight in the evening). A
+  character between a window and a lamp gets a warm side and a cool side: the shading on the body ends in
+  the second light's colour (`rig.lightShade(…, fill, fillAmount)`), with a thin rim of it.
+- **Backlight**: a bright window right behind a character darkens them a little, with a rim on both sides
+  and a soft glow of light round the hair and shoulders. A lamp behind them gives only a thin rim, and no
+  longer lights the front of the body (light from behind does not reach the face we see).
+- **Standing in the sunlight**: inside the patch of sun from a window a character is brighter and warmer,
+  has a rim of sunlight and a hard shadow along the sun, in the day as well as the evening.
+- **Clouds** pass over the sun every ~11 s: the sun patch, the shaft, the dust and the light on the
+  characters dim and come back (`set.light({ clouds: false })` to turn them off).
+- **Lamps flicker when switched on** (at least 0.9 s) before they come up (`set.lamp(…, { flicker: false })`
+  for a smooth fade).
+- **TV** prop (`"kind": "tv"`, in the living room): in the evening and at night it and the screens light the
+  room and the characters with a flicker that changes colour every couple of seconds, on the walls and the
+  floor too.
+- **Shadow on the wall behind**: a character standing near the back wall darkens a soft patch of it, offset
+  away from the light.
+- At night the window glass is dark blue; the lamps in the room no longer lighten it.
+
+Fixed — after a Gemini review of the lighting
+- The warm tint of the evening made the characters grey: the tint now keeps their colours (less sepia, more
+  saturation).
+- The glow of a lamp right behind a person showed as a dirty orange outline round the head: only windows
+  give that glow now.
+
 ## 0.58.0
 
 Added — a whole film from one script

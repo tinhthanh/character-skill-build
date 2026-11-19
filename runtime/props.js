@@ -121,6 +121,20 @@ const DRAW = {
     <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
     <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
   },
+  // TV trên KỆ THẤP, màn hình quay ra người xem, đang chiếu (màn hình sáng xanh nhạt). Trong bối cảnh 3D lúc chiều / tối nó
+  // là một nguồn sáng nhấp nháy đổi màu (`set.light` lamp `kind: 'screen'`).
+  tv: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, cab = F - 54, y0 = cab - 12 - 96;
+    return `
+    <rect x="118" y="${cab}" width="164" height="50" rx="4" fill="#a47551" stroke="#6e4a30" stroke-width="1.4"/>
+    <path d="M 200 ${cab} V ${cab + 50}" stroke="${line}" stroke-width="1" opacity=".35"/>
+    <rect x="124" y="${F - 6}" width="10" height="6" fill="${dark}"/><rect x="266" y="${F - 6}" width="10" height="6" fill="${dark}"/>
+    <rect x="186" y="${cab - 12}" width="28" height="12" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <rect x="112" y="${y0}" width="176" height="100" rx="5" fill="${color}" stroke="${line}" stroke-width="1.4"/>
+    <defs><linearGradient id="tvglow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8f0ff"/><stop offset=".55" stop-color="#8cc4ee"/><stop offset="1" stop-color="#5a8fc4"/></linearGradient></defs>
+    <rect x="118" y="${y0 + 6}" width="164" height="88" rx="2" fill="url(#tvglow)"/>
+    <path d="M 118 ${y0 + 70} L 160 ${y0 + 46} L 190 ${y0 + 64} L 226 ${y0 + 36} L 282 ${y0 + 72} V ${y0 + 94} H 118 Z" fill="#ffffff" opacity=".22"/>`;
+  },
   lamp: ({ color, dark, line }) => {
     const F = PROP_FRAME.floor;
     return `
@@ -170,13 +184,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy

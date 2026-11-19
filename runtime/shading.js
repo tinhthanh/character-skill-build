@@ -16,7 +16,7 @@ export function attachShade(svg, root) {
     <filter id="${id}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
     <mask id="${id}-mask" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><use href="#${root.id}" filter="url(#${id}-white)"/></mask>
     <linearGradient id="${id}-grad" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="0.86" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
     </linearGradient>`;
   const cover = document.createElementNS(NS, 'rect');
   for (const [key, value] of Object.entries({ x: -2000, y: -2000, width: 4400, height: 4400, fill: `url(#${id}-grad)`, mask: `url(#${id}-mask)`, 'pointer-events': 'none', 'data-shade': '' })) cover.setAttribute(key, value);
@@ -28,10 +28,11 @@ export function attachShade(svg, root) {
     /**
      * `dx, dy`: hướng ánh sáng đi TRÊN MÀN HÌNH (từ nguồn sáng tới nhân vật, vector bất kỳ); `amount` 0…1 độ tối phía
      * khuất; `rgb` màu nguồn sáng ("255,213,154") và `glow` 0…1 độ nhuốm màu ấy ở phía được chiếu; `dark` màu phía khuất.
-     * amount = 0 tắt lớp.
+     * `fill`, `fillAmount`: ÁNH SÁNG PHỤ ở phía khuất (cửa sổ lạnh bên kia đèn bàn ấm) — mép phía khuất nhuốm màu ấy thay vì
+     * tối hẳn. amount = 0 tắt lớp.
      */
-    set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0') {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark}`;
+    set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
+      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)}`;
       if (key === last) return;
       last = key;
       if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
@@ -49,6 +50,10 @@ export function attachShade(svg, root) {
       stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
       stops[2].setAttribute('stop-opacity', Math.min(0.7, amount * 0.75).toFixed(3));        // nửa khuất: tối rõ ngay sau giữa thân
       stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
+      // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
+      const lift = fill && fillAmount > 0.003;
+      stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
+      stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
     },
   };
 }
