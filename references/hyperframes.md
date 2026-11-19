@@ -440,6 +440,17 @@ is built, by `set.frameOn(subjects, size, { avoid })`: it measures the drawn fig
 start of the turn and moves the camera so nobody else is cut in half by the frame edge. Sizes: a person
 `close` = head, `medium` = from the waist, `full` = whole; a pet is always shown whole (`close` biggest).
 
+**Light.** `"set": { "light": "day" | "evening" | "night", "lamps": [ … ] }`. Every plane of the room is
+shaded by the main light, corners and the foot of the walls are darker, boxes sit on a soft shadow. A lamp
+(`{ "name": "lamp", "x": -180, "y": 550, "z": -840, "color": "#ffd59a", "power": 1, "on": true, "kind": "point" }`,
+`"kind": "ceiling"` for a ceiling light) has a glowing bulb, a warm pool on the floor and walls, lights the
+characters near it (brighter, warmer, a rim of its colour on the side facing it) and throws long shadows away
+from it. A `"lamp"` cutout is a light by itself. A back-wall panel with `"window": true` casts sunlight on
+the floor in the day and the evening. `"lamp": "on"` / `"off"` on a turn switches a lamp (a lamp switched on
+by the script starts off). In code: `set.light({ mood, lamps, windows })`, `tl.add(set.lamp('lamp', true), t)`.
+The light is drawn, not rendered: layers of colour over each plane, `filter` on the characters — it costs
+little (a 58 s film renders in about the same time as before).
+
 **Scripts in plain words.** `tools/script.py kich-ban.txt` turns a plain Vietnamese script into a scene file
 for a 3D set with `"camera": "auto"` and builds it; see `python3 tools/script.py --help` for the format and
 every word it knows (sets, moods, actions, actions toward someone). The scene file it writes is an ordinary

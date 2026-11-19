@@ -513,6 +513,25 @@ with tempfile.TemporaryDirectory() as work:
         done = subprocess.run([sys.executable, script_tool, bad, '--no-build'], capture_output=True, text=True)
         if done.returncode == 0 or 'Traceback' in done.stderr or needle not in done.stderr: problems.append(f'script.py: {text!r} is not refused clearly (wanted {needle!r}) — {done.stderr.strip()[:200]}')
 
+    # Đợt 16: ánh sáng — giờ trong ngày, đèn (bật / tắt theo lượt), cửa sổ hắt nắng.
+    lit = json.load(open(stage, encoding='utf-8'))
+    lit['set']['light'] = 'night'
+    lit['set']['lamps'] = [{'name': 'tran', 'x': 0, 'y': 650, 'z': -500, 'kind': 'ceiling', 'color': '#ffe2b0'}]
+    lit['set'].setdefault('panels', []).append({'wall': 'back', 'at': -200, 'y': 560, 'width': 300, 'height': 220, 'window': True})
+    lit['script'][1]['lamp'] = 'on'
+    lit['script'].append({'who': 'vet', 'lamp': {'name': 'tran', 'on': False, 'dur': 1}})
+    path = os.path.join(os.path.dirname(stage), '_check_light.json')
+    try:
+        json.dump(lit, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'lit'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('light: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'lit', 'index.html'), encoding='utf-8').read()
+        for needle in ('set.light({"mood": "night"', '"kind": "ceiling"', '"on": false', '"windows": [', 'set.lamp("tran", true, 0.6)', 'set.lamp("tran", false, 1)'):
+            if needle not in html: problems.append(f'light: {needle} is not in the composition')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -555,6 +574,10 @@ with tempfile.TemporaryDirectory() as work:
         ('"marks" that is not true / false', lambda s: s.update({'marks': 'no'}), '"marks"'),
         ('a missing sound file', lambda s: s.update({'sounds': {'wave': 'nope.wav'}}), 'nope.wav'),
         ('a camera other than "auto" in a set', lambda s: s.update({'camera': 'close'}), '"auto"'),
+        ('an unknown time of day', lambda s: s['set'].update({'light': 'dusk'}), 'set.light'),
+        ('a lamp of an unknown kind', lambda s: s['set'].update({'lamps': [{'x': 0, 'y': 600, 'z': -500, 'kind': 'neon'}]}), 'ceiling'),
+        ('a lamp switched where there is none', lambda s: s['script'][1].update({'lamp': 'on'}), 'no lamps'),
+        ('a window on a side wall', lambda s: s['set'].setdefault('panels', []).append({'wall': 'left', 'at': -300, 'y': 500, 'width': 200, 'height': 200, 'window': True}), 'back wall'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:

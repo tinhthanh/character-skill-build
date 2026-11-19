@@ -47,6 +47,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "preset": "reception" | "exam" | "pharmacy" | "living-room" | "park" | "street" — a ready-made room or an
            outdoor place (your boxes etc. are added). A person "seated": true with "on": "<box>" sits on that box's front edge
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
+           "light": "day" | "evening" | "night",  "lamps": [ { "name", "x", "y", "z", "color", "power", "on",
+           "kind": "point" | "ceiling" } ] — a "lamp" cutout is a light too; a back-wall panel "window": true casts
+           sunlight. "lamp": "on" / "off" / { "name", "on", "dur" } on a turn switches a lamp.
   characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
   The camera stays near eye level: pitch −8…15°, yaw within ±60°.
@@ -169,7 +172,7 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp')
 MARKS = ('!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music')         # runtime/marks.js
 PET_MOOD_MARKS = {'scared': '!', 'curious': '?', 'sleepy': 'zzz', 'happy': 'heart', 'excited': 'heart', 'angry': 'anger', 'guilty': 'sweat', 'pain': 'sweat'}
 SHOW_KEYS = ('title', 'bullets', 'image')
@@ -177,7 +180,9 @@ PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
-SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset')
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps')
+LIGHT_MOODS = ('day', 'evening', 'night')
+LAMP_KEYS = ('name', 'x', 'y', 'z', 'color', 'power', 'range', 'on', 'kind')
 # BỐI CẢNH DỰNG SẴN (`"set": { "preset": "reception" }`): đồ đạc của một căn phòng quen thuộc, đặt theo phòng mặc định
 # (rộng 1800, sâu 1300). Hộp / tấm / tấm hình người viết khai thêm thì CỘNG vào sau. Nhân vật vẫn tự đặt (gợi ý chỗ đứng
 # ghi ở `spots`, in ra khi dựng). Toạ độ chọn để người đứng ở `spots` không đứng lọt vào lòng hộp.
@@ -194,7 +199,7 @@ SET_PRESETS = {
         'boxes': [{'name': 'table', 'x': 100, 'z': -480, 'width': 200, 'depth': 160, 'height': 170, 'color': '#9fc3cf', 'top': '#eef5f7', 'side': '#86aebb'},
                   {'name': 'cabinet', 'x': -780, 'z': -1050, 'width': 260, 'depth': 120, 'height': 330, 'color': '#e9eef1', 'top': '#ffffff', 'side': '#ccd6dc'}],
         'panels': [{'wall': 'back', 'at': -380, 'y': 560, 'width': 260, 'height': 190, 'color': '#ffffff', 'border': '10px solid #dfe9ec'},
-                   {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff'}],
+                   {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff', 'window': True}],
         'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 600}],
         'spots': 'pet on the table: "on": "table", x 200, z -560 · vet: x 40, z -560 · owner: x 360, z -560',
     },
@@ -226,17 +231,17 @@ SET_PRESETS = {
     },
     'living-room': {
         'room': {'floor': '#d9c4a8', 'floor2': '#cdb596', 'wall': '#f3ead9', 'sideWall': '#eadfcb'},
-        'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 150, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
-                  {'name': 'coffee-table', 'x': -420, 'z': -560, 'width': 240, 'depth': 120, 'height': 80, 'color': '#a47551', 'top': '#b88a63', 'side': '#8c6243'}],
+        'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 110, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
+                  {'name': 'coffee-table', 'x': 80, 'z': -700, 'width': 220, 'depth': 120, 'height': 80, 'color': '#a47551', 'top': '#b88a63', 'side': '#8c6243'}],
         'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff'}],
-        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}],
-        'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500',
+        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'lamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470}],
+        'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
-PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name')
+PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on')
 CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
 FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
@@ -585,8 +590,20 @@ def main():
             if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
             if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
+            if 'on' in item and (item.get('kind') != 'lamp' or item['on'] not in (True, False)): fail(f'set.cutouts[{n}].on is for a "lamp": true (lit) or false (off until a turn switches it on with "lamp")')
             if 'door' in item and (item.get('kind') != 'carrier' or item['door'] not in ('left', 'right')): fail(f'set.cutouts[{n}].door must be "left" or "right" (carrier only)')
             if 'reading' in item and (item.get('kind') != 'scale' or not isinstance(item['reading'], str)): fail(f'set.cutouts[{n}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
+        # ÁNH SÁNG: "light" (giờ trong ngày), "lamps" (đèn), panel "window": true (cửa sổ hắt nắng).
+        if stage_set.get('light', 'day') not in LIGHT_MOODS: fail(f'set.light must be one of {", ".join(LIGHT_MOODS)} — got {js(stage_set.get("light"))}')
+        if not isinstance(stage_set.get('lamps', []), list): fail('set.lamps must be a list of { "x", "y", "z", "color", "power", "on", "kind", "name" }')
+        for n, item in enumerate(stage_set.get('lamps', [])):
+            if not isinstance(item, dict): fail(f'set.lamps[{n}] must be an object')
+            known(f'set.lamps[{n}]', item, LAMP_KEYS)
+            for key in ('x', 'y', 'z', 'power', 'range'):
+                if key in item and not isinstance(item[key], (int, float)): fail(f'set.lamps[{n}].{key} must be a number')
+            if item.get('kind', 'point') not in ('point', 'ceiling'): fail(f'set.lamps[{n}].kind must be "point" (a lamp) or "ceiling" (a ceiling light) — got {js(item.get("kind"))}')
+            if 'on' in item and item['on'] not in (True, False): fail(f'set.lamps[{n}].on must be true or false')
+            if 'color' in item and not re.match(r'^#[0-9a-fA-F]{6}$', str(item['color'])): fail(f'set.lamps[{n}].color must be a colour such as "#ffd59a"')
         for n, item in enumerate(stage_set.get('panels', [])):
             if item.get('wall', 'back') not in ('back', 'left', 'right'): fail(f'set.panels[{n}].wall must be "back", "left" or "right"')
             for key in ('at', 'y', 'width', 'height'):
@@ -804,6 +821,7 @@ def main():
                 half = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))['width'] / 2
                 leaving = (float(who['x']) + half if turn['exit'] == 'left' else half - float(who['x'])) + 0.55 * who['_host_width']
             steps.append(f"['exit', {js(turn['exit'])}, {round(leaving / who['_unit'])}]")
+        if not steps and 'lamp' in turn: steps.append("['idle', 0.9]")            # lượt chỉ bật / tắt đèn: một nhịp đứng yên
         if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
         # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
@@ -855,6 +873,7 @@ def main():
     flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals)
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
+    lamp_ops = []                                           # { turn, name, on, dur } — bật / tắt đèn của bối cảnh 3D
     popups = []                                             # { turn, cutout: số thứ tự, title, text, hold } — thông báo trên màn hình đạo cụ 3D
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
@@ -1037,6 +1056,14 @@ def main():
             if screen_item.get('kind') not in SCREEN_KINDS or (screen_item['kind'] == 'laptop' and screen_item.get('facing') != 'viewer'):
                 fail(f'{where}: "popup" needs a screen the viewer sees — "{pop["on"]}" must be a "monitor", or a "laptop" with "facing": "viewer"')
             popups.append({'turn': emitted[0], 'cutout': index + 1, 'title': pop.get('title', ''), 'text': pop.get('text', ''), 'hold': float(pop.get('hold', 2.5))})
+        # BẬT / TẮT ĐÈN (`"lamp"`): "on" / "off" (đèn đầu tiên), hay { "name": "…", "on": true, "dur": 0.6 } — đúng lúc lượt này bắt đầu.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or 'lamp' not in turn: continue
+            if stage_set is None: fail(f'{where}: "lamp" switches a lamp of a 3D set — add "set" with "lamps" (or a "lamp" cutout)')
+            spec = turn['lamp'] if isinstance(turn['lamp'], dict) else {'on': turn['lamp']}
+            if spec.get('on') in ('on', 'off'): spec = dict(spec, on=spec['on'] == 'on')
+            if not isinstance(spec, dict) or set(spec) - {'name', 'on', 'dur'} or spec.get('on') not in (True, False): fail(f'{where}: "lamp" is "on", "off" or {{ "name": "…", "on": true, "dur": 0.6 }} — got {js(turn["lamp"])}')
+            lamp_ops.append({'turn': emitted[0], 'name': spec.get('name'), 'on': spec['on'], 'dur': float(spec.get('dur', 0.6)), 'where': where})
         # THẺ THÔNG BÁO trên khung (`"toast"`): gắn với lượt của chính mục này (sau các bước lại gần vừa chèn).
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or 'toast' not in turn: continue
@@ -1194,14 +1221,20 @@ def main():
         setup.append(f"    set.wall({{ from: [{-half:g}, {back:g}], to: [{half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['wall'])} }});")
         setup.append(f"    set.wall({{ from: [{-half:g}, {front:g}], to: [{-half:g}, {back:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
         setup.append(f"    set.wall({{ from: [{half:g}, {back:g}], to: [{half:g}, {front:g}], height: {room['height']:g}, style: {js('background:' + room['sideWall'])} }});")
+        windows = []                                        # ô cửa trên tường sau — hắt nắng (set.light)
         for item in stage_set.get('panels', []):
             side = item.get('wall', 'back')
             look = f"background:{item.get('color', '#9fd0e6')};border:{item.get('border', '12px solid #f4f7f8')};box-sizing:border-box"
+            # Cửa sổ: ô kính SÁNG (nguồn của vệt nắng) — sáng hơn tường, quầng sáng tràn ra mép.
+            if item.get('window'): look += ";box-shadow:0 0 60px 10px rgba(255,250,232,.55), inset 0 0 40px rgba(255,255,255,.7)"
             if item.get('image'):
                 # Ảnh trên tấm (màn hình TV, poster, phim X-quang, biển tên): lấp đầy tấm, cắt phần thừa.
                 name = copy_asset(base, out, item['image'], copied)
                 look += f";background-image:url('{name}');background-size:cover;background-position:center"
             at, turn = (([item['at'], item['y'], back + 1], 0) if side == 'back' else ([-half + 1, item['y'], item['at']], 90) if side == 'left' else ([half - 1, item['y'], item['at'] - item['width']], -90))
+            if item.get('window'):
+                if side != 'back': fail('set.panels: "window": true works on the back wall (the sunlight falls into the room toward the camera)')
+                windows.append({'x': item['at'], 'y': item['y'], 'width': item['width'], 'height': item['height'], 'z': back + 1})
             setup.append(f"    set.panel({{ at: {js(at)}, size: [{item['width']:g}, {item['height']:g}], turn: {turn}, style: {js(look)} }});")
         for n, item in enumerate(stage_set.get('boxes', [])):
             colour = item.get('color', '#8fb3bf')
@@ -1235,6 +1268,25 @@ def main():
                 dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
                 if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
                 setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} set.stand(cutout{n + 1}, {{ {where_} }});")
+        # ÁNH SÁNG: giờ trong ngày + đèn. Cây đèn đường / đèn cây có trong bối cảnh (cutout "lamp") tự là một nguồn sáng ở
+        # chỗ bóng đèn của nó (554 / 470 chiều cao khung); "lamps" thêm đèn tuỳ ý (đèn trần: "kind": "ceiling").
+        lamps = [dict(item) for item in stage_set.get('lamps', [])]
+        for n, item in enumerate(stage_set.get('cutouts', [])):
+            if item.get('kind') != 'lamp': continue
+            tall = float(item.get('height', round(person_default * 1)))
+            lamps.append(dict({'name': item.get('name', f'cutout{n + 1}'), 'x': item['x'], 'z': float(item['z']) + 1, 'y': round(float(item.get('y', 0)) + tall * 554 / 470), 'power': 0.9},
+                              **({'on': item['on']} if 'on' in item else {})))
+        # Đèn mà kịch bản BẬT ở một lượt (và chưa ghi "on") thì lúc đầu tắt — đèn sáng sẵn rồi lượt "bật đèn" làm nó tắt
+        # phụt rồi sáng lại. Đèn bị TẮT ở một lượt thì lúc đầu sáng.
+        for n, lamp in enumerate(lamps):
+            name = lamp.get('name', f'lamp{n + 1}')
+            first = next((op for op in lamp_ops if (op['name'] if op['name'] is not None else (lamps[0].get('name', 'lamp1'))) == name), None)
+            if first and 'on' not in lamp: lamp['on'] = not first['on']
+        light = {'mood': stage_set.get('light', 'day')}
+        if lamps: light['lamps'] = lamps
+        if windows: light['windows'] = windows
+        lamp_names = [lamp.get('name', f'lamp{n + 1}') for n, lamp in enumerate(lamps)]
+        setup.append(f"    // Light: time of day, lamps (glow, pools of light, long shadows), sunlight through the windows.\n    set.light({js(light)});")
     elif layout == 'split':
         # MÀN HÌNH CHIA ĐÔI: mỗi nửa một nền riêng (`sides.left` / `sides.right`: màu tường, sàn, hoặc một phông dựng sẵn).
         sides = scene.get('sides', {})
@@ -1522,6 +1574,11 @@ def main():
             else: aim = f'{{ {values} }}'
             call = f"set.cut({aim})" if view['cut'] else f"set.move({aim}, {view['dur']:g}, {js(view['ease'])})"
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
+        for op in lamp_ops:
+            if not lamp_names: fail(f'{op["where"]}: "lamp" — the set has no lamps (add set.lamps, or a "lamp" cutout)')
+            name = op['name'] if op['name'] is not None else lamp_names[0]
+            if name not in lamp_names: fail(f'{op["where"]}: "lamp" names {js(name)}, but the lamps are {", ".join(lamp_names)}')
+            moves.append(f"    tl.add(set.lamp({js(name)}, {js(op['on'])}, {op['dur']:g}), T0 + talk.turns[{op['turn']}].start);      // lamp {'on' if op['on'] else 'off'}")
         # Các lần CẮT CẢNH của kịch bản (và của đạo diễn tự động): phụ đề không sót qua chúng.
         moves.append('    const CUTS = [' + ', '.join(f'T0 + talk.turns[{view["turn"]}].start' for view in views if view['cut']) + '];')
         if director and height > width * 1.2 and len(beats) > 1:

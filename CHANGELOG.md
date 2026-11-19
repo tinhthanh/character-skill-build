@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.56.0
+
+Added — light in 3D sets
+- **`"set": { "light": "day" | "evening" | "night" }`** (`set.light({ mood, lamps, windows })`): walls, floor
+  and boxes are shaded by the direction of the main light, room corners and the foot of the walls are
+  darker (ambient occlusion), boxes sit on a soft contact shadow; evening is orange with long shadows,
+  night is dark and blue.
+- **Lamps**: `"lamps": [{ "name", "x", "y", "z", "color", "power", "on", "kind": "point" | "ceiling" }]`, and every
+  `"lamp"` cutout (street lamp, the living room's standing lamp) is a light by itself. A lamp has a
+  glowing bulb (a ceiling light also a faint cone of light), a warm pool on the floor and the walls that
+  fades with distance, makes people and pets near it brighter and warmer (each frame, as they walk), gives
+  them a rim of its colour on the side facing it, and throws long shadows away from it.
+- **Windows**: a back-wall panel with `"window": true` glows and casts a patch of sunlight on the floor,
+  with a faint shaft of light through the air (day and evening).
+- **Switching lamps**: `"lamp": "on"` / `"off"` / `{ "name", "on", "dur" }` on a turn (`set.lamp(name, on)` in
+  code). A lamp the script switches on starts off.
+- Presets: the exam room's window is a window; the living room has a standing lamp by the sofa (and a lower
+  sofa, so a seated person fits it); the park's street lamp lights up in the evening.
+- `tools/script.py`: `ánh sáng: ngày | chiều | tối` in the header, `[bật đèn]` / `[tắt đèn]` in a turn.
+
 ## 0.55.0
 
 Added — scripts in plain words, vertical video

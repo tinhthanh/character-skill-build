@@ -1,4 +1,4 @@
-/* VGCharacter v0.55.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.56.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5095,7 +5095,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   view.style.overflow = 'hidden';
   const base = { yaw: 0, pitch: 6, distance: 1700, lens: 1700, x: 0, y: 300, z: -350, zoom: 1, blur: 0 };
   const camera = { ...base }, marks = [];
-  const backdrop = [], props = [], actors = [], layers = [], focused = [];
+  const backdrop = [], props = [], actors = [], layers = [], focused = [], surfaces = [];
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
   const layer = (index) => {
@@ -5108,23 +5108,147 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     }
     return layers[index];
   };
-  const face = (parent, width, height, transform, style, centre = null) => {
+  const face = (parent, width, height, transform, style, centre = null, geom = null) => {
     const element = document.createElement('div');
     element.style.cssText = `position:absolute;left:0;top:0;transform-origin:0 0;width:${width}px;height:${height}px;transform:${transform};${style || ''}`;
     parent.appendChild(element);
     if (centre) focused.push({ element, centre, filter: element.style.filter || '', blur: 0 });
+    if (geom) surfaces.push({ element, width, height, ...geom });
     return element;
   };
   const paint = (style, fallback) => (typeof style === 'string' && style.trim() ? (/[:;]/.test(style) ? style : `background:${style}`) : `background:${fallback}`);
+  const MOODS = {
+    day:     { dark: 0.06, keyShade: 0.16, key: [0.35, -0.8, -0.5],  shade: '20,28,40', tint: null,                       sun: [0.2, -0.6, 0.78],   sunColor: '255,244,214', sunAlpha: 0.62, lampsOn: false, warm: 0 },
+    evening: { dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
+    night:   { dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     sun: null,                                         lampsOn: true,  warm: 0 },
+  };
+  const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const rgbOf = (hex) => { const h = hex.replace('#', ''), full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h; return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(','); };
+  let lighting = null, litKey = '';
+  const lightSurface = (f) => {
+    const mood = lighting.mood;
+    if (!f.shadeEl) {
+      f.shadeEl = document.createElement('div'); f.glowEl = document.createElement('div');
+      for (const el of [f.shadeEl, f.glowEl]) { el.style.cssText = 'position:absolute;inset:0;pointer-events:none'; f.element.appendChild(el); }
+      if (f.kind === 'wall') f.glowEl.dataset.ao = 'linear-gradient(to top, rgba(0,0,0,.2), rgba(0,0,0,0) 24%), linear-gradient(to right, rgba(0,0,0,.1), rgba(0,0,0,0) 7%, rgba(0,0,0,0) 93%, rgba(0,0,0,.1))';
+      if (f.kind === 'floor' && f.back) f.glowEl.dataset.ao = 'linear-gradient(to bottom, rgba(0,0,0,.16), rgba(0,0,0,0) 80px)';
+    }
+    const facing = Math.max(0, dot(f.n, lighting.key.map((c) => -c)));
+    const darkness = 1 - (1 - mood.dark) * (1 - mood.keyShade * (1 - facing));
+    const glow = [], mask = [];
+    for (const lamp of lighting.lamps) {
+      if (lamp.level <= 0.001) continue;
+      const p = [lamp.x - f.origin[0], lamp.y - f.origin[1], lamp.z - f.origin[2]], d = dot(p, f.n);
+      if (d < -20 || Math.abs(d) >= lamp.range) continue;                                        // đèn ở sau mặt này, hay quá xa
+      const strength = lamp.power * lamp.level * Math.pow(1 - Math.abs(d) / lamp.range, 0.8), R = Math.sqrt(lamp.range * lamp.range - d * d);
+      const u = dot(p, f.u).toFixed(1), v = dot(p, f.v).toFixed(1), c = lamp.rgb;
+      glow.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(${c},${Math.min(0.66, 0.7 * strength).toFixed(3)}) 0, rgba(${c},${Math.min(0.34, 0.3 * strength).toFixed(3)}) ${(R * 0.4).toFixed(1)}px, rgba(${c},0) ${R.toFixed(1)}px)`);
+      mask.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(0,0,0,${Math.max(0, 1 - 1.9 * strength).toFixed(3)}) 0, rgba(0,0,0,${Math.max(0, 1 - 0.7 * strength).toFixed(3)}) ${(R * 0.45).toFixed(1)}px, rgba(0,0,0,1) ${R.toFixed(1)}px)`);
+    }
+    f.shadeEl.style.background = darkness > 0.004 ? `rgba(${mood.shade},${darkness.toFixed(3)})` : 'none';
+    const masks = mask.length ? mask.join(', ') : 'none';
+    f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
+    f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
+    const layers = [...glow, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
+    f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
+  };
+  const lightAt = (x, y, z) => {
+    const mood = lighting.mood;
+    let level = 1 - (mood.dark > 0.1 ? mood.dark * 0.85 : 0), warm = mood.warm, rim = null;
+    for (const lamp of lighting.lamps) {
+      if (lamp.level <= 0.001) continue;
+      const d = Math.hypot(lamp.x - x, lamp.y - y, lamp.z - z);
+      if (d >= lamp.range * 1.15) continue;
+      const k = lamp.power * lamp.level * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
+      level += k * 0.6; warm += k * lamp.warmth;
+      if (!rim || k > rim.k) rim = { k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb };
+    }
+    if (mood === MOODS.evening && (!rim || rim.k < 0.35)) rim = { k: 0.55, x: x - mood.sun[0] * 1000, y: y - mood.sun[1] * 1000, z: z - mood.sun[2] * 1000, rgb: mood.sunColor };
+    return { level: clamp(level, 0.28, 1.06), warm: clamp(warm, 0, 0.42), rim };
+  };
+  const castShadows = (actor, rank, seen) => {
+    const casts = [];
+    if (lighting && seen > 0.05 && !actor.lamp) {
+      const tall = actor.height * 0.85, x = actor.where, z = actor.spot.z, y = actor.spot.y;
+      for (const lamp of lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.y <= tall + y + 20) continue;
+        const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
+        if (d >= lamp.range * 1.3 || flat < 1) continue;
+        const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * 0.25, tall * 2.2), alpha: (lighting.mood === MOODS.evening ? 0.3 : 0.85) * strength * seen });
+      }
+      const sun = lighting.mood.sun;
+      if (sun && lighting.mood === MOODS.evening) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: tall * 1.7, alpha: 0.34 * seen });
+    }
+    actor.casts = actor.casts || [];
+    while (actor.casts.length < casts.length) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;pointer-events:none';
+      actor.casts.push(el);
+    }
+    actor.casts.forEach((el, n) => {
+      const cast = casts[n];
+      if (!cast) { el.style.opacity = '0'; return; }
+      if (el.parentNode !== layers[rank]) layers[rank].appendChild(el);
+      const across = actor.width * 0.26;
+      Object.assign(el.style, { width: cast.length.toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity: Math.min(1, cast.alpha).toFixed(3),
+        background: 'linear-gradient(to right, rgba(0,0,0,.55), rgba(0,0,0,.18) 70%, rgba(0,0,0,0))',
+        transform: `translate3d(${actor.where.toFixed(1)}px, ${(-actor.spot.y - 0.7).toFixed(1)}px, ${actor.spot.z.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
+    });
+  };
   const set = {
     camera,
     view,
+    light({ mood = 'day', lamps = [], windows = [] } = {}) {
+      if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
+      const preset = MOODS[mood];
+      lighting = { mood: preset, key: norm(preset.key), lamps: [] };
+      lamps.forEach((spec, n) => {
+        const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
+          power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
+        const [r, g, b] = lamp.rgb.split(',').map(Number);
+        lamp.warmth = clamp((r - b) / 255, 0, 1) * 0.35;
+        const glow = document.createElement('div'), size = 150 * Math.sqrt(lamp.power);
+        glow.style.cssText = `width:${size}px;height:${size}px;aspect-ratio:1;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side, rgba(255,255,255,.95), rgba(${lamp.rgb},.75) 18%, rgba(${lamp.rgb},.22) 48%, rgba(${lamp.rgb},0))`;
+        stand(glow, null, { x: lamp.x, z: lamp.z + 2, y: lamp.y - size / 2, height: size, turn: false, ground: 1, shadow: false });
+        actors[actors.length - 1].lamp = lamp; lamp.sprites = [glow];
+        if (lamp.kind === 'ceiling') {
+          const cone = document.createElement('div'), wide = 520 * Math.sqrt(lamp.power);
+          cone.style.cssText = `width:${wide}px;height:${lamp.y}px;aspect-ratio:${(wide / lamp.y).toFixed(4)};pointer-events:none;clip-path:polygon(44% 0, 56% 0, 100% 100%, 0 100%);background:linear-gradient(rgba(${lamp.rgb},.26), rgba(${lamp.rgb},.08) 70%, rgba(${lamp.rgb},0))`;
+          stand(cone, null, { x: lamp.x, z: lamp.z + 1, y: 0, height: lamp.y, turn: false, ground: 1, shadow: false });
+          actors[actors.length - 1].lamp = lamp; lamp.sprites.push(cone);
+        }
+        lighting.lamps.push(lamp);
+      });
+      if (preset.sun) for (const win of windows) {
+        const sun = norm(preset.sun), corners = [[win.x, win.y], [win.x + win.width, win.y], [win.x + win.width, win.y - win.height], [win.x, win.y - win.height]]
+          .map(([x, y]) => { const t = -y / sun[1]; return [x + t * sun[0], win.z + t * sun[2]]; });
+        const xs = corners.map((c) => c[0]), zs = corners.map((c) => c[1]), x0 = Math.min(...xs), z0 = Math.min(...zs), w = Math.max(...xs) - x0, h = Math.max(...zs) - z0;
+        const shape = corners.map(([x, z]) => `${((x - x0) / w * 100).toFixed(2)}% ${((z - z0) / h * 100).toFixed(2)}%`).join(', ');
+        const reach = win.y / -sun[1], vx = sun[0], vy = -sun[1], vz = sun[2], nx = 0 * vz - 0 * vy, ny = 0 * vx - 1 * vz, nz = 1 * vy - 0 * vx;
+        face(layer(0), win.width, reach, `matrix3d(1,0,0,0, ${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)},0, ${nx.toFixed(4)},${ny.toFixed(4)},${nz.toFixed(4)},0, ${win.x},${-win.y},${win.z + 2},1)`,
+          `pointer-events:none;filter:blur(10px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.32).toFixed(2)}), rgba(${preset.sunColor},${(preset.sunAlpha * 0.12).toFixed(2)}) 70%, rgba(${preset.sunColor},0))`);
+        face(layer(0), w, h, `translate3d(${x0}px, -1px, ${z0}px) rotateX(90deg)`,
+          `pointer-events:none;clip-path:polygon(${shape});filter:blur(6px);background:linear-gradient(to bottom, rgba(${preset.sunColor},${(preset.sunAlpha * 0.55).toFixed(2)}), rgba(${preset.sunColor},${preset.sunAlpha}))`);
+      }
+      litKey = '';
+      set.update();
+      return set;
+    },
+    lamp(which, on = true, duration = 0.6) {
+      if (!lighting) throw new Error('[character] set.lamp: call set.light({ lamps: […] }) first');
+      const lamp = typeof which === 'number' ? lighting.lamps[which] : lighting.lamps.find((item) => item.name === which);
+      if (!lamp) throw new Error(`[character] set.lamp: no lamp ${JSON.stringify(which)} (lamps: ${lighting.lamps.map((item) => item.name).join(', ')})`);
+      return gsap.fromTo(lamp, { level: on ? 0 : 1 }, { level: on ? 1 : 0, duration, ease: 'power2.inOut', immediateRender: false, onUpdate: () => set.update() });
+    },
     floor({ x = [-900, 900], z = [-1100, 200], y = 0, style = null } = {}) {
       const depth = z[1] - z[0], strips = clamp(Math.round(depth / 150), 1, 12), each = depth / strips;
       room = room ? [Math.min(room[0], x[0]), Math.max(room[1], x[1])] : [x[0], x[1]];
       for (let k = 0; k < strips; k++) {
         const strip = face(layer(0), x[1] - x[0], each + 0.5, `translate3d(${x[0]}px, ${-y}px, ${z[0] + k * each}px) rotateX(90deg)`,
-          paint(style, '#a9c4cb') + `;background-position-y:${(-k * each).toFixed(2)}px`, [(x[0] + x[1]) / 2, y, z[0] + (k + 0.5) * each]);
+          paint(style, '#a9c4cb') + `;background-position-y:${(-k * each).toFixed(2)}px`, [(x[0] + x[1]) / 2, y, z[0] + (k + 0.5) * each],
+          { origin: [x[0], y, z[0] + k * each], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0], kind: 'floor', back: k === 0 });
         strip.dataset.floor = k;
         backdrop.push(strip);
       }
@@ -5133,14 +5257,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     wall({ from, to, height = 700, y = 0, style = null } = {}) {
       if (!Array.isArray(from) || !Array.isArray(to)) throw new Error('[character] set.wall({ from: [x, z], to: [x, z] }) needs both ends');
       const length = Math.hypot(to[0] - from[0], to[1] - from[1]), turn = -Math.atan2(to[1] - from[1], to[0] - from[0]) * 180 / Math.PI;
+      const u = [(to[0] - from[0]) / length, 0, (to[1] - from[1]) / length];
       backdrop.push(face(layer(0), length, height, `translate3d(${from[0]}px, ${-y - height}px, ${from[1]}px) rotateY(${turn}deg)`, paint(style, '#c9dce1') + ';backface-visibility:hidden',
-        [(from[0] + to[0]) / 2, y + height / 2, (from[1] + to[1]) / 2]));
+        [(from[0] + to[0]) / 2, y + height / 2, (from[1] + to[1]) / 2], { origin: [from[0], y + height, from[1]], u, v: [0, -1, 0], n: [-u[2], 0, u[0]], kind: 'wall' }));
       return set;
     },
     panel({ at, size, turn = 0, style = null } = {}) {
       const across = turn * Math.PI / 180;
       backdrop.push(face(layer(0), size[0], size[1], `translate3d(${at[0]}px, ${-at[1]}px, ${at[2]}px) rotateY(${turn}deg)`, paint(style, '#f4f7f8'),
-        [at[0] + Math.cos(across) * size[0] / 2, at[1] - size[1] / 2, at[2] - Math.sin(across) * size[0] / 2]));
+        [at[0] + Math.cos(across) * size[0] / 2, at[1] - size[1] / 2, at[2] - Math.sin(across) * size[0] / 2],
+        { origin: [at[0], at[1], at[2]], u: [Math.cos(across), 0, -Math.sin(across)], v: [0, -1, 0], n: [Math.sin(across), 0, Math.cos(across)], kind: 'panel' }));
       return set;
     },
     box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf' } = {}) {
@@ -5150,10 +5276,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       group.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d';
       layer(0).appendChild(group);
       const top = -y - height, middle = [x + width / 2, y + height / 2, z - depth / 2];
-      face(group, width, depth, `translate3d(${x}px, ${top}px, ${z - depth}px) rotateX(90deg)`, paint(tone.top, '#f1f4f5'), middle);
-      face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
-      face(group, depth, height, `translate3d(${x + width}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle);
-      face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle);
+      face(layer(0), width + 60, depth + 60, `translate3d(${x - 30}px, ${-y - 0.6}px, ${z - depth - 30}px) rotateX(90deg)`,
+        `background:radial-gradient(closest-side, rgba(0,0,0,.26), rgba(0,0,0,.12) 70%, rgba(0,0,0,0));opacity:${y > 0 ? 0 : 1}`);
+      const geomTop = { origin: [x, y + height, z - depth], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0], kind: 'box' };
+      face(group, width, depth, `translate3d(${x}px, ${top}px, ${z - depth}px) rotateX(90deg)`, paint(tone.top, '#f1f4f5'), middle, geomTop);
+      face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle,
+        { origin: [x, y + height, z], u: [0, 0, -1], v: [0, -1, 0], n: [-1, 0, 0], kind: 'box' });
+      face(group, depth, height, `translate3d(${x + width}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle,
+        { origin: [x + width, y + height, z], u: [0, 0, -1], v: [0, -1, 0], n: [1, 0, 0], kind: 'box' });
+      face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle,
+        { origin: [x, y + height, z], u: [1, 0, 0], v: [0, -1, 0], n: [0, 0, 1], kind: 'box' });
       for (const item of focused.slice(-4)) item.solid = true;
       const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width] };
       props.push(prop);
@@ -5254,7 +5386,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const { host, rig } = actor;
         if (!actor.width) { actor.width = host.offsetWidth; actor.height = host.offsetHeight; }        // host đang ẩn thì chưa đo được: đo lại ở khung sau
         if (actor.ground === null && actor.width) actor.ground = groundOf(rig);
-        soften(actor, host, '', blurAt(at.depth));
+        let lit = '';
+        if (lighting && !actor.lamp) {
+          const L = lightAt(actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z);
+          if (Math.abs(L.level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${L.level.toFixed(3)}) sepia(${L.warm.toFixed(3)})`;
+          if (L.rim && L.rim.k > 0.08 && actor.rig) {
+            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (2.2 * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
+            lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
+          }
+        }
+        soften(actor, host, lit, blurAt(at.depth));
         host.style.zIndex = 2 * rank + 1;
         if (!actor.content) actor.content = contentOf(host);
         const [cx0, cy0, cx1, cy1] = actor.content, w = actor.width * at.scale, h = actor.height * at.scale;
@@ -5264,7 +5405,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
         const margin = actor.width * 0.25, inside = room ? Math.min(actor.where - room[0], room[1] - actor.where) : Infinity;
         const present = room ? clamp((inside + margin) / (2 * margin), 0, 1) : 1;
-        if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
+        if (actor.lamp) { if (host.style.opacity !== actor.lamp.level.toFixed(3)) host.style.opacity = actor.lamp.level.toFixed(3); }
+        else if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
         host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
         const markEl = rig && rig.markEl;
         if (markEl) {
@@ -5297,6 +5439,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
+          castShadows(actor, rank, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
             transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
@@ -5322,6 +5465,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (r.left < frameBox.left - margin || r.top < frameBox.top - margin || r.right > frameBox.right + margin || r.bottom > frameBox.bottom + margin) px = 0;
         }
         soften(item, item.element, item.filter, px);
+      }
+      if (lighting) {
+        const key = lighting.lamps.map((lamp) => lamp.level.toFixed(3)).join(',');
+        if (key !== litKey) {
+          litKey = key;
+          surfaces.forEach(lightSurface);
+          for (const lamp of lighting.lamps) for (const sprite of lamp.sprites) sprite.style.opacity = lamp.level.toFixed(3);
+        }
       }
       return frame;
     },
@@ -5454,7 +5605,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     let shadow = null;
     if (withShadow) {
       shadow = document.createElement('div');
-      shadow.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.30),rgba(0,0,0,.16) 62%,rgba(0,0,0,0))';
+      shadow.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.42),rgba(0,0,0,.2) 60%,rgba(0,0,0,0))';
     }
     actors.push({ rig, host, spot, ground, shadow, turn: turn && rig && rig.s && typeof rig.s.huong === 'number', blur: 0 });
     set.update();
@@ -5473,8 +5624,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const blurAt = (depth) => (camera.blur > 0 ? Math.min(16, camera.blur * Math.abs(camera.lens - depth - camera.distance) / camera.distance) : 0);
   const soften = (item, element, filter, px) => {
     const rounded = Math.round(px * 10) / 10;
-    if (rounded === item.blur) return;
-    item.blur = rounded;
+    if (rounded === item.blur && filter === item.applied) return;
+    item.blur = rounded; item.applied = filter;
     element.style.filter = [filter, rounded ? `blur(${rounded}px)` : ''].filter(Boolean).join(' ');
   };
   function groundOf(rig) {
@@ -5731,7 +5882,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.55.0';
+const VERSION = '0.56.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

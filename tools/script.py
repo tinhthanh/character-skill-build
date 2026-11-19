@@ -22,6 +22,7 @@ Một tệp kịch bản:
 
   Dòng đầu (khoá: giá trị, nối nhau bằng " · "):
     bối cảnh   phòng khám · lễ tân · nhà thuốc · công viên · đường phố · phòng khách
+    ánh sáng   ngày (mặc định) · chiều (chạng vạng, nắng xiên, bóng dài) · tối (đèn là nguồn sáng)
     máy        tự động (mặc định: máy tự chọn mọi góc) · cố định (một góc toàn cảnh)
     khung      ngang (1920×1080, mặc định) · dọc (1080×1920: TikTok, Reels, Shorts)
     mở đầu / kết thúc   tiêu đề | dòng phụ | nút (thẻ đầu / cuối phim) · logo  tệp ảnh · nhạc  tệp nhạc nền
@@ -31,6 +32,7 @@ Một tệp kịch bản:
   Dòng kịch bản:
     tên: lời thoại                     tên (tâm trạng): lời thoại
     tên: [hành động, hành động]        thú: [sợ] — một cảm xúc; [sợ, run] — giữ nét mặt sợ trong lúc run
+    tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
@@ -44,7 +46,7 @@ PRESETS = {'phòng khám': 'exam', 'khám': 'exam', 'lễ tân': 'reception', 'q
 # Hộp của từng bối cảnh (theo tools/scene.py SET_PRESETS) mà một nhân vật có thể đứng / ngồi lên.
 BOXES = {'exam': {'table': (100, -480, 200, 160)}, 'reception': {'counter': (-520, -430, 440, 140), 'bench': (330, -820, 360, 120)},
          'pharmacy': {'counter': (-260, -420, 520, 130)}, 'park': {'bench': (220, -880, 340, 110)},
-         'living-room': {'sofa': (-560, -860, 520, 180), 'coffee-table': (-420, -560, 240, 120)}, 'street': {}}
+         'living-room': {'sofa': (-560, -860, 520, 180), 'coffee-table': (80, -700, 220, 120)}, 'street': {}}       # x, z, rộng, sâu
 ON_WORDS = {'bàn': ('table', 'coffee-table', 'counter'), 'quầy': ('counter',), 'ghế': ('bench', 'sofa'), 'sofa': ('sofa',), 'ghế đá': ('bench',)}
 PERSON_MOODS = {'vui': 'happy', 'buồn': 'sad', 'ngạc nhiên': 'surprised', 'giận': 'angry', 'tức giận': 'angry', 'suy nghĩ': 'thinking', 'cười': 'laughing',
                 'cười lớn': 'laughing', 'lo': 'worried', 'lo lắng': 'worried', 'bối rối': 'confused', 'mệt': 'tired', 'khóc': 'crying', 'ngượng': 'embarrassed',
@@ -67,6 +69,8 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
             'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None)}
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music'}
+LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
+SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 
 
 class ScriptError(Exception):
@@ -99,7 +103,7 @@ def parse(text):
         # Dòng đầu: "khoá: giá trị · khoá: giá trị" với khoá đã biết.
         pairs = [part for part in re.split(r'\s*·\s*', line)]
         keys = [part.split(':', 1)[0].strip().lower() for part in pairs if ':' in part]
-        if not lines and keys and all(key in ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc') for key in keys):
+        if not lines and keys and all(key in ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng') for key in keys):
             for part in pairs:
                 key, value = part.split(':', 1)
                 head[key.strip().lower()] = value.strip()
@@ -189,6 +193,7 @@ def build_scene(text, base):
                     if 'mood' in turn: raise ScriptError(f'{where}: hai tâm trạng trong một lượt')
                     turn['mood'] = table.get(word, word)
                 elif word in MARKS: turn['mark'] = MARKS[word]
+                elif word in SWITCHES: turn['lamp'] = SWITCHES[word]
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:
@@ -207,6 +212,10 @@ def build_scene(text, base):
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
 
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
+    if head.get('ánh sáng'):
+        mood = LIGHTS.get(head['ánh sáng'].lower())
+        if not mood: raise ScriptError(f'ánh sáng phải là {", ".join(LIGHTS)} — "{head["ánh sáng"]}"')
+        scene['set']['light'] = mood
     if portrait: scene['width'], scene['height'] = 1080, 1920
     if camera == 'tự động': scene['camera'] = 'auto'
     for key, card in (('mở đầu', 'intro'), ('kết thúc', 'outro')):
