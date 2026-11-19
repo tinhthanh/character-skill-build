@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.60.0
+
+Added — the whole frame in the light
+- **Things in the room take the light**: tables, sofas, counters cast long shadows away from each lamp above
+  them, along the evening sun, and along the sun when they stand in a patch of sunlight. Flat props (plant,
+  TV) get a rim of light like the characters.
+- **Lens**: a colour grade for the time of day (cool at night, warm in the evening), darker corners, a fine
+  film grain that moves every frame (from the timeline, so seeking is exact), a wide soft glare round every
+  bulb and round a sunny window. `set.light({ lens: false })` turns it off.
+- **The light changes within a scene**: `tl.add(set.shift('night', 6), t)` — the sun fades, the room darkens
+  and changes colour, and the lamps switch themselves on (flickering) when it is dark enough. In a scene file
+  `"sky": "night"` (or `{ "to": "night", "dur": 6 }`) on a turn; in a script `[trời tối dần]`, `[hoàng hôn]`,
+  `[trời sáng]`, or `ánh sáng: chiều → tối` in the scene line (the sky turns halfway through the scene).
+- **Power cut**: `"power": "off"` / `"on"` on a turn (`[mất điện]` / `[có điện]` in a script) — every lamp and
+  screen goes out at once, then they come back one after the other, each with a flicker.
+- **The camera sees the light**: the opening shot and a lamp turn in the evening or at night take the TV in
+  too; a full shot reaches further for a lamp. A close shot of a pet moves sideways so that a person standing
+  behind is out of the frame rather than cut at the neck, when it can.
+- `"lens": false` in a scene file's `"set"` turns the lens layer off.
+
+Fixed — after a Gemini review of the lighting
+- In a power cut the characters stayed lit as if a lamp shone on them: at night with no lamp on they now sink
+  into the dark.
+- A lamp right behind a person: the face is a little darker, the rim of lamplight thicker, with a touch of light
+  spilling over the edge.
+- Bright windows behind people (the clinic): a clearer white rim, and a soft shadow on the floor away from the
+  window.
+- Shadows on the floor are softer and fade towards the tail; the film grain was invisible after video
+  compression and is stronger.
+
+Measured
+- The lens layer costs about 15 % of the render time (a 13 s scene: 20.8 s with it, 18.0 s without).
+
 ## 0.59.0
 
 Added — light that lives in the room

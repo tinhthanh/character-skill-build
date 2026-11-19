@@ -23,6 +23,7 @@ Một tệp kịch bản:
   Dòng đầu (khoá: giá trị, nối nhau bằng " · "):
     bối cảnh   phòng khám · lễ tân · nhà thuốc · công viên · đường phố · phòng khách
     ánh sáng   ngày (mặc định) · chiều (chạng vạng, nắng xiên, bóng dài) · tối (đèn là nguồn sáng)
+               · "chiều → tối" (trời tối dần từ giữa cảnh, đèn tự bật)
     máy        tự động (mặc định: máy tự chọn mọi góc) · cố định (một góc toàn cảnh)
     khung      ngang (1920×1080, mặc định) · dọc (1080×1920: TikTok, Reels, Shorts)
     mở đầu / kết thúc   tiêu đề | dòng phụ | nút (thẻ đầu / cuối phim) · logo  tệp ảnh · nhạc  tệp nhạc nền
@@ -33,6 +34,8 @@ Một tệp kịch bản:
     tên: lời thoại                     tên (tâm trạng): lời thoại
     tên: [hành động, hành động]        thú: [sợ] — một cảm xúc; [sợ, run] — giữ nét mặt sợ trong lúc run
     tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
+    tên: [mất điện] / [có điện]        mọi đèn và màn hình tắt phụt / bật lại
+    tên: [trời tối dần] / [hoàng hôn] / [trời sáng]   trời chuyển giờ trong 6 giây
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
@@ -80,6 +83,8 @@ MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat',
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
+POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
+SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
 
 
 class ScriptError(Exception):
@@ -212,6 +217,8 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                     turn['mood'] = table.get(word, word)
                 elif word in MARKS: turn['mark'] = MARKS[word]
                 elif word in SWITCHES: turn['lamp'] = SWITCHES[word]
+                elif word in POWER: turn['power'] = POWER[word]
+                elif word in SKIES: turn['sky'] = SKIES[word]
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:
@@ -243,9 +250,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     characters = [c for c in characters if c['name'] in used] or characters
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
     if head.get('ánh sáng'):
-        mood = LIGHTS.get(head['ánh sáng'].lower())
-        if not mood: raise ScriptError(f'ánh sáng phải là {", ".join(LIGHTS)} — "{head["ánh sáng"]}"')
-        scene['set']['light'] = mood
+        # "chiều → tối": cảnh bắt đầu lúc chiều, trời tối dần từ giữa cảnh (6 giây).
+        parts = [part.strip().lower() for part in re.split(r'→|->', head['ánh sáng'])]
+        moods = [LIGHTS.get(part) for part in parts]
+        if len(parts) > 2 or not all(moods): raise ScriptError(f'ánh sáng phải là {", ".join(LIGHTS)}, hay "chiều → tối" — "{head["ánh sáng"]}"')
+        scene['set']['light'] = moods[0]
+        if len(moods) == 2 and script:
+            middle = script[len(script) // 2]
+            if isinstance(middle, dict) and 'sky' not in middle: middle['sky'] = {'to': moods[1], 'dur': 6}
     if portrait: scene['width'], scene['height'] = 1080, 1920
     if camera == 'tự động': scene['camera'] = 'auto'
     for key, card in (('mở đầu', 'intro'), ('kết thúc', 'outro')):

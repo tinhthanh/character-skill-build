@@ -520,6 +520,9 @@ with tempfile.TemporaryDirectory() as work:
     lit['set'].setdefault('panels', []).append({'wall': 'back', 'at': -200, 'y': 560, 'width': 300, 'height': 220, 'window': True})
     lit['script'][1]['lamp'] = 'on'
     lit['script'].append({'who': 'vet', 'lamp': {'name': 'tran', 'on': False, 'dur': 1}})
+    lit['script'].append({'who': 'vet', 'power': 'off'})                             # đợt 20: mất điện, trời chuyển, tắt ống kính
+    lit['script'].append({'who': 'vet', 'power': 'on', 'sky': {'to': 'day', 'dur': 4}})
+    lit['set']['lens'] = False
     path = os.path.join(os.path.dirname(stage), '_check_light.json')
     try:
         json.dump(lit, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -530,7 +533,8 @@ with tempfile.TemporaryDirectory() as work:
     else:
         html = open(os.path.join(work, 'lit', 'index.html'), encoding='utf-8').read()
         for needle in ('set.light({"mood": "night"', '"kind": "ceiling"', '"on": false', '"windows": [', 'set.lamp("tran", true, 0.6)', 'set.lamp("tran", false, 1)',
-                       "['point', set.targetPoint(vet, set.lampPoint(\"tran\"))]", '.start + 0.85'):
+                       "['point', set.targetPoint(vet, set.lampPoint(\"tran\"))]", '.start + 0.85', 'set.lamp("tran", false, 0.12)', 'set.lamp("tran", true, 0.9)',
+                       'set.shift("day", 4)', '"lens": false'):
             if needle not in html: problems.append(f'light: {needle} is not in the composition')
 
     # Đợt 18: kịch bản nhiều cảnh → film.json; mở đầu "hook"; thông báo trong kịch bản chữ.
@@ -550,6 +554,17 @@ with tempfile.TemporaryDirectory() as work:
                           (one['script'][2].get('toast'), {'title': 'VetGo', 'text': 'Đặt lịch 8:00'}), (one['script'][1].get('lamp'), 'on'),
                           (film.get('scenes'), ['phim-1.scene.json', 'phim-2.scene.json']), (film.get('music'), 'nen.mp3'), ('music' in one, False)]:
             if got != want: problems.append(f'script.py (scenes): expected {want!r} — got {got!r}')
+    # Đợt 20: mất điện / có điện, trời chuyển giờ trong kịch bản chữ.
+    sky = os.path.join(work, 'troi.txt')
+    open(sky, 'w', encoding='utf-8').write('bối cảnh: phòng khách · ánh sáng: chiều → tối\nbà (granny)\nbà: Chiều rồi.\nbà: [mất điện]\nbà: [có điện]\nbà: [trời sáng]\n')
+    done = subprocess.run([sys.executable, script_tool, sky, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py: power / sky words are refused: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        got = json.load(open(os.path.join(work, 'troi.scene.json'), encoding='utf-8'))
+        steps = [{k: v for k, v in turn.items() if k in ('power', 'sky')} for turn in got['script']]
+        # "chiều → tối": trời chuyển ở lượt giữa cảnh (lượt thứ 3 trong 4).
+        if got['set'].get('light') != 'evening' or steps != [{}, {'power': 'off'}, {'power': 'on', 'sky': {'to': 'night', 'dur': 6}}, {'sky': 'day'}]:
+            problems.append(f'script.py (power / sky): got light {got["set"].get("light")!r}, turns {steps!r}')
     hooked = json.loads(json.dumps(call)); hooked['hook'] = {'title': 'Bé ăn nhầm sô-cô-la?', 'text': 'Gọi VetGo'}
     path = os.path.join(os.path.dirname(stage), '_check_hook.json')
     try:
@@ -608,6 +623,8 @@ with tempfile.TemporaryDirectory() as work:
         ('an unknown time of day', lambda s: s['set'].update({'light': 'dusk'}), 'set.light'),
         ('a lamp of an unknown kind', lambda s: s['set'].update({'lamps': [{'x': 0, 'y': 600, 'z': -500, 'kind': 'neon'}]}), 'ceiling'),
         ('a lamp switched where there is none', lambda s: s['script'][1].update({'lamp': 'on'}), 'no lamps'),
+        ('an unknown sky', lambda s: s['script'][1].update({'sky': 'dusk'}), '"sky"'),
+        ('a power word that is not on / off', lambda s: s['script'][1].update({'power': 'cut'}), '"power"'),
         ('a window on a side wall', lambda s: s['set'].setdefault('panels', []).append({'wall': 'left', 'at': -300, 'y': 500, 'width': 200, 'height': 200, 'window': True}), 'back wall'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')

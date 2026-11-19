@@ -158,7 +158,8 @@ clips for every voice file.
    Light: `"set": { "light": "night", "lamps": [ … ] }` (`day`, `evening`, `night`), `"window": true` on a
    back-wall panel, `"lamp": "on"` on a turn — lamps glow (and flicker when switched on), light the room and the
    characters, cast shadows; windows light the characters too (backlight, sunlight patch, passing clouds); a
-   `"tv"` cutout flickers in the evening / at night.
+   `"tv"` cutout flickers in the evening / at night; furniture casts long shadows; a lens layer grades the
+   frame. `"sky": "night"` on a turn darkens the scene gradually; `"power": "off"` / `"on"` is a power cut.
    Easiest: `"camera": "auto"` at the top — the camera chooses every shot (speaker with listener, close on
    a pet's expression, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
    "size": "medium" }` — worked out for you. `"mark": "?"` puts a comic mark over a head; `"sounds": { "bark":

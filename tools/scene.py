@@ -172,7 +172,7 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
 MARKS = ('!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music')         # runtime/marks.js
 PET_MOOD_MARKS = {'scared': '!', 'curious': '?', 'sleepy': 'zzz', 'happy': 'heart', 'excited': 'heart', 'angry': 'anger', 'guilty': 'sweat', 'pain': 'sweat'}
 SHOW_KEYS = ('title', 'bullets', 'image')
@@ -180,7 +180,7 @@ PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
-SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps', 'shading')
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps', 'shading', 'lens')
 LIGHT_MOODS = ('day', 'evening', 'night')
 LAMP_KEYS = ('name', 'x', 'y', 'z', 'color', 'power', 'range', 'on', 'kind')
 # BỐI CẢNH DỰNG SẴN (`"set": { "preset": "reception" }`): đồ đạc của một căn phòng quen thuộc, đặt theo phòng mặc định
@@ -824,6 +824,8 @@ def main():
                 half = dict(ROOM_DEFAULTS, **stage_set.get('room', {}))['width'] / 2
                 leaving = (float(who['x']) + half if turn['exit'] == 'left' else half - float(who['x'])) + 0.55 * who['_host_width']
             steps.append(f"['exit', {js(turn['exit'])}, {round(leaving / who['_unit'])}]")
+        if not steps and ('power' in turn or 'sky' in turn):
+            steps.append("['idle', 1.2]")                   # mất điện / trời chuyển: một nhịp đứng yên cho thấy căn phòng đổi sáng
         if not steps and 'lamp' in turn:
             # Lượt chỉ bật / tắt đèn: NGƯỜI với tay tới công tắc trên thân cây đèn (đèn sáng đúng lúc tay tới — xem lamp_ops);
             # thú thì một nhịp đứng yên.
@@ -881,6 +883,7 @@ def main():
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
     lamp_ops = []                                           # { turn, name, on, dur } — bật / tắt đèn của bối cảnh 3D
+    power_ops, sky_ops = [], []                             # mất điện / có điện · trời chuyển giờ
     popups = []                                             # { turn, cutout: số thứ tự, title, text, hold } — thông báo trên màn hình đạo cụ 3D
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
@@ -974,7 +977,7 @@ def main():
             if company: return dict(span, subjects=[who['name']] + company, size='medium', speech=True)
             if talker.get('mood') in STRONG or not listener: return dict(span, subjects=[who['name']], size='close' if talker.get('mood') in STRONG else 'medium', speech=True)
             return dict(span, subjects=[who['name'], listener], size='medium', speech=True)
-        if len(group) == 1 and 'lamp' in group[0] and not group[0].get('do'):
+        if len(group) == 1 and ('lamp' in group[0] or 'power' in group[0] or 'sky' in group[0]) and not group[0].get('do') and not group[0].get('say'):
             # Bật / tắt đèn: cả người lẫn cây đèn trong khung (frameOn tự lấy bóng đèn đang sáng vào) — thấy căn phòng đổi sáng.
             return dict(span, subjects=[names[group[0]['who']]['name']], size='full', lamp=True)
         if len(group) == 1:
@@ -1078,6 +1081,19 @@ def main():
             # Người bật đèn bằng tay (lượt không lời, không động tác): đèn đổi đúng lúc tay chạm tới công tắc (~0,75 s).
             reach = turn['who'] in names and not names[turn['who']]['_pet'] and not turn.get('say') and not turn.get('do')
             lamp_ops.append({'turn': emitted[0], 'name': spec.get('name'), 'on': spec['on'], 'dur': float(spec.get('dur', 0.35 if reach else 0.6)), 'where': where, 'delay': 0.85 if reach else 0})
+        # MẤT ĐIỆN / CÓ ĐIỆN (`"power": "off" | "on"`): mọi đèn và màn hình tắt phụt / bật lại (chớp) cùng lúc.
+        # TRỜI CHUYỂN (`"sky": "night"` hay { "to": "night", "dur": 6 }): nắng tắt dần, phòng tối dần, tới giờ lên đèn thì đèn tự bật.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict): continue
+            if 'power' in turn:
+                if stage_set is None: fail(f'{where}: "power" switches every lamp of a 3D set — add "set"')
+                if turn['power'] not in ('on', 'off'): fail(f'{where}: "power" is "on" or "off" — got {js(turn["power"])}')
+                power_ops.append({'turn': emitted[0], 'on': turn['power'] == 'on', 'where': where})
+            if 'sky' in turn:
+                if stage_set is None: fail(f'{where}: "sky" changes the light of a 3D set — add "set"')
+                spec = turn['sky'] if isinstance(turn['sky'], dict) else {'to': turn['sky']}
+                if not isinstance(spec, dict) or set(spec) - {'to', 'dur'} or spec.get('to') not in ('day', 'evening', 'night'): fail(f'{where}: "sky" is "day", "evening", "night" or {{ "to": "night", "dur": 6 }} — got {js(turn["sky"])}')
+                sky_ops.append({'turn': emitted[0], 'to': spec['to'], 'dur': float(spec.get('dur', 6))})
         # THẺ THÔNG BÁO trên khung (`"toast"`): gắn với lượt của chính mục này (sau các bước lại gần vừa chèn).
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or 'toast' not in turn: continue
@@ -1309,6 +1325,7 @@ def main():
         light = {'mood': stage_set.get('light', 'day')}
         if room.get('gloss'): light['gloss'] = True
         if stage_set.get('shading') is False: light['shading'] = False        # không đổ bóng trên thân nhân vật: render nhanh hơn
+        if stage_set.get('lens') is False: light['lens'] = False              # không chỉnh màu / tối góc / hạt phim
         if lamps: light['lamps'] = lamps
         if windows: light['windows'] = windows
         lamp_names = [lamp.get('name', f'lamp{n + 1}') for n, lamp in enumerate(lamps)]
@@ -1629,6 +1646,13 @@ def main():
             name = op['name'] if op['name'] is not None else lamp_names[0]
             if name not in lamp_names: fail(f'{op["where"]}: "lamp" names {js(name)}, but the lamps are {", ".join(lamp_names)}')
             moves.append(f"    tl.add(set.lamp({js(name)}, {js(op['on'])}, {op['dur']:g}), T0 + talk.turns[{op['turn']}].start + {op['delay']:g});      // lamp {'on' if op['on'] else 'off'}")
+        for op in power_ops:
+            # Mất điện: tắt phụt (0,12 s, không chớp); có điện: các đèn bật lại lần lượt, mỗi cái chớp một nhịp.
+            for n, name in enumerate(lamp_names):
+                call = f"set.lamp({js(name)}, false, 0.12)" if not op['on'] else f"set.lamp({js(name)}, true, 0.9)"
+                moves.append(f"    tl.add({call}, T0 + talk.turns[{op['turn']}].start + {0.2 + (0.3 * n if op['on'] else 0):g});      // power {'on' if op['on'] else 'off'}")
+        for op in sky_ops:
+            moves.append(f"    tl.add(set.shift({js(op['to'])}, {op['dur']:g}), T0 + talk.turns[{op['turn']}].start);      // the sky turns {op['to']}")
         # Các lần CẮT CẢNH của kịch bản (và của đạo diễn tự động): phụ đề không sót qua chúng.
         moves.append('    const CUTS = [' + ', '.join(f'T0 + talk.turns[{view["turn"]}].start' for view in views if view['cut']) + '];')
         if director and height > width * 1.2 and len(beats) > 1:

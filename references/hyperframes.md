@@ -456,6 +456,11 @@ them a little and gives them a rim and a soft glow of light (backlight). Clouds 
 (`set.light({ clouds: false })` to keep it steady). A `"tv"` cutout (in the living room) and the screens
 light the room with a flicker that changes colour in the evening and at night. Someone standing near the back
 wall darkens the wall behind them. At night the window glass is dark blue.
+Tables and sofas cast long shadows from the lamps and the sun too. A lens layer grades the colour for the time of
+day, darkens the corners, adds a fine film grain and a glare round bright lights (`set.light({ lens: false })`).
+`"sky": "night"` on a turn (`{ "to": "night", "dur": 6 }`) turns the light of the scene to another time of day
+(`set.shift('night', 6)` in code; lamps switch themselves on as it gets dark); `"power": "off"` / `"on"` cuts and
+restores every lamp and screen at once.
 Characters are shaded too: the side toward the nearest lamp (or the main light) is lit and tinted, the other
 side darker (`rig.lightShade`, done by the set each frame). A turn with only `"lamp"` makes the person reach
 for the lamp's switch while it changes. Lit lamps stay in automatic shots when that costs little. Evenings
