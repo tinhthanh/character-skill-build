@@ -628,7 +628,9 @@ The library draws characters only. A scene usually needs:
   hem of the top is at about 0.1–0.15. So a counter in front that is taller than ~0.35 × host
   height leaves only the head showing. Either keep the counter low, or raise the character's
   host (a taller stool) until the chest clears it, and check with `tools/peek.sh`.
-- **Several scenes in one film.** Render each scene at the same size and frame rate
+- **Several scenes in one film:** `python3 tools/film.py film.json` builds and renders each scene file and
+  joins them with fade / slide transitions (sound kept in step; silent scenes get a silent track). By hand:
+  render each scene at the same size and frame rate
   (`hyperframes render --fps 24 --output partN.mp4`; the default is 30 fps), then join them,
   re-encoding so sound and picture stay together:
 

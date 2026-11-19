@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.50.0
+
+Added — more pets, opening and closing cards, films
+- **Breeds:** dogs `corgi` (short legs, long body), `poodle`, `husky`, `black_dog`; cats `white_cat`,
+  `calico` (with black and orange patches — a new pet colour `patches`). A breed may now carry its
+  own default `shape`.
+- **Rabbit** (`rabbit`): a new species — long ears, round body, big hind legs, a cotton tail; rests
+  sitting; **hops** wherever a dog trots (`walk`, `enter`, `exit`); `hop`, `thump`, and the shared
+  actions (eat, sleep, unwell, scratchItch, play, carrier …).
+- **`"intro"` / `"outro"`** in scene files: a full-frame opening card (the scene starts after it) and
+  a closing card after the last turn — brand colour, logo, title, a line of text, a call-to-action
+  button. Every turn-based time (camera, captions, toasts, popups, sound) is shifted by the opening.
+- **`tools/film.py film.json`** — builds and renders several scene files and joins them into one film
+  with `fade`, `slide` or `cut` transitions, sound in step (a silent scene gets a silent track).
+
 ## 0.49.0
 
 Added — notifications on screens in a set

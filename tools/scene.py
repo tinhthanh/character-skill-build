@@ -101,6 +101,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   toast        `"toast": "Appointment moved"` or `{ "title": "VetGo", "text": "Bella: Saturday 9:00" }` on a turn: an
                app notification card slides in at the top of the frame as the turn starts and stays 2.5–4 s.
                A person holding a phone can also get one ON the phone: ["notify", "Reminder: Saturday 9:00"].
+  intro/outro  `"intro": { "title": "…", "text": "…", "cta": "…", "logo": "logo.png", "dur": 2.6, "color": "#2f9e8f" }`
+               opens the video with a full-frame card (the scene starts after it); `"outro"` closes it with one after the
+               last turn (the call to action: "cta"). Join several scene files into one film with tools/film.py.
   popup        3D sets: `"popup": { "on": "screen", "title": "New appointment", "text": "Milo, 15:00", "hold": 2.5 }` on a
                turn pops a notification card up ON the screen of a set.cutouts "monitor" (or a "laptop" with "facing":
                "viewer") given that "name" — it follows the camera with the screen.
@@ -151,7 +154,8 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro')
+CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
@@ -1214,6 +1218,44 @@ def main():
             text = html_text(note['text']).replace('"', '&quot;')
             body.append(f'  <div id="toast-{number + 1}" class="clip toast" data-text="{text}" data-start="0" data-duration="1" data-track-index="{track[0]}" data-toast-turn="{note["turn"]}" data-layout-ignore="">{html_text(note["title"])}</div>')
             track[0] += 1
+    # ── THẺ MỞ ĐẦU / KẾT THÚC (`"intro"`, `"outro"`): một khung toàn màn hình — nền màu thương hiệu, logo, tiêu đề, một dòng
+    # chữ, một nút kêu gọi. Mỗi thứ là một clip phẳng. Thẻ mở đầu chiếm `dur` giây đầu (hội thoại bắt đầu sau nó, `T0`);
+    # thẻ kết thúc nối sau lượt cuối (giờ bắt đầu điền sau khi đo, `__OUTRO_START__`).
+    intro, outro = scene.get('intro'), scene.get('outro')
+    intro_dur, card_lines = 0.0, []
+    for which, card in (('intro', intro), ('outro', outro)):
+        if card is None: continue
+        if not isinstance(card, dict) or set(card) - set(CARD_KEYS) or not (card.get('title') or card.get('text')): fail(f'"{which}" is {{ "title", "text", "cta", "logo", "dur", "color" }} with at least a title or a text — got {js(card)}')
+        dur = float(card.get('dur', 2.6 if which == 'intro' else 3.2))
+        if not 1 <= dur <= 10: fail(f'{which}.dur must be 1…10 seconds')
+        colour = card.get('color', '#2f9e8f')
+        if not re.match(r'^#[0-9a-fA-F]{6}$', colour): fail(f'{which}.color must be #rrggbb')
+        start, length = ('0', f'{dur:g}') if which == 'intro' else ('__OUTRO_START__', '__OUTRO_DUR__')
+        unit = min(width, height)
+        def card_clip(kind, css, tag='div', content='', extra=''):
+            style.append(f'  #{which}-{kind} {{ {css} z-index: 50; }}')
+            body.append(f'  <{tag} id="{which}-{kind}" class="clip card-{which}" data-start="{start}" data-duration="{length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>{content}</{tag}>' if tag != 'img'
+                        else f'  <img id="{which}-{kind}" class="clip card-{which}" data-start="{start}" data-duration="{length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>')
+            track[0] += 1
+        card_clip('bg', f'position: absolute; inset: 0; background: radial-gradient(circle at 30% 25%, #ffffff33, transparent 55%), linear-gradient(150deg, {colour}, #0f2a38);')
+        top = 0.3
+        if card.get('logo'):
+            if not os.path.isfile(os.path.join(base, card['logo'])): fail(f'{which}.logo not found: {card["logo"]} (looked in {base})')
+            name = copy_asset(base, out, card['logo'], copied)
+            card_clip('logo', f'position: absolute; left: 50%; top: {round(height * 0.16)}px; height: {round(unit * 0.16)}px; transform: translateX(-50%);', tag='img', extra=f' src="{name}" alt=""')
+            top = 0.38
+        if card.get('title'):
+            card_clip('title', f'position: absolute; left: 8%; right: 8%; top: {round(height * top)}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 800; font-size: {round(unit * 0.085)}px; line-height: 1.12; color: #ffffff; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);', content=html_text(card['title']))
+        if card.get('text'):
+            card_clip('text', f'position: absolute; left: 12%; right: 12%; top: {round(height * (top + 0.2))}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 500; font-size: {round(unit * 0.042)}px; line-height: 1.3; color: #e6f4f1;', content=html_text(card['text']))
+        if card.get('cta'):
+            card_clip('cta', f'position: absolute; left: 50%; top: {round(height * (top + 0.36))}px; transform: translateX(-50%); padding: {round(unit * 0.018)}px {round(unit * 0.05)}px; border-radius: 999px; background: #ffffff; color: {colour}; font-family: system-ui, sans-serif; font-weight: 800; font-size: {round(unit * 0.04)}px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);', content=html_text(card['cta']))
+        if which == 'intro':
+            intro_dur = dur
+            card_lines.append(f"    // Opening card: the words come in, then the whole card fades into the scene.\n    gsap.utils.toArray('.card-intro:not(#intro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, 0.15 + n * 0.15));\n    tl.to('.card-intro', {{ opacity: 0, duration: 0.45, ease: 'power1.in' }}, T0 - 0.45);")
+        else:
+            card_lines.append(f"    // Closing card after the last turn: it fades in over the scene, then the words come in.\n    tl.from('#outro-bg', {{ opacity: 0, duration: 0.5 }}, T1); gsap.utils.toArray('.card-outro:not(#outro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, T1 + 0.3 + n * 0.15));\n    tl.to({{}}, {{ duration: {dur:g} }}, T1);")
+    card_code = "\n    const T1 = tl.duration();                 // the closing card (if any) starts here\n" + "\n".join(card_lines) if card_lines else "\n    const T1 = tl.duration();"
     camera = False if stage_set is not None or layout == 'split' else scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
     if camera:
@@ -1234,13 +1276,13 @@ def main():
     # nào hiện đúng lúc lời nói tới cụm ấy. Hộp chữ hai ba dòng che mất nhân vật thấp và cử chỉ tay. Bề ngang một chữ
     # ≈ 0,55 cỡ chữ; trừ lề trong 60px.
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
-    caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), 0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
+    caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), T0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
     if popups:
         caption_code += "\n    // Notifications on the screens of props in the set (they follow the camera with the prop)."
         for pop in popups:
-            caption_code += f"\n    tl.add(cutout{pop['cutout']}Prop.notify({js({'title': pop['title'], 'text': pop['text']})}, {{ hold: {pop['hold']:g} }}).paused(false), talk.turns[{pop['turn']}].start + 0.3);"
+            caption_code += f"\n    tl.add(cutout{pop['cutout']}Prop.notify({js({'title': pop['title'], 'text': pop['text']})}, {{ hold: {pop['hold']:g} }}).paused(false), T0 + talk.turns[{pop['turn']}].start + 0.3);"
     if speakers:
-        moves = ' '.join(f"tl.to('#dim-left', {{ opacity: {0 if side in ('left', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start); tl.to('#dim-right', {{ opacity: {0 if side in ('right', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start);" for turn, side in speakers)
+        moves = ' '.join(f"tl.to('#dim-left', {{ opacity: {0 if side in ('left', None) else 0.32}, duration: 0.3 }}, T0 + talk.turns[{turn}].start); tl.to('#dim-right', {{ opacity: {0 if side in ('right', None) else 0.32}, duration: 0.3 }}, T0 + talk.turns[{turn}].start);" for turn, side in speakers)
         caption_code += "\n    // Split screen: the half that is not speaking dims a little.\n    " + moves
     if toasts: caption_code += "\n    // Notification cards slide in at their data-start and out before their clip ends (tools/scene.py fills both in).\n    document.querySelectorAll('.toast').forEach((element) => { const start = +element.dataset.start, end = start + +element.dataset.duration; tl.from(element, { opacity: 0, y: -30, duration: 0.4, ease: 'back.out(1.6)' }, start); tl.to(element, { opacity: 0, y: -16, duration: 0.3, ease: 'power2.in' }, end - 0.3); });"
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
@@ -1254,7 +1296,7 @@ def main():
         for view in views:
             values = ', '.join(f'{key}: {value:g}' for key, value in view['values'].items())
             call = f"set.cut({{ {values} }})" if view['cut'] else f"set.move({{ {values} }}, {view['dur']:g}, {js(view['ease'])})"
-            moves.append(f"    tl.add({call}, talk.turns[{view['turn']}].start);")
+            moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
         if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
@@ -1286,12 +1328,13 @@ def main():
     ], {{ {camera_code}gap: {float(scene.get('gap', 0.25))} }});
 
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
-    talk.addTo(tl, 0);
-{caption_code}{view_code}{drive_code}
+    const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
+    talk.addTo(tl, T0);
+{caption_code}{view_code}{card_code}{drive_code}
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
-    window.__sceneTimings = {{ duration: tl.duration(), turns: talk.turns.map((turn) => [turn.start, turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: step.start, sound: step.sound, length: step.speech }}))) }};
+    window.__sceneTimings = {{ duration: tl.duration(), outro: T1, turns: talk.turns.map((turn) => [T0 + turn.start, T0 + turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: T0 + step.start, sound: step.sound, length: step.speech }}))) }};
   </script>
 </div>
 </body>
@@ -1307,6 +1350,7 @@ def main():
         final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
     final = place_shows(final, timings, total)
     final = place_toasts(final, timings, total)
+    if outro: final = final.replace('__OUTRO_START__', f'{timings["outro"]:.2f}').replace('__OUTRO_DUR__', f'{max(0.5, total - timings["outro"]):.2f}')
     # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
     final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')
     open(target, 'w', encoding='utf-8').write(final)

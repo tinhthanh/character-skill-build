@@ -51,7 +51,7 @@ export const COLOR_KEYS = {
   buttons: 'cuc', tie: 'caVat', drawstrings: 'day',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   // thú
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
-  collar: 'vongCo', tag: 'the', earInner: 'taiTrong',
+  collar: 'vongCo', tag: 'the', earInner: 'taiTrong', patches: 'patch',
 };
 
 /** Trạng thái của rig NGƯỜI (cũng là khoá của tư thế nghỉ). */

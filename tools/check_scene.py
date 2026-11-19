@@ -394,6 +394,30 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
 
+    # Đợt 10: thẻ mở đầu / kết thúc; tools/film.py từ chối khoá lạ (ghép thật cần render — không chạy ở đây).
+    cards = json.loads(json.dumps(call))
+    cards['intro'] = {'title': 'Đặt lịch trong 30 giây', 'text': 'VetGo'}
+    cards['outro'] = {'title': 'VetGo', 'cta': 'Tải app ngay', 'dur': 2.5}
+    path = os.path.join(os.path.dirname(stage), '_check_cards.json')
+    try:
+        json.dump(cards, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'cards'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a scene with intro / outro cards does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'cards', 'index.html'), encoding='utf-8').read()
+        for needle in ('id="intro-bg"', 'id="intro-title"', 'id="outro-cta"', 'const T0 = 2.6;', 'talk.addTo(tl, T0);'):
+            if needle not in html: problems.append(f'cards: {needle} is not in the composition')
+        if '__OUTRO_' in html: problems.append('cards: the closing card was not timed (placeholder left in the composition)')
+        starts = re.findall(r'id="outro-bg"[^>]*data-start="([\d.]+)"', html)
+        toast = re.findall(r'id="toast-1"[^>]*data-start="([\d.]+)"', html)
+        if not starts or not toast or not float(toast[0]) > 2.6: problems.append(f'cards: the turns are not shifted after the opening card (toast at {toast})')
+    bad_film = os.path.join(work, 'bad-film.json')
+    json.dump({'scenes': ['x.json'], 'music': 'a.mp3'}, open(bad_film, 'w'))
+    done = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'film.py'), bad_film], capture_output=True, text=True)
+    if done.returncode == 0 or 'music' not in done.stderr: problems.append('film.py: an unknown key in film.json is not refused clearly — ' + done.stderr.strip()[:160])
+
     for outdoor in ('park', 'street'):
         scene = {'id': outdoor, 'set': {'preset': outdoor}, 'characters': [{'name': 'boy', 'id': 'boy', 'x': -200, 'z': -500, 'holds': 'leash'}, {'name': 'dog', 'species': 'dog', 'x': 0, 'z': -500}],
                  'script': [{'who': 'boy', 'do': [['leash', '@dog']]}, {'together': [{'who': 'boy', 'do': [['walk', 4, 200]]}, {'who': 'dog', 'do': [['walk', 4, 300]]}]},

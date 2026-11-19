@@ -150,7 +150,7 @@ owns the whole state and overwrites it.
 All pets stand side-on with the **head toward screen right** and the face turned to the
 viewer. `walk` with a negative distance turns the animal round first.
 
-**Dogs** (`dog`, `shiba`) rest standing:
+**Dogs** (`dog`, `shiba`, `corgi` — short legs, long body —, `poodle`, `husky`, `black_dog`) rest standing:
 
 | Action | Arguments | What it does | ≈ seconds |
 |---|---|---|---|
@@ -184,7 +184,7 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
 | `exit` | `(to = 'right', distance)` | turn that way and run out past the edge of the frame — **ends hidden** | 2.4 |
 
-**Cats** (`cat`, `orange_cat`, `black_cat`) rest **sitting**; actions that need them standing
+**Cats** (`cat`, `orange_cat`, `black_cat`, `white_cat`, `calico`) rest **sitting**; actions that need them standing
 stand them up first:
 
 | Action | Arguments | What it does | ≈ seconds |
@@ -229,6 +229,15 @@ clear ring round the head), `rig.wear('bandage')` a bandage on the near front le
 `rig.wear(kind, false)` takes it off. They take effect at once (not a timeline step) and stay on
 through every action. `createPet(host, { species, wear: ['cone'] })` does the same at creation,
 and a scene file takes `"wears": "cone"` on a pet.
+
+**Rabbit** (`rabbit`) rests **sitting**, long ears up; it **hops** wherever a dog trots (`walk`, `enter`, `exit`), and
+does the shared actions (idle, sit / stand / lie down, sleep, unwell, eat, drink, scratchItch, tremble, cough, openMouth,
+shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `wear`) plus:
+
+| Action | Arguments | What it does | ≈ seconds |
+|---|---|---|---|
+| `hop` | `(times = 2)` | hops on the spot: a crouch, a leap with the hind legs out and the ears swept back, a landing | 0.7 + 0.66 × `times` |
+| `thump` | `(times = 2)` | alert: ears straight up, eyes wide, the hind feet thump the ground | 0.85 + 0.4 × `times` |
 
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything

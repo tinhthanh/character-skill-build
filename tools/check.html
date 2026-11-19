@@ -102,7 +102,7 @@ try {
     if (L.validateConfig({ proportions: { headSize: 1.2 }, colors: { top: '#2f9e8f' }, restPose: { smile: 1, handL: 'fist' } }).length) hong('guards', 'validateConfig rejects a valid config');
     if (L.validateConfig({ shape: { legLength: 0.8 }, colors: { fur: '#333333' } }, 'pet').length) hong('guards', 'validateConfig rejects a valid pet config');
     expectThrow('createCharacter with a wrongly typed config', () => L.createCharacter(host, { id: 'surgeon', config: { faceShape: { halfWidth: 'wide' } } }));
-    expectThrow('createPet with an unknown species', () => L.createPet(host, { species: 'rabbit' }));
+    expectThrow('createPet with an unknown species', () => L.createPet(host, { species: 'hamster' }));
     expectThrow('setColors with a colour name', () => new RigSVG(host, 'default').setColors({ top: 'red' }));
     expectThrow('registering a duplicate id', () => L.registerCharacter({ id: 'surgeon', define: (base) => ({ ...base }) }));
     expectThrow('backSkullColor naming a missing colour', () => L.registerCharacter({ id: 'check_tmp_1', define: (base) => ({ ...base, backSkullColor: 'missing' }) }));
@@ -1571,7 +1571,7 @@ try {
         return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg)) };
       };
       let compared = 0;
-      for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets]]) {
+      for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
         const kind = id in RigThu.LOAI ? RigThu.LOAI[id].loai : null;
         for (const entry of list.filter((item) => item.steps.length === 1 && (!item.species || item.species === kind))) {
           await new Promise((resolve) => setTimeout(resolve, 0));        // nhường lượt: trang vẫn trả lời chrome_run giữa chừng (CI chậm)

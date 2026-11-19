@@ -1,4 +1,4 @@
-/* VGCharacter v0.49.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.50.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -4846,6 +4846,7 @@ const dauMeo = (p, m) => `
   <g id="${p}-tai${b}"><path d="M ${g * 33} -12 L ${g * 29} -49 L ${g * 5} -29 Z" fill="${m.long}" stroke="${m.long}" stroke-width="3" stroke-linejoin="round"/>
     <path d="M ${g * 28} -19 L ${g * 26.500} -40 L ${g * 12} -28 Z" fill="${m.taiTrong}"/></g>`; }).join('')}
   <ellipse rx="37" ry="32" fill="${m.long}"/>
+  ${m.patch ? `<path d="M -36 -6 Q -38 -28 -14 -31 Q -4 -32 -2 -24 Q -6 -12 -18 -8 Q -28 -2 -36 -6 Z" fill="${m.patch}"/>` : ''}
   <path d="M 0 -31 v 9 M -9 -30 l 2 8 M 9 -30 l -2 8" stroke="${m.dom}" stroke-width="3.200" stroke-linecap="round"/>
   <path d="M -36 -2 l 9 1.500 M -35 7 l 8 -0.500 M 36 -2 l -9 1.500 M 35 7 l -8 -0.500" stroke="${m.dom}" stroke-width="2.600" stroke-linecap="round"/>
   <ellipse cx="0" cy="17" rx="16" ry="12" fill="${m.longSang}"/>
@@ -4865,6 +4866,32 @@ const dauMeo = (p, m) => `
   <path d="M -4 9 Q 0 7.500 4 9 Q 2.500 13 0 13.800 Q -2.500 13 -4 9 Z" fill="${m.mui}"/>
   <path d="M -13 14 l -19 -4 M -13 17 l -20 1 M -13 20 l -18 6 M 13 14 l 19 -4 M 13 17 l 20 1 M 13 20 l 18 6"
         stroke="#ffffff" stroke-width="0.900" stroke-linecap="round" opacity=".85"/>`;
+
+/* ───────────────────────────────────────────────────────────── ĐẦU THỎ
+ * Hai tai dài dựng đứng (lót hồng), mặt tròn, mắt tròn đen to, mũi hồng nhỏ, hai răng cửa, má phồng.
+ */
+const dauTho = (p, m) => `
+  ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
+  <g id="${p}-tai${b}"><ellipse cx="${g * 13}" cy="-62" rx="10.500" ry="34" fill="${m.long}" transform="rotate(${g * 8} ${g * 13} -30)"/>
+    <ellipse cx="${g * 13}" cy="-60" rx="5.500" ry="26" fill="${m.taiTrong}" transform="rotate(${g * 8} ${g * 13} -30)"/></g>`; }).join('')}
+  <ellipse rx="36" ry="32" fill="${m.long}"/>
+  <ellipse cx="0" cy="14" rx="19" ry="13" fill="${m.longSang}"/>
+  <ellipse cx="-22" cy="9" rx="5.500" ry="3.200" fill="${m.ma}" opacity=".5"/><ellipse cx="22" cy="9" rx="5.500" ry="3.200" fill="${m.ma}" opacity=".5"/>
+  ${['L', 'R'].map((b) => { const g = b === 'L' ? -1 : 1; return `
+  <g id="${p}-mat${b}" transform="translate(${g * 15} -4)">
+    <ellipse rx="6.600" ry="7.400" fill="${m.mat}"/>
+    <g id="${p}-nguoi${b}"><circle cx="-2" cy="-2.600" r="2.300" fill="#fff"/><circle cx="2" cy="2.400" r="1" fill="#fff" opacity=".8"/></g>
+  </g>`; }).join('')}
+  <g id="${p}-mom">
+    <path id="${p}-ham" fill="${m.mieng}"/>
+    <path id="${p}-luoi" fill="${m.luoi}"/>
+    <path id="${p}-luoiNet" stroke="${chinhSang(m.luoi, -0.25)}" stroke-width="0.800" fill="none" stroke-linecap="round"/>
+    <path id="${p}-moi" stroke="${m.vienNet}" stroke-width="1.400" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <rect x="-3.800" y="14.500" width="3.500" height="5" rx="1" fill="#ffffff" stroke="${m.vienNet}" stroke-width=".7"/>
+  <rect x="0.300" y="14.500" width="3.500" height="5" rx="1" fill="#ffffff" stroke="${m.vienNet}" stroke-width=".7"/>
+  <path d="M -3.500 7.500 Q 0 6 3.500 7.500 Q 2 11 0 11.500 Q -2 11 -3.500 7.500 Z" fill="${m.mui}"/>
+  <path d="M -10 12 l -14 -3 M -10 15 l -15 1 M 10 12 l 14 -3 M 10 15 l 15 1" stroke="${m.vienNet}" stroke-width=".7" stroke-linecap="round" opacity=".5"/>`;
 
 /* ─────────────────────────────────────────────────────────────── LOÀI
  * H0 / S0: hông và vai lúc ĐỨNG. chanT / chanS: hai đốt chân trước / sau (a = đốt
@@ -4904,6 +4931,47 @@ LOAI.shiba = {
 LOAI.orange_cat = {
   ...LOAI.cat, ten: 'Mèo — mướp cam',
   mau: { ...LOAI.cat.mau, long: '#eda24a', longToi: '#c9802e', dom: '#c9712a', longSang: '#fff6e8', mat: '#7cb342', vongCo: '#d6453d' },
+};
+// THỎ: loài riêng — thân tròn, chân sau to (đùi lớn), chân trước ngắn, đuôi bông ngắn; nghỉ ở dáng NGỒI; đi bằng NHẢY
+// CÓC (`gait: 'hop'`, xem #buoc).
+LOAI.rabbit = {
+  ten: 'Thỏ — trắng xám', loai: 'rabbit', gait: 'hop',
+  H0: { x: 160, y: 244 }, S0: { x: 222, y: 246 }, dayThan: 27,
+  chanT: { a: 19, b: 19, rong: 11 }, chanS: { a: 26, b: 27, rong: 15, dui: 26 },
+  dau: { dx: 16, dy: -40, r: 34 }, mom: { y: 13, co: 0.6 }, veDau: dauTho, taiTam: [13, -30], taiGoc: 26,
+  duoi: { dai: 9, rong: 19, goc: 40, cong: 0, dx: -20, dy: -6 },
+  nghi: { ngoi: 1, cuoi: 0.3 },
+  mau: { long: '#d9d6d2', longToi: '#b9b4ae', longSang: '#ffffff', taiTrong: '#f2aab6', ma: '#f2a3a3', mui: '#e58b96', mat: '#2b1d1a',
+         mieng: '#5a2530', luoi: '#ef8a94', vongCo: '#2f9e8f', the: '#f1c232', vien: '#1d0d10', vienNet: '#2a1519' },
+};
+// Các GIỐNG chó / mèo dựng trên hình thể sẵn có: đổi màu, tai, đuôi và (qua `shape`) dáng — corgi chân ngắn mình dài.
+LOAI.corgi = {
+  ...LOAI.dog, ten: 'Chó — corgi', ears: 'pointed', taiTam: [22, -24], taiGoc: 14, shape: { legLength: 0.62, bodyLength: 1.22 },
+  duoi: { ...LOAI.dog.duoi, dai: 22, cong: 0.4 },
+  mau: { ...LOAI.dog.mau, long: '#e3974a', longToi: '#bf7631', longSang: '#fffaf2', vongCo: '#d6453d' },
+};
+LOAI.poodle = {
+  ...LOAI.dog, ten: 'Chó — poodle', shape: { headSize: 1.06, legLength: 1.08, bodyThickness: 0.92 },
+  duoi: { ...LOAI.dog.duoi, dai: 40, cong: 1.5, rong: 15 },
+  mau: { ...LOAI.dog.mau, long: '#e8c39a', longToi: '#c99f74', longSang: '#f7e6d2', vongCo: '#8a5ad6' },
+};
+LOAI.husky = {
+  ...LOAI.dog, ten: 'Chó — husky', ears: 'pointed', taiTam: [22, -24], taiGoc: 14, shape: { legLength: 1.08 },
+  duoi: { ...LOAI.dog.duoi, dai: 52, cong: 1.0 },
+  mau: { ...LOAI.dog.mau, long: '#7d8895', longToi: '#5f6975', longSang: '#f6f7f8', mat: '#3d8fd6', vongCo: '#d6453d' },
+};
+LOAI.black_dog = {
+  ...LOAI.dog, ten: 'Chó — mực',
+  mau: { ...LOAI.dog.mau, long: '#2f2b2b', longToi: '#1d1a1a', longSang: '#5b5352', ma: '#c98a8a', mat: '#1a1210', vongCo: '#f1c232' },
+};
+LOAI.white_cat = {
+  ...LOAI.cat, ten: 'Mèo — trắng',
+  mau: { ...LOAI.cat.mau, long: '#f4f1ec', longToi: '#d9d4cc', dom: '#f4f1ec', longSang: '#ffffff', mat: '#5aa9e6', vongCo: '#d6453d' },
+};
+LOAI.calico = {
+  ...LOAI.cat, ten: 'Mèo — tam thể',
+  // Tam thể: nền trắng, vằn cam, chân xa và đuôi sẫm như mảng lông đen.
+  mau: { ...LOAI.cat.mau, long: '#f7f3ec', longToi: '#d9d2c6', dom: '#e08a3c', patch: '#3a3234', longSang: '#ffffff', mat: '#c9a227', vongCo: '#2f9e8f' },
 };
 LOAI.black_cat = {
   ...LOAI.cat, ten: 'Mèo — mun',
@@ -4972,6 +5040,7 @@ class RigThu {
   static DONG_TAC = {
     dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS],
     cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS],
+    rabbit: ['idle', 'hop', 'thump', 'tiltHead', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS.filter((name) => name !== 'fetch' && name !== 'greet')],
   };
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -4990,7 +5059,7 @@ class RigThu {
     if (!nv) throw new Error(`[character] no species "${loai}" (available: ${Object.keys(LOAI).join(', ')})`);
     this.host = host;
     this.base = nv;                               // hình thể gốc của giống — setShape tính lại từ đây
-    this.shape = { ...DEFAULT_SHAPE };
+    this.shape = { ...DEFAULT_SHAPE, ...(nv.shape || {}) };          // giống có dáng riêng (corgi chân ngắn) — `setShape` chỉnh tiếp từ đó
     this.nv = shapedSpecies(nv, this.shape);
     this.mauKhai = { ...nv.mau };
     this.mau = this.nv.mau = RigThu.#withAliases(this.mauKhai);
@@ -5067,7 +5136,8 @@ class RigThu {
       <ellipse id="${p}-bung" fill="${m.longSang}"/>
       <circle id="${p}-ucSang" r="${nv.dayThan * 0.6}" fill="${m.longSang}"/>
       <g id="${p}-van">${nv.loai === 'cat'
-        ? [-17, -2, 13].map((x) => `<path d="M ${x} ${-nv.dayThan + 1} q 4 7 1 14" stroke="${m.dom}" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('') : ''}</g>
+        ? (m.patch ? `<ellipse cx="-14" cy="${(-nv.dayThan * 0.35).toFixed(1)}" rx="15" ry="${(nv.dayThan * 0.55).toFixed(1)}" fill="${m.patch}"/><ellipse cx="16" cy="${(-nv.dayThan * 0.5).toFixed(1)}" rx="9" ry="${(nv.dayThan * 0.4).toFixed(1)}" fill="${m.dom}"/>` : '')
+          + [-17, -2, 13].map((x) => `<path d="M ${x} ${-nv.dayThan + 1} q 4 7 1 14" stroke="${m.dom}" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('') : ''}</g>
     </g>
     <g id="${p}-chanGan"${V}>
       <circle id="${p}-duiN" r="${nv.chanS.dui}" fill="${m.long}"/>
@@ -5307,6 +5377,7 @@ class RigThu {
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
+    hop: 'Nhảy cóc', thump: 'Giậm chân',
     rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng', greet: 'Mừng chủ', play: 'Rủ chơi', goIn: 'Vào lồng', comeOut: 'Ra khỏi lồng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
@@ -5350,6 +5421,13 @@ class RigThu {
    * đưa tới (40%). Hai cặp chéo lệch nhau nửa chu kỳ — kiểu đi nước kiệu.
    */
   #buoc(f, a, A, cao) {
+    // THỎ nhảy cóc: mỗi chu kỳ một cú bật — cả thân vọt lên theo nửa vòng sin, chân sau duỗi ra sau, chân trước với ra
+    // trước lúc bay; hai chân mỗi cặp đi cùng nhau.
+    if (this.nv.gait === 'hop') {
+      const c = ((f % 1) + 1) % 1, fly = Math.sin(Math.PI * c);
+      return { y: -cao * 2.2 * fly * a, tnX: A * 0.9 * fly * a, txX: A * 0.9 * fly * a, snX: -A * 1.1 * fly * a, sxX: -A * 1.1 * fly * a, tnY: 4 * fly * a, txY: 4 * fly * a,
+               snY: 0, sxY: 0, truocY: -3 * fly * a, sauY: 2 * fly * a, dauY: -2 * fly * a, duoi: 0 };
+    }
     const chan = (p) => { p = ((p % 1) + 1) % 1;
       if (p < 0.6) return { x: A * (1 - 2 * p / 0.6), y: 0 };
       const u = (p - 0.6) / 0.4; return { x: -A + 2 * A * mem(u), y: cao * Math.sin(Math.PI * u) }; };
@@ -5799,6 +5877,35 @@ class RigThu {
     t.to(s, { mieng: 0.05, luoi: 0, dau: 0, dauY: 0, matY: 0.4, duration: 0.35, ease: 'sine.inOut' }, 1.15);
     t.to(s, { mieng: 0.15, duration: 0.1, yoyo: true, repeat: 1 }, 1.55);
     this.#khep(t, 0.35, 1.8);
+    return t;
+  }
+
+  /* ---------------------------------------------------------------- THỎ */
+
+  /** NHẢY CÓC tại chỗ `times` cú: thụp lấy đà, bật lên (chân sau duỗi, tai ngả ra sau), đáp xuống. */
+  hop(times = 2) {
+    const t = this.tl(), s = this.s;
+    let at = this.#dung(t, 0);
+    for (let i = 0; i < times; i++) {
+      t.to(s, { sauY: 6, truocY: 4, duration: 0.12, ease: 'power2.in' }, at)
+       .to(s, { y: -40, sauY: -2, truocY: -6, snX: -16, sxX: -16, tnX: 12, txX: 12, taiL: -0.6, taiR: -0.6, duration: 0.22, ease: 'power2.out' }, at + 0.12)
+       .to(s, { y: 0, snX: 0, sxX: 0, tnX: 0, txX: 0, sauY: 4, truocY: 3, taiL: 0.2, taiR: 0.2, duration: 0.2, ease: 'power2.in' }, at + 0.34)
+       .to(s, { sauY: 0, truocY: 0, duration: 0.12 }, at + 0.54);
+      at += 0.66;
+    }
+    this.#khep(t, 0.35, at);
+    return t;
+  }
+
+  /** GIẬM CHÂN cảnh giác: tai dựng thẳng, mắt mở to, chân sau giậm mạnh xuống đất hai cái. */
+  thump(times = 2) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { taiL: -0.25, taiR: -0.25, matY: -0.1, nhinX: 1.5, dauY: -4, duration: 0.25, ease: 'power2.out' }, 0);      // tai DỰNG THẲNG, khép vào nhau (dương là xoè ra)
+    for (let i = 0; i < times; i++) {
+      const a = 0.35 + i * 0.4;
+      t.to(s, { snY: 14, sxY: 14, sauY: -4, duration: 0.12, ease: 'power2.out' }, a).to(s, { snY: 0, sxY: 0, sauY: 2, duration: 0.07, ease: 'power3.in' }, a + 0.12).to(s, { sauY: 0, duration: 0.1 }, a + 0.19);
+    }
+    this.#khep(t, 0.4, 0.45 + times * 0.4);
     return t;
   }
 
@@ -7062,7 +7169,7 @@ const COLOR_KEYS = {
   buttons: 'cuc', tie: 'caVat', drawstrings: 'day',          // `skirt` (màu váy / tạp dề) đi qua nguyên vẹn
   // thú
   fur: 'long', furLight: 'longSang', furDark: 'longToi', stripes: 'dom', nose: 'mui',
-  collar: 'vongCo', tag: 'the', earInner: 'taiTrong',
+  collar: 'vongCo', tag: 'the', earInner: 'taiTrong', patches: 'patch',
 };
 
 /** Trạng thái của rig NGƯỜI (cũng là khoá của tư thế nghỉ). */
@@ -8039,7 +8146,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.49.0';
+const VERSION = '0.50.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -8313,6 +8420,8 @@ function seed(value) { RigSVG.gieo(value); RigThu.gieo(value); }
 const BUILT_IN_NAMES = {
   default: 'Default (plain adult)', vet: 'Veterinarian', surgeon: 'Surgeon', nurse: 'Nurse', doctor: 'Doctor with glasses',
   dog: 'Dog (golden puppy)', shiba: 'Dog (shiba)', cat: 'Cat (grey tabby)', orange_cat: 'Cat (orange tabby)', black_cat: 'Cat (black)',
+  corgi: 'Dog (corgi)', poodle: 'Dog (poodle)', husky: 'Dog (husky)', black_dog: 'Dog (black)', white_cat: 'Cat (white)', calico: 'Cat (calico)',
+  rabbit: 'Rabbit',
 };
 const displayName = (id, definition) => BUILT_IN_NAMES[id] || definition.ten || id;
 

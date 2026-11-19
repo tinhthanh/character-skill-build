@@ -119,6 +119,8 @@
     { "label": "dog: beg", "steps": ["beg"], "species": "dog" },
     { "label": "dog: givePaw", "steps": ["givePaw"], "species": "dog" },
     { "label": "dog: sniff", "steps": ["sniff"], "species": "dog" },
+    { "label": "rabbit: hop", "steps": ["hop"], "species": "rabbit" },
+    { "label": "rabbit: thump", "steps": ["thump"], "species": "rabbit" },
     { "label": "cat: meow", "steps": ["meow"], "species": "cat" },
     { "label": "cat: purr", "steps": ["purr"], "species": "cat" },
     { "label": "cat: lickPaw", "steps": ["lickPaw"], "species": "cat" },

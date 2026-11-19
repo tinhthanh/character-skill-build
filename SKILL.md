@@ -18,7 +18,8 @@ away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, and wear a recovery
 cone or a leg bandage; people can wear a mask, exam gloves and a surgical cap. 3D sets include outdoor places (`park`,
-`street`).
+`street`). Pets: dogs `dog`, `shiba`, `corgi`, `poodle`, `husky`, `black_dog`; cats `cat`, `orange_cat`, `black_cat`,
+`white_cat`, `calico`; and a `rabbit` that hops.
 
 There are two jobs. Do the one you were asked for; most videos need both.
 
@@ -136,7 +137,9 @@ clips for every voice file.
    `confused`, `tired`). `do` takes any action step; `"enter"` / `"exit"` on a turn bring a
    character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
    draws a room. Vertical video: `"width": 1080,
-   "height": 1920`. **Phone call between two places:** `"layout": "split"` (two halves, each its own background; a
+   "height": 1920`. **Opening and closing cards:** `"intro"` / `"outro"` (title, text, a call-to-action button, a logo).
+   **Several scenes into one film:** `python3 tools/film.py film.json` (transitions, sound in step).
+   **Phone call between two places:** `"layout": "split"` (two halves, each its own background; a
    `"side"` on every character), and `"toast"` on a turn for an app notification card. **Explainer with one presenter:** `"layout": "presenter"` and
    `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
    beside the character as they speak (`examples/scene-presenter/scene.json`).

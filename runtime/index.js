@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.49.0';
+export const VERSION = '0.50.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -296,6 +296,8 @@ export function seed(value) { RigSVG.gieo(value); RigThu.gieo(value); }
 const BUILT_IN_NAMES = {
   default: 'Default (plain adult)', vet: 'Veterinarian', surgeon: 'Surgeon', nurse: 'Nurse', doctor: 'Doctor with glasses',
   dog: 'Dog (golden puppy)', shiba: 'Dog (shiba)', cat: 'Cat (grey tabby)', orange_cat: 'Cat (orange tabby)', black_cat: 'Cat (black)',
+  corgi: 'Dog (corgi)', poodle: 'Dog (poodle)', husky: 'Dog (husky)', black_dog: 'Dog (black)', white_cat: 'Cat (white)', calico: 'Cat (calico)',
+  rabbit: 'Rabbit',
 };
 const displayName = (id, definition) => BUILT_IN_NAMES[id] || definition.ten || id;
 
