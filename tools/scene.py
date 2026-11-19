@@ -41,7 +41,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "boxes": [ { "name": "table", "x": 330, "z": -560, "width": 380, "depth": 200, "height": 170 } ],
            "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
-                      kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing")
+                      kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
+                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg")
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "preset": "reception" | "exam" | "pharmacy" | "living-room" — a ready-made room (your boxes etc. are added)
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
@@ -57,7 +58,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
                true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
-               `holds`: "cup" | "clipboard" | "phone" (right hand), { "L": "cup" }, or
+               `holds`: "cup" | "clipboard" | "phone" | "syringe" | "pills" | "leash" (right hand), { "L": "cup" }, or
                { "R": { "kind": "phone", "image": "app.png" } } (a picture on the screen) — gives a person that item
                to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
@@ -73,6 +74,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
                crying, embarrassed, sleepy. Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
                "headInHands", "bow", "wai", ["handshake", "@other"] (with the other's ["handshake", "@you"] in "together").
+               "ponder", "crossArms", "handsOnHips", "introduce", "callOut", "relief", "startle", "lookAround",
+               ["hurry", 6, 200]. Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
+               ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
+               Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth".
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -129,7 +134,7 @@ def known(where, given, allowed):
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on')
-PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
+PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
@@ -175,10 +180,11 @@ SET_PRESETS = {
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills')
+FLOOR_KINDS = ('bowl', 'scale')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
@@ -397,6 +403,8 @@ def main():
             if ('screen' in item or 'facing' in item) and item.get('kind') not in SCREEN_KINDS: fail(f'set.cutouts[{n}]: "screen" and "facing" are for "laptop" and "monitor" only')
             if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
+            if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
+            if 'reading' in item and (item.get('kind') != 'scale' or not isinstance(item['reading'], str)): fail(f'set.cutouts[{n}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         for n, item in enumerate(stage_set.get('panels', [])):
             if item.get('wall', 'back') not in ('back', 'left', 'right'): fail(f'set.panels[{n}].wall must be "back", "left" or "right"')
             for key in ('at', 'y', 'width', 'height'):
@@ -500,7 +508,7 @@ def main():
                 if item[1:] not in names: fail(f'{where}: "{item}" refers to a character that is not in the scene')
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
-                if stage_set is not None and actor and step[0] in ('point', 'stroke'): parts.append(f"set.target({actor}, {item[1:]})")
+                if stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
                 else: parts.append(item[1:])
             else:
@@ -671,14 +679,16 @@ def main():
             who = names[turn['who']]
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat') and isinstance(step[1], str) and step[1][1:] in names): continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
                     reach_notes.append(f'{where}: "{who["name"]}" reaches for "{step[1][1:]}" ({step[0]}), which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
                 gap = float(names[step[1][1:]]['x']) - float(who['x'])
                 # Đưa đồ: hai cánh tay cùng vươn (0,45); bắt tay: bàn tay gặp nhau ở giữa, đứng gần hơn (0,38); chạm tới con vật: gần như vuốt ve.
-                wanted = {'handOver': 0.45, 'handshake': 0.38}.get(step[0], 0.24) * who['_host_height']
+                # Soi đèn / đưa bánh thưởng tới ĐẦU con vật (cao hơn thân, xa vai hơn): đứng sát hơn nữa (0,16), không thì tay
+                # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
+                wanted = {'handOver': 0.45, 'handshake': 0.38, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
@@ -723,11 +733,13 @@ def main():
     # ── đạo cụ ──
     props = []
     for index, prop in enumerate(scene.get('props', [])):
-        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter) and "x"')
+        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale) and "x"')
+        if 'fill' in prop and (prop['kind'] != 'bowl' or prop['fill'] not in ('food', 'water', 'empty')): fail(f'props[{index}].fill must be "food", "water" or "empty" (bowl only)')
+        if 'reading' in prop and (prop['kind'] != 'scale' or not isinstance(prop['reading'], str)): fail(f'props[{index}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         known(f'props[{index}]', prop, PROP_KEYS)
         host_height = float(prop.get('height', person_default))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
-                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back') if key in prop}})
+                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back', 'fill', 'reading') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
         if who.get('seated') in ('chair', 'stool'):
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
@@ -836,7 +848,7 @@ def main():
         for n, item in enumerate(stage_set.get('cutouts', [])):
             # Tấm hình phẳng đứng trong phòng (đạo cụ vẽ sẵn hay ảnh) — đặt sát máy quay là có tiền cảnh.
             # Máy tính vẽ trong CÙNG khung với người (400 × 470): mặc định cao bằng người, để nó cùng tỉ lệ với nhân vật.
-            tall = float(item.get('height', round(person_default * (1 if item.get('kind') in SCREEN_KINDS else 0.74))))
+            tall = float(item.get('height', round(person_default * (1 if item.get('kind') in SCREEN_KINDS + FLOOR_KINDS else 0.74))))
             where_ = ', '.join(f"{key}: {float(item[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
             if item.get('kind'):
                 options = {'color': item.get('color')}
@@ -848,6 +860,8 @@ def main():
                         name = os.path.basename(item['screen'])
                         if os.path.abspath(os.path.join(base, item['screen'])) != os.path.abspath(os.path.join(out, name)): shutil.copy(os.path.join(base, item['screen']), os.path.join(out, name))
                         options['image'] = name
+                for key in ('fill', 'reading'):
+                    if key in item: options[key] = item[key]
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
                 setup.append(f"    const cutout{n + 1} = document.createElement('div'); VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});")
@@ -974,7 +988,8 @@ def main():
             # cùng — đặt nhân vật ở đó rồi cho nó bước thêm là nó đi quá, đứng chồng lên người kia.
             setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
     for prop in props:
-        options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back')}
+        options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
+                   'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
         if who.get('_seat') and stage_set is not None:

@@ -78,6 +78,27 @@ const DRAW = {
     <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
     ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}`;
   },
+  // BÁT ăn của thú cưng, trên sàn: `fill` 'food' (hạt), 'water' (nước) hoặc 'empty'. Đặt host CÙNG khung với con vật
+  // (`bottom`, `height` như host của nó) rồi dời ra trước mõm — `eat` / `drink` cúi đầu xuống đúng cao độ sàn.
+  bowl: ({ w = 46, fill = 'food', color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, h = w * 0.36;
+    const inside = fill === 'water' ? `<ellipse cx="200" cy="${F - h + 2}" rx="${w * 0.4}" ry="${w * 0.09}" fill="#8fd0f0"/>`
+      : fill === 'food' ? [-12, -5, 2, 9, -8, 5].map((dx, n) => `<circle cx="${200 + dx * w / 46}" cy="${F - h + (n > 3 ? -1 : 1)}" r="${w * 0.07}" fill="#a0612f" stroke="#6e3e1b" stroke-width=".6"/>`).join('') : '';
+    return `
+    <path d="M ${x0} ${F - h} L ${x0 + w * 0.12} ${F} H ${x1 - w * 0.12} L ${x1} ${F - h} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
+    <ellipse cx="200" cy="${F - h}" rx="${w / 2}" ry="${w * 0.12}" fill="${dark}" stroke="${line}" stroke-width="1.200"/>${inside}`;
+  },
+  // CÂN thú y: bệ cân thấp trên sàn, màn hình số ở mép trước hiện `reading` (vd. '4.2 kg'). Con vật đứng LÊN bệ: host của
+  // nó cao hơn sàn đúng bề dày bệ (≈ 0,03 × chiều cao host).
+  scale: ({ w = 210, reading = '', color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, top = F - 14;
+    const text = String(reading).replace(/[<&"]/g, '');
+    return `
+    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <rect x="${x0 + 8}" y="${top - 3}" width="${w - 16}" height="5" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
+    ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
+  },
 };
 
 // Mặt màn hình: nền sáng, hoặc ảnh lấp đầy (cắt theo khung). Mỗi lần vẽ một id cắt riêng.
@@ -90,14 +111,14 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor'
- *   options  { for, color, width, height, back, on, image, facing }
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale'
+ *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
  *     width    bề rộng, đơn vị khung (ghế 108, ghế đẩu 84, bàn 230, quầy 300, chậu cây 120)
@@ -106,11 +127,15 @@ export const PROP_KINDS = Object.keys(DRAW);
  *     on       máy tính: chiều cao mặt bàn / quầy nó đặt lên, tính từ sàn (150 — khớp bàn, quầy mặc định)
  *     image    máy tính: ảnh trên màn hình (đường dẫn / URL); laptop chỉ hiện khi `facing: 'viewer'`
  *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'
+ *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
+ *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
  * Trả về { svg, kind, seatY }. Host nên có cùng `bottom` và `height` với host của nhân vật.
  */
 export function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
-  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing } = options;
+  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading } = options;
+  if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
+  if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
   if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
   if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
@@ -127,6 +152,8 @@ export function createProp(host, kind, options = {}) {
   if (on !== undefined) o.on = on;
   if (image !== undefined) o.image = image;
   if (facing !== undefined) o.facing = facing;
+  if (fill !== undefined) o.fill = fill;
+  if (reading !== undefined) o.reading = reading;
   host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;

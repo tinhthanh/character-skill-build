@@ -36,6 +36,8 @@ const NGHI = Object.freeze({
   itemBackL: 0, itemBackR: 0,
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
+  gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi khám (`examine`), 2 = bánh thưởng (`giveTreat`)
+  leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
   watchL: 0, watchR: 0,
   ovL: 0, ovR: 0, ovBatL: 0, ovBatR: 0, ovCangL: 0, ovCangR: 0,   // đặt góc tay CUỐI CÙNG (góc trên màn hình), trọng số 0…1 — xem apDung
   sauDauL: 0, sauDauR: 0,       // 1 = cánh tay ấy vẽ SAU đầu (gãi gáy: bàn tay vòng ra sau đầu)
@@ -230,6 +232,14 @@ const COUNT_POSE = [35, 135];             // khuỷu HẠ, cẳng tay dựng lê
 const WATCH_POSE = [24, -120];            // cẳng tay NGANG trước ngực, mặt đồng hồ hướng ra (sát cằm thì ở cảnh cận chỉ còn mẩu tay áo cạnh cằm)
 const SHAKE_POSE = [40, 50];
 const FACE_HANDS_POSE = [35, -170];       // ôm mặt: khuỷu hạ, hai bàn tay áp hai bên má (đầu gục xuống đón)
+// Đợt 4 — cử chỉ cho video giải thích (góc màn hình qua kênh `ov`, [bắp, cẳng] như các dáng trên).
+const PONDER_POSE = [16, -179];           // tay chống cằm: khuỷu hạ, cẳng tay dựng sát người, bàn tay dưới cằm (đầu cúi xuống đón — tay chibi ngắn)
+const HUG_ARM_POSE = [12, -98];           // cẳng tay vắt ngang bụng đỡ khuỷu tay kia (dáng suy nghĩ)
+const FOLD_POSE = { L: [24, -132], R: [18, -118] };   // khoanh tay: hai cẳng tay chéo nhau trước ngực, một cao một thấp
+const HIPS_POSE = [52, -100];             // chống nạnh: khuỷu dang ra, bàn tay úp vào hông
+const CHEST_POSE = [20, -128];            // đặt tay lên ngực (giới thiệu bản thân, cảm ơn, thở phào)
+const HAIL_POSE = [150, 18];              // giơ cao một tay vẫy gọi (tay chibi không khum tới miệng: khum tay chỉ thành tay đặt lên vai)
+const STARTLE_POSE = [38, 138];           // giật mình: hai bàn tay xoè giơ lên cạnh vai
 const NAPE_POSE = [135, 105];             // gãi gáy: khuỷu giơ cạnh đầu, bàn tay vòng ra SAU đầu (cánh tay vẽ sau lớp đầu)              // tay đưa ra ngang hông về phía người kia
 const CARRY_ZOOM = 1.15;
 const UPRIGHT_HANDS = ['cai', 'mot', 'hai', 'ba'];          // hình bàn tay vẽ dựng đứng, luôn xoay cho ngón chỉ lên trời
@@ -716,17 +726,18 @@ export class RigSVG {
   static DONG_TAC = ['idle', 'wave', 'thumbsUp', 'point', 'present', 'nod',
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
-                     'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai'];
+                     'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
+                     'examine', 'giveTreat', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
-  static DI_NGANG = ['walk', 'enter', 'exit'];
+  static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
   static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown'];
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake'];
   // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
-  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -935,7 +946,15 @@ export class RigSVG {
           <g id="${p}-coTay${ben}" transform="translate(0 ${g})">${this.#tay(ben)}<g id="${p}-item${ben}">${this.nv['heldItem' + ben](p, this.mau, this.nv)}</g>
             <g id="${p}-watch${ben}" style="display:none"><rect x="-10" y="-8" width="20" height="10" rx="3" fill="#3b3f47"/><circle cx="0" cy="-3" r="8.4" fill="#f4f1e8" stroke="#3b3f47" stroke-width="1.8"/><path d="M 0 -3 V -8.6 M 0 -3 H 4.2" stroke="#3b3f47" stroke-width="1.5" stroke-linecap="round"/></g>
             <g id="${p}-tool${ben}" style="display:none"><path d="M 0 10 C ${ben === 'L' ? 14 : -14} 0 ${ben === 'L' ? 4 : -4} -18 ${ben === 'L' ? 12 : -12} -32" fill="none" stroke="#3b3f47" stroke-width="2.6" stroke-linecap="round"/>
-              <circle cx="0" cy="12" r="7.5" fill="#c7ccd4" stroke="#3b3f47" stroke-width="1.4"/><circle cx="0" cy="12" r="3.8" fill="#8a929e"/></g></g>
+              <circle cx="0" cy="12" r="7.5" fill="#c7ccd4" stroke="#3b3f47" stroke-width="1.4"/><circle cx="0" cy="12" r="3.8" fill="#8a929e"/></g>
+            <g id="${p}-gadget${ben}" style="display:none">
+              <g data-gadget="1"><path d="M -4 27 L -11 48 Q 0 52 11 48 L 4 27 Z" fill="#fff3a8" opacity=".55"/>
+                <rect x="-3" y="2" width="6" height="22" rx="2.5" fill="#3d7fd0" stroke="#24415f" stroke-width="1.1"/><rect x="-3.6" y="21" width="7.2" height="6" rx="1.5" fill="#d9dde3" stroke="#24415f" stroke-width="1"/></g>
+              <g data-gadget="2" transform="translate(0 16)"><path d="M -8 -2.6 H 8 M -8 2.6 H 8" stroke="#a5784a" stroke-width="1"/><rect x="-8" y="-2.8" width="16" height="5.6" fill="#ecc893"/>
+                <circle cx="-9" cy="-2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/><circle cx="-9" cy="2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/>
+                <circle cx="9" cy="-2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/><circle cx="9" cy="2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/>
+                <rect x="-8" y="-1.6" width="16" height="3.2" fill="#ecc893"/></g>
+            </g></g>
         </g>
       </g>`;
   }
@@ -1113,6 +1132,8 @@ export class RigSVG {
       </g>
     </g>
   </g>
+  <!-- DÂY DẮT (leash): ở GỐC SVG, ngoài mọi phép biến đổi — hai đầu dây đo trên màn hình rồi đổi về hệ này. -->
+  <path id="${p}-leash" fill="none" stroke="#c0392b" stroke-width="3.2" stroke-linecap="round" style="display:none"/>
 </svg>`;
   }
 
@@ -1124,7 +1145,7 @@ export class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1718,6 +1739,13 @@ export class RigSVG {
     // Mặt ống nghe trong tay (`listen`): hiện / ẩn hẳn theo `tool`, không hoà mờ.
     for (const side of ['L', 'R']) if (e['tool' + side]) e['tool' + side].style.display = s['tool' + side] >= 0.5 ? '' : 'none';
     for (const side of ['L', 'R']) if (e['watch' + side]) e['watch' + side].style.display = s['watch' + side] >= 0.5 ? '' : 'none';
+    // Dụng cụ nhỏ trong tay (`gadget`): số nguyên chọn MỘT hình con (`data-gadget`), 0 = không có gì.
+    for (const side of ['L', 'R']) {
+      const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
+      if (!box) continue;
+      box.style.display = kind > 0 ? '' : 'none';
+      for (const child of box.children) child.style.display = +child.getAttribute('data-gadget') === kind ? '' : 'none';
+    }
     const gripping = { L: false, R: false };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       // Mốc là −90° cho CẢ HAI tay: hình tay trái được soi gương sẵn bên trong, còn hình tay phải vẽ nguyên — ở dáng
@@ -1837,6 +1865,27 @@ export class RigSVG {
     e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, h) * 0.28} 1) rotate(${s.mayR * 8})`);
 
     this.#veMom();
+    this.#drawLeash();
+  }
+
+  // DÂY DẮT: từ lòng bàn tay cầm quai dây tới vòng cổ con vật đang dắt, võng xuống ở giữa. Hai đầu đo TRÊN MÀN HÌNH
+  // (con vật là một SVG khác, đứng đâu cũng được) rồi đổi về hệ gốc của SVG này. Con vật tự gọi hàm này sau mỗi lần nó
+  // vẽ (`onDraw`), nên dây bám theo cả khi chỉ con vật cử động.
+  #drawLeash() {
+    const line = this.el && this.el.leash, pet = this.leashed;
+    if (!line) return;
+    if (!pet || this.s.leash < 0.5 || !pet.el || !pet.el.vong || !this.svg.getScreenCTM) { line.style.display = 'none'; return; }
+    const k = this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
+    const handCTM = hand && hand.getScreenCTM();
+    if (!toRoot || !handCTM) { line.style.display = 'none'; return; }
+    const inverse = toRoot.inverse();
+    const a = new DOMPoint(0, 16).matrixTransform(handCTM).matrixTransform(inverse);
+    const collar = pet.el.vong.getBoundingClientRect();
+    const b = new DOMPoint(collar.left + collar.width / 2, collar.top + collar.height / 2).matrixTransform(inverse);
+    const span = Math.hypot(b.x - a.x, b.y - a.y), sag = Math.min(40, span * 0.16);
+    const mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    line.setAttribute('d', `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
+    line.style.display = '';
   }
 
   /**
@@ -2165,6 +2214,7 @@ export class RigSVG {
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
+    so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -3090,11 +3140,13 @@ export class RigSVG {
     else if (live) {
       // Vuốt ve nhắm vào ĐẦU (đỉnh đầu); nghe tim phổi và tiêm nhắm vào THÂN (giữa ngực con vật).
       const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
+      // Trên đầu con vật: đỉnh đầu (vuốt ve, soi tai), ngang mắt, hay MÕM (soi răng, đưa bánh thưởng).
+      const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7 }[part] ?? 0.2;
       const node = body || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
       if (node) {
         const r = node.getBoundingClientRect(), sv = this.svg.getBoundingClientRect();
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
-        tx = (r.left + r.width / 2 - ox) / unit - s.x; ty = (r.top + r.height * (body ? 0.35 : 0.2) - oy) / unit - s.y - DOI_Y;
+        tx = (r.left + r.width / 2 - ox) / unit - s.x; ty = (r.top + r.height * (body ? 0.35 : headAt) - oy) / unit - s.y - DOI_Y;
       }
     }
     // Tay ở PHÍA con vật; tay ấy đang cầm đồ thì dùng tay kia.
@@ -3109,7 +3161,17 @@ export class RigSVG {
     // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
     // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
     const across = (k === 'L') !== (tx < HONG.x);
-    const upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
+    let upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
+    // Đích GẦN hơn chiều dài cánh tay (đầu con vật trên bàn khám, người đứng sát): duỗi thẳng thì bàn tay vượt quá đích,
+    // thõng xuống dưới nó — đèn soi rọi vào thành bàn. Gập khuỷu (hai đốt, như `#meetAngles`): khuỷu thấp, cẳng tay
+    // hất lên, bàn tay dừng đúng ở đích.
+    const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
+    const d = Math.hypot(tx - shoulder.x, ty - (shoulder.y + drop));
+    if (!across && d < (armUpper + armFore) * 0.96) {
+      const alpha = Math.acos(clamp((armUpper * armUpper + d * d - armFore * armFore) / (2 * armUpper * d), -1, 1)) * 180 / Math.PI;
+      const beta = Math.acos(clamp((armUpper * armUpper + armFore * armFore - d * d) / (2 * armUpper * armFore), -1, 1)) * 180 / Math.PI;
+      upper = clamp(upper - alpha, -15, 95); fore = 180 - beta;
+    }
     return { k, upper, fore, lean, crouch, tx, across };
   }
 
@@ -3193,6 +3255,140 @@ export class RigSVG {
     t.to(s, { mieng: 0.12, chum: 0.5, duration: 0.15, yoyo: true, repeat: 1 }, 1.6);                                  // "chậc"
     t.set(s, { ['watch' + k]: 0 }, 2.35);
     this.#khep(t, 0.45, 1.95);
+    return t;
+  }
+
+  // Đặt nhanh góc `ov` của các tay rồi bật trọng số lên (dáng chính xác của một cử chỉ) — tween ngắn chứ không `set` ở
+  // mốc 0 (xem checkWatch). `poses`: { L: [bắp, cẳng], R: [bắp, cẳng] }.
+  #ovPose(t, poses, extra = {}, d = 0.4, ease = 'power2.out') {
+    const s = this.s, angles = {}, weights = {};
+    for (const [k, [upper, fore]] of Object.entries(poses)) { angles['ovBat' + k] = upper; angles['ovCang' + k] = fore; weights['ov' + k] = 1; weights['carry' + k] = 0; }
+    t.to(s, { ...angles, duration: 0.02 }, 0);
+    t.to(s, { ...weights, ...extra, duration: d, ease }, 0);
+  }
+
+  // Tay rảnh để cử chỉ một tay; cả hai tay đều cầm đồ thì không có tay nào — trả null.
+  #gestureHand(hand) {
+    const k = this.#freeHand(hand);
+    return this.holds[k] && this.s['item' + k] > 0.5 ? null : k;
+  }
+
+  /** SUY NGHĨ `hold` giây: tay chống cằm, tay kia vắt ngang bụng đỡ khuỷu, mắt nhìn lên một bên, gõ nhẹ ngón vào cằm. */
+  ponder(hold = 1.8, { hand = 'auto' } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#gestureHand(hand), m = k === 'L' ? -1 : 1;
+    if (!k) return this.express('thinking', hold + 0.6);
+    const other = k === 'L' ? 'R' : 'L', otherFree = !(this.holds[other] && s['item' + other] > 0.5);
+    this.#faceFront(t);
+    this.#ovPose(t, otherFree ? { [k]: PONDER_POSE, [other]: HUG_ARM_POSE } : { [k]: PONDER_POSE },
+      { dau: N.dau - m * 6, dauY: 17, nhinX: m * 2.2, nhinY: -1.8, mayL: m > 0 ? 0.2 : 0.75, mayR: m > 0 ? 0.75 : 0.2, chum: 0.45, cuoi: 0.2, duration: 0.45 });
+    t.set(s, { ['tay' + k]: 'nam', ...(otherFree ? { ['tay' + other]: 'mo' } : {}) }, 0.05);
+    for (let a = 0.6, n = 0; a + 0.3 < 0.45 + hold; a += 0.5, n++) t.to(s, { ['ovCang' + k]: PONDER_POSE[1] + 6, duration: 0.12, ease: 'sine.out', yoyo: true, repeat: 1 }, a);
+    this.#khep(t, 0.45, 0.45 + hold);
+    return t;
+  }
+
+  /** KHOANH TAY `hold` giây: hai cẳng tay chéo trước ngực, nghiêng đầu, một bên mày nhướng — hoài nghi, chờ đợi, "để xem". */
+  crossArms(hold = 2) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    if (['L', 'R'].some((side) => this.holds[side] && s['item' + side] > 0.5)) return this.#headGesture(t, 2, -5);
+    this.#faceFront(t);
+    this.#ovPose(t, FOLD_POSE, { dau: N.dau + 5, dauY: -2, mayL: 0.85, mayR: 0.1, cuoi: 0.15, nhinX: -1, vai: N.vai - 2 });
+    t.set(s, { tayL: 'nam', tayR: 'nam' }, 0.05);
+    t.to(s, { dau: N.dau + 8, duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5 + hold * 0.3);
+    this.#khep(t, 0.45, 0.4 + hold);
+    return t;
+  }
+
+  /** CHỐNG NẠNH `hold` giây: hai tay úp vào hông, khuỷu dang ra, ưỡn ngực, cười tự tin. */
+  handsOnHips(hold = 2) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    const sides = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    if (!sides.length) return this.#headGesture(t, 2, -5);
+    this.#faceFront(t);
+    this.#ovPose(t, Object.fromEntries(sides.map((side) => [side, HIPS_POSE])), { dauY: -3, vai: N.vai - 3, cuoi: 1, mayL: 0.6, mayR: 0.6, tho: 1 });
+    t.set(s, Object.fromEntries(sides.map((side) => ['tay' + side, 'nam'])), 0.05);
+    t.to(s, { dau: N.dau + 4, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.6);
+    this.#khep(t, 0.45, 0.4 + hold);
+    return t;
+  }
+
+  /** GIỚI THIỆU MÌNH: đặt bàn tay lên ngực, nghiêng đầu cười, gật nhẹ — "tôi là…", "cảm ơn". */
+  introduce(hand = 'auto') {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#gestureHand(hand);
+    if (!k) return this.nod();
+    this.#ovPose(t, { [k]: CHEST_POSE }, { cuoi: 1, mayL: 0.55, mayR: 0.55, dau: N.dau + (k === 'L' ? 4 : -4) });
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.05);
+    t.to(s, { dauY: 9, matY: 0.4, duration: 0.25, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.55);
+    this.#khep(t, 0.45, 1.5);
+    return t;
+  }
+
+  /** GỌI TO: giơ cao một tay vẫy, ngẩng đầu, miệng mở to — "Mời bé Milo vào khám!", gọi ai từ xa. */
+  callOut(hold = 1.2, { hand = 'auto' } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#gestureHand(hand), m = k === 'L' ? -1 : 1;
+    if (!k) return this.#headGesture(t, 2, -5);
+    this.#faceFront(t);
+    this.#ovPose(t, { [k]: HAIL_POSE }, { dauY: -5, dau: N.dau - m * 4, mayL: 0.8, mayR: 0.8, cuoi: 0.5, nhinX: m * 1.5, duration: 0.35 });
+    for (let n = 0; n < 4; n++) t.to(s, { ['ovCang' + k]: HAIL_POSE[1] + (n % 2 ? -16 : 16), duration: 0.18, ease: 'sine.inOut' }, 0.4 + n * 0.18);
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.05);
+    // Hai tiếng gọi: miệng mở to, đầu nhấn theo.
+    for (const a of [0.4, 0.4 + hold * 0.55]) t.to(s, { mieng: 0.9, chum: 0, dauY: -8, duration: 0.12, ease: 'power2.out' }, a).to(s, { mieng: 0.25, dauY: -5, duration: hold * 0.4, ease: 'sine.inOut' }, a + 0.12);
+    this.#khep(t, 0.4, 0.45 + hold);
+    return t;
+  }
+
+  /** THỞ PHÀO: đặt tay lên ngực, nhắm mắt, vai trĩu xuống một hơi dài, rồi cười nhẹ nhõm — "may quá, bé khỏe rồi". */
+  relief(hand = 'auto') {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#gestureHand(hand);
+    if (!k) return this.express('happy', 1.6);
+    this.#ovPose(t, { [k]: CHEST_POSE }, { matY: 0.85, mieng: 0.3, chum: 0.6, cuoi: 0.4, tho: 1, vai: N.vai - 3, dauY: -2, duration: 0.45 });
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.05);
+    // Thở ra: vai và đầu trĩu xuống, miệng chúm thổi hơi, rồi mở mắt cười.
+    t.to(s, { tho: 0, vai: N.vai + 4, dauY: 8, mieng: 0.15, duration: 0.8, ease: 'sine.inOut' }, 0.5);
+    t.to(s, { matY: 0, chum: 0, cuoi: 1, mayL: 0.6, mayR: 0.6, dauY: 2, duration: 0.35, ease: 'power2.out' }, 1.35);
+    this.#khep(t, 0.45, 1.9);
+    return t;
+  }
+
+  /** GIẬT MÌNH: người giật lùi, hai bàn tay xoè giơ lên cạnh vai, mắt tròn, miệng chữ O, rồi hoàn hồn. */
+  startle() {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    const sides = ['L', 'R'].filter((side) => !(this.holds[side] && s['item' + side] > 0.5));
+    this.#faceFront(t, 0.1);
+    this.#ovPose(t, Object.fromEntries(sides.map((side) => [side, STARTLE_POSE])), { dauY: -7, vai: N.vai - 6, mieng: 0.85, chum: 0.6, cuoi: -0.2, mayL: 1, mayR: 1, nhinY: -0.6, duration: 0.14, ease: 'back.out(2)' });
+    if (sides.length) t.set(s, Object.fromEntries(sides.map((side) => ['tay' + side, 'xoe'])), 0.03);
+    t.to(s, { x: s.x - 5, duration: 0.12, ease: 'power2.out' }, 0).to(s, { x: s.x, duration: 0.4, ease: 'sine.inOut' }, 0.6);
+    this.#chop(t, 0.75);
+    t.to(s, { mieng: 0.3, chum: 0.2, duration: 0.3 }, 0.7);
+    this.#khep(t, 0.45, 1.0);
+    return t;
+  }
+
+  /** NGÓ QUANH: quay đầu nhìn sang trái, sang phải, rồi về — tìm ai đó, tìm thú cưng đi lạc. */
+  lookAround() {
+    const t = this.tl(), s = this.s, N = this.NGHI, h = s.huong;
+    t.to(s, { huong: clamp(h - 0.35, -1, 1), dau: N.dau + 5, dauX: -4, nhinX: -2.6, mayL: 0.6, mayR: 0.6, cuoi: 0.3, duration: 0.4, ease: 'power2.inOut' }, 0);
+    t.to(s, { huong: clamp(h + 0.35, -1, 1), dau: N.dau - 5, dauX: 4, nhinX: 2.6, duration: 0.6, ease: 'power2.inOut' }, 0.9);
+    this.#chop(t, 1.6);
+    this.#khep(t, 0.45, 2.0);
+    return t;
+  }
+
+  /**
+   * ĐI VỘI / CHẠY: như `walk` (ngang, đứng lại ở đích) nhưng nhịp chân nhanh gần gấp rưỡi, sải dài, nhón người — tình
+   * huống khẩn cấp. `hurry()` chạy tại chỗ; `hurry(6, 200)` chạy 200 đơn vị sang phải.
+   */
+  hurry(buoc = 6, quang = 0) {
+    const t = this.tl(), s = this.s, chieu = quang < 0 ? -1 : 1;
+    t.to(s, { huong: chieu, cuoi: 0.2, mayL: 0.85, mayR: 0.85, mieng: 0.25, duration: 0.25, ease: 'power2.inOut' }, 0);
+    if (quang) {
+      const x0 = s.x, d = this.#doBuoc(Math.abs(quang), true, true);
+      const at = this.#di(t, 0.1, d.buoc, 0.3, { kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b) });
+      this.#khep(t, 0.4, at, { x: x0 + quang });
+    } else {
+      const at = this.#di(t, 0.1, buoc, 0.3, { kA: 1.2 });
+      this.#khep(t, 0.4, at);
+    }
     return t;
   }
 
@@ -3320,6 +3516,72 @@ export class RigSVG {
   #holdsFree(preferred) {
     const busy = (side) => this.holds[side] && this.s['item' + side] > 0.5;
     return busy(preferred) && !busy(preferred === 'L' ? 'R' : 'L') ? (preferred === 'L' ? 'R' : 'L') : preferred;
+  }
+
+  /**
+   * KHÁM BẰNG ĐÈN SOI: cúi xuống, đưa cây đèn soi (hiện ra trong tay) tới `part` của con vật `target` — 'ears' (tai,
+   * mặc định), 'eyes' (mắt), 'teeth' (răng: soi vào mõm; cho con vật `openMouth` cùng lúc) — soi hai chỗ, đầu nghiêng
+   * nhìn kỹ, rồi gật.
+   */
+  examine(target = null, part = 'ears', hold = 1.4) {
+    const spot = { ears: 'head', eyes: 'eyes', teeth: 'mouth' }[part];
+    if (!spot) throw new Error(`[character] examine: part must be 'ears', 'eyes' or 'teeth', got ${JSON.stringify(part)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, spot), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
+    this.#leanTo(t, reach, 'nam');
+    t.set(s, { ['gadget' + k]: 1 }, 0.1);
+    t.to(s, { dau: N.dau + m * 6 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.2, mayR: 0.2, cuoi: 0.45, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.45);
+    // Soi chỗ thứ nhất, nhích đèn sang chỗ thứ hai, rồi gật: "ổn".
+    t.to(s, { ['bat' + k]: upper + 3, ['cang' + k]: fore - 5, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.45);
+    t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.8);
+    t.to(s, { dauY: 12, cuoi: 0.9, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, 0.5 + hold);
+    this.#khep(t, 0.5, 0.9 + hold);
+    return t;
+  }
+
+  /**
+   * CHO ĂN BÁNH THƯỞNG: cúi xuống, chìa cái bánh xương (hiện ra trong tay) tới MÕM con vật `target`, đợi nó đớp (bánh
+   * biến mất), cười rồi thu tay về. Cho con vật `beg` rồi `eat` cùng lúc trong một `together`.
+   */
+  giveTreat(target = null) {
+    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'mouth'), { k, upper, fore } = reach;
+    this.#leanTo(t, reach, 'nam');
+    t.set(s, { ['gadget' + k]: 2 }, 0.05);
+    t.to(s, { cuoi: 1, mieng: 0.25, mayL: 0.6, mayR: 0.6, duration: 0.3 }, 0.4);
+    // Chìa tới thêm một chút, con vật đớp (bánh mất), tay rụt lại một nhịp.
+    t.to(s, { ['bat' + k]: upper + 3, ['cang' + k]: fore - 4, duration: 0.25, ease: 'sine.out' }, 0.6);
+    t.set(s, { ['gadget' + k]: 0 }, 1.05);
+    t.to(s, { ['bat' + k]: upper - 4, ['cang' + k]: fore + 6, dauY: N.dauY + 3, duration: 0.18, ease: 'power2.out' }, 1.05);
+    this.#khep(t, 0.5, 1.4);
+    return t;
+  }
+
+  /**
+   * DẮT con vật `pet` bằng dây: dây hiện ra từ quai dây trong tay (`items: { R: 'leash' }`) tới vòng cổ nó, và GIỮ (thế
+   * dắt) — `walk` của người và của con vật trong một `together` là dắt nó đi dạo; dây bám theo cả hai. `unleash()` tháo dây.
+   */
+  leash(pet) {
+    if (!pet || !pet.el || !pet.el.vong || pet instanceof RigSVG) throw new Error('[character] leash(pet): pet must be a pet rig (createPet(...).rig)');
+    const s = this.s, k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-leash]'));
+    if (!k) throw new Error('[character] leash: the character is not holding a leash — give it one: createCharacter(host, { id, items: { R: "leash" } })');
+    if (this.leashed && this.leashed !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
+    this.leashed = pet; this.leashHand = k;
+    pet.onDraw = () => this.#drawLeash();
+    const t = this.tl();
+    // Cúi nhìn con vật, móc dây vào cổ nó (dây hiện), rồi đứng thẳng lên — vẫn giữ dây.
+    t.to(s, { dauY: 6, nhinY: 2.2, cuoi: 0.9, duration: 0.3, ease: 'sine.out' }, 0);
+    t.set(s, { leash: 1 }, 0.35);
+    this.#khep(t, 0.4, 0.55, { leash: 1 });
+    return t;
+  }
+
+  /** THÁO DÂY con vật đang dắt (`leash`): dây biến mất, người về dáng nghỉ, vẫn cầm quai dây. */
+  unleash() {
+    if (!this.leashed || this.s.leash < 0.5) throw new Error('[character] unleash: the character is not walking a pet — leash(pet) first');
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 6, nhinY: 2.2, duration: 0.3, ease: 'sine.out' }, 0);
+    t.set(s, { leash: 0 }, 0.35);
+    this.#khep(t, 0.4, 0.55, { leash: 0 });
+    return t;
   }
 
   /**

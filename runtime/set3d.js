@@ -292,7 +292,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         actor.unit = size && actor.height ? actor.height / size.h : 0;
         actor.where = actor.spot.x + actor.step * actor.unit;
       }
-      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => a.at.depth - b.at.depth);     // xa → gần
+      // xa → gần. Người và con vật đứng CÙNG độ sâu (lệch dưới 12 đơn vị — con vật trên bàn khám ngay cạnh bác sĩ): người
+      // ở trước. Không thì ai được đặt sau nằm trên, và bàn tay soi đèn / tiêm / đưa bánh thưởng chui ra sau con vật.
+      const PERSON_AHEAD = 12, ahead = (actor) => (actor.rig && typeof actor.rig.seatY === 'function' ? PERSON_AHEAD : 0);
+      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => (a.at.depth + ahead(a.actor)) - (b.at.depth + ahead(b.actor)));
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
         element.style.left = cx + 'px'; element.style.top = cy + 'px';

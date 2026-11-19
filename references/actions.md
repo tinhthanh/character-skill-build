@@ -35,10 +35,21 @@ the demo steps from `tools/action-catalog.json`.
 | `headInHands` | `(hold = 1.4)` | both hands to the face, head sunk, eyes shut, a shake of the head — overwhelmed (a chibi's short arms reach the cheeks, not the top of the head) | `hold` + 0.95 |
 | `bow` | `(depth = 1)` | head and shoulders bow, eyes closed, back up smiling — thanks, sorry, welcome | 1.8 |
 | `wai` | — | Thai greeting: palms pressed together in front of the chest, a small bow | 2.05 |
+| `ponder` | `(hold = 1.8, { hand })` | hand to the chin, the other forearm across the belly, eyes up to one side, a tap on the chin — thinking it over | `hold` + 0.9 |
+| `crossArms` | `(hold = 2)` | arms folded across the chest, head tilted, one brow raised — doubtful, waiting | `hold` + 0.85 |
+| `handsOnHips` | `(hold = 2)` | both hands on the hips, elbows out, chest up, a confident smile | `hold` + 0.85 |
+| `introduce` | `(hand = 'auto')` | an open hand on the chest, a small nod and smile — "I am…", "thank you" | 1.95 |
+| `callOut` | `(hold = 1.2, { hand })` | one hand raised high and waving, head up, mouth wide open twice — calling someone from afar ("Milo, your turn!") | `hold` + 0.85 |
+| `relief` | `(hand = 'auto')` | hand on the chest, eyes closed, a long breath out with the shoulders dropping, then a relieved smile | 2.35 |
+| `startle` | — | a jolt back, both open hands thrown up by the shoulders, round eyes, mouth in an O, then calm again | 1.45 |
+| `lookAround` | — | turn the head (and a little of the body) left, then right, then back — searching for someone, a lost pet | 2.45 |
 | `handshake` | `(target)` | reach the hand on `target`'s side to a point half way between the two (at waist height, shared by both, whatever their heights) and shake three times. Run it `together` with the other person's `handshake` | 1.8 |
 | `listen` | `(target, hold = 1.6)` | bend to a pet (a rig, an element or `{ x, y }`) and put a stethoscope (it appears in the hand, tube up to the neck) on its body, listen with the head tilted and eyes up, move it once, nod. The pet must be within reach — on an exam table at about hand height | `hold` + 1.5 |
 | `inject` | `(target)` | with a held `'syringe'`, bend to the pet, needle toward its body, press the plunger, pull back, smile. The pet must stand on the side of the hand holding the syringe (otherwise an error says so); throws without a syringe | 2.35 |
 | `carry` / `putDown` | `(pet)` / — | **stance**: bend down, take the pet in both hands and hold it in front of the belly, curled up, a little enlarged (1.35×) so it reads; the following steps play while carrying, and the pet's own actions (purr, wagTail) keep playing in the arms. `putDown` puts it back where it was picked up — walking away first is refused. The pet must be within reach | 1.55 / 1.1 |
+| `examine` | `(target, part = 'ears', hold = 1.4)` | bend to the pet and shine a penlight (it appears in the hand) on `part`: `'ears'`, `'eyes'` or `'teeth'` (the muzzle — run the pet's `openMouth` `together`), look closely, move the light once, nod. Close targets (a pet on the exam table right beside the person) bend the elbow so the hand stops at the target | `hold` + 1.4 |
+| `giveTreat` | `(target)` | bend and hold out a bone-shaped treat (it appears in the hand) to the pet's mouth; it disappears as the pet takes it; smile, pull back. Pair with the pet's `beg`, `wagTail` or `eat` in a `together` | 1.9 |
+| `leash` / `unleash` | `(pet)` / — | **stance**: clip a leash onto the pet; a line is drawn from the held leash handle (`items: { R: 'leash' }`) to the pet's collar and follows both of them — `walk` the person and the pet `together` to walk it. `unleash` removes the line. Throws without a leash in hand | 0.95 / 0.95 |
 | `write` | `(dur = 1.2)` | the other hand comes over to the held item (clipboard, phone) and writes a few lines, head down; with empty hands it writes on the left palm | `dur` + 0.87 |
 | `call` | `(text = null, dur = 2.4, { mood, side })` | put the held phone to the cheek (its back facing out, the head tilting to it), say `text` over `dur` seconds, put it down. No `text`: listening, small nods. With empty hands it mimes the call with a fist. A chibi's short arm cannot reach the ear in a front view, so the phone goes to the cheek — the usual cartoon shorthand | `dur` + 1.05 |
 | `phoneUp` / `phoneDown` | `(side = 'auto')` / — | **stance**: put the phone to the cheek and keep it there; the following steps (`explain`, `speakCues` with a recorded voice, `nod`…) play on the phone, the other hand still gestures. `phoneDown` puts it down. Needs a held phone | 0.8 / 0.5 |
@@ -64,6 +75,7 @@ the demo steps from `tools/action-catalog.json`.
 | `stepInPlace` | `(steps = 6)` | steps on the spot, arms still | 2.9 |
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |
+| `hurry` | `(steps = 6, distance = 0)` | like `walk` but quicker steps (0.3 s each instead of 0.46), mouth open, brows up — in a rush, an emergency | 2.3 on the spot |
 | `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
 | `enter` | `(from = 'left', distance)` | walk in from outside the frame, from the `'left'` or the `'right'`, to the character's own spot. The distance is worked out from the composition's edge (270–700 units); pass `distance` to fix it | 1.6–5.2 |
 | `exit` | `(to = 'right', distance)` | walk out past the edge of the frame to the `'right'` or the `'left'`, from wherever the character stands — **ends hidden**. `distance` as for `enter` | 1.6–5.2 |
@@ -141,6 +153,12 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `givePaw` | — | sit and offer a front paw | 1.9 |
 | `sniff` | — | nose to the ground | 1.8 |
 | `unwell` | `(hold = 2.5)` | ears down, sleepy eyes, head low, tail drooping, a sigh — standing or lying | `hold` + 1.2 |
+| `scratchItch` | `(times = 8)` | sit and scratch the neck fast with the near hind paw, head tilted to it, eyes half shut — itchy skin, fleas | 0.9 + 0.14 × `times` |
+| `limp` | `(steps = 4, distance = 0)` | walk holding one front paw up, head and chest dipping at each step, ears down — a sore leg | about 2 on the spot |
+| `tremble` | `(hold = 2)` | crouch low, ears pinned, tail tucked, eyes wide, shaking all over — scared of the vet, of fireworks | `hold` + 0.75 |
+| `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
+| `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
+| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down (front legs out); `sleep` lies down, head down, eyes closed, slow deep breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -161,6 +179,12 @@ stand them up first:
 | `tiltHead` | — | tilt one way, then the other | 2.3 |
 | `pounce` | — | crouch, wiggle, leap | 2.4 |
 | `unwell` | `(hold = 2.5)` | ears down, sleepy eyes, head low, tail drooping, a sigh — standing or lying | `hold` + 1.2 |
+| `scratchItch` | `(times = 8)` | sit and scratch the neck fast with the near hind paw, head tilted to it, eyes half shut — itchy skin, fleas | 0.9 + 0.14 × `times` |
+| `limp` | `(steps = 4, distance = 0)` | walk holding one front paw up, head and chest dipping at each step, ears down — a sore leg | about 2 on the spot |
+| `tremble` | `(hold = 2)` | crouch low, ears pinned, tail tucked, eyes wide, shaking all over — scared of the vet, of fireworks | `hold` + 0.75 |
+| `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
+| `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
+| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -196,6 +220,8 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `plant` | `color` (the pot), `width = 120` | a potted plant; in a 3D set, a foreground cutout (`set.stand`, `set.cutouts`) |
 | `laptop` | `on = 150`, `facing = 'away'`, `image`, `color`, `width = 96` | a laptop on a surface `on` units above the floor (150 = the default table or counter top). `'away'`: the lid faces the viewer — the machine of someone behind the desk; put its host **after** the person's (in front) so the lid hides the typing hands. `'viewer'`: the screen faces out and shows `image` |
 | `monitor` | `on = 150`, `image`, `color`, `width = 150` | a desktop screen on a stand, facing the viewer, showing `image` (the app, a lab result, an X-ray) |
+| `bowl` | `fill = 'food'` (`'water'`, `'empty'`), `color`, `width = 46` | a pet bowl on the floor. For `eat` / `drink`, give its host the pet's `bottom` and `height` and put it just in front of the muzzle: about 0.15 × the pet's host height toward the side its head is on |
+| `scale` | `reading` (e.g. `'4.2 kg'`), `color`, `width = 210` | a low vet scale with a digital display. Stand the pet on it: raise the pet's host by the platform (about 0.03 × the host height) |
 
 The top of a table or counter is `(12 + height) × hostHeight / 470` px above the bottom of its
 host (the floor line sits 12 units above the host's bottom edge) — e.g. 262 px for the default
@@ -219,7 +245,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 
 | Call | Use |
 |---|---|
-| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `'syringe'`, `'pills'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
+| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `'syringe'`, `'pills'`, `'leash'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config })` | build a pet |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |

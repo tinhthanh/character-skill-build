@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.44.0
+
+Added — symptoms, care and gestures
+- **Pet symptoms and care** (dogs and cats): **`scratchItch`** (sit, scratch the neck with a hind
+  paw), **`limp`** (a front paw held up, the head dipping each step; walks a distance like
+  `walk`), **`tremble`** (crouched, ears pinned, tail tucked, shaking), **`eat`** / **`drink`**
+  (head down to a bowl on the floor, chewing / lapping), **`cough`**, **`openMouth`** (for a
+  dental exam).
+- **People with pets:** **`examine(pet, 'ears' | 'eyes' | 'teeth')`** with a penlight that
+  appears in the hand; **`giveTreat(pet)`** (a bone treat, gone when the pet takes it);
+  **`leash(pet)` / `unleash()`** — a stance: a leash line from the held handle (new item
+  **`'leash'`**) to the pet's collar, following both while they `walk` together.
+- **Gestures:** **`ponder`** (hand to the chin), **`crossArms`**, **`handsOnHips`**,
+  **`introduce`** (hand on the chest), **`callOut`** (a hand raised high, calling out),
+  **`relief`** (a long breath out), **`startle`**, **`lookAround`**, and **`hurry`** — a walk with
+  quicker steps.
+- **Props `bowl`** (`fill`: food, water, empty) and **`scale`** (`reading`: '4.2 kg'), also as
+  cutouts in a 3D set and as `props` in a scene file.
+- `tools/actions.sh --zoom 2` for bigger cells.
+
+Fixed
+- **A hand reaching for something closer than the arm's length overshot it**: `stroke`,
+  `listen`, `inject` and the new actions straightened the arm toward the target, so the hand
+  ended below a pet's head standing on the exam table right beside the person. The elbow now
+  bends (two-link reach) so the hand stops at the target.
+- **3D sets:** a person and a pet at the same depth (within 12 units — a pet on the exam table
+  beside the vet) draw the person in front, so the hand that examines, injects or gives a treat
+  is not hidden behind the pet.
+- `tools/scene.py` walks a person to 0.16 × its height from a pet before `examine` /
+  `giveTreat` (pet's head, higher and further than its body).
+
 ## 0.43.0
 
 Added — gestures, greetings and moods

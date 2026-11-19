@@ -1566,6 +1566,79 @@ try {
       if (compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
       stage.remove();
     }
+    // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.
+    {
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
+      const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
+      for (const species of ['dog', 'cat']) {
+        const pet = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species }).rig;
+        const unit = () => pet.svg.getBoundingClientRect().height / 330;
+        const floor = () => { const r = pet.svg.getBoundingClientRect(); return r.top + r.height * 292 / 330; };
+        // Ăn: mõm xuống tới miệng bát (đáy đầu sát sàn) mà không lút xuống dưới nền.
+        const meal = pet.eat(2); meal.time(1.2);
+        const gap = (floor() - pet.el.dau.getBoundingClientRect().bottom) / unit();
+        if (gap > 22 || gap < -6) hong(`${species}.eat`, `the head does not reach a bowl on the floor (its bottom is ${gap.toFixed(0)} units above the floor; want −6…22)`);
+        meal.kill(); pet.datNghi();
+        // Khập khiễng: một chân trước nhấc khỏi đất suốt lúc đi; xong thì đặt xuống.
+        const lame = pet.limp(4); lame.time(lame.duration() * 0.5);
+        if (!(pet.s.tnNhac > 0.9)) hong(`${species}.limp`, 'the sore front leg is not held up');
+        lame.progress(1); if (pet.s.tnNhac !== pet.NGHI.tnNhac) hong(`${species}.limp`, 'the leg stays up after limping');
+        lame.kill(); pet.datNghi();
+        // Run sợ: người rung (lệch qua lại giữa hai khung liền), đuôi cụp xuống dưới hông nhưng không xuyên sàn.
+        const fear = pet.tremble(2); let low = Infinity, high = -Infinity;
+        for (let time = 0.9; time < 1.2; time += 1 / 120) { fear.time(time); low = Math.min(low, pet.s.sauX); high = Math.max(high, pet.s.sauX); }
+        if (high - low < 1.5) hong(`${species}.tremble`, 'the body does not shake');
+        const tail = pet.el.duoi.getBoundingClientRect(), body = pet.el.mong.getBoundingClientRect();
+        if (!(tail.bottom > body.top + body.height * 0.6)) hong(`${species}.tremble`, 'the tail is not tucked down');
+        if (tail.bottom > floor() + 3 * unit()) hong(`${species}.tremble`, 'the tucked tail goes through the floor');
+        fear.kill(); pet.svg.remove();
+      }
+      const vet = L.createCharacter(spot('left:300px;top:0;width:200px;height:235px'), { id: 'vet', items: { R: 'leash' } }).rig;
+      const dog = L.createPet(spot('left:420px;top:150px;width:100px;height:82px'), { species: 'dog' }).rig;
+      // Đèn soi / bánh thưởng hiện trong tay lúc dùng, mất đi khi xong.
+      for (const [name, args, kind] of [['examine', [dog, 'teeth'], 1], ['giveTreat', [dog], 2]]) {
+        const line = vet[name](...args);
+        line.time(0.6); const shown = ['L', 'R'].find((side) => Math.round(vet.s['gadget' + side]) === kind);
+        if (!shown || vet.el['gadget' + shown].style.display === 'none') hong(name, 'the tool is not in the hand');
+        line.progress(1); if (vet.s.gadgetL || vet.s.gadgetR) hong(name, 'the tool stays in the hand afterwards');
+        line.kill();
+      }
+      // Dây dắt: từ tay cầm quai tới vòng cổ con vật, bám theo khi chỉ con vật cử động; tháo thì mất.
+      const at = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.right) / 2, (r.top + r.bottom) / 2]; };
+      const ends = () => { const d = vet.el.leash.getAttribute('d').match(/-?[\d.]+/g).map(Number), m = vet.svg.getScreenCTM(); return [new DOMPoint(d[0], d[1]).matrixTransform(m), new DOMPoint(d[4], d[5]).matrixTransform(m)]; };
+      const walk = L.sequence(vet, [['leash', dog], ['nod'], ['unleash']]);
+      walk.time(walk.data.steps[1].start + 0.3);
+      if (vet.el.leash.style.display === 'none') hong('leash', 'no leash drawn while walking a pet');
+      else {
+        const [hand, collar] = ends(), [cx, cy] = at(dog.el.vong);
+        if (Math.hypot(collar.x - cx, collar.y - cy) > 4) hong('leash', `the leash does not end at the collar (${Math.hypot(collar.x - cx, collar.y - cy).toFixed(0)} px off)`);
+        const grip = at(vet.el.coTayR); if (Math.hypot(hand.x - grip[0], hand.y - grip[1]) > 30) hong('leash', 'the leash does not start at the hand');
+        dog.s.x = 60; dog.apDung(); const [, moved] = ends(), [mx] = at(dog.el.vong);
+        if (Math.abs(moved.x - mx) > 4) hong('leash', 'the leash does not follow the pet when only the pet moves');
+        dog.s.x = 0; dog.apDung();
+      }
+      walk.progress(1); if (vet.el.leash.style.display !== 'none') hong('unleash', 'the leash stays after unleash');
+      walk.kill();
+      let refused = ''; try { L.createCharacter(spot('left:600px;top:0;width:200px;height:235px'), { id: 'boy' }).rig.leash(dog); } catch (error) { refused = error.message; }
+      if (!refused.includes('not holding a leash')) hong('leash', 'leashing without a leash in hand should be refused with a clear message');
+      // Cử chỉ đợt 4: bàn tay tới đúng chỗ của dáng (đo trên màn hình so với khuôn mặt / thân).
+      const actor = L.createCharacter(spot('left:700px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+      const face = () => actor.el.khuon.getBoundingClientRect(), body = () => actor.el.ao.getBoundingClientRect();
+      for (const [name, args, when, test, what] of [
+        ['ponder', [1.8], 1.0, () => { const f = face(), h = at(actor.el.coTayR); return h[1] > f.bottom - 26 && h[1] < f.bottom + 18 && h[0] > f.left && h[0] < f.right; }, 'the hand is not under the chin'],
+        ['handsOnHips', [2], 1.0, () => { const b = body(); return ['L', 'R'].every((k) => { const h = at(actor.el['coTay' + k]); return h[1] > b.top + b.height * 0.5 && Math.abs(h[0] - (k === 'L' ? b.left : b.right)) < 18; }); }, 'the hands are not on the hips'],
+        ['callOut', [], 0.8, () => { const f = face(); return at(actor.el.coTayR)[1] < (f.top + f.bottom) / 2; }, 'the calling hand is not raised up by the head'],
+        ['startle', [], 0.4, () => ['L', 'R'].every((k) => at(actor.el['coTay' + k])[1] < body().top + 20), 'the hands are not thrown up by the shoulders'],
+      ]) {
+        const line = actor[name](...args); line.time(when);
+        if (!test()) hong(name, what);
+        line.progress(1); if (actor.s.ovL || actor.s.ovR) hong(name, 'the gesture pose stays after the action'); line.kill(); actor.datNghi();
+      }
+      const brisk = actor.hurry(6), calm = actor.walk(6);
+      if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
+      brisk.kill(); calm.kill();
+      stage.remove();
+    }
     // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
     {
       const stage6 = document.createElement('div'); stage6.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:400px';

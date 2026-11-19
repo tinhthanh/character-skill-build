@@ -228,13 +228,16 @@ function khop(R, T, a, b, raTruoc) {
   return { J, T };
 }
 
+// Động tác TRIỆU CHỨNG và chăm sóc, chung cho chó và mèo (nội dung thú y: ngứa, khập khiễng, sợ hãi, biếng ăn, ho…).
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth'];
+
 export class RigThu {
   static KHUNG = KHUNG;
   static NGHI = NGHI;
   static LOAI = LOAI;
   static DONG_TAC = {
-    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit'],
-    cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit'],
+    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS],
+    cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS],
   };
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -459,6 +462,8 @@ export class RigThu {
       if (e['dongTu' + b]) e['dongTu' + b].setAttribute('rx', fx(clamp(2.6 * s.dongTu, 0.7, 6.4)));
     }
     this.#veMom();
+    // Ai đó cần vẽ lại theo con vật (dây dắt của người dắt nó — `leash` của rig người) thì gọi họ sau mỗi lần vẽ.
+    if (this.onDraw) this.onDraw();
   }
 
   // Mõm: nét môi hình chữ "w" dưới mũi, hàm mở ra phía dưới, lưỡi nằm trong hàm rồi thè ra.
@@ -516,6 +521,7 @@ export class RigThu {
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
+    scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
 
   /* ------------------------------------------------------------ tiện ích */
@@ -564,7 +570,7 @@ export class RigThu {
              truocY: -1.6 * nh * a, sauY: 1.6 * nh * a, dauY: 1.4 * nh * a, duoi: 7 * Math.sin(2 * Math.PI * f) * a };
   }
   // Đặt `chuKy` chu kỳ bước vào timeline; `quang` ≠ 0 thì dời cả con đúng chừng ấy (chân trụ không trượt).
-  #di(t, at, chuKy, h, { vao = true, ra = true, quang = 0, x0 = 0, A = 13, cao = 9 } = {}) {
+  #di(t, at, chuKy, h, { vao = true, ra = true, quang = 0, x0 = 0, A = 13, cao = 9, bob = 1 } = {}) {
     const s = this.s;
     const bao = (c) => (vao ? mem(c / 0.5) : 1) * (ra ? mem((chuKy - c) / 0.5) : 1);
     // Chân trụ lùi 2A trong 0.6 chu kỳ ⇒ thân tiến (2A/0.6)·biên độ mỗi chu kỳ. Lập bảng quãng đường.
@@ -573,7 +579,10 @@ export class RigThu {
     const tiLe = quang ? Math.abs(quang) / X[n] : 0, dau = quang < 0 ? -1 : 1;
     const dat = (c) => {
       const a = bao(c);
-      Object.assign(s, this.#buoc(c, a, A * (tiLe ? Math.min(1.35, Math.max(0.5, tiLe)) : 1), cao));
+      const step = this.#buoc(c, a, A * (tiLe ? Math.min(1.35, Math.max(0.5, tiLe)) : 1), cao);
+      // `bob` > 1: ĐI KHẬP KHIỄNG — ngực và đầu chúi xuống mạnh mỗi khi chân trước lành chịu sức (xem `limp`).
+      if (bob !== 1) { step.truocY *= bob; step.dauY *= bob; }
+      Object.assign(s, step);
       if (quang) { const v = clamp(c, 0, chuKy) * M, i = Math.min(n - 1, Math.floor(v)); s.x = x0 + dau * tiLe * (X[i] + (X[i + 1] - X[i]) * (v - i)); }
     };
     // Đổ qua SETTER chứ không qua `onUpdate` — tua bằng seek() hay tua ngược vẫn đúng (xem rig-svg.js).
@@ -750,6 +759,110 @@ export class RigThu {
     t.to(s, { dau: -14, dauX: -3, taiL: 0.5, taiR: 0.9, duration: 0.35, ease: 'power2.inOut' }, 1.0);
     this.#chop(t, 1.5);
     this.#khep(t, 0.4, 1.9);
+    return t;
+  }
+
+  /* ------------------------------------------------ TRIỆU CHỨNG, CHĂM SÓC */
+
+  /**
+   * GÃI NGỨA: ngồi xuống, co chân sau phía người xem lên cổ gãi lia lịa `times` nhịp, đầu nghiêng về phía chân, mắt lim
+   * dim — ngứa da, ve rận. Chân sau chibi ngắn không tới tai: nó gãi ở cổ, nhìn vẫn ra "gãi tai".
+   */
+  scratchItch(times = 8) {
+    const t = this.tl(), s = this.s, nv = this.nv, C = nv.chanS;
+    t.to(s, { ngoi: 1, duration: 0.3, ease: 'power2.inOut' }, 0);
+    // Đích của bàn chân: cổ, ngay dưới tai — tính ở dáng NGỒI (xem #khung); khớp chân tự kéo về trong tầm với.
+    const T = nv.chanT, shoulderY = Math.min(nv.S0.y, DAT - T.rong * 0.36 - 4 - 0.96 * (T.a + T.b)), neck = { x: nv.S0.x - 9 + nv.dau.dx * 0.35, y: shoulderY + nv.dau.dy * 0.45 };
+    const footX = neck.x - (nv.H0.x + 52), footY = (DAT - C.rong * 0.36) - neck.y;
+    t.to(s, { snX: footX, snY: footY, dau: 22, dauX: -9, dauY: 9, matY: 0.55, cuoi: 0.6, mieng: 0.25, luoi: nv.loai === 'dog' ? 0.6 : 0, taiR: -0.4, duration: 0.3, ease: 'power2.out' }, 0.2);
+    for (let i = 0; i < times * 2; i++) t.to(s, { snY: footY + (i % 2 ? 10 : -8), snX: footX + (i % 2 ? -5 : 4), dau: i % 2 ? 19 : 25, duration: 0.07, ease: 'sine.inOut' }, 0.5 + i * 0.07);
+    const end = 0.5 + times * 0.14;
+    this.#khep(t, 0.4, end);
+    return t;
+  }
+
+  /**
+   * ĐI KHẬP KHIỄNG: một chân trước co lên không dám chạm đất, đầu và ngực chúi xuống mỗi bước, tai cụp, đuôi rủ — đau
+   * chân, xương khớp. `limp()` bước tại chỗ; `limp(4, 120)` đi thật 120 đơn vị (như `walk`).
+   */
+  limp(buoc = 4, quang = 0) {
+    const t = this.tl(), s = this.s, x0 = s.x;
+    let at = this.#dung(t, 0);
+    const held = s.huong < 0 ? -1 : 1, dir = quang < 0 ? -1 : quang > 0 ? 1 : held;
+    if (dir !== held) { t.to(s, { huong: dir, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22; }
+    t.to(s, { tnNhac: 1, tnGoc: 62, taiL: -0.7, taiR: -0.7, cuoi: -0.2, duoi: -45, matY: 0.25, duration: 0.25, ease: 'power2.out' }, at);
+    const chuKy = quang ? Math.max(2, Math.round(Math.abs(quang) / 32)) : buoc / 2;
+    at = this.#di(t, at + 0.15, chuKy, 0.65, { quang, x0, A: 10, cao: 7, bob: 3.2 });
+    this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: dir } : {});
+    if (dir !== held) t.to(s, { huong: held, duration: 0.22, ease: 'power1.inOut' }, '>');
+    return t;
+  }
+
+  /**
+   * RUN SỢ `hold` giây: thụp thấp người, tai ép ra sau, đuôi cụp giữa hai chân, mắt mở to — sợ đi khám, sợ tiếng pháo.
+   * Người rung bần bật suốt lúc ấy.
+   */
+  tremble(hold = 2) {
+    const t = this.tl(), s = this.s, N = this.NGHI, dog = this.nv.loai === 'dog';
+    // Đứng dậy (mèo nghỉ ở dáng ngồi) rồi thụp xuống; đuôi CỤP: chó gỡ độ cuộn của đuôi, mèo đuôi dài thì vòng sát
+    // sàn ra sau chứ không chọc xuống dưới nền.
+    const up = this.#dung(t, 0);
+    t.to(s, { truocY: 9, sauY: 12, dauY: 9, dauX: -4, dau: 6, taiL: -1.6, taiR: -1.6, duoi: dog ? -112 : -84, duoiCong: dog ? -1.1 : 0.45, dongTu: 1.7, nhinY: -0.8, cuoi: -0.6, mieng: 0,
+              duration: 0.3, ease: 'power2.out' }, up);
+    // Run: lệch qua lại 1,3 đơn vị, 0,045 s một nhịp — nhanh hơn mọi nhịp thở hay bước chân, đọc ngay ra "run".
+    for (let a = up + 0.3, i = 0; a < up + 0.3 + hold; a += 0.045, i++) t.to(s, { sauX: i % 2 ? -1.3 : 1.3, truocX: i % 2 ? 1 : -1, dauX: -4 + (i % 2 ? 1 : -1), duration: 0.045, ease: 'none' }, a);
+    this.#chop(t, up + 0.3 + hold * 0.55);
+    this.#khep(t, 0.45, up + 0.3 + hold, { dongTu: N.dongTu });
+    return t;
+  }
+
+  // Cúi đầu xuống cái bát trước mặt (ăn, uống): dáng chung — trả về thời điểm đã cúi xong.
+  #toBowl(t) {
+    const s = this.s, nv = this.nv, at = this.#dung(t, 0);
+    // Mõm xuống tới miệng bát trên sàn (cao ≈ 18 đơn vị): vai hạ (chân trước khuỵu) và đầu thò ra trước. Độ cúi tính theo
+    // hình thể từng loài — một con số chung thì mèo (đầu thấp hơn chó) cúi lút đầu xuống dưới nền.
+    this.bowlDip = DAT - 30 - (nv.S0.y + 20 + nv.dau.dy + nv.mom.y * (nv.headScale || 1));
+    t.to(s, { truocY: 20, dauX: nv.dau.dx + 4, dauY: this.bowlDip, dau: 18, taiL: 0.2, taiR: 0.2, nhinY: 1.6, matY: 0.3, cuoi: 0.5, duration: 0.4, ease: 'power2.inOut' }, at);
+    return at + 0.4;
+  }
+
+  /** ĂN `dur` giây: cúi xuống bát (đạo cụ `bowl`), nhai từng miếng, đầu nhấp nhô; chó vẫy đuôi chầm chậm. */
+  eat(dur = 2) {
+    const t = this.tl(), s = this.s, at = this.#toBowl(t);
+    for (let a = at, i = 0; a + 0.2 <= at + dur; a += 0.2, i++) t.to(s, { mieng: i % 2 ? 0.05 : 0.4, dauY: this.bowlDip + (i % 2 ? 0 : 3), duration: 0.2, ease: 'sine.inOut' }, a);
+    if (this.nv.loai === 'dog') this.#vay(t, at, Math.max(2, Math.floor(dur / 0.3)), 18, 0.3, 10);
+    this.#khep(t, 0.4, at + dur);
+    return t;
+  }
+
+  /** UỐNG NƯỚC `dur` giây: cúi xuống bát, lưỡi liếm nước từng nhịp. */
+  drink(dur = 2) {
+    const t = this.tl(), s = this.s, at = this.#toBowl(t);
+    for (let a = at, i = 0; a + 0.16 <= at + dur; a += 0.16, i++) t.to(s, { luoi: i % 2 ? 0.1 : 0.9, mieng: i % 2 ? 0.1 : 0.3, dauY: this.bowlDip + (i % 2 ? 0 : 2), duration: 0.16, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.4, at + dur);
+    return t;
+  }
+
+  /** HO `times` tiếng: rướn cổ ra trước, mỗi tiếng ho ngực giật, miệng mở, mắt nhắm lại — bệnh hô hấp. */
+  cough(times = 3) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauX: 8, dauY: 8, dau: 8, taiL: -0.6, taiR: -0.6, cuoi: -0.3, duration: 0.25, ease: 'power2.out' }, 0);
+    for (let i = 0; i < times; i++) {
+      const a = 0.3 + i * 0.5;
+      t.to(s, { truocY: 5, sauY: 2, dauY: 4, duration: 0.08, ease: 'power2.in' }, a)                                         // lấy hơi
+       .to(s, { truocY: -3, sauY: -1, dauY: 13, dauX: 12, mieng: 0.75, matY: 0.85, duration: 0.1, ease: 'power3.out' }, a + 0.08)    // ho
+       .to(s, { truocY: 0, sauY: 0, dauY: 8, dauX: 8, mieng: 0.05, matY: 0.2, duration: 0.25, ease: 'sine.inOut' }, a + 0.2);
+    }
+    this.#khep(t, 0.4, 0.4 + times * 0.5);
+    return t;
+  }
+
+  /** HÁ MIỆNG `hold` giây: ngẩng cằm, há to — cho bác sĩ khám răng (`examine(pet, 'teeth')` của rig người). */
+  openMouth(hold = 1.2) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dau: -10, dauY: -3, mieng: 0.95, luoi: 0.25, matY: 0.3, taiL: 0.3, taiR: 0.3, duration: 0.3, ease: 'power2.out' }, 0);
+    t.to(s, { mieng: 0.85, duration: hold * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.3);
+    this.#khep(t, 0.35, 0.3 + hold);
     return t;
   }
 

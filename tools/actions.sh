@@ -1,7 +1,7 @@
 #!/bin/sh
 # REVIEW every action of one character BEFORE using it in a scene — each action runs through
 # sequence(), exactly as tools/scene.py runs it, and is captured at several moments.
-#   tools/actions.sh <id> [file.png] [--turned] [--only "label,label"] [--cols 6]
+#   tools/actions.sh <id> [file.png] [--turned] [--only "label,label"] [--cols 6] [--zoom 2]
 #   tools/actions.sh vet                       → actions-vet.png (facing front)
 #   tools/actions.sh granny --turned           → actions-granny-turned.png (three-quarter stance)
 #   tools/actions.sh vet --only "clap,wai"     → just those rows
@@ -10,13 +10,14 @@
 # action throws shows the error in red and the run exits 1.
 set -e
 cd "$(dirname "$0")/.."
-ID="${1:?usage: tools/actions.sh <id> [file.png] [--turned] [--only labels] [--cols n]}"; shift
-OUT=""; STANCE="front"; ONLY=""; COLS=6
+ID="${1:?usage: tools/actions.sh <id> [file.png] [--turned] [--only labels] [--cols n] [--zoom n]}"; shift
+OUT=""; STANCE="front"; ONLY=""; COLS=6; ZOOM=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --turned) STANCE="turned" ;;
     --only) shift; ONLY="$1" ;;
     --cols) shift; COLS="$1" ;;
+    --zoom) shift; ZOOM="$1" ;;
     *) OUT="$1" ;;
   esac
   shift
@@ -33,7 +34,7 @@ cleanup() { status=$?; kill $SRV 2>/dev/null || true; wait $SRV 2>/dev/null || t
 trap cleanup EXIT
 i=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/tools/actions.html" || [ $i -ge 30 ]; do i=$((i+1)); python3 -c "import time; time.sleep(0.2)"; done
 ENC_ONLY="$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "$ONLY")"
-URL="http://127.0.0.1:$PORT/tools/actions.html?nv=$ID&stance=$STANCE&cols=$COLS&only=$ENC_ONLY"
+URL="http://127.0.0.1:$PORT/tools/actions.html?nv=$ID&stance=$STANCE&cols=$COLS&zoom=$ZOOM&only=$ENC_ONLY"
 rm -f "$OUT"
 set +e
 CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "$URL" --wait DONE,ERROR --timeout 120 --fail-on-error \

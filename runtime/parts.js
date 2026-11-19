@@ -157,6 +157,17 @@ export function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
         </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
 }
 
+/** QUAI DÂY DẮT (vòng quai và một đoạn dây thả xuống): cầm để `leash(pet)` — dây tới vòng cổ con vật do rig vẽ. */
+export function leash(c, { color = '#c0392b', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-leash="1" transform="translate(0 12)">
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${line}" stroke-width=".7" opacity=".5"/>
+          <rect x="-7.5" y="-3" width="15" height="6" rx="2.5" fill="${color}" stroke="${line}" stroke-width=".9"/>
+        </g>${grip ? gripFingers(c, { reach: 15 }) : ''}`;
+}
+
 /** LỌ THUỐC (hộp thuốc viên có nắp, nhãn): đưa cho chủ nuôi, giới thiệu đơn thuốc. */
 export function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
   const line = lineOf(c);

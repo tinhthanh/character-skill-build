@@ -10,8 +10,11 @@ A library of **100% SVG characters driven by GSAP** and the tools to put them in
 definition on a shared skeleton, so every character can already wave, talk, walk, sit,
 cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, show an app on
 the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
-clap, count on fingers, check the time, bow, greet with a wai, shake hands (44 actions) and hold a stance (sit down, face someone, put an item away, keep the phone at the
-cheek, carry a pet). Pets can also lie down, sleep and look unwell.
+clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
+startle, hurry, shine a penlight in a pet's ears or mouth, give it a treat, walk it on a leash
+(64 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
+away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
+itch, limp, tremble with fear, eat and drink from a bowl, cough and open the mouth for an exam.
 
 There are two jobs. Do the one you were asked for; most videos need both.
 

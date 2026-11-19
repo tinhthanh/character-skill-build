@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>Action review</title>
 <!-- TRANG DUYỆT ĐỘNG TÁC — mọi động tác của một nhân vật, chạy qua sequence() đúng như trong cảnh, chụp nhiều nhịp:
-       tools/actions.html?nv=<id>[&stance=turned][&only=nhãn,nhãn][&cols=6]
+       tools/actions.html?nv=<id>[&stance=turned][&only=nhãn,nhãn][&cols=6][&zoom=2]
      Mỗi hàng một mục của tools/action-catalog.json (bước diễn mẫu, món đồ cầm, con thú trong tầm tay), mỗi cột một
      thời điểm. Gọi động tác trực tiếp thì không thấy lỗi chỉ xảy ra trong sequence() (vd. lệnh `set` ở mốc 0 bị bỏ
      qua): trang này dùng đúng đường đi của tools/scene.py. Hàng nào động tác báo lỗi thì hiện chữ đỏ. -->
@@ -14,7 +14,7 @@ import { RigThu, createCharacter, createPet, sequence, seed } from '../runtime/i
 const query = new URLSearchParams(location.search);
 const id = query.get('nv') || 'vet', isPet = id in RigThu.LOAI, turned = query.get('stance') === 'turned';
 const only = (query.get('only') || '').split(',').map((label) => label.trim()).filter(Boolean);
-const cols = Math.max(2, +(query.get('cols') || 6)), cellW = 230, cellH = 250;
+const cols = Math.max(2, +(query.get('cols') || 6)), zoom = Math.min(4, Math.max(1, +(query.get('zoom') || 1))), cellW = 230 * zoom, cellH = 250 * zoom;
 const catalog = await (await fetch('action-catalog.json', { cache: 'no-store' })).json();
 const kind = isPet ? RigThu.LOAI[id].loai : null;
 const entries = (isPet ? catalog.pets : catalog.people)
@@ -39,10 +39,10 @@ for (const entry of entries) {
       let pet = null;
       // Con vật đặt trong TẦM TAY (ngang bàn khám), ở phía tay phải — như trong bài kiểm tra tools/check.html.
       if (entry.pet) {
-        const petHost = document.createElement('div'); petHost.style.cssText = 'position:absolute;left:115px;top:118px;width:100px;height:82px';
+        const petHost = document.createElement('div'); petHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${118 * zoom}px;width:${100 * zoom}px;height:${82 * zoom}px`;
         cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet }).rig;
       }
-      const host = document.createElement('div'); host.style.cssText = isPet ? 'position:absolute;left:15px;top:60px;width:200px;height:165px' : 'position:absolute;left:5px;top:10px;width:200px;height:235px';
+      const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
       cell.insertBefore(host, cell.firstChild);
       const rig = isPet ? createPet(host, { species: id }).rig
         : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
