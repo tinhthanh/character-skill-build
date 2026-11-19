@@ -52,8 +52,6 @@ def main():
     parser.add_argument('film', help='film.json')
     parser.add_argument('--no-render', action='store_true', help='reuse the parts rendered last time; only join them')
     args = parser.parse_args()
-    for tool in ('ffmpeg', 'ffprobe'):
-        if not shutil.which(tool): fail(f'{tool} not found — install FFmpeg')
     path = os.path.abspath(args.film)
     try: film = json.load(open(path, encoding='utf-8'))
     except (OSError, ValueError) as error: fail(f'cannot read {args.film}: {error}')
@@ -69,6 +67,9 @@ def main():
     fps = int(film.get('fps', 30))
     output = os.path.join(base, film.get('output', os.path.splitext(os.path.basename(path))[0] + '.mp4'))
     parts_dir = os.path.splitext(output)[0] + '.parts'
+    # Soát film.json TRƯỚC khi đòi FFmpeg: lỗi trong tệp thì báo đúng lỗi ấy, cả trên máy chưa cài FFmpeg (CI).
+    for tool in ('ffmpeg', 'ffprobe'):
+        if not shutil.which(tool): fail(f'{tool} not found — install FFmpeg')
     os.makedirs(parts_dir, exist_ok=True)
     env = dict(os.environ, HYPERFRAMES_NO_TELEMETRY='1', DO_NOT_TRACK='1')
 
