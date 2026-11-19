@@ -42,9 +42,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
-                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left")
+                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left"), tree, lamp
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
-           "preset": "reception" | "exam" | "pharmacy" | "living-room" — a ready-made room (your boxes etc. are added)
+           "preset": "reception" | "exam" | "pharmacy" | "living-room" | "park" | "street" — a ready-made room or an
+           outdoor place (your boxes etc. are added). A person "seated": true with "on": "<box>" sits on that box's front edge
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
   characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
@@ -80,7 +81,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
-               A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene.
+               A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene; a person's
+               "wears": "mask" | "gloves" | "cap" (or a list). Pets: "greet", "play", ["goIn", 90] … ["comeOut", 90].
                "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] together with the vet's
                ["takePet", "@owner"] (a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
                together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
@@ -149,6 +151,7 @@ def known(where, given, allowed):
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
+PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast')
 SHOW_KEYS = ('title', 'bullets', 'image')
@@ -183,6 +186,25 @@ SET_PRESETS = {
         'cutouts': [{'kind': 'monitor', 'x': 120, 'z': -460, 'y': 180}],
         'spots': 'pharmacist behind the counter: x 0, z -620 · customer: x 0…250, z -300',
     },
+    # NGOÀI TRỜI: tường sau là bầu trời + đồi xa (vẽ bằng dải màu), hai tường bên cùng màu trời để không thành vách phòng.
+    'park': {
+        'room': {'width': 2200, 'depth': 1500, 'floor': '#8cc46d', 'floor2': '#84bb66', 'tile': 260,
+                 'wall': 'linear-gradient(#a9d8f2 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)', 'sideWall': 'linear-gradient(#b9e0f4 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)'},
+        'boxes': [{'name': 'bench', 'x': 220, 'z': -880, 'width': 340, 'depth': 110, 'height': 85, 'color': '#a47551', 'top': '#c08f66', 'side': '#8c6243'}],
+        'cutouts': [{'kind': 'tree', 'x': -720, 'z': -1100}, {'kind': 'tree', 'x': 780, 'z': -1000, 'color': '#5f9a68'}, {'kind': 'lamp', 'x': -260, 'z': -1150},
+                    {'kind': 'plant', 'x': 900, 'z': 60, 'height': 560, 'color': '#a47551'}],
+        'spots': 'walk the dog along x -600…600, z -500 · on the bench: "on": "bench", x 380, "seated": true (sits in front of it)',
+    },
+    'street': {
+        'room': {'width': 2200, 'depth': 1300, 'floor': '#cfcfc8', 'floor2': '#c2c2bb', 'tile': 150,
+                 'wall': 'linear-gradient(#e9d8c2 0%, #e9d8c2 82%, #b9a58c 82%)', 'sideWall': 'linear-gradient(#bfe0f2, #e3f2f9)'},
+        'panels': [{'wall': 'back', 'at': -700, 'y': 460, 'width': 420, 'height': 300, 'color': '#a9d6ec', 'border': '14px solid #6b4f3a'},
+                   {'wall': 'back', 'at': -200, 'y': 400, 'width': 170, 'height': 300, 'color': '#6b4f3a', 'border': '8px solid #4a3627'},
+                   {'wall': 'back', 'at': 120, 'y': 460, 'width': 420, 'height': 300, 'color': '#a9d6ec', 'border': '14px solid #6b4f3a'},
+                   {'wall': 'back', 'at': -720, 'y': 610, 'width': 1300, 'height': 90, 'color': '#2f9e8f', 'border': '6px solid #ffffff'}],
+        'cutouts': [{'kind': 'lamp', 'x': -900, 'z': -700}, {'kind': 'tree', 'x': 820, 'z': -750}, {'kind': 'lamp', 'x': 500, 'z': -700}],
+        'spots': 'pedestrians along x -700…700, z -400 · a shop door at x -115 on the back wall',
+    },
     'living-room': {
         'room': {'floor': '#d9c4a8', 'floor2': '#cdb596', 'wall': '#f3ead9', 'sideWall': '#eadfcb'},
         'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 150, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
@@ -196,9 +218,9 @@ ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wa
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
 CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-FLOOR_KINDS = ('bowl', 'scale', 'carrier')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
@@ -548,9 +570,9 @@ def main():
             who['holds'] = held
         # `wears`: phụ kiện của thú — "cone" (loa chống liếm), "bandage" (băng chân), hay một danh sách.
         if 'wears' in who:
-            if not pet: fail(f'character "{name}": "wears" is for pets (a cone or a bandage)')
+            allowed = WEARABLES if pet else PERSON_WEARABLES
             worn = who['wears'] if isinstance(who['wears'], list) else [who['wears']]
-            if not worn or any(item not in WEARABLES for item in worn): fail(f'character "{name}": "wears" must be {" or ".join(WEARABLES)}, or a list of them — got {js(who["wears"])}')
+            if not worn or any(item not in allowed for item in worn): fail(f'character "{name}": "wears" must be {" or ".join(allowed)}{" (a pet)" if pet else " (a person)"}, or a list of them — got {js(who["wears"])}')
             who['wears'] = worn
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
@@ -1118,14 +1140,25 @@ def main():
                 name = copy_asset(base, out, item['image'], copied)
                 item = dict(item, image=name)
             held[side] = item
-        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])}" + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
+        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])}" + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
         if stage_set is not None:
             boxes = [box.get('name') for box in stage_set.get('boxes', [])]
             lift = f", y: box{boxes.index(who['on']) + 1}.top" if who.get('on') else ''
+            # NGỒI trên một hộp (ghế đá, sofa): chân CHẠM SÀN, hông ở mặt hộp — đặt chân lên mặt hộp thì người ngồi trông như
+            # ngồi xổm trên ghế (cảnh thử đợt 8). Đứng trong bề sâu của hộp: mặt trước hộp che cẳng chân, đúng dáng ngồi trên nó.
+            depth_z = float(who.get('z', -300))
+            if who.get('on') and who.get('seated') and not who['_pet']:
+                box = stage_set['boxes'][boxes.index(who['on'])]
+                lift = ''
+                # Ngồi NGAY TRƯỚC mặt trước của hộp: đầu gối, cẳng chân hiện ra trước ghế; người lùi vào trong bề sâu hộp thì
+                # mặt trước ghế che tới ngang hông — trông như đứng sau một cái quầy.
+                depth_z = float(box['z']) + 12
+                seat_height = 86 * who['_host_height'] / PERSON[1]            # mặt ghế của rig: ~86 đơn vị khung trên sàn (rig.seatY)
+                if abs(float(box['height']) - seat_height) > 30: notes.append(f'character "{who["name"]}" sits on "{who["on"]}", which is {float(box["height"]):g} high — the seat of a character this size is about {seat_height:.0f}; make the box about that high, or the character floats above it / sinks into it')
             # Chỗ đứng LÚC ĐẦU (`_x0`): `who['x']` đã bị các lượt "bước lại gần" trong kịch bản cập nhật thành chỗ đứng sau
             # cùng — đặt nhân vật ở đó rồi cho nó bước thêm là nó đi quá, đứng chồng lên người kia.
-            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {float(who.get('z', -300)):g}{lift}, height: {who['_host_height']:g} }});")
+            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
                    'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door')}

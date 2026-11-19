@@ -231,7 +231,7 @@ function khop(R, T, a, b, raTruoc) {
 }
 
 // Động tác TRIỆU CHỨNG và chăm sóc, chung cho chó và mèo (nội dung thú y: ngứa, khập khiễng, sợ hãi, biếng ăn, ho…).
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play'];
 // Phụ kiện đeo (`wear`): loa chống liếm sau mổ, băng ở chân trước phía người xem.
 const WEARABLES = ['cone', 'bandage'];
 
@@ -577,7 +577,7 @@ export class RigThu {
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
-    rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng',
+    rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng', greet: 'Mừng chủ', play: 'Rủ chơi', goIn: 'Vào lồng', comeOut: 'Ra khỏi lồng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
@@ -702,7 +702,7 @@ export class RigThu {
 
   // Động tác đổi THẾ ĐỨNG và giữ nguyên cho các động tác sau.
   // `sleep` cũng đổi thế: ngủ xong con vật vẫn NẰM (thức dậy tại chỗ).
-  static STANCE = ['sitDown', 'standUp', 'face', 'lieDown', 'sleep'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'lieDown', 'sleep', 'goIn', 'comeOut'];
   static FLIP_MIN = 0.3;                 // bề ngang nhỏ nhất của con vật giữa một cú lật hướng
 
   /** Hoành độ TÂM con vật trên màn hình (px), tính cả quãng đã đi. */
@@ -963,6 +963,66 @@ export class RigThu {
     at = this.#vay(t, at, 8, 40, 0.11);
     t.set(s, { ballMouth: 0 }, at);
     this.#khep(t, 0.35, at, { x: x0, huong: dir });
+    return t;
+  }
+
+  /**
+   * MỪNG CHỦ: đứng dựng lên hai chân sau, hai chân trước chồm ra trước (lên chân người đứng trước mặt), đuôi vẫy lia lịa,
+   * lưỡi thè, mắt híp — `hold` giây rồi xuống. Đặt con vật sát người, quay mặt về phía người ấy.
+   */
+  greet(hold = 1.4) {
+    const t = this.tl(), s = this.s;
+    const at = this.#dung(t, 0);
+    t.to(s, { truocY: -38, truocX: 10, sauY: 2, tnNhac: 1, txNhac: 1, tnGoc: 118, txGoc: 108, dau: -8, dauY: -6, cuoi: 1, mieng: 0.55, luoi: 1, matY: 0.45, taiL: 0.8, taiR: 0.8,
+              duration: 0.35, ease: 'back.out(1.6)' }, at);
+    this.#vay(t, at + 0.2, Math.max(4, Math.round(hold / 0.1)), 46, 0.1, 20);
+    for (let a = at + 0.35, i = 0; a < at + 0.35 + hold; a += 0.22, i++) t.to(s, { tnGoc: i % 2 ? 118 : 128, txGoc: i % 2 ? 112 : 102, truocY: i % 2 ? -38 : -34, duration: 0.22, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.4, at + 0.35 + hold);
+    return t;
+  }
+
+  /**
+   * RỦ CHƠI: cúi rạp mời chơi (ngực sát đất, mông nhổm, đuôi vẫy), rồi nhảy qua lại hai lần — cho hai con vật đối mặt nhau
+   * chạy cùng lúc trong một `together` là chúng đùa với nhau.
+   */
+  play(times = 2) {
+    const t = this.tl(), s = this.s, x0 = s.x, dir = s.huong < 0 ? -1 : 1;
+    const at = this.#dung(t, 0);
+    t.to(s, { truocY: 22, truocX: 8, sauY: -6, tnX: 18, txX: 18, dauY: 12, dau: 6, cuoi: 1, mieng: 0.5, luoi: 0.6, taiL: 0.7, taiR: 0.7, duration: 0.3, ease: 'power2.out' }, at);
+    this.#vay(t, at + 0.1, 6, 38, 0.12, 22);
+    let a = at + 0.85;
+    for (let i = 0; i < times; i++) {
+      const g = i % 2 ? 1 : -1;
+      t.to(s, { truocY: 0, sauY: 0, tnX: 0, txX: 0, dauY: 0, y: -26, x: x0 + g * dir * 18, tnY: 10, txY: 10, snY: 8, sxY: 8, duration: 0.2, ease: 'power2.out' }, a)
+       .to(s, { y: 0, tnY: 0, txY: 0, snY: 0, sxY: 0, truocY: 14, duration: 0.18, ease: 'power2.in' }, a + 0.2);
+      a += 0.45;
+    }
+    t.to(s, { x: x0, truocY: 0, duration: 0.25, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.35, a + 0.25, { x: x0 });
+    return t;
+  }
+
+  /**
+   * VÀO LỒNG: đi `distance` đơn vị về phía đang quay mặt (vào trong lồng vận chuyển đặt ở đó) rồi NẰM xuống — và ở yên
+   * trong đó (thế nằm, chỗ mới). Lồng che con vật nhờ thứ tự lớp: đặt lồng gần máy hơn chỗ con vật nằm (bối cảnh 3D: `z`
+   * lớn hơn một chút; cảnh 2D: host của lồng SAU host con vật). `comeOut(distance)` đi ra.
+   */
+  goIn(distance = 90) {
+    const t = this.tl(), s = this.s, x0 = s.x, dir = s.huong < 0 ? -1 : 1;
+    let at = this.#dung(t, 0);
+    at = this.#di(t, at, Math.max(2, Math.round(Math.abs(distance) / 40)), 0.5, { quang: dir * distance, x0 });
+    this.#khep(t, 0.5, at, { x: x0 + dir * distance, nam: 1, ngoi: 0 });
+    return t;
+  }
+
+  /** RA KHỎI LỒNG: đứng dậy, quay đầu ra phía cửa, đi `distance` đơn vị ra khỏi lồng, và giữ hướng vừa đi ra. */
+  comeOut(distance = 120) {
+    const t = this.tl(), s = this.s, x0 = s.x, held = s.huong < 0 ? -1 : 1, out = -held;
+    let at = 0;
+    if (s.nam > 0.5) { t.to(s, { nam: 0, ...Object.fromEntries(Object.keys(LIE).map((k) => [k, this.NGHI[k]])), duration: 0.5, ease: 'power2.inOut' }, 0); at = 0.5; }
+    t.to(s, { huong: out, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22;
+    at = this.#di(t, at, Math.max(2, Math.round(Math.abs(distance) / 40)), 0.5, { quang: out * distance, x0 });
+    this.#khep(t, 0.4, at, { x: x0 + out * distance, huong: out, nam: 0 });
     return t;
   }
 

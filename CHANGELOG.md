@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.48.0
+
+Added — waiting room, outdoors, accessories for people
+- **People's accessories:** `rig.wear('mask' | 'gloves' | 'cap')` — a medical mask (below the eyes,
+  over the mouth, follows the face as it turns), exam gloves (the hands turn blue), a surgical cap over
+  the hair. `createCharacter(host, { wear })` and `"wears"` on a person in a scene file.
+- **Carry while seated:** a seated person stays seated while picking a pet up — it lies on the lap.
+- **Pets:** **`greet`** (rear up toward the owner, tail wagging), **`play`** (a play bow, then hops —
+  two pets `together`), **`goIn` / `comeOut`** (into a pet carrier and lie down; out again).
+- **Outdoor 3D sets:** `set.preset` **`park`** (sky, hills, grass, a bench, trees, a lamp) and
+  **`street`** (shop fronts, a sidewalk, lamps, a tree); new props **`tree`** and **`lamp`**.
+
+Fixed
+- **A person "seated" "on" a box sat on top of it like squatting.** `tools/scene.py` put their feet on
+  the box top; a seated person now has the feet on the floor at the box's front edge, the hips at its
+  top, and a note says when the box height does not match the character's seat height.
+
 ## 0.47.0
 
 Added — phone calls on a split screen, notifications

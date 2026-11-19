@@ -45,7 +45,7 @@ for (const entry of entries) {
       const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
       cell.insertBefore(host, cell.firstChild);
       const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
-        : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
+        : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg)) : step));
       const line = sequence(rig, steps);

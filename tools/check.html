@@ -1747,6 +1747,39 @@ try {
         let refused = ''; try { actor.notify('x'); } catch (error) { refused = error.message; }
         if (!refused.includes('not holding a phone')) hong('notify', 'a notification without a phone in hand should be refused with a clear message');
       }
+      // Đợt 8 — phụ kiện của người, ngồi bế thú, mừng chủ, vào / ra lồng.
+      {
+        const nurse = L.createCharacter(spot('left:500px;top:0;width:200px;height:235px'), { id: 'vet', wear: ['mask', 'cap'] }).rig;
+        const shown = (el) => el && el.style.display !== 'none';
+        if (!shown(nurse.el.khauTrang) || !shown(nurse.el.muMo)) hong('wear', 'createCharacter({ wear: ["mask", "cap"] }) shows no mask or no cap');
+        const eye = Math.max(nurse.el.matL.getBoundingClientRect().bottom, nurse.el.matR.getBoundingClientRect().bottom), mask = nurse.el.khauTrang.getBoundingClientRect();
+        if (!(mask.top > eye - 3)) hong('wear', `the mask covers the eyes (its top is ${(eye - mask.top).toFixed(1)} px above the bottom of the eyes)`);
+        const mouth = nurse.el.momG.getBoundingClientRect();
+        if (!(mask.top < mouth.top && mask.bottom > mouth.bottom)) hong('wear', 'the mask does not cover the mouth');
+        nurse.wear('gloves');
+        const skin = getComputedStyle(nurse.el.tayG.R.querySelector('[data-tay="mo"] path')).fill, bare = nurse.mau.da;
+        if (!nurse.svg.classList.contains(nurse.id + '-gloved') || skin.replace(/\s/g, '') === 'rgb(' + [1, 3, 5].map((i) => parseInt(bare.slice(i, i + 2), 16)).join(',') + ')') hong('wear', 'gloves do not change the colour of the hands');
+        nurse.wear('mask', false); if (shown(nurse.el.khauTrang)) hong('wear', 'the mask stays after taking it off');
+        let unknown = ''; try { nurse.wear('cone'); } catch (error) { unknown = error.message; }
+        if (!unknown.includes('mask, gloves, cap')) hong('wear', 'a pet accessory on a person should be refused with the list of person accessories');
+        nurse.svg.remove();
+        // Ngồi bế: vẫn ngồi suốt lúc nhấc con vật lên và khi đã bế.
+        const sitter = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig, lap = L.createPet(spot('left:110px;top:160px;width:100px;height:82px'), { species: 'cat' }).rig;
+        const seated = L.sequence(sitter, ['sitDown', ['carry', lap], ['idle', 0.5]], { breathe: false });
+        let lowest = 1; for (let time = seated.data.steps[1].start; time <= seated.duration(); time += 0.05) { seated.time(time); lowest = Math.min(lowest, sitter.s.seat); }
+        if (lowest < 0.9) hong('carry', `carrying while seated stands the person up (seat drops to ${lowest.toFixed(2)})`);
+        seated.kill(); sitter.svg.remove(); lap.svg.remove();
+        // Mừng chủ: hai chân trước chồm lên, xong thì xuống; vào lồng: dời chỗ rồi nằm; ra: đứng dậy và dời ngược lại.
+        const pup = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog' }).rig;
+        const hi = pup.greet(1); hi.time(0.8);
+        if (!(pup.s.tnNhac > 0.9 && pup.s.truocY < -20)) hong('greet', 'the dog does not rear up with its front paws raised');
+        hi.progress(1); if (pup.s.tnNhac !== pup.NGHI.tnNhac) hong('greet', 'the front paws stay up after greeting'); hi.kill(); pup.datNghi();
+        const into = L.sequence(pup, [['goIn', 90], ['comeOut', 90]], { breathe: false });
+        into.time(into.data.steps[1].start - 0.05);
+        if (!(pup.s.nam > 0.9 && Math.abs(pup.s.x - 90) < 1)) hong('goIn', `the pet does not end lying 90 units in (lying ${pup.s.nam.toFixed(2)}, x ${pup.s.x.toFixed(1)})`);
+        into.progress(1); if (!(pup.s.nam < 0.1 && Math.abs(pup.s.x) < 1)) hong('comeOut', `the pet does not come back out standing (lying ${pup.s.nam.toFixed(2)}, x ${pup.s.x.toFixed(1)})`);
+        into.kill(); pup.svg.remove();
+      }
       const brisk = actor.hurry(6), calm = actor.walk(6);
       if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
       brisk.kill(); calm.kill();

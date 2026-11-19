@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.47.0';
+export const VERSION = '0.48.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -249,7 +249,7 @@ const ITEMS = { cup, clipboard, phone, syringe, pills, leash };
  *   items        { L | R: 'cup' | 'clipboard' | 'phone' | { kind: 'phone', image } | (p, colours) => svg } — cho nhân vật cầm thêm món đồ ấy
  *   itemsHidden  true (hoặc ['R']) — món đồ có sẵn nhưng đang cất: để `take()` nhận nó, hay `showItem()` lấy ra
  */
-export function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false } = {}) {
+export function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false, wear = [] } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
@@ -267,6 +267,7 @@ export function createCharacter(host, { id = 'vet', config, items = null, itemsH
     if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, { kind, ...options }, or a function returning SVG)`);
     rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
   }
+  for (const kind of Array.isArray(wear) ? wear : [wear]) rig.wear(kind);      // phụ kiện đeo sẵn: 'mask', 'gloves', 'cap'
   return { rig, id };
 }
 

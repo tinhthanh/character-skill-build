@@ -107,7 +107,7 @@ def main():
           pet = VGCharacter.createPet(petHost, {{ species: entry.pet, wear: entry.wear || [] }}).rig; parts.push(table, petHost);
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
-        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }}).rig;
+        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
         if (turned) rig.state.facing = 0.55;
         parts.unshift(host);
       }}

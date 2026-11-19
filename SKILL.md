@@ -16,7 +16,9 @@ or mouth, give it a treat or a pill, brush it, walk it on a leash, kneel to it, 
 get a notification on the phone (76 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
-mouth for an exam, rub against a leg, fetch a ball, and wear a recovery cone or a leg bandage.
+mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, and wear a recovery
+cone or a leg bandage; people can wear a mask, exam gloves and a surgical cap. 3D sets include outdoor places (`park`,
+`street`).
 
 There are two jobs. Do the one you were asked for; most videos need both.
 

@@ -319,6 +319,7 @@ with tempfile.TemporaryDirectory() as work:
     care['set'].setdefault('cutouts', []).extend([{'kind': 'bowl', 'x': -300, 'z': -500, 'fill': 'water'}, {'kind': 'scale', 'x': 500, 'z': -600, 'reading': '4.2 kg'}, {'kind': 'carrier', 'x': 300, 'z': -500, 'door': 'left'}])
     boy = next(who for who in care['characters'] if who.get('id') == 'boy'); boy['holds'] = 'leash'
     next(who for who in care['characters'] if who.get('species') == 'cat')['wears'] = ['cone', 'bandage']
+    next(who for who in care['characters'] if who.get('id') == 'vet')['wears'] = ['mask', 'gloves', 'cap']
     care['script'] += [{'who': 'vet', 'do': [['examine', '@cat', 'teeth'], ['giveTreat', '@cat'], 'ponder', 'callOut', ['brush', '@cat'], 'fingerHeart', 'thumbsDown']},
                        {'who': 'boy', 'do': [['leash', '@cat'], 'unleash']},
                        {'who': 'boy', 'do': [['carry', '@cat']]},
@@ -333,7 +334,7 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('a scene with vet-care steps does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'care3d', 'index.html'), encoding='utf-8').read().replace("'", '"')
-        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}', 'wear: ["cone", "bandage"]', '"brush", set.target(vet, cat, "body")', '"door": "left"', '["handOverPet", vet]', '["takePet", boy]'):
+        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}', 'wear: ["cone", "bandage"]', '"brush", set.target(vet, cat, "body")', '"door": "left"', '["handOverPet", vet]', '["takePet", boy]', 'wear: ["mask", "gloves", "cap"]'):
             if needle not in html: problems.append(f'vet care: {needle} is not in the composition')
 
     # Đợt 7: màn hình chia đôi khi gọi điện, thẻ thông báo trên khung.
@@ -369,6 +370,19 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
 
+    for outdoor in ('park', 'street'):
+        scene = {'id': outdoor, 'set': {'preset': outdoor}, 'characters': [{'name': 'boy', 'id': 'boy', 'x': -200, 'z': -500, 'holds': 'leash'}, {'name': 'dog', 'species': 'dog', 'x': 0, 'z': -500}],
+                 'script': [{'who': 'boy', 'do': [['leash', '@dog']]}, {'together': [{'who': 'boy', 'do': [['walk', 4, 200]]}, {'who': 'dog', 'do': [['walk', 4, 300]]}]},
+                           {'together': [{'who': 'dog', 'do': ['greet']}, {'who': 'boy', 'do': ['unleash']}]}]}
+        path = os.path.join(os.path.dirname(stage), f'_check_{outdoor}.json')
+        try:
+            json.dump(scene, open(path, 'w', encoding='utf-8'))
+            done = build(path, os.path.join(work, outdoor))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'set.preset "{outdoor}" does not build: ' + done.stderr.strip()[:300])
+        elif '"tree"' not in open(os.path.join(work, outdoor, 'index.html'), encoding='utf-8').read(): problems.append(f'set.preset "{outdoor}": no tree cutout')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -385,7 +399,7 @@ with tempfile.TemporaryDirectory() as work:
         ('a camera swung round too far', lambda s: s['script'][0]['view'].update({'yaw': 75}), 'yaw'),
         ('the old isometric view', lambda s: s['script'][3].update({'view': {'isometric': True}}), 'wide'),
         ('too high a starting camera', lambda s: s['set'].update({'camera': {'pitch': 25}}), 'pitch'),
-        ('a cutout of an unknown kind', lambda s: s['set']['cutouts'].append({'kind': 'lamp', 'x': 0, 'z': 0}), 'lamp'),
+        ('a cutout of an unknown kind', lambda s: s['set']['cutouts'].append({'kind': 'fountain', 'x': 0, 'z': 0}), 'fountain'),
         ('a cutout with a missing picture', lambda s: s['set']['cutouts'].append({'image': 'nope.png', 'x': 0, 'z': 0}), 'nope.png'),
         ('a cutout without a position', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0}), '"z"'),
         ('too much blur', lambda s: s['script'][0]['view'].update({'blur': 50}), 'blur'),
@@ -394,7 +408,7 @@ with tempfile.TemporaryDirectory() as work:
         ('a phone turn without a line', lambda s: s['characters'][0].update({'holds': 'phone'}) or s['script'].insert(0, {'who': 'vet', 'do': ['nod'], 'phone': True}), '"say"'),
         ('a screen on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0, 'z': 0, 'screen': 'a.png'}), 'laptop'),
         ('a reading on a bowl', lambda s: s['set']['cutouts'].append({'kind': 'bowl', 'x': 0, 'z': 0, 'reading': '1 kg'}), 'scale only'),
-        ('a person wearing a cone', lambda s: s['characters'][0].update({'wears': 'cone'}), 'for pets'),
+        ('a person wearing a cone', lambda s: s['characters'][0].update({'wears': 'cone'}), 'a person'),
         ('a pet wearing a hat', lambda s: next(w for w in s['characters'] if w.get('species')).update({'wears': 'hat'}), 'cone or bandage'),
         ('a bowl full of soup', lambda s: s['set']['cutouts'].append({'kind': 'bowl', 'x': 0, 'z': 0, 'fill': 'soup'}), 'fill'),
         ('a laptop facing up', lambda s: s['set']['cutouts'].append({'kind': 'laptop', 'x': 0, 'z': 0, 'facing': 'up'}), 'facing'),

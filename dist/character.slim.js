@@ -1,4 +1,4 @@
-/* VGCharacter v0.47.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.48.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -441,6 +441,7 @@ class RigSVG {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
     if (!nv) throw new Error(`[character] no character "${nhanVat}"`);
     this.host = host;
+    this.wearing = new Set();                     // phụ kiện đang đeo (`wear`): khẩu trang, găng tay, mũ phẫu thuật
     this.nv = { ...NV_MAC_DINH, ...nv };
     this.mauKhai = { ...(nv.mau || {}) };
     this.#suyMau();
@@ -486,6 +487,7 @@ class RigSVG {
     this.svg = this.host.querySelector('svg');
     if (khung) this.svg.setAttribute('viewBox', khung);
     this.#layPhanTu();
+    this.#applyWear();                          // dựng lại (đổi màu, đổi dáng) thì phụ kiện đang đeo vẫn đeo
     this.apDung();
   }
   doiMau(kieu = {}) {
@@ -665,6 +667,7 @@ class RigSVG {
       <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
       <g id="${p}-capInv${ben}"><circle id="${p}-cap${ben}" r="0" fill="url(#${p}-capGrad)" clip-path="url(#${p}-thanCat)"/></g></mask>`).join('')}` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
+    <style>.${p}-gloved #${p}-tayL [fill="${this.mau.da}"], .${p}-gloved #${p}-tayR [fill="${this.mau.da}"] { fill: #7b9be8; }</style>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
     <clipPath id="${p}-phuKienClip" clipPathUnits="userSpaceOnUse"><rect id="${p}-phuKienRect" x="-400" y="-500" width="800" height="1000"/></clipPath>
     <mask id="${p}-xaMask" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
@@ -712,7 +715,7 @@ class RigSVG {
               <path id="${p}-taiNetL" d="M 1.8 -4.5 Q -3.2 -1 0.8 4.5" stroke="${this.mau.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0"/></g>
             <g id="${p}-taiR"><ellipse rx="7" ry="9" fill="${this.mau.da}"/>
               <path id="${p}-taiNetR" d="M -1.8 -4.5 Q 3.2 -1 -0.8 4.5" stroke="${this.mau.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0"/></g>
-            <g id="${p}-muG">${this.nv.mu(p, this.mau, this.nv)}</g>
+            <g id="${p}-muG">${this.nv.mu(p, this.mau, this.nv)}${this.#veMuMo(p)}</g>
             <g clip-path="url(#${p}-matClip)"><g id="${p}-ma">
             <ellipse id="${p}-maL" cy="${this.nv.maY}" ry="${this.nv.maRong * 0.62}" fill="${this.mau.ma}" opacity=".55"/>
             <ellipse id="${p}-maR" cy="${this.nv.maY}" ry="${this.nv.maRong * 0.62}" fill="${this.mau.ma}" opacity=".55"/>
@@ -740,6 +743,7 @@ class RigSVG {
               </g>
               <path id="${p}-moiTren" fill="none" stroke="${this.mau.mieng}" stroke-linecap="round"/>
             </g>
+            ${this.#veKhauTrang(p)}
             </g>
           </g>
         </g>
@@ -782,7 +786,7 @@ class RigSVG {
       matL: q('matL'), matR: q('matR'), nguoiL: q('nguoiL'), nguoiR: q('nguoiR'),
       mayL: q('mayL'), mayR: q('mayR'), mieng: q('mieng'), rang: q('rang'),
       khuon: q('khuon'), mui: q('mui'), netThem: q('netThem'),
-      momG: q('momG'), momClipP: q('momClipP'), luoi: q('luoi'),
+      momG: q('momG'), khauTrang: q('khauTrang'), muMo: q('muMo'), momClipP: q('momClipP'), luoi: q('luoi'),
       moiTren: q('moiTren'), nuocMat: q('nuocMat'), moHoi: q('moHoi'),
       tayG: { L: q('tayL'), R: q('tayR') },
       tay: {
@@ -2498,6 +2502,37 @@ class RigSVG {
     for (const [name, value] of pet.homeAttrs || []) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value);
     pet.apDung();
   }
+  #veKhauTrang(p) {
+    const nv = this.nv, top = Math.max(nv.muiY - 2, nv.matY + 14 * (nv.matCo || 1)), bottom = nv.miengY + 13, half = nv.maX + 1;
+    const folds = [0.3, 0.55, 0.8].map((k) => { const y = top + (bottom - top) * k; return `M ${-half + 5} ${y.toFixed(1)} Q 0 ${(y + 3).toFixed(1)} ${half - 5} ${y.toFixed(1)}`; }).join(' ');
+    return `<g id="${p}-khauTrang" style="display:none">
+              <path d="M ${-half} ${top + 4} Q 0 ${top - 6} ${half} ${top + 4} L ${half - 3} ${bottom - 6} Q 0 ${bottom + 4} ${-half + 3} ${bottom - 6} Z" fill="#cfe6f5" stroke="#8fb6cf" stroke-width="1.4" stroke-linejoin="round"/>
+              <path d="${folds}" stroke="#9fc3d9" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+              <path d="M ${-half} ${top + 6} L ${-nv.taiX + 4} ${top - 2} M ${-half + 2} ${bottom - 8} L ${-nv.taiX + 4} ${top + 6} M ${half} ${top + 6} L ${nv.taiX - 4} ${top - 2} M ${half - 2} ${bottom - 8} L ${nv.taiX - 4} ${top + 6}" stroke="#e8f2f8" stroke-width="1.6" stroke-linecap="round"/>
+            </g>`;
+  }
+  #veMuMo(p) {
+    const w = this.nv.taiX + 6;
+    return `<g id="${p}-muMo" style="display:none">
+              <path d="M ${-w} -22 Q ${-w - 8} -88 -10 -104 Q 0 -110 10 -104 Q ${w + 8} -88 ${w} -22 Q 0 -40 ${-w} -22 Z" fill="#5fb3a5" stroke="#3d8578" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M ${-w + 2} -26 Q 0 -44 ${w - 2} -26" stroke="#3d8578" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <path d="M -24 -80 q 8 6 16 0 M 6 -88 q 8 6 16 0 M -14 -60 q 8 6 16 0" stroke="#7cc6b9" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+            </g>`;
+  }
+  wear(kind, on = true) {
+    if (!RigSVG.WEARABLES.includes(kind)) throw new Error(`[character] wear: no accessory "${kind}" (available: ${RigSVG.WEARABLES.join(', ')})`);
+    if (on) this.wearing.add(kind); else this.wearing.delete(kind);
+    this.#applyWear();
+    return this;
+  }
+  static WEARABLES = ['mask', 'gloves', 'cap'];
+  #applyWear() {
+    const e = this.el;
+    if (!e) return;
+    if (e.khauTrang) e.khauTrang.style.display = this.wearing.has('mask') ? '' : 'none';
+    if (e.muMo) e.muMo.style.display = this.wearing.has('cap') ? '' : 'none';
+    this.svg.classList.toggle(this.id + '-gloved', this.wearing.has('gloves'));
+  }
   #bellyScreen() {
     const e = this.el, ctm = e.tren && e.tren.getScreenCTM && e.tren.getScreenCTM();
     if (!ctm) return null;
@@ -2601,7 +2636,7 @@ class RigSVG {
     this.#leanTo(t, reach, 'xoe');
     t.to(s, { ['bat' + other]: reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
     t.set(s, { om: 1 }, 0.5);                                                              // hai tay đã chạm: con vật vào tay
-    t.to(s, { omRise: 1, huong: 0, seat: N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
+    t.to(s, { omRise: 1, huong: 0, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
     this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: 0 });
     return t;
   }
@@ -3095,7 +3130,7 @@ function khop(R, T, a, b, raTruoc) {
   if (J.y > DAT - 4) J = j1.y < j2.y ? j1 : j2;
   return { J, T };
 }
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn', 'rub', 'fetch', 'greet', 'play'];
 const WEARABLES = ['cone', 'bandage'];
 class RigThu {
   static KHUNG = KHUNG;
@@ -3373,7 +3408,7 @@ class RigThu {
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
-    rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng',
+    rub: 'Dụi vào chân', fetch: 'Chạy nhặt bóng', greet: 'Mừng chủ', play: 'Rủ chơi', goIn: 'Vào lồng', comeOut: 'Ra khỏi lồng',
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
@@ -3457,7 +3492,7 @@ class RigThu {
     this.#khep(t, 0.4, at, { x: 0, ngoi: this.NGHI.ngoi, huong: dir });    // vào xong: về dáng nghỉ của giống, đầu vẫn quay về hướng vừa chạy
     return t;
   }
-  static STANCE = ['sitDown', 'standUp', 'face', 'lieDown', 'sleep'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'lieDown', 'sleep', 'goIn', 'comeOut'];
   static FLIP_MIN = 0.3;                 // bề ngang nhỏ nhất của con vật giữa một cú lật hướng
   centerX() {
     const frame = this.svg.getBoundingClientRect();
@@ -3638,6 +3673,48 @@ class RigThu {
     at = this.#vay(t, at, 8, 40, 0.11);
     t.set(s, { ballMouth: 0 }, at);
     this.#khep(t, 0.35, at, { x: x0, huong: dir });
+    return t;
+  }
+  greet(hold = 1.4) {
+    const t = this.tl(), s = this.s;
+    const at = this.#dung(t, 0);
+    t.to(s, { truocY: -38, truocX: 10, sauY: 2, tnNhac: 1, txNhac: 1, tnGoc: 118, txGoc: 108, dau: -8, dauY: -6, cuoi: 1, mieng: 0.55, luoi: 1, matY: 0.45, taiL: 0.8, taiR: 0.8,
+              duration: 0.35, ease: 'back.out(1.6)' }, at);
+    this.#vay(t, at + 0.2, Math.max(4, Math.round(hold / 0.1)), 46, 0.1, 20);
+    for (let a = at + 0.35, i = 0; a < at + 0.35 + hold; a += 0.22, i++) t.to(s, { tnGoc: i % 2 ? 118 : 128, txGoc: i % 2 ? 112 : 102, truocY: i % 2 ? -38 : -34, duration: 0.22, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.4, at + 0.35 + hold);
+    return t;
+  }
+  play(times = 2) {
+    const t = this.tl(), s = this.s, x0 = s.x, dir = s.huong < 0 ? -1 : 1;
+    const at = this.#dung(t, 0);
+    t.to(s, { truocY: 22, truocX: 8, sauY: -6, tnX: 18, txX: 18, dauY: 12, dau: 6, cuoi: 1, mieng: 0.5, luoi: 0.6, taiL: 0.7, taiR: 0.7, duration: 0.3, ease: 'power2.out' }, at);
+    this.#vay(t, at + 0.1, 6, 38, 0.12, 22);
+    let a = at + 0.85;
+    for (let i = 0; i < times; i++) {
+      const g = i % 2 ? 1 : -1;
+      t.to(s, { truocY: 0, sauY: 0, tnX: 0, txX: 0, dauY: 0, y: -26, x: x0 + g * dir * 18, tnY: 10, txY: 10, snY: 8, sxY: 8, duration: 0.2, ease: 'power2.out' }, a)
+       .to(s, { y: 0, tnY: 0, txY: 0, snY: 0, sxY: 0, truocY: 14, duration: 0.18, ease: 'power2.in' }, a + 0.2);
+      a += 0.45;
+    }
+    t.to(s, { x: x0, truocY: 0, duration: 0.25, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.35, a + 0.25, { x: x0 });
+    return t;
+  }
+  goIn(distance = 90) {
+    const t = this.tl(), s = this.s, x0 = s.x, dir = s.huong < 0 ? -1 : 1;
+    let at = this.#dung(t, 0);
+    at = this.#di(t, at, Math.max(2, Math.round(Math.abs(distance) / 40)), 0.5, { quang: dir * distance, x0 });
+    this.#khep(t, 0.5, at, { x: x0 + dir * distance, nam: 1, ngoi: 0 });
+    return t;
+  }
+  comeOut(distance = 120) {
+    const t = this.tl(), s = this.s, x0 = s.x, held = s.huong < 0 ? -1 : 1, out = -held;
+    let at = 0;
+    if (s.nam > 0.5) { t.to(s, { nam: 0, ...Object.fromEntries(Object.keys(LIE).map((k) => [k, this.NGHI[k]])), duration: 0.5, ease: 'power2.inOut' }, 0); at = 0.5; }
+    t.to(s, { huong: out, duration: 0.22, ease: 'power1.inOut' }, at); at += 0.22;
+    at = this.#di(t, at, Math.max(2, Math.round(Math.abs(distance) / 40)), 0.5, { quang: out * distance, x0 });
+    this.#khep(t, 0.4, at, { x: x0 + out * distance, huong: out, nam: 0 });
     return t;
   }
   shakeOff() {
@@ -4226,6 +4303,23 @@ const DRAW = {
     <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
     ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
   },
+  tree: ({ w = 300, color, dark, line }) => {
+    const F = PROP_FRAME.floor, r = w * 0.36;
+    return `
+    <path d="M ${200 - w * 0.06} ${F} L ${200 - w * 0.045} ${F - 260} L ${200 + w * 0.045} ${F - 260} L ${200 + w * 0.06} ${F} Z" fill="#8a6245" stroke="#5e4130" stroke-width="1.6"/>
+    <circle cx="${200 - r * 0.7}" cy="${F - 330}" r="${r}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="${200 + r * 0.7}" cy="${F - 340}" r="${r * 0.95}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="200" cy="${F - 430}" r="${r * 1.05}" fill="${color}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="${200 - r * 0.35}" cy="${F - 455}" r="${r * 0.3}" fill="#ffffff" opacity=".18"/>`;
+  },
+  lamp: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor;
+    return `
+    <path d="M 192 ${F} L 196 ${F - 560} L 204 ${F - 560} L 208 ${F} Z" fill="${color}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="182" y="${F - 22}" width="36" height="22" rx="4" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <path d="M 176 ${F - 560} H 224 L 214 ${F - 600} H 186 Z" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="188" y="${F - 562}" width="24" height="16" rx="3" fill="#fff3b0" stroke="${line}" stroke-width="1"/>`;
+  },
   carrier: ({ w = 150, door = 'right', color, dark, line }) => {
     const F = PROP_FRAME.floor, h = w * 0.66, x0 = 200 - w / 2, top = F - h, d = door === 'left' ? -1 : 1;
     const dx = d > 0 ? 200 + w / 2 - 6 : x0 + 6, gate = Array.from({ length: 6 }, (_, n) => `M ${dx - d * (n + 1) * 1.6} ${top + 14 + n * 0} L ${dx - d * (n + 1) * 1.6} ${F - 10}`).join(' ');
@@ -4245,7 +4339,7 @@ function screen(x, y, w, h, image) {
   return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
     <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
 }
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450' };
 const PROP_KINDS = Object.keys(DRAW);
 function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
@@ -5175,7 +5269,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.47.0';
+const VERSION = '0.48.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -5324,7 +5418,7 @@ function applyConfig(rig, config) {
   return rig;
 }
 const ITEMS = { cup, clipboard, phone, syringe, pills, leash };
-function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false } = {}) {
+function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false, wear = [] } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
   assertConfig(config, 'person', id);
@@ -5341,6 +5435,7 @@ function createCharacter(host, { id = 'vet', config, items = null, itemsHidden =
     if (!draw) throw new Error(`[character] createCharacter: no item ${JSON.stringify(item)} (available: ${Object.keys(ITEMS).join(', ')}, { kind, ...options }, or a function returning SVG)`);
     rig.setItem(side, draw, { shown: !(itemsHidden === true || (Array.isArray(itemsHidden) && itemsHidden.includes(side))) });
   }
+  for (const kind of Array.isArray(wear) ? wear : [wear]) rig.wear(kind);      // phụ kiện đeo sẵn: 'mask', 'gloves', 'cap'
   return { rig, id };
 }
 function createPet(host, { species = 'dog', config, wear = [] } = {}) {

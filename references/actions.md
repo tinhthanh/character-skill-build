@@ -175,6 +175,9 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
 | `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
 | `rub` | `(times = 4)` | rub against the legs of the person beside it: tail up and curled, cheek and head rubbing side to side, eyes half shut | 0.7 + 0.48 × `times` |
+| `greet` | `(hold = 1.4)` | rear up on the hind legs, front paws up toward the person in front, tail wagging hard, tongue out — welcoming its owner. Stand it close to the person, facing them | `hold` + 0.75 |
+| `play` | `(times = 2)` | a play bow (chest down, rump up, tail wagging) then hops side to side — run it for two pets facing each other in a `together` | about 2.3 |
+| `goIn` / `comeOut` | `(distance = 90)` / `(distance = 120)` | **stance**: walk `distance` units the way it faces into a pet `carrier` and lie down there; `comeOut` gets up, turns to the door and walks out. The carrier hides the pet when it is nearer the camera (3D set: a slightly larger `z`; 2D: its host after the pet's) | about 1.5 / 2.6 |
 | `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down (front legs out); `sleep` lies down, head down, eyes closed, slow deep breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
@@ -207,11 +210,19 @@ stand them up first:
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
 | `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
 | `rub` | `(times = 4)` | rub against the legs of the person beside it: tail up and curled, cheek and head rubbing side to side, eyes half shut | 0.7 + 0.48 × `times` |
+| `greet` | `(hold = 1.4)` | rear up on the hind legs, front paws up toward the person in front, tail wagging hard, tongue out — welcoming its owner. Stand it close to the person, facing them | `hold` + 0.75 |
+| `play` | `(times = 2)` | a play bow (chest down, rump up, tail wagging) then hops side to side — run it for two pets facing each other in a `together` | about 2.3 |
+| `goIn` / `comeOut` | `(distance = 90)` / `(distance = 120)` | **stance**: walk `distance` units the way it faces into a pet `carrier` and lie down there; `comeOut` gets up, turns to the door and walks out. The carrier hides the pet when it is nearer the camera (3D set: a slightly larger `z`; 2D: its host after the pet's) | about 1.5 / 2.6 |
 | `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
 | `exit` | `(to = 'right', distance)` | turn that way and run out past the edge of the frame — **ends hidden** | 2.7 |
+
+**Accessories for people.** `rig.wear('mask')` (a medical face mask under the eyes), `rig.wear('gloves')`
+(exam gloves: the hands turn blue), `rig.wear('cap')` (a surgical cap over the hair); `wear(kind, false)`
+takes it off; `createCharacter(host, { id, wear: ['mask', 'cap'] })` and `"wears"` on a person in a scene file.
+A person who is seated (`sitDown`) stays seated while carrying a pet — it lies on the lap.
 
 **Accessories.** `rig.wear('cone')` puts on a recovery cone (an Elizabethan collar, seen as a
 clear ring round the head), `rig.wear('bandage')` a bandage on the near front leg;
@@ -250,6 +261,8 @@ drawn behind. Tables and counters use the same `bottom` + `height` and their own
 | `laptop` | `on = 150`, `facing = 'away'`, `image`, `color`, `width = 96` | a laptop on a surface `on` units above the floor (150 = the default table or counter top). `'away'`: the lid faces the viewer — the machine of someone behind the desk; put its host **after** the person's (in front) so the lid hides the typing hands. `'viewer'`: the screen faces out and shows `image` |
 | `monitor` | `on = 150`, `image`, `color`, `width = 150` | a desktop screen on a stand, facing the viewer, showing `image` (the app, a lab result, an X-ray) |
 | `bowl` | `fill = 'food'` (`'water'`, `'empty'`), `color`, `width = 46` | a pet bowl on the floor. For `eat` / `drink`, give its host the pet's `bottom` and `height` and put it just in front of the muzzle: about 0.15 × the pet's host height toward the side its head is on |
+| `tree` | `color` (the leaves), `width = 300` | a tree, taller than a person (outdoor sets: `park`, `street`) |
+| `lamp` | `color` | a street lamp |
 | `carrier` | `door = 'right'` (`'left'`), `color`, `width = 150` | a pet carrier seen from the side, a barred door on one end. Put its host **after** the pet's (in front): a pet standing behind it is "inside", seen through the door |
 | `scale` | `reading` (e.g. `'4.2 kg'`), `color`, `width = 210` | a low vet scale with a digital display. Stand the pet on it: raise the pet's host by the platform (about 0.03 × the host height) |
 
@@ -275,7 +288,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 
 | Call | Use |
 |---|---|
-| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `'syringe'`, `'pills'`, `'leash'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
+| `VGCharacter.createCharacter(host, { id, config, items, itemsHidden, wear })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `'syringe'`, `'pills'`, `'leash'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
 | `VGCharacter.createPet(host, { species, config, wear })` | build a pet; `wear: ['cone']` (or `'bandage'`, or both) puts accessories on from the start — see `rig.wear` |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |

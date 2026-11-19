@@ -767,6 +767,7 @@ export class RigSVG {
     const nv = typeof nhanVat === 'string' ? RigSVG.NHAN_VAT[nhanVat] : nhanVat;
     if (!nv) throw new Error(`[character] no character "${nhanVat}"`);
     this.host = host;
+    this.wearing = new Set();                     // phụ kiện đang đeo (`wear`): khẩu trang, găng tay, mũ phẫu thuật
     this.nv = { ...NV_MAC_DINH, ...nv };
     // Giữ riêng phần màu nhân vật ĐÃ KHAI, tách khỏi phần rig tự suy. `doiMau`
     // cần biết chỗ nào là khai tay: đổi màu tóc thì chân mày đi theo, trừ khi
@@ -844,6 +845,7 @@ export class RigSVG {
     this.svg = this.host.querySelector('svg');
     if (khung) this.svg.setAttribute('viewBox', khung);
     this.#layPhanTu();
+    this.#applyWear();                          // dựng lại (đổi màu, đổi dáng) thì phụ kiện đang đeo vẫn đeo
     this.apDung();
   }
 
@@ -1081,6 +1083,7 @@ export class RigSVG {
       <rect x="-400" y="-500" width="800" height="1000" fill="#fff"/>
       <g id="${p}-capInv${ben}"><circle id="${p}-cap${ben}" r="0" fill="url(#${p}-capGrad)" clip-path="url(#${p}-thanCat)"/></g></mask>`).join('')}` : ''}
     <clipPath id="${p}-momClip"><path id="${p}-momClipP"/></clipPath>
+    <style>.${p}-gloved #${p}-tayL [fill="${this.mau.da}"], .${p}-gloved #${p}-tayR [fill="${this.mau.da}"] { fill: #7b9be8; }</style>
     <clipPath id="${p}-vaiCat"><rect id="${p}-vaiCatL" x="-70" y="-150" width="52" height="80"/><rect id="${p}-vaiCatR" x="18" y="-150" width="52" height="80"/></clipPath>
     <clipPath id="${p}-phuKienClip" clipPathUnits="userSpaceOnUse"><rect id="${p}-phuKienRect" x="-400" y="-500" width="800" height="1000"/></clipPath>
     <mask id="${p}-xaMask" maskUnits="userSpaceOnUse" x="-400" y="-500" width="800" height="1000">
@@ -1128,7 +1131,7 @@ export class RigSVG {
               <path id="${p}-taiNetL" d="M 1.8 -4.5 Q -3.2 -1 0.8 4.5" stroke="${this.mau.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0"/></g>
             <g id="${p}-taiR"><ellipse rx="7" ry="9" fill="${this.mau.da}"/>
               <path id="${p}-taiNetR" d="M -1.8 -4.5 Q 3.2 -1 -0.8 4.5" stroke="${this.mau.daToi}" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0"/></g>
-            <g id="${p}-muG">${this.nv.mu(p, this.mau, this.nv)}</g>
+            <g id="${p}-muG">${this.nv.mu(p, this.mau, this.nv)}${this.#veMuMo(p)}</g>
             <g clip-path="url(#${p}-matClip)"><g id="${p}-ma">
             <ellipse id="${p}-maL" cy="${this.nv.maY}" ry="${this.nv.maRong * 0.62}" fill="${this.mau.ma}" opacity=".55"/>
             <ellipse id="${p}-maR" cy="${this.nv.maY}" ry="${this.nv.maRong * 0.62}" fill="${this.mau.ma}" opacity=".55"/>
@@ -1156,6 +1159,7 @@ export class RigSVG {
               </g>
               <path id="${p}-moiTren" fill="none" stroke="${this.mau.mieng}" stroke-linecap="round"/>
             </g>
+            ${this.#veKhauTrang(p)}
             </g>
           </g>
         </g>
@@ -1201,7 +1205,7 @@ export class RigSVG {
       matL: q('matL'), matR: q('matR'), nguoiL: q('nguoiL'), nguoiR: q('nguoiR'),
       mayL: q('mayL'), mayR: q('mayR'), mieng: q('mieng'), rang: q('rang'),
       khuon: q('khuon'), mui: q('mui'), netThem: q('netThem'),
-      momG: q('momG'), momClipP: q('momClipP'), luoi: q('luoi'),
+      momG: q('momG'), khauTrang: q('khauTrang'), muMo: q('muMo'), momClipP: q('momClipP'), luoi: q('luoi'),
       moiTren: q('moiTren'), nuocMat: q('nuocMat'), moHoi: q('moHoi'),
       tayG: { L: q('tayL'), R: q('tayR') },
       tay: {
@@ -3868,7 +3872,52 @@ export class RigSVG {
     pet.apDung();
   }
 
-    // Điểm "trước bụng" (nơi con vật nằm khi bế) TRÊN MÀN HÌNH, ở trạng thái đang vẽ — cho người nhận con vật (`takePet`).
+    // KHẨU TRANG y tế: phủ từ sống mũi xuống dưới cằm miệng, ba nếp gấp, hai quai vòng ra tai. Nằm trong nhóm nét mặt
+  // (`net`) nên đi theo mặt khi quay. Ẩn cho tới khi `wear('mask')`.
+  #veKhauTrang(p) {
+    // Mép trên NGAY DƯỚI MẮT (mặt chibi: mũi nằm sát mắt — lấy mũi làm mốc thì khẩu trang che nửa con mắt), mép dưới qua
+    // khỏi miệng một chút; bề ngang vừa tới hai má.
+    const nv = this.nv, top = Math.max(nv.muiY - 2, nv.matY + 14 * (nv.matCo || 1)), bottom = nv.miengY + 13, half = nv.maX + 1;
+    const folds = [0.3, 0.55, 0.8].map((k) => { const y = top + (bottom - top) * k; return `M ${-half + 5} ${y.toFixed(1)} Q 0 ${(y + 3).toFixed(1)} ${half - 5} ${y.toFixed(1)}`; }).join(' ');
+    return `<g id="${p}-khauTrang" style="display:none">
+              <path d="M ${-half} ${top + 4} Q 0 ${top - 6} ${half} ${top + 4} L ${half - 3} ${bottom - 6} Q 0 ${bottom + 4} ${-half + 3} ${bottom - 6} Z" fill="#cfe6f5" stroke="#8fb6cf" stroke-width="1.4" stroke-linejoin="round"/>
+              <path d="${folds}" stroke="#9fc3d9" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+              <path d="M ${-half} ${top + 6} L ${-nv.taiX + 4} ${top - 2} M ${-half + 2} ${bottom - 8} L ${-nv.taiX + 4} ${top + 6} M ${half} ${top + 6} L ${nv.taiX - 4} ${top - 2} M ${half - 2} ${bottom - 8} L ${nv.taiX - 4} ${top + 6}" stroke="#e8f2f8" stroke-width="1.6" stroke-linecap="round"/>
+            </g>`;
+  }
+
+  // MŨ PHẪU THUẬT (mũ trùm tóc): một vòm vải ôm đỉnh đầu, trùm cả búi tóc, viền thắt ở trán. Trong nhóm mũ (`muG`), đi
+  // theo mái tóc. Ẩn cho tới khi `wear('cap')`.
+  #veMuMo(p) {
+    const w = this.nv.taiX + 6;
+    return `<g id="${p}-muMo" style="display:none">
+              <path d="M ${-w} -22 Q ${-w - 8} -88 -10 -104 Q 0 -110 10 -104 Q ${w + 8} -88 ${w} -22 Q 0 -40 ${-w} -22 Z" fill="#5fb3a5" stroke="#3d8578" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M ${-w + 2} -26 Q 0 -44 ${w - 2} -26" stroke="#3d8578" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <path d="M -24 -80 q 8 6 16 0 M 6 -88 q 8 6 16 0 M -14 -60 q 8 6 16 0" stroke="#7cc6b9" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+            </g>`;
+  }
+
+  /**
+   * ĐEO / THÁO phụ kiện — có hiệu lực ngay và suốt mọi động tác (không phải một bước trên timeline):
+   *   wear('mask')  khẩu trang y tế     wear('gloves')  găng tay y tế     wear('cap')  mũ phẫu thuật
+   *   wear('mask', false) tháo ra. Trả về chính rig.
+   */
+  wear(kind, on = true) {
+    if (!RigSVG.WEARABLES.includes(kind)) throw new Error(`[character] wear: no accessory "${kind}" (available: ${RigSVG.WEARABLES.join(', ')})`);
+    if (on) this.wearing.add(kind); else this.wearing.delete(kind);
+    this.#applyWear();
+    return this;
+  }
+  static WEARABLES = ['mask', 'gloves', 'cap'];
+  #applyWear() {
+    const e = this.el;
+    if (!e) return;
+    if (e.khauTrang) e.khauTrang.style.display = this.wearing.has('mask') ? '' : 'none';
+    if (e.muMo) e.muMo.style.display = this.wearing.has('cap') ? '' : 'none';
+    this.svg.classList.toggle(this.id + '-gloved', this.wearing.has('gloves'));
+  }
+
+  // Điểm "trước bụng" (nơi con vật nằm khi bế) TRÊN MÀN HÌNH, ở trạng thái đang vẽ — cho người nhận con vật (`takePet`).
   #bellyScreen() {
     const e = this.el, ctm = e.tren && e.tren.getScreenCTM && e.tren.getScreenCTM();
     if (!ctm) return null;
@@ -4024,7 +4073,8 @@ export class RigSVG {
     t.set(s, { om: 1 }, 0.5);                                                              // hai tay đã chạm: con vật vào tay
     // Nhấc lên và QUAY VỀ PHÍA NGƯỜI XEM: dáng ôm là dáng nhìn thẳng (ở dáng 3/4 tay phía xa buông chéo qua mặt con
     // vật), và "khoe" con vật ra máy quay cũng là điều ta muốn thấy. Thế bế giữ hướng nhìn thẳng; `putDown` trả lại hướng cũ.
-    t.to(s, { omRise: 1, huong: 0, seat: N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
+    // Đang NGỒI (`sitDown`, ghế phòng chờ) thì vẫn ngồi — con vật nằm trên đùi; đứng thì đứng thẳng lại sau cú khuỵu gối.
+    t.to(s, { omRise: 1, huong: 0, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
     this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: 0 });
     return t;
   }
