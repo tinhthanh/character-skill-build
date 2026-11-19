@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.42.0';
+export const VERSION = '0.43.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -353,13 +353,21 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
     // bằng `set` (enter đặt nhân vật ra ngoài khung), mà GSAP KHÔNG vẽ `set` khi đầu phát nằm
     // đúng ở thời điểm 0. Đặt sẵn trạng thái ấy vào rig TRƯỚC khi dựng bản thật.
     restore(endState);
+    // Bản nháp KHÔNG được ăn số ngẫu nhiên: đã gieo (`seed`) thì chuỗi phải ra đúng như gọi động tác trực tiếp.
+    const randomState = [RigSVG.luuNgau(), RigThu.luuNgau()];
     const draft = rig[name](...args);
-    draft.progress(1e-6); const startState = snapshot(); draft.kill();
+    draft.progress(1e-6); const startState = snapshot();
+    // Trạng thái KẾT THÚC cũng đo trên bản nháp. Bản thật thì KHÔNG được tua trước: tua tới cuối rồi về 0 làm GSAP
+    // coi các lệnh `set` ở mốc 0 của nó là đã vẽ, và khi chuỗi phát thật chúng không được vẽ nữa (vd. nắm tay của
+    // thumbsUp mất 0,38 s đầu, bàn tay xoè). tools/check.html so mọi động tác qua chuỗi với gọi trực tiếp.
+    // Rồi tua nháp về 0 trước khi bỏ: vài động tác đổi DOM theo trạng thái (carry đưa SVG con vật vào vòng tay) và đo
+    // DOM lúc dựng — bản thật phải được dựng trên DOM như lúc bước bắt đầu.
+    draft.progress(1); endState = snapshot(); draft.progress(0); draft.kill();
+    RigSVG.traNgau(randomState[0]); RigThu.traNgau(randomState[1]);
     restore(startState);
     if (!firstFrame) firstFrame = startState;
     const child = rig[name](...args);
-    child.progress(1); endState = snapshot();
-    child.progress(0).paused(false);
+    child.paused(false);
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
     // `face` về phía một nhân vật / phần tử: ghi lại đích để tools/peek.sh soát xem về sau nó có còn ở phía ấy không.

@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.43.0
+
+Added — gestures, greetings and moods
+- **`clap`**, **`countFingers(n)`** (new hand shapes `mot` / `hai` / `ba`: one, two, three fingers,
+  drawn upright like the thumbs-up, the hand enlarged 1.7× and each count held 0.8 s so they read), **`checkWatch`** (a big
+  watch appears on the wrist, raised to the chest), **`scratchHead`** (elbow up by the head, the
+  hand behind it — the arm is drawn behind the head, and on the way down the forearm folds in
+  and the hand relaxes, so no fist flashes beside the head), **`headInHands`** (elbows down, both hands on
+  the cheeks, head sunk — a chibi's arms do not reach the top of the head), **`bow`**, **`wai`**
+  (Thai greeting). The two-handed and "show" gestures turn the character to face the viewer for
+  their length (turned three-quarter, the far hand is hidden behind the body) and back.
+- Two new arm channels for gestures that need one exact pose: `ovL/R` + `ovBatL/R`, `ovCangL/R`
+  (screen angles applied last, after the elbow rules), and `sauDauL/R` (draw the arm behind the
+  head); `handZoomL/R` enlarges the upright hand shapes.
+- **`handshake(other)`** — both people reach to ONE shared point half way between them at waist
+  height, so an adult and a child of different heights still meet; run it `together`.
+  `tools/scene.py` walks the person close enough first.
+- **Expressions `crying`** (tears that run down the cheeks, sobbing shoulders), **`embarrassed`**
+  (deeper blush, a big sweat drop, looking away) and **`sleepy`** (a yawn held open about a
+  second, drooping eyes, nodding off). New face
+  state channels: `khoc` / `khocY` (tears), `moHoi` (sweat drop), `doMa` (blush).
+- **`set.preset`** in scene files: `reception`, `exam`, `pharmacy`, `living-room` — a furnished
+  room in one key; your own boxes, panels and cutouts are added after it.
+
+Added — look at every action before it goes into a scene
+- **`tools/actions.sh <id> [--turned] [--only labels]`** — a review sheet: one row per action, six
+  moments through it, each action run through `sequence()` exactly as `tools/scene.py` runs it
+  (with the item in hand or the pet within reach it needs). A row whose action throws is red and
+  listed on the terminal; the run then exits 1.
+- **`python3 tools/reel.py <id> [--turned] [--render] [--clips]`** — a HyperFrames composition in
+  which the character performs every action in turn, its name on screen; `--render` makes the mp4,
+  `--clips` also cuts one mp4 per action (`clips/NN-name.mp4`).
+- Both read **`tools/action-catalog.json`**: every action as a ready demo (steps, items, a pet).
+
+Fixed
+- **Inside `sequence()` an action's first instant was lost**: a hand shape or pose set at the
+  very start of a step (`thumbsUp`'s fist, `point`, `cheer`, `march`, `walkForward`,
+  `countFingers`, `checkWatch`, `stroke`, `listen`) was not drawn for its first part — the hand
+  stayed open until the next change. `sequence()` measured each step by playing it to the end
+  and back, which made GSAP treat those zero-time sets as already drawn; it now measures a draft
+  and adds the real step untouched. `tools/check.html` now runs every single-step catalog action
+  through `sequence()` and compares it, key by key and frame by frame, with a direct call.
+- With `seed()`, `sequence()` now gives the same random choices (blinks, gestures, mouth shapes)
+  as calling the action directly; building its draft no longer draws from the random sequence.
+  Seeded scenes therefore blink and gesture differently than in 0.42.
+
+Not added
+- A high five was tried and left out: standing close, the big chibi heads sit exactly where the
+  two hands would meet; standing further apart, the arms do not reach.
+
 ## 0.42.0
 
 Added — the vet's work and pets in the clinic

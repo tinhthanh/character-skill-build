@@ -296,6 +296,24 @@ with tempfile.TemporaryDirectory() as work:
         for needle in ('["listen", set.target(vet, cat, \'body\'), 1.5]', '["inject", set.target(vet, cat, \'body\')]', '["carry", cat]', '"putDown"', '["sleep", 2]'):
             if needle not in html: problems.append(f'exam / carry steps: {needle} is not in the composition')
 
+    # Bối cảnh dựng sẵn: đồ của preset đi trước, đồ khai thêm cộng vào sau; có gợi ý chỗ đứng; biểu cảm và cử chỉ mới.
+    preset = json.load(open(stage, encoding='utf-8'))
+    preset['set'] = {'preset': 'reception', 'boxes': [{'name': 'extra', 'x': 600, 'z': -300, 'width': 100, 'depth': 100, 'height': 80}]}
+    for who in preset['characters']: who.pop('on', None)
+    preset['script'].append({'who': 'vet', 'do': ['clap', ['countFingers', 3], 'checkWatch', 'wai', 'bow', ['handshake', '@boy']], 'mood': 'embarrassed'})
+    path = os.path.join(os.path.dirname(stage), '_check_preset.json')
+    try:
+        json.dump(preset, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'preset3d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a scene with set.preset does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'preset3d', 'index.html'), encoding='utf-8').read()
+        if '// counter' not in html or '// extra' not in html or html.index('// counter') > html.index('// extra'): problems.append('set.preset: the preset counter is missing, or the extra box does not come after it')
+        if 'where people stand' not in done.stdout: problems.append('set.preset: no hint about where people stand')
+        if '"handshake", boy' not in html.replace("'", '"') and '["handshake", boy]' not in html: problems.append('handshake @boy is not in the composition')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [
@@ -316,6 +334,7 @@ with tempfile.TemporaryDirectory() as work:
         ('a cutout with a missing picture', lambda s: s['set']['cutouts'].append({'image': 'nope.png', 'x': 0, 'z': 0}), 'nope.png'),
         ('a cutout without a position', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0}), '"z"'),
         ('too much blur', lambda s: s['script'][0]['view'].update({'blur': 50}), 'blur'),
+        ('an unknown set preset', lambda s: s['set'].update({'preset': 'spa'}), 'reception'),
         ('a phone line for someone without a phone', lambda s: s['script'].insert(0, {'who': 'vet', 'say': 'Alo', 'phone': True}), 'holds'),
         ('a phone turn without a line', lambda s: s['characters'][0].update({'holds': 'phone'}) or s['script'].insert(0, {'who': 'vet', 'do': ['nod'], 'phone': True}), '"say"'),
         ('a screen on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0, 'z': 0, 'screen': 'a.png'}), 'laptop'),

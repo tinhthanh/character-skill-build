@@ -467,6 +467,11 @@ character facing right is seen more from the front as the camera moves to the ri
   negative further in (the open front of the room is at `room.front`, 200 by default), and
   heights are px above the floor. One unit is one pixel at the point the camera aims at when
   `distance` equals `lens`.
+- **`set.preset`** — a ready-made room: `"reception"` (counter with a laptop, wall screen, bench,
+  plant), `"exam"` (exam table, cabinet, poster), `"pharmacy"` (counter, shelf, monitor, sign) or
+  `"living-room"` (sofa, coffee table, window, plant; warm colours). Boxes, panels and cutouts you
+  list are added after the preset's; `room` keys you give override its. `tools/scene.py` prints
+  where people should stand for it.
 - **`set.room`** — `width`, `depth`, `height`, `front`; `floor` and `floor2` (two colours make
   a checker of `tile` px; drop `floor2` for a plain floor), `wall`, `sideWall` (CSS colours or
   gradients). `set.sky` is what shows beyond the room.

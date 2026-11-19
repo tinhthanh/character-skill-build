@@ -9,8 +9,8 @@ A library of **100% SVG characters driven by GSAP** and the tools to put them in
 [HyperFrames](https://github.com/heygen-com/hyperframes) video. A character is a small JS
 definition on a shared skeleton, so every character can already wave, talk, walk, sit,
 cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, show an app on
-the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up
-(36 actions) and hold a stance (sit down, face someone, put an item away, keep the phone at the
+the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
+clap, count on fingers, check the time, bow, greet with a wai, shake hands (44 actions) and hold a stance (sit down, face someone, put an item away, keep the phone at the
 cheek, carry a pet). Pets can also lie down, sleep and look unwell.
 
 There are two jobs. Do the one you were asked for; most videos need both.
@@ -134,6 +134,12 @@ clips for every voice file.
    beside the character as they speak (`examples/scene-presenter/scene.json`).
    For a room with depth and a camera that changes angle (pan, push in, wide shot), add
    `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
+   **Look at the moves first.** Before you write the script, see what each action looks like on the
+   characters you cast: `sh tools/actions.sh <id> [--turned]` saves a review sheet (one row per
+   action, six moments through it, run through `sequence()` exactly as the scene will), and
+   `python3 tools/reel.py <id> [--turned] [--render | --clips]` builds a reel in which the
+   character performs every action with its name on screen (and, with `--clips`, one mp4 per
+   action). Both read `tools/action-catalog.json`; add an entry there for a new action.
 2. **Build it.** `python3 tools/scene.py scene.json` → `<id>/index.html` next to the scene
    file, with the bundle, cues and audio beside it. Read its notes (lines starting `!`).
 3. **Preview and look.** `sh tools/peek.sh <id>/index.html` prints every step's timing and

@@ -44,10 +44,13 @@ const RAD = Math.PI / 180;
 const mem = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 const pha = (a, b, k) => a + (b - a) * k;
 let ngau = Math.random;
+// Trạng thái của dãy đã gieo (null = đang dùng Math.random) — `luuNgau` / `traNgau` chụp và trả lại nó, để một lần
+// dựng NHÁP (sequence() dựng thử mỗi động tác) không ăn mất số ngẫu nhiên của lần dựng thật.
+let hatHienTai = null;
 const gieoHat = (hat) => {
-  if (hat === null || hat === undefined) { ngau = Math.random; return; }
-  let a = hat >>> 0;
-  ngau = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1);
+  if (hat === null || hat === undefined) { ngau = Math.random; hatHienTai = null; return; }
+  hatHienTai = hat >>> 0;
+  ngau = () => { hatHienTai = (hatHienTai + 0x6D2B79F5) >>> 0; let t = hatHienTai; t = Math.imul(t ^ (t >>> 15), t | 1);
                  t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 };
 const nhieu = (a, b) => a + ngau() * (b - a);
@@ -234,6 +237,8 @@ export class RigThu {
     cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit'],
   };
   static gieo(hat) { gieoHat(hat); }
+  static luuNgau() { return hatHienTai; }
+  static traNgau(state) { if (state !== null && hatHienTai !== null) hatHienTai = state; }
   static #dem = 0;
   /** Tên màu công khai → khoá màu nội bộ. `index.js` gán bảng này lúc nạp thư viện. */
   static COLOR_ALIASES = {};

@@ -43,6 +43,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing")
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
+           "preset": "reception" | "exam" | "pharmacy" | "living-room" — a ready-made room (your boxes etc. are added)
            "camera": { "yaw": 0, "pitch": 6, "distance": 1750, "blur": 4 } }   blur: depth of field, 0 = off
   characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
@@ -69,7 +70,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                ["handOver", "@other"] together with the other's ["take", "@giver"]. A character that strokes
                or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
-  script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired.
+  script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
+               crying, embarrassed, sleepy. Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
+               "headInHands", "bow", "wai", ["handshake", "@other"] (with the other's ["handshake", "@you"] in "together").
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -129,10 +132,46 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
 SHOW_KEYS = ('title', 'bullets', 'image')
-MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired')
+MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
-SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin')
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset')
+# BỐI CẢNH DỰNG SẴN (`"set": { "preset": "reception" }`): đồ đạc của một căn phòng quen thuộc, đặt theo phòng mặc định
+# (rộng 1800, sâu 1300). Hộp / tấm / tấm hình người viết khai thêm thì CỘNG vào sau. Nhân vật vẫn tự đặt (gợi ý chỗ đứng
+# ghi ở `spots`, in ra khi dựng). Toạ độ chọn để người đứng ở `spots` không đứng lọt vào lòng hộp.
+SET_PRESETS = {
+    'reception': {
+        'boxes': [{'name': 'counter', 'x': -520, 'z': -430, 'width': 440, 'depth': 140, 'height': 190, 'color': '#c9ad8c', 'top': '#e7d7c2', 'side': '#b89a78'},
+                  {'name': 'bench', 'x': 330, 'z': -820, 'width': 360, 'depth': 120, 'height': 90, 'color': '#9fc3cf', 'top': '#d8e9ef', 'side': '#86aebb'}],
+        'panels': [{'wall': 'back', 'at': -480, 'y': 560, 'width': 360, 'height': 210, 'color': '#2b2f36', 'border': '10px solid #2b2f36'},
+                   {'wall': 'back', 'at': 300, 'y': 580, 'width': 260, 'height': 160, 'color': '#e9f3f6', 'border': '10px solid #ffffff'}],
+        'cutouts': [{'kind': 'laptop', 'x': -300, 'z': -470, 'y': 190}, {'kind': 'plant', 'x': 780, 'z': 60, 'height': 600}],
+        'spots': 'receptionist behind the counter: x -300, z -620 · visitors: x 150…400, z -380',
+    },
+    'exam': {
+        'boxes': [{'name': 'table', 'x': 100, 'z': -480, 'width': 200, 'depth': 160, 'height': 170, 'color': '#9fc3cf', 'top': '#eef5f7', 'side': '#86aebb'},
+                  {'name': 'cabinet', 'x': -780, 'z': -1050, 'width': 260, 'depth': 120, 'height': 330, 'color': '#e9eef1', 'top': '#ffffff', 'side': '#ccd6dc'}],
+        'panels': [{'wall': 'back', 'at': -380, 'y': 560, 'width': 260, 'height': 190, 'color': '#ffffff', 'border': '10px solid #dfe9ec'},
+                   {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff'}],
+        'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 600}],
+        'spots': 'pet on the table: "on": "table", x 200, z -560 · vet: x 40, z -560 · owner: x 360, z -560',
+    },
+    'pharmacy': {
+        'boxes': [{'name': 'counter', 'x': -260, 'z': -420, 'width': 520, 'depth': 130, 'height': 180, 'color': '#f2f4f7', 'top': '#ffffff', 'side': '#d6dbe2'},
+                  {'name': 'shelf', 'x': -700, 'z': -1100, 'width': 1400, 'depth': 120, 'height': 420, 'color': '#c9ad8c', 'top': '#e7d7c2', 'side': '#b89a78'}],
+        'panels': [{'wall': 'back', 'at': -120, 'y': 640, 'width': 240, 'height': 90, 'color': '#1f8a70', 'border': '6px solid #ffffff'}],
+        'cutouts': [{'kind': 'monitor', 'x': 120, 'z': -460, 'y': 180}],
+        'spots': 'pharmacist behind the counter: x 0, z -620 · customer: x 0…250, z -300',
+    },
+    'living-room': {
+        'room': {'floor': '#d9c4a8', 'floor2': '#cdb596', 'wall': '#f3ead9', 'sideWall': '#eadfcb'},
+        'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 150, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
+                  {'name': 'coffee-table', 'x': -420, 'z': -560, 'width': 240, 'depth': 120, 'height': 80, 'color': '#a47551', 'top': '#b88a63', 'side': '#8c6243'}],
+        'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff'}],
+        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}],
+        'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500',
+    },
+}
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
@@ -322,9 +361,19 @@ def main():
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
     stage_set = scene.get('set')
+    preset_note = None
     if stage_set is not None:
         if not isinstance(stage_set, dict): fail('"set" must be an object: { "room": {…}, "boxes": […], "camera": {…} }')
         known('set', stage_set, SET_KEYS)
+        if 'preset' in stage_set:
+            preset = SET_PRESETS.get(stage_set['preset'])
+            if not preset: fail(f'set.preset must be one of {", ".join(SET_PRESETS)} — got {js(stage_set["preset"])}')
+            # Đồ của bối cảnh dựng sẵn ĐI TRƯỚC, đồ người viết khai thêm cộng vào sau; `room` gộp từng khoá (khai thêm thì đè).
+            merged = {key: value for key, value in stage_set.items() if key != 'preset'}
+            for key in ('boxes', 'panels', 'cutouts'): merged[key] = [dict(item) for item in preset.get(key, [])] + list(stage_set.get(key, []))
+            if 'room' in preset: merged['room'] = dict(preset['room'], **stage_set.get('room', {}))
+            stage_set = scene['set'] = merged
+            preset_note = f'set.preset: where people stand — {preset["spots"]}'
         for key, allowed in (('room', ROOM_KEYS), ('camera', CAMERA_KEYS)):
             if key in stage_set and not isinstance(stage_set[key], dict): fail(f'set.{key} must be an object')
             known(f'set.{key}', stage_set.get(key, {}), allowed)
@@ -622,13 +671,14 @@ def main():
             who = names[turn['who']]
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake') and isinstance(step[1], str) and step[1][1:] in names): continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
                     reach_notes.append(f'{where}: "{who["name"]}" reaches for "{step[1][1:]}" ({step[0]}), which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
                 gap = float(names[step[1][1:]]['x']) - float(who['x'])
-                wanted = (0.45 if step[0] == 'handOver' else 0.24) * who['_host_height']      # chạm tới con vật: gần như vuốt ve
+                # Đưa đồ: hai cánh tay cùng vươn (0,45); bắt tay: bàn tay gặp nhau ở giữa, đứng gần hơn (0,38); chạm tới con vật: gần như vuốt ve.
+                wanted = {'handOver': 0.45, 'handshake': 0.38}.get(step[0], 0.24) * who['_host_height']
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
@@ -1030,6 +1080,7 @@ def main():
     for voice, line in zip(voices, timings['speech']):
         print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
     for note in notes: print(f'  ! {note}')
+    if preset_note: print(f'  · {preset_note}')
     print(f'next: sh tools/peek.sh {os.path.relpath(target)}      # timings, warnings and a contact sheet')
 
 

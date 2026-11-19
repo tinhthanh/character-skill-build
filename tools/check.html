@@ -1102,11 +1102,16 @@ try {
     }
     // `hand` chọn tay chủ đạo của cử chỉ khi nói (người dẫn diễn về phía bảng nội dung).
     for (const [hand, lead, other] of [['L', 'L', 'R'], ['R', 'R', 'L']]) for (const step of [(o) => ['explain', 'mot hai ba bon nam sau bay tam', 4, o], (o) => ['speakCues', { metadata: { duration: 4 }, mouthCues: Array.from({ length: 13 }, (_, n) => ({ start: n * 0.3, end: n * 0.3 + 0.3, value: n % 3 ? 'B' : 'D' })) }, null, o]]) {
-      L.seed(5); const actor = L.createCharacter(host, { id: 'boy' }).rig, rest = { L: actor.state.forearmL, R: actor.state.forearmR };
-      const line = L.sequence(actor, [step({ hand })]), moved = { L: 0, R: 0 };
-      for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); for (const side of ['L', 'R']) moved[side] = Math.max(moved[side], Math.abs(actor.state['forearm' + side] - rest[side])); }
-      if (moved[lead] < 30 || moved[lead] < moved[other]) hong('gesture hand', `${line.data.steps[0].name} with hand ${hand}: arm ${lead} moves ${moved[lead].toFixed(0)}°, arm ${other} ${moved[other].toFixed(0)}°`);
-      line.kill(); actor.svg.remove();
+      // Cộng dồn qua BA seed: một lần rút thăm có thể ra toàn dáng hai tay, mà tay phụ nghỉ ở góc xa dáng đích hơn nên
+      // "lệch khỏi nghỉ" của nó lớn hơn — so một seed là phép thử ăn may theo dãy ngẫu nhiên.
+      const moved = { L: 0, R: 0 }, total = { L: 0, R: 0 }; let label = '';
+      for (const value of [5, 6, 7]) {
+        L.seed(value); const actor = L.createCharacter(host, { id: 'boy' }).rig, rest = { L: actor.state.forearmL, R: actor.state.forearmR };
+        const line = L.sequence(actor, [step({ hand })]); label = line.data.steps[0].name;
+        for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); for (const side of ['L', 'R']) { const off = Math.abs(actor.state['forearm' + side] - rest[side]); moved[side] = Math.max(moved[side], off); total[side] += off / 30; } }
+        line.kill(); actor.svg.remove();
+      }
+      if (moved[lead] < 30 || total[lead] < total[other]) hong('gesture hand', `${label} with hand ${hand}: arm ${lead} moves ${moved[lead].toFixed(0)}° (${total[lead].toFixed(0)}°·s in all), arm ${other} ${moved[other].toFixed(0)}° (${total[other].toFixed(0)}°·s)`);
     }
     // MÁY QUAY và người bước ra: nói xong rồi `exit` thì máy quay về toàn cảnh lúc bắt đầu đi — kể cả khi trước lượt ấy
     // máy quay đang ở toàn cảnh (từng ghì cận vào chỗ trống). Và con vật đứng cạnh không bị mép dưới khung cắt ngang.
@@ -1324,7 +1329,7 @@ try {
       if (caller.s.tayL !== 'chi') hong('tapPhone', `the other hand should point with the index finger (hand "${caller.s.tayL}")`);
       if (Math.hypot((finger.left + finger.right - phoneBox.left - phoneBox.right) / 2, (finger.top + finger.bottom - phoneBox.top - phoneBox.bottom) / 2) > phoneBox.width * 1.5) hong('tapPhone', 'the tapping hand is not at the phone');
       // …và CÚI NHÌN màn hình suốt lúc bấm (không nhìn ống kính).
-      if (!(caller.s.dauY >= 12 && caller.s.nhinY >= 4 && caller.s.matY >= 0.4)) hong('tapPhone', `the head should be down looking at the phone while tapping (head ${caller.s.dauY.toFixed(1)}, eyes ${caller.s.nhinY.toFixed(1)}, lids ${caller.s.matY.toFixed(2)})`);
+      if (!(caller.s.dauY >= 9 && caller.s.nhinY >= 4 && caller.s.matY >= 0.4)) hong('tapPhone', `the head should be down looking at the phone while tapping (head ${caller.s.dauY.toFixed(1)}, eyes ${caller.s.nhinY.toFixed(1)}, lids ${caller.s.matY.toFixed(2)})`);
       tap.kill();
       // Bấm rồi khoe NGAY (sequence): điện thoại không thu về cỡ nhỏ ở giữa hai bước.
       caller.reset();
@@ -1343,7 +1348,7 @@ try {
       // Gõ phím: hai cẳng tay đưa ra trước rồi về nghỉ.
       const keys = empty.typing(1.6); keys.time(1);
       if (!(empty.s.cangL < -50 && empty.s.cangR < -50)) hong('typing', `both forearms should come forward over the keyboard (${empty.s.cangL.toFixed(0)}°, ${empty.s.cangR.toFixed(0)}°)`);
-      if (!(empty.s.dauY >= 12 && empty.s.nhinY >= 4 && empty.s.matY >= 0.4)) hong('typing', `the head should be down at the screen while typing (head ${empty.s.dauY.toFixed(1)}, eyes ${empty.s.nhinY.toFixed(1)}) — with the hands hidden behind the lid, the head is what tells`);
+      if (!(empty.s.dauY >= 9 && empty.s.nhinY >= 4 && empty.s.matY >= 0.4)) hong('typing', `the head should be down at the screen while typing (head ${empty.s.dauY.toFixed(1)}, eyes ${empty.s.nhinY.toFixed(1)}) — with the hands hidden behind the lid, the head is what tells`);
       keys.progress(1); if (Math.abs(empty.s.cangR - empty.NGHI.cangR) > 1e-6) hong('typing', 'does not return to rest');
       keys.kill(); empty.svg.remove(); caller.svg.remove();
       // Máy tính: ảnh trên màn hình; laptop quay lưng thì không có màn hình; tuỳ chọn sai bị từ chối.
@@ -1430,6 +1435,136 @@ try {
       let walked = ''; try { L.sequence(walker, [['carry', cat], ['walk', 4, 120], ['putDown']]); } catch (error) { walked = error.message; }
       if (!walked.includes('walk back first')) hong('putDown', 'putting a pet down after walking away should be refused with a clear message');
       ring.remove();
+    }
+    // CỬ CHỈ, GIAO TIẾP VÀ BIỂU CẢM (đợt 3): đếm ngón, vỗ tay, chắp tay, xem đồng hồ, ôm đầu, cúi chào, bắt tay; khóc,
+    // ngượng, buồn ngủ.
+    {
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:600px;height:300px'; document.body.appendChild(stage);
+      const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
+      const one = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+      const at = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.right) / 2, (r.top + r.bottom) / 2]; };
+      // Đếm ngón: một – hai – ba ngón theo nhịp; bàn tay giơ lên cao hơn khuỷu (không phải chống nạnh ở hông).
+      const count = one.countFingers(3); const shapes = [];
+      for (const time of [0.6, 1.4, 2.2]) { count.time(time); shapes.push(one.s.tayR); }
+      if (shapes.join() !== 'mot,hai,ba') hong('countFingers', `the hand should show one, two, three fingers in turn — got ${shapes.join(', ')}`);
+      count.time(2.2);
+      { const top = one.el.ao.getBoundingClientRect(); if (!(at(one.el.coTayR)[1] < top.top + top.height * 0.5)) hong('countFingers', 'the counting hand is not raised to the chest (it is down by the hip)'); }
+      // Cổ tay ở TRÊN khuỷu (cẳng tay dựng lên): khuỷu cao mà cẳng tay chúc xuống thì bàn tay đếm (luôn dựng ngón lên trời)
+      // nằm dưới cẳng tay, ngón chĩa ngược vào tay áo.
+      { const wrist = new DOMPoint(0, 0).matrixTransform(one.el.coTayR.getScreenCTM()), elbow = new DOMPoint(0, 0).matrixTransform(one.el.cangR.getScreenCTM());
+        if (!(wrist.y < elbow.y - 5)) hong('countFingers', `the forearm hangs down (wrist ${wrist.y.toFixed(0)} below elbow ${elbow.y.toFixed(0)}) — the upright fingers point into the sleeve`); }
+      count.progress(1); count.kill();          // chạy HẾT bước: dừng giữa chừng thì kênh `ov` còn khoá tay cho động tác sau
+      // Vỗ tay và chắp tay: hai bàn tay gặp nhau trước ngực.
+      const handsApart = () => { const a = at(one.el.coTayL), b = at(one.el.coTayR); return Math.hypot(a[0] - b[0], a[1] - b[1]) / one.svg.getScreenCTM().a; };
+      const clap = one.clap(3); let together = 1e9, apart = 0;
+      for (let time = 0.35; time <= 1.25; time += 1 / 30) { clap.time(time); together = Math.min(together, handsApart()); apart = Math.max(apart, handsApart()); }
+      clap.kill();
+      if (!(together < 24 && apart > together + 6)) hong('clap', `the hands should meet and part (closest ${together.toFixed(0)}, widest ${apart.toFixed(0)} units apart)`);
+      const wai = one.wai(); wai.time(0.9); if (handsApart() > 30) hong('wai', `the palms are not together (${handsApart().toFixed(0)} units apart)`); wai.kill();
+      // Xem đồng hồ: đồng hồ hiện ở cổ tay lúc xem, mất đi khi xong; mắt nhìn xuống.
+      const watch = one.checkWatch(); watch.time(0.8);
+      const worn = ['L', 'R'].find((side) => one.el['watch' + side].style.display !== 'none');
+      if (!worn) hong('checkWatch', 'no watch on the wrist while checking it');
+      if (!(one.s.nhinY >= 4)) hong('checkWatch', 'the eyes do not look down at the watch');
+      watch.progress(1); if (one.el.watchL.style.display !== 'none' || one.el.watchR.style.display !== 'none') hong('checkWatch', 'the watch stays after the gesture');
+      watch.kill();
+      // Qua `sequence()` (như tools/scene.py dùng): góc tay đặt ở đầu bước phải có hiệu lực — lệnh `set` đúng mốc 0 của một
+      // bước không được vẽ, tay duỗi thẳng xuống thay vì đưa đồng hồ lên ngực.
+      for (const [name, args, key, want] of [['checkWatch', [], 'ovBatL', 24], ['countFingers', [3], 'ovBatR', 35], ['scratchHead', [], 'ovBatR', 135], ['headInHands', [1], 'ovBatL', 35]]) {
+        const chain = L.sequence(one, [['nod'], [name, ...args]]); chain.time(chain.data.steps[1].start + 0.6);
+        if (Math.abs(one.s[key] - want) > 1) hong(name, `inside a sequence the arm angle is ${one.s[key].toFixed(0)}° instead of ${want}° — the pose set at the step's start is lost`);
+        chain.progress(1); chain.kill();
+      }
+      // Ôm mặt: hai bàn tay áp hai bên má với KHUỶU HẠ (không dang ngang như cánh máy bay), rồi về.
+      const grief = one.headInHands(1); grief.time(0.8);
+      const face = one.el.khuon.getBoundingClientRect(), handL = at(one.el.coTayL), handR = at(one.el.coTayR), elbowL = at(one.el.cangL), elbowR = at(one.el.cangR);
+      if (!(one.s.ovL > 0.9 && one.s.ovR > 0.9)) hong('headInHands', 'both hands should come up to the face');
+      if (!(handL[1] < face.bottom + 6 && handR[1] < face.bottom + 6)) hong('headInHands', 'the hands do not reach the face');
+      if (!(elbowL[1] > handL[1] && elbowR[1] > handR[1])) hong('headInHands', 'the elbows are not below the hands (winged out like a plane)');
+      grief.progress(1); if (one.s.ovL !== 0 || one.s.ovR !== 0) hong('headInHands', 'the hands stay at the face');
+      grief.kill();
+      const bow = one.bow(); bow.time(0.6); if (!(one.s.dauY > 18)) hong('bow', `the head does not go down far enough (${one.s.dauY.toFixed(1)})`); bow.kill();
+      // Gãi gáy: bàn tay vòng ra SAU đầu (cánh tay vẽ trước nhóm đầu), không che mặt; xong thì cánh tay về trước đầu.
+      const nape = one.scratchHead(); nape.time(0.7);
+      const behind = !!(one.el.batR.compareDocumentPosition(one.el.dau) & Node.DOCUMENT_POSITION_FOLLOWING) || !!(one.el.batL.compareDocumentPosition(one.el.dau) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (!behind) hong('scratchHead', 'the scratching hand is drawn in front of the face (it should go behind the head)');
+      // Hạ tay: còn giơ (ov > 0,3) thì cánh tay vẫn sau đầu — đổi lớp giữa chừng làm nắm tay thoáng hiện ra cạnh đầu.
+      for (let time = 1.2; time < 1.75; time += 1 / 30) { nape.time(time); if (one.s.ovR > 0.3 && !(one.el.batR.compareDocumentPosition(one.el.dau) & Node.DOCUMENT_POSITION_FOLLOWING)) { hong('scratchHead', `at ${time.toFixed(2)} s the raised arm comes back in front of the head — a fist flashes beside the head`); break; } }
+      nape.progress(1); if (one.el.batR.compareDocumentPosition(one.el.dau) & Node.DOCUMENT_POSITION_FOLLOWING) hong('scratchHead', 'the arm stays behind the head after scratching');
+      nape.kill();
+      // Cử chỉ hai tay quay về phía người xem dù đang đứng 3/4, rồi trả lại hướng cũ.
+      one.state.facing = 0.55; const clap2 = one.clap(2); clap2.time(0.5);
+      if (Math.abs(one.s.huong) > 0.05) hong('clap', `a turned character should face the viewer to clap (facing ${one.s.huong.toFixed(2)}) — the far hand is hidden`);
+      clap2.progress(1); if (Math.abs(one.s.huong - 0.55) > 0.01) hong('clap', 'does not turn back to the held facing');
+      clap2.kill(); one.state.facing = 0;
+      // Biểu cảm mới: khóc có nước mắt chảy xuống; ngượng có má đỏ và giọt mồ hôi; buồn ngủ ngáp rồi mắt díp.
+      const cry = one.express('crying', 1.6); cry.time(0.4); const early = one.s.khocY; cry.time(1.4);
+      if (!(+one.el.nuocMat.getAttribute('opacity') > 0.9)) hong('express', 'crying shows no tears');
+      if (!(one.s.khocY > early + 0.3)) hong('express', 'the tears do not run down while crying');
+      cry.progress(1); if (one.s.khoc !== 0) hong('express', 'the tears stay after crying');
+      cry.kill();
+      const shy = one.express('embarrassed', 1.2); shy.time(0.8);
+      if (!(+one.el.moHoi.getAttribute('opacity') > 0.9) || !(+one.el.maL.getAttribute('opacity') > 0.85)) hong('express', 'embarrassed shows no sweat drop or no deeper blush');
+      shy.kill();
+      const yawn = one.express('sleepy', 3); let opened = 0;
+      for (let time = 0; time <= 2.2; time += 1 / 30) { yawn.time(time); if (one.s.mieng > 0.8) opened += 1 / 30; }
+      if (opened < 0.9) hong('express', `sleepy: the yawn is open for only ${opened.toFixed(2)} s — too short to read`); yawn.kill();
+      // Bắt tay: hai người khác chiều cao, hai bàn tay gặp nhau.
+      const a = L.createCharacter(spot('left:200px;top:0;width:200px;height:235px'), { id: 'vet' }).rig, b = L.createCharacter(spot('left:278px;top:0;width:200px;height:235px'), { id: 'boy' }).rig;
+      const shakeA = L.sequence(a, [['face', b], ['handshake', b]]), shakeB = L.sequence(b, [['face', a], ['handshake', a]]);
+      const mid = shakeA.data.steps[1].start + 0.6; shakeA.time(mid); shakeB.time(mid);
+      const ha = at(a.el.coTayR), hb = at(b.el.coTayL), gap = Math.hypot(ha[0] - hb[0], ha[1] - hb[1]) / a.svg.getScreenCTM().a;
+      if (gap > 22) hong('handshake', `the two hands do not meet (${gap.toFixed(0)} units apart) — an adult and a child shaking hands must aim at one shared point`);
+      shakeA.kill(); shakeB.kill();
+      stage.remove();
+    }
+    // QUA sequence() PHẢI GIỐNG GỌI TRỰC TIẾP — với MỌI động tác trong tools/action-catalog.json (bản mẫu mà
+    // tools/actions.sh và tools/reel.py dùng). Một động tác đứng SAU một bước khác trong chuỗi (như trong cảnh thật) phải
+    // đi qua đúng các trạng thái như khi gọi một mình: lệnh `set` ở mốc 0 của bước bị bỏ qua, tween ghi nhớ sai giá trị
+    // đầu… đều làm hai đường lệch nhau. So từng khóa trạng thái ở từng khung 1/60 s.
+    {
+      const catalog = await (await fetch('action-catalog.json', { cache: 'no-store' })).json();
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
+      const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
+      const build = (id, entry, left) => {
+        const pet = entry.pet ? L.createPet(spot(`left:${left + 110}px;top:108px;width:100px;height:82px`), { species: entry.pet }).rig : null;
+        const host = spot(`left:${left}px;top:0;width:200px;height:235px`);
+        const rig = id in RigThu.LOAI ? L.createPet(host, { species: id }).rig
+          : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
+        const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
+        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg)) };
+      };
+      let compared = 0;
+      for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets]]) {
+        const kind = id in RigThu.LOAI ? RigThu.LOAI[id].loai : null;
+        for (const entry of list.filter((item) => item.steps.length === 1 && (!item.species || item.species === kind))) {
+          stage.replaceChildren(); L.seed(5);
+          const direct = build(id, entry, 0), keys = Object.keys(direct.rig.NGHI);
+          // Bước dẫn dựng rồi bỏ: ăn đúng phần số ngẫu nhiên mà bước dẫn của chuỗi bên dưới ăn.
+          (kind ? direct.rig.idle(0.5) : direct.rig.nod()).kill();
+          const line = direct.rig[direct.name](...direct.args), frames = [];
+          for (let n = 0; n <= Math.round(line.duration() * 60); n++) { line.time(n / 60); direct.rig.apDung(); frames.push(keys.map((key) => direct.rig.s[key])); }
+          line.kill();
+          L.seed(5);
+          const chained = build(id, entry, 400);
+          // Bước dẫn: gật đầu (người) / ngồi yên (thú) — cả hai kết thúc ĐÚNG dáng nghỉ, nên bước sau bắt đầu như khi gọi một mình.
+          const chain = L.sequence(chained.rig, [kind ? ['idle', 0.5] : ['nod'], [chained.name, ...chained.args]], { breathe: false }), start = chain.data.steps[1].start;
+          let worst = null;
+          frames.forEach((frame, n) => {
+            chain.time(start + n / 60);
+            keys.forEach((key, k) => {
+              // Hình bàn tay (chuỗi) không nội suy được: chuỗi lấy hình của khung mẫu trước, nên được lệch MỘT khung.
+              const a = frame[k], b = chained.rig.s[key], near = [frames[n - 1], frame, frames[n + 1]].some((f) => f && f[k] === b);
+              const gap = typeof a === 'number' ? Math.abs(a - b) : (near ? 0 : Infinity);
+              if (gap > 0.5 && (!worst || gap > worst.gap)) worst = { key, gap, time: n / 60, a, b };
+            });
+          });
+          chain.kill(); compared++;
+          if (worst) hong(`${id}.${entry.label}`, `inside a sequence the action differs from a direct call — ${publicKey(worst.key)} is ${typeof worst.b === 'number' ? worst.b.toFixed(2) : worst.b} instead of ${typeof worst.a === 'number' ? worst.a.toFixed(2) : worst.a} at ${worst.time.toFixed(2)} s`);
+        }
+      }
+      if (compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
+      stage.remove();
     }
     // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
     {

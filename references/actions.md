@@ -9,6 +9,11 @@ A step is `'name'`, `['name', ...args]`, or a number (extra pause in seconds, on
 inserts a 0.1 s gap between consecutive steps by default; change it with
 `sequence(rig, steps, { gap: 0 })`.
 
+To SEE the actions on a given character before using them: `sh tools/actions.sh <id> [--turned]`
+(a still review sheet, six moments per action) or `python3 tools/reel.py <id> [--render | --clips]`
+(a video reel, optionally one clip per action). Both run each action through `sequence()` and read
+the demo steps from `tools/action-catalog.json`.
+
 ## People — `VGCharacter.createCharacter(host, { id, config, items, itemsHidden }).rig`
 
 | Action | Arguments | What it does | ≈ seconds |
@@ -23,6 +28,14 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `shrug` | — | shrug with open palms | 1.7 |
 | `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
 | `drink` | `(side = 'auto')` | raise the held item (a cup) to the mouth, tilt it, eyes closed, then lower it with a smile; a turned character faces the viewer to drink. With empty hands it mimes the sip | 1.85 |
+| `clap` | `(times = 4)` | both hands clap in front of the chest, beaming | 0.8 + 0.32 × `times` |
+| `countFingers` | `(count = 3, { hand })` | raise a hand beside the chest and count one, two, three fingers, a beat each — listing benefits | 0.9 + 0.8 × `count` |
+| `checkWatch` | — | a watch appears on the wrist; raise it to the chest, look down at it, look up impatient — waiting, running late | 2.4 |
+| `scratchHead` | `(hand = 'auto')` | hand up by the head, a few scratches, sheepish smile — embarrassed, forgot something | 1.65 |
+| `headInHands` | `(hold = 1.4)` | both hands to the face, head sunk, eyes shut, a shake of the head — overwhelmed (a chibi's short arms reach the cheeks, not the top of the head) | `hold` + 0.95 |
+| `bow` | `(depth = 1)` | head and shoulders bow, eyes closed, back up smiling — thanks, sorry, welcome | 1.8 |
+| `wai` | — | Thai greeting: palms pressed together in front of the chest, a small bow | 2.05 |
+| `handshake` | `(target)` | reach the hand on `target`'s side to a point half way between the two (at waist height, shared by both, whatever their heights) and shake three times. Run it `together` with the other person's `handshake` | 1.8 |
 | `listen` | `(target, hold = 1.6)` | bend to a pet (a rig, an element or `{ x, y }`) and put a stethoscope (it appears in the hand, tube up to the neck) on its body, listen with the head tilted and eyes up, move it once, nod. The pet must be within reach — on an exam table at about hand height | `hold` + 1.5 |
 | `inject` | `(target)` | with a held `'syringe'`, bend to the pet, needle toward its body, press the plunger, pull back, smile. The pet must stand on the side of the hand holding the syringe (otherwise an error says so); throws without a syringe | 2.35 |
 | `carry` / `putDown` | `(pet)` / — | **stance**: bend down, take the pet in both hands and hold it in front of the belly, curled up, a little enlarged (1.35×) so it reads; the following steps play while carrying, and the pet's own actions (purr, wagTail) keep playing in the arms. `putDown` puts it back where it was picked up — walking away first is refused. The pet must be within reach | 1.55 / 1.1 |
@@ -39,7 +52,7 @@ inserts a 0.1 s gap between consecutive steps by default; change it with
 | `explain` | `(text, dur = 2.4, { mood, hand })` | like `speak` with livelier head and hand gestures; `hand: 'L'` or `'R'` picks the arm that leads them (e.g. the one on the side of the content the character is presenting) | `dur` + 0.55 |
 | `speakCues` | `(cues, dur, { cuChi, mood, hand })` | lip-sync from the audio's mouth cues (made by `tools/cues.py`) instead of an estimate; gestures on the pauses. `{ cuChi: false }` keeps the hands still | audio length + 0.55 |
 | `worry` | — | brows up, hands fidget | 2.1 |
-| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired`. The body joins in: a hop when `happy`, arms flung out when `surprised`, a hand raised to the chest when `thinking`, fists when `angry`, a sigh when `tired` | `hold` + 0.7 |
+| `express` | `(name = 'happy', hold = 1.2)` | a facial expression held, then released: `happy` · `sad` · `surprised` · `angry` · `thinking` · `laughing` · `worried` · `confused` · `tired` · `crying` (tears running down, sobbing shoulders) · `embarrassed` (deeper blush, a sweat drop, looking away) · `sleepy` (a yawn, then drooping eyes and nodding off). The body joins in: a hop when `happy`, arms flung out when `surprised`, a hand raised to the chest when `thinking`, fists when `angry`, a sigh when `tired` | `hold` + 0.7 |
 | `turn` | `(direction = 'right', hold = 1.5, amount = 0.55)` | turn to a three-quarter view (`amount` 1 = full profile), hold, face front again | `hold` + 0.8 |
 | `sit` | `(hold = 2)` | sit down as on an unseen chair (knees slightly apart, shins upright), hands on the lap, stand up again — put a `createProp('chair')` behind it, a seat with nothing under it still reads oddly | `hold` + 0.95 |
 | `sitDown` | — | sit down and **stay seated** — following actions (speak, nod, wave…) play seated | 0.55 |

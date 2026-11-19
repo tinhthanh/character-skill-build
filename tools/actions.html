@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Action review</title>
+<!-- TRANG DUYỆT ĐỘNG TÁC — mọi động tác của một nhân vật, chạy qua sequence() đúng như trong cảnh, chụp nhiều nhịp:
+       tools/actions.html?nv=<id>[&stance=turned][&only=nhãn,nhãn][&cols=6]
+     Mỗi hàng một mục của tools/action-catalog.json (bước diễn mẫu, món đồ cầm, con thú trong tầm tay), mỗi cột một
+     thời điểm. Gọi động tác trực tiếp thì không thấy lỗi chỉ xảy ra trong sequence() (vd. lệnh `set` ở mốc 0 bị bỏ
+     qua): trang này dùng đúng đường đi của tools/scene.py. Hàng nào động tác báo lỗi thì hiện chữ đỏ. -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<body style="margin:0;background:#1d3a4b;font:12px system-ui;color:#cfe">
+<div id="sheet"></div>
+<script type="module">
+import { RigThu, createCharacter, createPet, sequence, seed } from '../runtime/index.js';
+const query = new URLSearchParams(location.search);
+const id = query.get('nv') || 'vet', isPet = id in RigThu.LOAI, turned = query.get('stance') === 'turned';
+const only = (query.get('only') || '').split(',').map((label) => label.trim()).filter(Boolean);
+const cols = Math.max(2, +(query.get('cols') || 6)), cellW = 230, cellH = 250;
+const catalog = await (await fetch('action-catalog.json', { cache: 'no-store' })).json();
+const kind = isPet ? RigThu.LOAI[id].loai : null;
+const entries = (isPet ? catalog.pets : catalog.people)
+  .filter((entry) => !entry.species || entry.species === kind)
+  .filter((entry) => !only.length || only.includes(entry.label));
+const sheet = document.getElementById('sheet');
+const title = document.createElement('div');
+title.style.cssText = 'padding:8px 10px;font-size:15px;font-weight:600';
+title.textContent = `${id} · ${turned ? 'turned 3/4' : 'facing front'} · ${entries.length} actions · columns = moments through each action`;
+sheet.appendChild(title);
+let failures = 0;
+const failed = [];
+for (const entry of entries) {
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:stretch;border-top:1px solid #2c5166';
+  const name = document.createElement('div'); name.style.cssText = 'width:150px;padding:8px;flex:none;font-weight:600'; name.textContent = entry.label;
+  row.appendChild(name); sheet.appendChild(row);
+  for (let column = 0; column < cols; column++) {
+    const cell = document.createElement('div'); cell.style.cssText = `position:relative;width:${cellW}px;height:${cellH}px;overflow:hidden;flex:none;border-left:1px solid #2c5166`;
+    row.appendChild(cell);
+    try {
+      seed(3);
+      let pet = null;
+      // Con vật đặt trong TẦM TAY (ngang bàn khám), ở phía tay phải — như trong bài kiểm tra tools/check.html.
+      if (entry.pet) {
+        const petHost = document.createElement('div'); petHost.style.cssText = 'position:absolute;left:115px;top:118px;width:100px;height:82px';
+        cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet }).rig;
+      }
+      const host = document.createElement('div'); host.style.cssText = isPet ? 'position:absolute;left:15px;top:60px;width:200px;height:165px' : 'position:absolute;left:5px;top:10px;width:200px;height:235px';
+      cell.insertBefore(host, cell.firstChild);
+      const rig = isPet ? createPet(host, { species: id }).rig
+        : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
+      if (turned && !isPet) rig.state.facing = 0.55;
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg)) : step));
+      const line = sequence(rig, steps);
+      const at = line.duration() * (column + 0.5) / cols;
+      line.time(at); rig.render();
+      const stamp = document.createElement('span'); stamp.style.cssText = 'position:absolute;right:4px;top:2px;color:#8fb3c4';
+      stamp.textContent = `${at.toFixed(2)} s`; cell.appendChild(stamp);
+    } catch (error) {
+      failures++;
+      failed.push(`${entry.label} @${column}: ${error.message || error}`);
+      cell.innerHTML = `<div style="color:#ff8a80;padding:8px;font-size:11px">${String(error.message || error).replace(/</g, '&lt;')}</div>`;
+    }
+  }
+}
+title.textContent += failures ? ` · ${failures} cells FAILED` : '';
+// Danh sách lỗi dạng chữ để tools/actions.sh in ra (không cần nhìn ảnh để biết hàng nào hỏng).
+const report = document.createElement('pre'); report.id = 'failures'; report.style.cssText = 'color:#ff8a80;padding:8px';
+report.textContent = failed.join('\n'); sheet.appendChild(report);
+document.title = failures ? 'ERROR' : 'DONE';
+</script>
