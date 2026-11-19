@@ -44,6 +44,8 @@
     { "label": "call (listening)", "steps": [["call", null, 2]], "items": { "R": "phone" } },
     { "label": "phoneUp → explain → phoneDown", "steps": ["phoneUp", ["explain", "Dạ chiều nay ba giờ được không ạ?", 2.2], "phoneDown"], "items": { "R": "phone" } },
     { "label": "tapPhone → showPhone", "steps": [["tapPhone", 1.4], ["showPhone", 1.6]], "items": { "R": "phone" } },
+    { "label": "notify", "steps": [["notify", "Nhắc lịch tái khám: Thứ Bảy 9:00", 1.8]], "items": { "R": "phone" } },
+    { "label": "notify → showPhone", "steps": [["notify", ["Kết quả xét nghiệm", "Bé Milo khỏe mạnh"], 1.2], ["showPhone", 1.4]], "items": { "R": "phone" } },
     { "label": "typing", "steps": [["typing", 2]] },
     { "label": "clap", "steps": [["clap", 4]] },
     { "label": "countFingers", "steps": [["countFingers", 3]] },

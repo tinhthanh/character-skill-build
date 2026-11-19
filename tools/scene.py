@@ -92,6 +92,13 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                side is a CONTENT PANEL. A turn can then carry `"show": { "title": "…", "bullets": ["…"], "image":
                "file.png" }` — it appears as the turn starts (bullets one by one while the line is spoken) and
                stays until the next `show` (`"show": false` clears the panel). No close-up camera in this layout.
+               `"layout": "split"` is a PHONE CALL between two places: the frame splits in two halves, each with its own
+               background (`"sides": { "left": { "preset": "home" }, "right": { "wall": "#…", "floor": "#…" } }`), every
+               character has `"side": "left" | "right"` and an `x` within its half (default: the middle of it). The half
+               that is not speaking dims a little; no close-up camera. Use `"phone": true` turns for the call.
+  toast        `"toast": "Appointment moved"` or `{ "title": "VetGo", "text": "Bella: Saturday 9:00" }` on a turn: an
+               app notification card slides in at the top of the frame as the turn starts and stays 2.5–4 s.
+               A person holding a phone can also get one ON the phone: ["notify", "Reminder: Saturday 9:00"].
   voice        `"voice": "maichi"` on a character (or on one turn) speaks its lines with the `voice-tts` command
                (Vietnamese; `voice-tts voices` lists them). Each line is synthesised ONCE into voice/ next to the
                scene file and reused — delete a file to have it spoken again. `"voice": false` on a turn keeps
@@ -139,11 +146,11 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
@@ -267,6 +274,7 @@ def retime(target):
         html = html.replace(f'data-start="0" data-duration="{old_total}"', f'data-start="0" data-duration="{new_total}"')
         changed.append(f'total {old_total} → {new_total} s')
     html = place_shows(html, timings, float(new_total))
+    html = place_toasts(html, timings, float(new_total))
     open(target, 'w', encoding='utf-8').write(html)
     print(target)
     print('  ' + ('; '.join(changed) if changed else 'already in time — nothing changed'))
@@ -292,6 +300,22 @@ def place_shows(html, timings, total):
         tag = re.sub(r'data-start="[^"]*"', f'data-start="{start:.2f}"', tag, count=1)
         return re.sub(r'data-duration="[^"]*"', f'data-duration="{max(0.2, end - start):.2f}"', tag, count=1)
     return re.sub(r'<(?:div|img)\b[^>]*\bdata-show-turn="\d+"[^>]*>', fix, html)
+
+
+def place_toasts(html, timings, total):
+    """Fill in data-start / data-duration of every notification card (`"toast"`) from the turn timings: it slides in
+    0.2 s into its turn and stays for the turn (2.5–4 s)."""
+    turns = timings.get('turns')
+    if not turns: return html
+    def fix(match):
+        tag = match.group(0)
+        turn = int(re.search(r'data-toast-turn="(\d+)"', tag).group(1))
+        begin, finish = turns[min(turn, len(turns) - 1)]
+        start = begin + 0.2
+        length = min(4.0, max(2.5, finish - begin), max(0.5, total - start))
+        tag = re.sub(r'data-start="[^"]*"', f'data-start="{start:.2f}"', tag, count=1)
+        return re.sub(r'data-duration="[^"]*"', f'data-duration="{length:.2f}"', tag, count=1)
+    return re.sub(r'<div\b[^>]*\bdata-toast-turn="\d+"[^>]*>', fix, html)
 
 
 def speak_line(base, who, voice, words, where):
@@ -481,9 +505,16 @@ def main():
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if isinstance(turn, dict) and turn.get('enter') and turn.get('who') not in late: late[turn.get('who')] = turn['enter']
     names = {}
+    split = scene.get('layout') == 'split'
+    if split and stage_set is not None: fail('"layout": "split" is a 2D layout — it cannot be combined with "set"')
     for who in cast:
         if not isinstance(who, dict) or not who.get('name'): fail('every character needs a "name"')
         name = who['name']
+        # MÀN HÌNH CHIA ĐÔI: mỗi nhân vật thuộc một nửa khung (`side`), `x` tính trong nửa ấy (mặc định giữa nửa).
+        if split:
+            if who.get('side') not in ('left', 'right'): fail(f'character "{name}": in a "split" layout every character needs "side": "left" or "right"')
+            who['x'] = (0 if who['side'] == 'left' else width / 2) + float(who.get('x', width / 4))
+        elif 'side' in who: fail(f'character "{name}": "side" is for "layout": "split"')
         known(f'character "{name}"', who, CHARACTER_KEYS)
         if name in names: fail(f'two characters are named "{name}"')
         if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name): fail(f'character name "{name}" must be a plain identifier (letters, digits, underscore)')
@@ -675,10 +706,13 @@ def main():
     if arrivals: turns.append(('  // ' + ', '.join(who['name'] for who in entering) + (' walk' if len(entering) > 1 else ' walks') + ' in from outside the frame to the mark',
                                '{ together: [' + ', '.join(arrivals) + '] }' if len(arrivals) > 1 else arrivals[0]))
     layout = scene.get('layout', 'stage')
-    if layout not in ('stage', 'presenter'): fail(f'"layout" must be "stage" or "presenter", got {js(layout)}')
+    if layout not in ('stage', 'presenter', 'split'): fail(f'"layout" must be "stage", "presenter" or "split", got {js(layout)}')
+    if 'sides' in scene and layout != 'split': fail('"sides" (a background for each half) needs "layout": "split"')
+    speakers = []                                           # màn hình chia đôi: (chỉ số lượt, nửa của người nói) — nửa kia tối đi
     # Chỉ số "phẳng" của từng lượt trong talk.turns: các lượt mở đầu (thú ngồi sẵn, bước vào, quay mặt) đứng trước kịch bản.
     flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals)
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
+    toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
     views, emitted, reach_notes, pace_notes = [], [flat], [], []
@@ -760,6 +794,16 @@ def main():
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                 emitted[0] += 1
                 who['x'] = float(who['x']) + move
+        if layout == 'split':
+            talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
+            speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
+        # THẺ THÔNG BÁO trên khung (`"toast"`): gắn với lượt của chính mục này (sau các bước lại gần vừa chèn).
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or 'toast' not in turn: continue
+            note = turn['toast'] if isinstance(turn['toast'], dict) else {'title': turn['toast']}
+            if not isinstance(note, dict) or not isinstance(note.get('title', ''), str) or not isinstance(note.get('text', ''), str) or set(note) - {'title', 'text'} or not (note.get('title') or note.get('text')):
+                fail(f'{where}: "toast" is a string, or {{ "title": "…", "text": "…" }} — got {js(turn["toast"])}')
+            toasts.append({'turn': emitted[0], 'title': note.get('title', ''), 'text': note.get('text', '')})
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
             known(where, entry, ('together',))
@@ -937,6 +981,26 @@ def main():
                 dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
                 if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
                 setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} set.stand(cutout{n + 1}, {{ {where_} }});")
+    elif layout == 'split':
+        # MÀN HÌNH CHIA ĐÔI: mỗi nửa một nền riêng (`sides.left` / `sides.right`: màu tường, sàn, hoặc một phông dựng sẵn).
+        sides = scene.get('sides', {})
+        if not isinstance(sides, dict) or set(sides) - {'left', 'right'}: fail('"sides" is { "left": { … }, "right": { … } }')
+        for side in ('left', 'right'):
+            look = sides.get(side, {})
+            if not isinstance(look, dict) or set(look) - {'wall', 'wallDark', 'floor', 'preset'}: fail(f'sides.{side} takes "wall", "wallDark", "floor" or "preset" — got {js(look)}')
+            if look.get('preset') and look['preset'] not in PRESETS: fail(f'sides.{side}.preset must be one of {", ".join(PRESETS)}')
+            left = '0' if side == 'left' else '50%'
+            if look.get('preset'):
+                art = PRESETS[look['preset']]
+                clip(f'wall-{side}', f'position: absolute; left: {left}; top: 0; width: 50%; height: 100%; background: {art["wallDark"]} url("{_svg(" ".join(art["svg"].split()))}") center bottom / cover no-repeat;')
+                floor_colour = look.get('floor', art['floor'])
+            else:
+                wall, dark = look.get('wall', '#1f4a5c' if side == 'left' else '#5c3b1f'), look.get('wallDark', '#0c1c26' if side == 'left' else '#26170c')
+                clip(f'wall-{side}', f'position: absolute; left: {left}; top: 0; width: 50%; height: 100%; background: linear-gradient(165deg, {wall} 0%, {dark} 72%);')
+                floor_colour = look.get('floor', '#0f2a38' if side == 'left' else '#38220f')
+            clip(f'floor-{side}', f'position: absolute; left: {left}; bottom: 0; width: 50%; height: {background["floorHeight"]}px; background: {floor_colour};')
+            layers.append(f'#wall-{side}'); layers.append(f'#floor-{side}')
+        picture = None
     elif picture:
         source = os.path.join(base, picture)
         if not os.path.isfile(source): fail(f'background.image not found: {picture} (looked in {base})')
@@ -948,7 +1012,7 @@ def main():
         clip('wall', f'position: absolute; inset: 0; background: linear-gradient(165deg, {background["wall"]} 0%, {background["wallDark"]} 72%);'); layers.append('#wall')
     if preset:
         background['floor'] = scene.get('background', {}).get('floor', PRESETS[preset]['floor'])
-    if stage_set is None and (not picture or 'floor' in scene.get('background', {})):
+    if stage_set is None and layout != 'split' and (not picture or 'floor' in scene.get('background', {})):
         clip('floor', f'position: absolute; left: 0; right: 0; bottom: 0; height: {background["floorHeight"]}px; background: {background["floor"]};'); layers.append('#floor')
     for prop in [item for item in props if not item['front']]:
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
@@ -960,6 +1024,15 @@ def main():
         clip(who['_element'], f'position: absolute; left: {who["_left"]:.0f}px; bottom: {ground}px; height: {who["_host_height"]:.0f}px;'); layers.append('#' + who['_element'])
     for prop in [item for item in props if item['front']]:           # "front": true — vẽ SAU nhân vật, tức che phía trước họ (đứng sau quầy)
         clip(prop['element'], f'position: absolute; left: {prop["left"]:.0f}px; bottom: {ground}px; height: {prop["host_height"]:.0f}px;'); layers.append('#' + prop['element'])
+    if layout == 'split':
+        # Nửa KHÔNG nói tối đi một chút (lớp phủ), và một vạch trắng ngăn hai nửa — vẽ sau nhân vật nên đè lên họ.
+        for side in ('left', 'right'):
+            clip(f'dim-{side}', f'position: absolute; left: {"0" if side == "left" else "50%"}; top: 0; width: 50%; height: 100%; background: #000; opacity: 0; pointer-events: none;', extra=' data-layout-ignore=""')
+        clip('divider', f'position: absolute; left: calc(50% - {max(3, round(width * 0.003))}px); top: 0; width: {max(6, round(width * 0.006))}px; height: 100%; background: #f4f7f8; box-shadow: 0 0 18px rgba(0, 0, 0, 0.35);', extra=' data-layout-ignore=""')
+        for who in names.values():
+            half = (0, width / 2) if who['side'] == 'left' else (width / 2, width)
+            if who['_left'] < half[0] - 2 or who['_left'] + who['_host_width'] > half[1] + 2:
+                notes.append(f'character "{who["name"]}" stands across the middle of the split frame (its host reaches past its half) — move its "x" toward the middle of the {who["side"]} half')
     # ── VÙNG NỘI DUNG của bố cục "presenter": tiêu đề, các ý, ảnh — mỗi thứ là MỘT clip phẳng (HyperFrames
     # không nhận clip lồng phần tử con), vị trí tính sẵn. Vùng nằm ở phía đối diện với nhân vật.
     landscape = width >= height
@@ -1071,7 +1144,26 @@ def main():
             setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
         if who['_late']:
             setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")
-    camera = False if stage_set is not None else scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
+    # ── THẺ THÔNG BÁO (`"toast"` trên một lượt): một thẻ kiểu thông báo ứng dụng ở góc trên khung — biểu tượng chuông,
+    # tiêu đề đậm, một dòng nội dung. Mỗi thẻ là một clip phẳng; giờ hiện điền sau khi đo thời gian (`place_toasts`).
+    if toasts:
+        unit = min(width, height)
+        card_w = round(width * (0.36 if width >= height else 0.82))
+        style.append(f'  .toast {{ position: absolute; top: {round(height * 0.05)}px; {"right" if width >= height else "left"}: {round(width * 0.04) if width >= height else round((width - card_w) / 2)}px; width: {card_w}px; box-sizing: border-box; '
+                     f'padding: {round(unit * 0.018)}px {round(unit * 0.022)}px {round(unit * 0.018)}px {round(unit * 0.085)}px; border-radius: {round(unit * 0.022)}px; background: rgba(255, 255, 255, 0.97); '
+                     f'box-shadow: 0 {round(unit * 0.01)}px {round(unit * 0.03)}px rgba(0, 0, 0, 0.22); font-family: system-ui, sans-serif; color: #16303a; }}')
+        bell = _svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4c-3 0-5 2.2-5 5.2v3.6L5.6 15h12.8L17 12.8V9.2C17 6.2 15 4 12 4zm-2 12.5a2 2 0 004 0' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/></svg>")
+        style.append(f'  .toast::before {{ content: ""; position: absolute; left: {round(unit * 0.022)}px; top: 50%; width: {round(unit * 0.046)}px; height: {round(unit * 0.046)}px; margin-top: {-round(unit * 0.023)}px; '
+                     f'border-radius: {round(unit * 0.012)}px; background: #2f9e8f url("{bell}") center / 70% no-repeat; }}')
+        # MỘT phần tử cho mỗi thẻ (HyperFrames không nhận clip có phần tử con): tiêu đề là chữ của chính nó, dòng nội dung
+        # là `::after` lấy từ `data-text`, biểu tượng là `::before`.
+        style.append(f'  .toast {{ font-weight: 800; font-size: {round(unit * 0.03)}px; line-height: 1.2; z-index: 30; }}')
+        style.append(f'  .toast::after {{ content: attr(data-text); display: block; font-weight: 400; font-size: {round(unit * 0.026)}px; line-height: 1.25; color: #3b5560; margin-top: {round(unit * 0.004)}px; }}')
+        for number, note in enumerate(toasts):
+            text = html_text(note['text']).replace('"', '&quot;')
+            body.append(f'  <div id="toast-{number + 1}" class="clip toast" data-text="{text}" data-start="0" data-duration="1" data-track-index="{track[0]}" data-toast-turn="{note["turn"]}" data-layout-ignore="">{html_text(note["title"])}</div>')
+            track[0] += 1
+    camera = False if stage_set is not None or layout == 'split' else scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
     if camera:
         kind = camera.get('kind', 'chest') if isinstance(camera, dict) else 'chest'
@@ -1092,6 +1184,10 @@ def main():
     # ≈ 0,55 cỡ chữ; trừ lề trong 60px.
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
     caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), 0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
+    if speakers:
+        moves = ' '.join(f"tl.to('#dim-left', {{ opacity: {0 if side in ('left', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start); tl.to('#dim-right', {{ opacity: {0 if side in ('right', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start);" for turn, side in speakers)
+        caption_code += "\n    // Split screen: the half that is not speaking dims a little.\n    " + moves
+    if toasts: caption_code += "\n    // Notification cards slide in at their data-start and out before their clip ends (tools/scene.py fills both in).\n    document.querySelectorAll('.toast').forEach((element) => { const start = +element.dataset.start, end = start + +element.dataset.duration; tl.from(element, { opacity: 0, y: -30, duration: 0.4, ease: 'back.out(1.6)' }, start); tl.to(element, { opacity: 0, y: -16, duration: 0.3, ease: 'power2.in' }, end - 0.3); });"
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
     timeline_hook, view_code, drive_code = '', '', ''
@@ -1155,6 +1251,7 @@ def main():
     for voice, line in zip(voices, timings['speech']):
         final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
     final = place_shows(final, timings, total)
+    final = place_toasts(final, timings, total)
     # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
     final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')
     open(target, 'w', encoding='utf-8').write(final)

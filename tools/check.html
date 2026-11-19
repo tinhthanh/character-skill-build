@@ -1732,6 +1732,21 @@ try {
         run.progress(1); if (Math.abs(runner.s.x) > 0.5 || runner.s.ballMouth) hong('fetch', `the dog does not end back where it started without the ball (x ${runner.s.x.toFixed(1)})`);
         run.kill(); runner.svg.remove();
       }
+      // Đợt 7 — thông báo trên điện thoại: thẻ bật ra trên bàn tay cầm máy, có chữ, tắt khi xong; không cầm máy thì báo lỗi.
+      {
+        const caller = L.createCharacter(spot('left:500px;top:0;width:200px;height:235px'), { id: 'granny', items: { R: 'phone' } }).rig;
+        const ping = caller.notify('Nhắc lịch tái khám: Thứ Bảy 9:00', 1.5); ping.time(1.0);
+        const card = caller.el.note, lines = [...card.querySelectorAll('text')].map((line) => line.textContent);
+        if (card.style.display === 'none') hong('notify', 'no notification card while it is shown');
+        else {
+          const box = card.getBoundingClientRect(), hand = at(caller.el.coTayR);
+          if (!(box.bottom < hand[1] + 6 && box.left < hand[0] && box.right > hand[0] - 40)) hong('notify', 'the card is not just above the phone hand');
+        }
+        if (lines[0] !== 'Nhắc lịch tái khám:' || lines[1] !== 'Thứ Bảy 9:00') hong('notify', `the text is split as ${JSON.stringify(lines)} (want ["Nhắc lịch tái khám:", "Thứ Bảy 9:00"])`);
+        ping.progress(1); if (card.style.display !== 'none') hong('notify', 'the card stays after the action'); ping.kill(); caller.svg.remove();
+        let refused = ''; try { actor.notify('x'); } catch (error) { refused = error.message; }
+        if (!refused.includes('not holding a phone')) hong('notify', 'a notification without a phone in hand should be refused with a clear message');
+      }
       const brisk = actor.hurry(6), calm = actor.walk(6);
       if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
       brisk.kill(); calm.kill();

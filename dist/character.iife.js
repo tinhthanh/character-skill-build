@@ -1,4 +1,4 @@
-/* VGCharacter v0.46.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.47.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -45,6 +45,7 @@ const NGHI = Object.freeze({
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
   gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`)
+  note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
   watchL: 0, watchR: 0,
@@ -758,7 +759,7 @@ class RigSVG {
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet'];
   // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
-  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -1177,6 +1178,12 @@ class RigSVG {
   </g>
   <!-- DÂY DẮT (leash): ở GỐC SVG, ngoài mọi phép biến đổi — hai đầu dây đo trên màn hình rồi đổi về hệ này. -->
   <path id="${p}-leash" fill="none" stroke="#c0392b" stroke-width="3.2" stroke-linecap="round" style="display:none"/>
+  <g id="${p}-note" style="display:none">
+    <path d="M -86 -46 H 86 Q 96 -46 96 -36 V 6 Q 96 16 86 16 H 10 L 0 28 L -10 16 H -86 Q -96 16 -96 6 V -36 Q -96 -46 -86 -46 Z" fill="#ffffff" stroke="#c8d3da" stroke-width="1.6"/>
+    <rect x="-86" y="-38" width="22" height="22" rx="6" fill="#2f9e8f"/><path d="M -75 -33 q -6 1 -6 8 v 4 h 12 v -4 q 0 -7 -6 -8 z M -77 -19 h 4" stroke="#ffffff" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <text data-note="1" x="-56" y="-27" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
+    <text data-note="2" x="-56" y="-10" font-family="Arial, sans-serif" font-size="13" fill="#3b5560" data-layout-ignore=""></text>
+  </g>
   <g id="${p}-ball" style="display:none"><circle r="11" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.5"/>
     <path d="M -10 -3 Q 0 5 10 -3 M -10 4 Q 0 -4 10 4" stroke="#ffffff" stroke-width="1.8" fill="none" opacity=".9"/></g>
 </svg>`;
@@ -1190,7 +1197,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1919,6 +1926,23 @@ class RigSVG {
     this.#veMom();
     this.#drawLeash();
     this.#drawBall();
+    this.#drawNote();
+  }
+
+  // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
+  #drawNote() {
+    const e = this.el, s = this.s, n = this.noted;
+    if (!e || !e.note) return;
+    const k = clamp(s.note, 0, 1);
+    if (!n || k < 0.02) { e.note.style.display = 'none'; return; }
+    const hand = e['coTay' + n.side], ctm = hand && hand.getScreenCTM(), root = this.svg.getScreenCTM();
+    if (!ctm || !root) { e.note.style.display = 'none'; return; }
+    const p = new DOMPoint(0, 4).matrixTransform(ctm).matrixTransform(root.inverse());
+    // Thẻ nằm TRÊN bàn tay, lệch vào phía trong khung một chút để không tràn khỏi mép khung nhân vật.
+    const x = clamp(p.x, 110, KHUNG.w - 110), y = p.y - 40 - 20 * k;
+    e.note.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${(0.4 + 0.6 * k).toFixed(3)})`);
+    e.note.style.opacity = Math.min(1, k * 1.6).toFixed(2);
+    e.note.style.display = '';
   }
 
   // QUẢ BÓNG đang bay (`throwBall`): một đường parabol trong hệ gốc của SVG, từ trên vai tay ném tới một điểm trên sàn
@@ -3914,6 +3938,39 @@ class RigSVG {
     t.to(s, { omRise: 1, huong: 0, than: this.NGHI.than, nhinX: 0, nhinY: 1.8, dauY: 3, duration: 0.55, ease: 'power2.inOut' }, HANDOVER_AT + 0.02);
     this.#khep(t, 0.4, HANDOVER_AT + 0.6, { om: 1, omRise: 1, huong: 0 });
     return t;
+  }
+
+  /**
+   * NHẬN THÔNG BÁO trên điện thoại đang cầm: máy rung, một THẺ THÔNG BÁO bật ra phía trên máy (dòng đầu đậm — ví dụ
+   * "Nhắc lịch tái khám", dòng sau — "Thứ Bảy, 9:00"), người nhìn xuống máy, mắt sáng lên, giữ `hold` giây rồi thẻ tắt.
+   * `text`: một chuỗi (tự xuống dòng ở khoảng 24 ký tự) hoặc [dòng 1, dòng 2]. Phải đang cầm điện thoại.
+   */
+  notify(text = 'Thông báo mới', hold = 1.8, { side = 'auto' } = {}) {
+    const t = this.tl(), s = this.s, N = this.NGHI, k = this.#phoneHand(side);
+    if (!(this.holds[k] && s['item' + k] > 0.5 && this.el['item' + k].querySelector('[data-back]'))) throw new Error('[character] notify: the character is not holding a phone — give it one: createCharacter(host, { id, items: { R: "phone" } })');
+    const lines = Array.isArray(text) ? text.map(String) : RigSVG.#noteLines(String(text));
+    this.noted = { side: k };
+    const [first, second] = [...this.el.note.querySelectorAll('text')];
+    first.textContent = (lines[0] || '').slice(0, 30); second.textContent = (lines[1] || '').slice(0, 30);
+    // Rung: món đồ nghiêng qua lại thật nhanh vài nhịp ("bzz").
+    for (let n = 0; n < 6; n++) t.to(s, { ['itemTilt' + k]: n % 2 ? -7 : 7, duration: 0.05, ease: 'none' }, n * 0.05);
+    t.to(s, { ['itemTilt' + k]: 0, duration: 0.05 }, 0.3);
+    t.to(s, { note: 1, duration: 0.3, ease: 'back.out(1.8)' }, 0.25);
+    t.to(s, { nhinY: 2.2, nhinX: k === 'L' ? -1.2 : 1.2, dauY: 4, mayL: 0.8, mayR: 0.8, cuoi: 0.9, duration: 0.3, ease: 'power2.out' }, 0.3);
+    t.to(s, { nhinY: 0, nhinX: 0, dauY: 0, duration: 0.3, ease: 'sine.inOut' }, 0.6 + hold * 0.6);
+    t.to(s, { note: 0, duration: 0.25, ease: 'power2.in' }, 0.55 + hold);
+    this.#khep(t, 0.4, 0.8 + hold);
+    return t;
+  }
+
+  // Chia một câu thông báo thành hai dòng ở khoảng trắng gần ký tự thứ 24.
+  static #noteLines(text) {
+    if (text.length <= 24) return [text, ''];
+    // Có dấu hai chấm / gạch ngang ở nửa đầu thì ngắt ở đó: "Nhắc lịch tái khám:" | "Thứ Bảy 9:00".
+    const mark = text.search(/[:\-–] /);
+    if (mark > 6 && mark < 30) return [text.slice(0, mark + 1).trim(), text.slice(mark + 1).trim()];
+    const cut = text.lastIndexOf(' ', 24);
+    return cut > 8 ? [text.slice(0, cut), text.slice(cut + 1)] : [text.slice(0, 24), text.slice(24)];
   }
 
   /**
@@ -7810,7 +7867,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.46.0';
+const VERSION = '0.47.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

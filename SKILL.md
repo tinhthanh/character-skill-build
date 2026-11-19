@@ -13,7 +13,7 @@ the phone, type on a laptop, examine a pet with a stethoscope, give an injection
 clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
 or mouth, give it a treat or a pill, brush it, walk it on a leash, kneel to it, hand it to someone, throw it a ball
-(75 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
+get a notification on the phone (76 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, and wear a recovery cone or a leg bandage.
@@ -134,7 +134,8 @@ clips for every voice file.
    `confused`, `tired`). `do` takes any action step; `"enter"` / `"exit"` on a turn bring a
    character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
    draws a room. Vertical video: `"width": 1080,
-   "height": 1920`. **Explainer with one presenter:** `"layout": "presenter"` and
+   "height": 1920`. **Phone call between two places:** `"layout": "split"` (two halves, each its own background; a
+   `"side"` on every character), and `"toast"` on a turn for an app notification card. **Explainer with one presenter:** `"layout": "presenter"` and
    `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
    beside the character as they speak (`examples/scene-presenter/scene.json`).
    For a room with depth and a camera that changes angle (pan, push in, wide shot), add

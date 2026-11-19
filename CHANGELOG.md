@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.47.0
+
+Added — phone calls on a split screen, notifications
+- **`"layout": "split"`** in scene files: a phone call between two places. The frame splits in two
+  halves with their own backgrounds (`"sides"`: a preset or wall / floor colours), a divider between
+  them; every character has `"side"` and an `x` within its half. The half that is not speaking dims.
+- **`"toast"`** on a turn: an app notification card (icon, bold title, a line of text) slides in at
+  the top of the frame as the turn starts and stays 2.5–4 s.
+- **`notify(text)`** for a person holding a phone: the phone buzzes and a notification card with the
+  text pops up above it.
+
 ## 0.46.0
 
 Added — passing a pet, kneeling, play
