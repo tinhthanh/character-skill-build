@@ -43,12 +43,19 @@ the demo steps from `tools/action-catalog.json`.
 | `relief` | `(hand = 'auto')` | hand on the chest, eyes closed, a long breath out with the shoulders dropping, then a relieved smile | 2.35 |
 | `startle` | — | a jolt back, both open hands thrown up by the shoulders, round eyes, mouth in an O, then calm again | 1.45 |
 | `lookAround` | — | turn the head (and a little of the body) left, then right, then back — searching for someone, a lost pet | 2.45 |
+| `thumbsDown` | `(hand = 'auto')` | thumb pointing down in front of the chest, a frown, a shake of the head — "don't", "wrong". The pair of `thumbsUp` | 1.75 |
+| `stopSign` | `(hold = 1.2, { hand })` | the open palm held up before the chest, a firm push, a serious face — "stop!", a warning | `hold` + 0.75 |
+| `fingerWag` | `(times = 3, { hand })` | the index finger raised by the shoulder, wagging side to side with the head — "no, no" | 0.8 + 0.3 × `times` |
+| `beckon` | `(times = 3, { hand })` | an open hand held out by the hip, fingers curling in — "come here" (a pet, a customer) | 0.8 + 0.36 × `times` |
+| `fingerHeart` | `(hold = 1.4, { hand })` | thumb and index crossed before the chest, a red heart pops up and beats twice, a wink — the finger heart | `hold` + 0.85 |
+| `vSign` | `(hold = 1.4, { hand })` | two fingers in a V beside the face, head tilted, a big smile and a wink — a photo pose, a sign-off | `hold` + 0.75 |
 | `handshake` | `(target)` | reach the hand on `target`'s side to a point half way between the two (at waist height, shared by both, whatever their heights) and shake three times. Run it `together` with the other person's `handshake` | 1.8 |
 | `listen` | `(target, hold = 1.6)` | bend to a pet (a rig, an element or `{ x, y }`) and put a stethoscope (it appears in the hand, tube up to the neck) on its body, listen with the head tilted and eyes up, move it once, nod. The pet must be within reach — on an exam table at about hand height | `hold` + 1.5 |
 | `inject` | `(target)` | with a held `'syringe'`, bend to the pet, needle toward its body, press the plunger, pull back, smile. The pet must stand on the side of the hand holding the syringe (otherwise an error says so); throws without a syringe | 2.35 |
 | `carry` / `putDown` | `(pet)` / — | **stance**: bend down, take the pet in both hands and hold it in front of the belly, curled up, a little enlarged (1.35×) so it reads; the following steps play while carrying, and the pet's own actions (purr, wagTail) keep playing in the arms. `putDown` puts it back where it was picked up — walking away first is refused. The pet must be within reach | 1.55 / 1.1 |
 | `examine` | `(target, part = 'ears', hold = 1.4)` | bend to the pet and shine a penlight (it appears in the hand) on `part`: `'ears'`, `'eyes'` or `'teeth'` (the muzzle — run the pet's `openMouth` `together`), look closely, move the light once, nod. Close targets (a pet on the exam table right beside the person) bend the elbow so the hand stops at the target | `hold` + 1.4 |
-| `giveTreat` | `(target)` | bend and hold out a bone-shaped treat (it appears in the hand) to the pet's mouth; it disappears as the pet takes it; smile, pull back. Pair with the pet's `beg`, `wagTail` or `eat` in a `together` | 1.9 |
+| `giveTreat` | `(target, { kind = 'treat' })` | bend and hold out a bone-shaped treat (it appears in the hand) to the pet's mouth; it disappears as the pet takes it; smile, pull back. `kind: 'pill'` gives a pill instead. Pair with the pet's `beg`, `wagTail` or `eat` in a `together` | 1.9 |
+| `brush` | `(target, strokes = 4)` | bend and brush along the pet's back with a brush that appears in the hand — grooming | 1.0 + 0.42 × `strokes` |
 | `leash` / `unleash` | `(pet)` / — | **stance**: clip a leash onto the pet; a line is drawn from the held leash handle (`items: { R: 'leash' }`) to the pet's collar and follows both of them — `walk` the person and the pet `together` to walk it. `unleash` removes the line. Throws without a leash in hand | 0.95 / 0.95 |
 | `write` | `(dur = 1.2)` | the other hand comes over to the held item (clipboard, phone) and writes a few lines, head down; with empty hands it writes on the left palm | `dur` + 0.87 |
 | `call` | `(text = null, dur = 2.4, { mood, side })` | put the held phone to the cheek (its back facing out, the head tilting to it), say `text` over `dur` seconds, put it down. No `text`: listening, small nods. With empty hands it mimes the call with a fist. A chibi's short arm cannot reach the ear in a front view, so the phone goes to the cheek — the usual cartoon shorthand | `dur` + 1.05 |
@@ -134,7 +141,7 @@ gestures use the arm on that side, so the hand goes toward whoever it is facing.
 until `showItem(side)`. Do not tween `rig.state.itemR` beside a `sequence()` — the sequence
 owns the whole state and overwrites it.
 
-## Pets — `VGCharacter.createPet(host, { species, config }).rig`
+## Pets — `VGCharacter.createPet(host, { species, config, wear }).rig`
 
 All pets stand side-on with the **head toward screen right** and the face turned to the
 viewer. `walk` with a negative distance turns the animal round first.
@@ -159,6 +166,10 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
 | `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
 | `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
+| `shakeOff` | — | shake the whole body from head to tail, ears flapping, water drops flying off — after a bath | 1.25 |
+| `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
+| `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
+| `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down (front legs out); `sleep` lies down, head down, eyes closed, slow deep breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -185,10 +196,20 @@ stand them up first:
 | `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
 | `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
 | `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
+| `shakeOff` | — | shake the whole body from head to tail, ears flapping, water drops flying off — after a bath | 1.25 |
+| `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
+| `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
+| `yawn` | — | head back, mouth wide open, eyes shut, then a smack of the lips | 2.15 |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
 | `exit` | `(to = 'right', distance)` | turn that way and run out past the edge of the frame — **ends hidden** | 2.7 |
+
+**Accessories.** `rig.wear('cone')` puts on a recovery cone (an Elizabethan collar, seen as a
+clear ring round the head), `rig.wear('bandage')` a bandage on the near front leg;
+`rig.wear(kind, false)` takes it off. They take effect at once (not a timeline step) and stay on
+through every action. `createPet(host, { species, wear: ['cone'] })` does the same at creation,
+and a scene file takes `"wears": "cone"` on a pet.
 
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything
@@ -246,7 +267,7 @@ granny.state.seat = 1;                       // already seated in the first fram
 | Call | Use |
 |---|---|
 | `VGCharacter.createCharacter(host, { id, config, items, itemsHidden })` | build a person; returns `{ rig, id }`. `items: { R: 'cup' }` (or `'clipboard'`, `'phone'`, `'syringe'`, `'pills'`, `'leash'`, `{ kind: 'phone', image: 'app.png' }` for a picture on the phone's screen, or a function returning SVG; `L` for the other hand) gives any character that item to hold; `itemsHidden: true` starts with it put away, ready for `take()` or `showItem()`. Omit `config` to use the one baked into the bundle; pass `null` to ignore it |
-| `VGCharacter.createPet(host, { species, config })` | build a pet |
+| `VGCharacter.createPet(host, { species, config, wear })` | build a pet; `wear: ['cone']` (or `'bandage'`, or both) puts accessories on from the start — see `rig.wear` |
 | `VGCharacter.createProp(host, kind, options)` | build a chair, stool, table or counter (see Scene props) |
 | `VGCharacter.shot(scene, subject, kind, options)` | camera: zoom the scene onto one rig or an array of rigs (people and pets) — `'face'` / `'chest'` / `'full'` — or back to `'wide'` — see `references/hyperframes.md` → Camera shots |
 | `rig.shotBox(kind)` | the box such a shot aims at, in frame units, for the rig's current state |

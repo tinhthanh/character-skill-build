@@ -166,7 +166,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle);
       // Bốn mặt vừa dựng là mặt của một VẬT: đánh dấu để `update` không làm mờ chúng khi chúng tràn ra ngoài khung hình.
       for (const item of focused.slice(-4)) item.solid = true;
-      const prop = { group, centre: middle, top: y + height };
+      const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width] };
       props.push(prop);
       return prop;
     },
@@ -261,6 +261,25 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     },
 
     /**
+     * GẮN bối cảnh vào timeline chính để máy quay được áp ở MỌI khung, kể cả khi bộ dựng tua bằng `seek(t)` — lệnh này
+     * TẮT callback của GSAP, nên `onUpdate: set.update` không chạy và khung ấy mang góc máy của lần vẽ trước. Bộ dựng
+     * chụp nhiều khung song song: khi máy đang lia, các khung xen kẽ mang hai góc máy khác nhau — hình CHỚP (đo được ở
+     * cảnh thử đợt 5: cậu bé nhảy qua lại mỗi khung trong lúc lia). Gọi SAU khi đã dựng xong timeline:
+     *   const tl = gsap.timeline({ paused: true, onUpdate: set.update }); … ; set.drive(tl);
+     * Một tween rỗng phủ cả timeline; setter của nó (GSAP ghi ở mọi lần vẽ, kể cả khi tua) hẹn `set.update()` vào cuối
+     * lượt (microtask) — SAU khi mọi nhân vật đã nhận trạng thái của khung, như rig tự vẽ lại (xem `rig.s`).
+     */
+    drive(tl) {
+      let queued = false;
+      const driver = { _t: 0, get t() { return this._t; }, set t(value) {
+        this._t = value;
+        if (!queued) { queued = true; queueMicrotask(() => { queued = false; set.update(); }); }
+      } };
+      tl.to(driver, { t: 1, duration: Math.max(tl.duration(), 0.001), ease: 'none' }, 0);
+      return set;
+    },
+
+    /**
      * ÁP máy quay hiện tại lên bối cảnh và mọi nhân vật. Gọi sau mỗi lần timeline cập nhật:
      * `gsap.timeline({ paused: true, onUpdate: set.update })` — và phải gọi SAU khi các rig đã dựng khung của mình.
      */
@@ -292,10 +311,16 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         actor.unit = size && actor.height ? actor.height / size.h : 0;
         actor.where = actor.spot.x + actor.step * actor.unit;
       }
-      // xa → gần. Người và con vật đứng CÙNG độ sâu (lệch dưới 12 đơn vị — con vật trên bàn khám ngay cạnh bác sĩ): người
-      // ở trước. Không thì ai được đặt sau nằm trên, và bàn tay soi đèn / tiêm / đưa bánh thưởng chui ra sau con vật.
-      const PERSON_AHEAD = 12, ahead = (actor) => (actor.rig && typeof actor.rig.seatY === 'function' ? PERSON_AHEAD : 0);
-      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => (a.at.depth + ahead(a.actor)) - (b.at.depth + ahead(b.actor)));
+      // xa → gần. Người và con vật đứng SÁT NHAU, CÙNG độ sâu trong phòng (con vật trên bàn khám ngay cạnh bác sĩ): NGƯỜI
+      // luôn ở trước, bất kể góc máy — không thì bàn tay soi đèn / tiêm / đưa bánh chui ra sau con vật. Quyết định theo vị
+      // trí TRONG PHÒNG (z, x), không theo khoảng cách tới máy: máy xoay thì khoảng cách ấy đổi dần, và thứ tự lớp đảo
+      // đúng một khung giữa lúc lia — con vật bật từ sau ra trước tay người (Gemini / người dùng: "giây 19 vẫn giật").
+      const isPerson = (actor) => !!(actor.rig && typeof actor.rig.seatY === 'function');
+      const together = (a, b) => Math.abs(a.spot.z - b.spot.z) < 30 && Math.abs(a.where - b.where) < 220;
+      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => {
+        if (isPerson(a.actor) !== isPerson(b.actor) && together(a.actor, b.actor)) return isPerson(a.actor) ? 1 : -1;
+        return a.at.depth - b.at.depth;
+      });
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
@@ -341,9 +366,23 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         actor.base = own; actor.wrote = clamp(own - camera.yaw / 90, -1, 1);
         if (rig.s.huong !== actor.wrote) { rig.s.huong = actor.wrote; rig.render(); }
       });
-      // Mỗi đồ vật vào lớp nằm ngay TRƯỚC những nhân vật ở xa máy hơn nó.
+      // Mỗi đồ vật vào lớp nằm ngay TRƯỚC những nhân vật ở SAU nó. Nhân vật đứng sát hộp theo chiều ngang thì "sau" tính
+      // theo VỊ TRÍ TRONG PHÒNG: đứng sau mặt trước của hộp (z nhỏ hơn) là ở sau hộp, ở mọi góc máy. So khoảng cách tới
+      // máy của TÂM hộp với của nhân vật thì người đứng ngang giữa bề sâu cái bàn (bác sĩ cạnh bàn khám) có cùng độ sâu
+      // với tâm bàn — máy lia hay người bước nhích là cái bàn nhảy trước / sau người liên tục (người dùng, đợt 5).
+      // Nhân vật ở xa hộp (không chồng lên nó trên màn hình) vẫn xếp theo độ sâu như cũ.
       for (const prop of props) {
-        const depth = set.project(...prop.centre).depth, index = shown.filter(({ at }) => at.depth < depth).length;
+        const depth = set.project(...prop.centre).depth;
+        const near = (actor) => prop.span && actor.where > prop.span[0] - 200 && actor.where < prop.span[1] + 200;
+        // Đứng TRÊN hộp (con vật trên bàn khám: chân ở mặt bàn) thì luôn ở trên hộp. Người đứng sát một con vật đang ở trên
+        // hộp cũng ở trên hộp: người ấy đã được xếp TRƯỚC con vật (bàn tay khám không chui ra sau nó), mà con vật thì ở trên
+        // hộp — để hộp trước người là một vòng lặp lớp, và phép xếp chọn lúc thế này lúc thế kia theo góc máy.
+        const onTop = (actor) => actor.spot.y >= prop.top - 1;
+        const tending = (actor) => isPerson(actor) && shown.some(({ actor: other }) => other !== actor && onTop(other) && near(other) && together(actor, other));
+        const behind = ({ actor, at }) => (onTop(actor) || tending(actor) ? false : near(actor) ? actor.spot.z <= prop.front + 0.5 : at.depth < depth);
+        // Hộp nằm ngay DƯỚI nhân vật đầu tiên (xa máy nhất) ở trước nó. Đếm số nhân vật ở sau thì sai khi thứ tự không đúng
+        // theo độ sâu (người được xếp trước con vật cạnh nó): hộp nhảy lên trên con vật đứng trên chính nó.
+        const first = shown.findIndex((entry) => !behind(entry)), index = first < 0 ? shown.length : first;
         if (prop.group.parentNode !== layers[index]) layers[index].appendChild(prop.group);
       }
       // MẶT CỦA KHỐI HỘP TRÀN RA NGOÀI KHUNG thì không làm mờ. Chrome vẽ hỏng một mặt phẳng 3D có `filter` (mờ, dù chỉ

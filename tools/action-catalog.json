@@ -1,5 +1,5 @@
 {
-  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), after (steps that undo a stance). Points are in the 400 × 470 frame.",
+  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species). Points are in the 400 × 470 frame.",
   "people": [
     { "label": "idle", "steps": [["idle", 1.6]] },
     { "label": "wave", "steps": ["wave"] },
@@ -62,6 +62,12 @@
     { "label": "startle", "steps": ["startle"] },
     { "label": "lookAround", "steps": ["lookAround"] },
     { "label": "hurry", "steps": [["hurry", 6]] },
+    { "label": "thumbsDown", "steps": ["thumbsDown"] },
+    { "label": "stopSign", "steps": ["stopSign"] },
+    { "label": "fingerWag", "steps": ["fingerWag"] },
+    { "label": "beckon", "steps": ["beckon"] },
+    { "label": "fingerHeart", "steps": ["fingerHeart"] },
+    { "label": "vSign", "steps": ["vSign"] },
     { "label": "stroke (pet)", "steps": [["stroke", "@pet"]], "pet": "cat" },
     { "label": "listen (pet)", "steps": [["listen", "@pet", 1.6]], "pet": "cat" },
     { "label": "inject (pet)", "steps": [["inject", "@pet"]], "pet": "cat", "items": { "R": "syringe" } },
@@ -69,6 +75,8 @@
     { "label": "examine ears (pet)", "steps": [["examine", "@pet", "ears"]], "pet": "dog" },
     { "label": "examine teeth (pet)", "steps": [["examine", "@pet", "teeth"]], "pet": "dog" },
     { "label": "giveTreat (pet)", "steps": [["giveTreat", "@pet"]], "pet": "dog" },
+    { "label": "giveTreat pill (pet)", "steps": [["giveTreat", "@pet", { "kind": "pill" }]], "pet": "cat" },
+    { "label": "brush (pet)", "steps": [["brush", "@pet"]], "pet": "dog" },
     { "label": "leash → nod → unleash (pet)", "steps": [["leash", "@pet"], "nod", "unleash"], "pet": "dog", "items": { "R": "leash" } }
   ],
   "pets": [
@@ -86,6 +94,11 @@
     { "label": "drink", "steps": [["drink", 2]] },
     { "label": "cough", "steps": ["cough"] },
     { "label": "openMouth", "steps": ["openMouth"] },
+    { "label": "shakeOff", "steps": ["shakeOff"] },
+    { "label": "sneeze", "steps": ["sneeze"] },
+    { "label": "pant", "steps": [["pant", 2]] },
+    { "label": "yawn", "steps": ["yawn"] },
+    { "label": "wearing cone + bandage: limp", "steps": [["limp", 4]], "wear": ["cone", "bandage"] },
     { "label": "dog: wagTail", "steps": ["wagTail"], "species": "dog" },
     { "label": "dog: bark", "steps": ["bark"], "species": "dog" },
     { "label": "dog: sit", "steps": ["sit"], "species": "dog" },

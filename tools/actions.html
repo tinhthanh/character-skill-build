@@ -40,11 +40,11 @@ for (const entry of entries) {
       // Con vật đặt trong TẦM TAY (ngang bàn khám), ở phía tay phải — như trong bài kiểm tra tools/check.html.
       if (entry.pet) {
         const petHost = document.createElement('div'); petHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${118 * zoom}px;width:${100 * zoom}px;height:${82 * zoom}px`;
-        cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet }).rig;
+        cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet, wear: entry.wear || [] }).rig;
       }
       const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
       cell.insertBefore(host, cell.firstChild);
-      const rig = isPet ? createPet(host, { species: id }).rig
+      const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
         : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg)) : step));

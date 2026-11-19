@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.45.0
+
+Added — do / don't gestures, aftercare and grooming
+- **Gestures:** **`thumbsDown`** (new hand shape: thumb pointing down), **`stopSign`** (palm held
+  up), **`fingerWag`** ("no, no"), **`beckon`** ("come here"), **`fingerHeart`** (new hand shape
+  with a red heart that pops up and beats), **`vSign`**.
+- **Pet accessories:** `rig.wear('cone' | 'bandage')` — a recovery cone round the head, a bandage
+  on the near front leg; on at once and through every action. `createPet(host, { wear })`, and
+  `"wears"` on a pet in a scene file.
+- **Grooming and medicine:** **`brush(pet)`** (a brush appears in the hand), **`giveTreat(pet,
+  { kind: 'pill' })`**.
+- **Pets:** **`shakeOff`** (with water drops), **`sneeze`**, **`pant`**, **`yawn`**.
+- The action catalog (review sheet, reel) takes `wear` on an entry.
+
+Fixed
+- **3D sets flickered during camera moves.** The camera was applied only from the master
+  timeline's `onUpdate`, which GSAP skips when a renderer seeks with `seek(t)`; such a frame kept
+  the camera of the frame drawn before it, and with frames rendered in parallel, neighbouring frames
+  alternated between two camera positions (a character jumping back and forth while the camera
+  pans). New **`set.drive(tl)`** applies the camera on every frame however it is reached;
+  `tools/scene.py` writes it. Re-run `tools/scene.py` on 3D scenes built with an earlier version.
+- **3D sets: a pet popped in front of the person beside it during a camera move.** A person and a
+  pet standing side by side at the same depth were stacked by their distance to the camera, which
+  changes as the camera turns — mid-pan the order swapped in one frame (the dog on the exam table
+  jumping over the vet's hand). They are now stacked by where they stand in the room: the person
+  stays in front at every camera angle.
+- **3D sets: a table jumped in front of and behind the person beside it.** A box was stacked by the
+  camera distance of its centre; a person standing beside an exam table, level with the middle of its
+  depth, is at the same distance, so every camera move or small step swapped them. Near a box (overlapping
+  it across the room), "behind" now goes by position in the room — behind its front face is behind the
+  box, at any camera angle. A character standing on the box, and a person tending it, are always above
+  the box.
+- **Camera moves in a scene file were too fast to look smooth.** A `"view"` without `"dur"` took 1.5 s
+  however far the camera went; a long move then swept 40+ px a frame and juddered at 30 fps.
+  `tools/scene.py` now gives each move time for its distance (at most 220 units, 18° of yaw, 420 of
+  distance a second; 1.5–4 s) and notes a `"dur"` that is too short.
+- **A short walk turned the whole body sideways and back.** `walk(steps, d)` with `d` up to 70 units
+  (the step closer `tools/scene.py` inserts before `examine` / `giveTreat`) now steps sideways
+  without turning (`RigSVG.SIDESTEP`).
+
 ## 0.44.0
 
 Added — symptoms, care and gestures

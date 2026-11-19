@@ -318,7 +318,8 @@ with tempfile.TemporaryDirectory() as work:
     care = json.load(open(stage, encoding='utf-8'))
     care['set'].setdefault('cutouts', []).extend([{'kind': 'bowl', 'x': -300, 'z': -500, 'fill': 'water'}, {'kind': 'scale', 'x': 500, 'z': -600, 'reading': '4.2 kg'}])
     boy = next(who for who in care['characters'] if who.get('id') == 'boy'); boy['holds'] = 'leash'
-    care['script'] += [{'who': 'vet', 'do': [['examine', '@cat', 'teeth'], ['giveTreat', '@cat'], 'ponder', 'callOut']},
+    next(who for who in care['characters'] if who.get('species') == 'cat')['wears'] = ['cone', 'bandage']
+    care['script'] += [{'who': 'vet', 'do': [['examine', '@cat', 'teeth'], ['giveTreat', '@cat'], 'ponder', 'callOut', ['brush', '@cat'], 'fingerHeart', 'thumbsDown']},
                        {'who': 'boy', 'do': [['leash', '@cat'], 'unleash']}, {'who': 'cat', 'do': ['scratchItch', ['limp', 4], 'openMouth']}]
     path = os.path.join(os.path.dirname(stage), '_check_care.json')
     try:
@@ -329,7 +330,7 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('a scene with vet-care steps does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'care3d', 'index.html'), encoding='utf-8').read().replace("'", '"')
-        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}'):
+        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}', 'wear: ["cone", "bandage"]', '"brush", set.target(vet, cat, "body")'):
             if needle not in html: problems.append(f'vet care: {needle} is not in the composition')
 
     def variant3d(change):
@@ -357,6 +358,8 @@ with tempfile.TemporaryDirectory() as work:
         ('a phone turn without a line', lambda s: s['characters'][0].update({'holds': 'phone'}) or s['script'].insert(0, {'who': 'vet', 'do': ['nod'], 'phone': True}), '"say"'),
         ('a screen on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0, 'z': 0, 'screen': 'a.png'}), 'laptop'),
         ('a reading on a bowl', lambda s: s['set']['cutouts'].append({'kind': 'bowl', 'x': 0, 'z': 0, 'reading': '1 kg'}), 'scale only'),
+        ('a person wearing a cone', lambda s: s['characters'][0].update({'wears': 'cone'}), 'for pets'),
+        ('a pet wearing a hat', lambda s: next(w for w in s['characters'] if w.get('species')).update({'wears': 'hat'}), 'cone or bandage'),
         ('a bowl full of soup', lambda s: s['set']['cutouts'].append({'kind': 'bowl', 'x': 0, 'z': 0, 'fill': 'soup'}), 'fill'),
         ('a laptop facing up', lambda s: s['set']['cutouts'].append({'kind': 'laptop', 'x': 0, 'z': 0, 'facing': 'up'}), 'facing'),
         ('a picture on a cup', lambda s: s['characters'][0].update({'holds': {'R': {'kind': 'cup', 'image': 'a.png'}}}), 'holds'),

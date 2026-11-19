@@ -535,6 +535,7 @@ character facing right is seen more from the front as the camera moves to the ri
   tl.add(VGCharacter.sequence(vet, ['wave', ['explain', 'Hello!', 3]]), 0);
   tl.add(set.move({ yaw: 20, distance: 1300 }, 4), 0);                     // a tween of the camera
   tl.add(set.cut({ ...VGCharacter.OVERVIEW, y: 280, z: -450, zoom: 0.9 }), 6);   // a cut to the wide shot
+  set.drive(tl);            // LAST: apply the camera on every frame, also when the renderer seeks without callbacks
 </script>
 ```
 
@@ -548,6 +549,7 @@ character facing right is seen more from the front as the camera moves to the ri
 | `set.look(values)` · `set.move(values, duration, ease)` · `set.cut(values)` | the camera: `yaw`, `pitch`, `distance`, `lens`, `x`, `y`, `z`, `zoom`, `blur`. `look` sets where it starts; `move` and `cut` return a marker to `tl.add(…, at)`. Limits: `VGCharacter.CAMERA_LIMITS`; wide shot: `VGCharacter.OVERVIEW` |
 | `set.camera` | the camera as last computed (read-only) |
 | `set.update()` | apply the camera at the timeline's current time — pass it as the master timeline's `onUpdate`. Seek with `tl.time(t)`: GSAP's `tl.seek(t)` skips `onUpdate` |
+| `set.drive(tl)` | call it once the master timeline is built: it adds an empty tween over the whole timeline whose setter schedules `set.update()` on every frame, including frames the renderer reaches with `seek(t)`, which skips `onUpdate`. Without it, a frame rendered that way keeps the camera of the frame drawn before it; HyperFrames renders frames in parallel, so during a camera move neighbouring frames alternate between two camera positions and the picture flickers. `tools/scene.py` writes it |
 | `set.project(x, y, z)` | where a point of the set lands: `{ x, y, scale, depth }` |
 | `set.target(from, to, part = 'head')` | aim for `from.point(…)` / `from.stroke(…)` at `to`'s head — or with `'body'` at its body, for `listen` / `inject` — from positions in the room — use it instead of passing the rig: those actions otherwise aim for the camera angle at build time. The hand reaches in `from`'s own plane only: give both the same `z` |
 
@@ -649,6 +651,7 @@ The library draws characters only. A scene usually needs:
   frame therefore depends only on its time, never on where the playhead came from.
 - The rig redraws from its state object on every write, so it renders correctly whether the
   renderer seeks with `totalTime(t, false)` or with `seek(t)` (which suppresses GSAP callbacks).
+  A 3D set's camera does the same through `set.drive(tl)`.
 - Rig timelines use `lazy: false`. GSAP normally defers a tween's first write to the end of
   the tick; when a renderer jumps straight to a frame, a later tween would otherwise record
   its start value before an earlier one has written, and the character snaps to a stale

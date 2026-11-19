@@ -77,7 +77,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "ponder", "crossArms", "handsOnHips", "introduce", "callOut", "relief", "startle", "lookAround",
                ["hurry", 6, 200]. Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
                ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
-               Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth".
+               Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
+               "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
+               "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
+               A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -133,7 +136,8 @@ def known(where, given, allowed):
 
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears')
+WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone')
 SHOW_KEYS = ('title', 'bullets', 'image')
@@ -186,6 +190,9 @@ SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn 
 FLOOR_KINDS = ('bowl', 'scale')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
+# Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
+CAMERA_SPEED = {'x': 220, 'y': 160, 'z': 220, 'yaw': 18, 'pitch': 8, 'distance': 420, 'zoom': 0.4}
+CAMERA_START = {'yaw': 0, 'pitch': 6, 'distance': 1700, 'x': 0, 'y': 300, 'z': -350, 'zoom': 1}   # máy mặc định của createSet (runtime/set3d.js, `base`)
 VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
 # vòng xa hơn thì không có mặt sau để xoay tới.
@@ -503,6 +510,12 @@ def main():
                 if isinstance(item, dict) and item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'character "{name}": holds image not found: {item["image"]}')
             if who.get('holdsHidden') not in (None, False, True): fail(f'character "{name}": "holdsHidden" must be true or false')
             who['holds'] = held
+        # `wears`: phụ kiện của thú — "cone" (loa chống liếm), "bandage" (băng chân), hay một danh sách.
+        if 'wears' in who:
+            if not pet: fail(f'character "{name}": "wears" is for pets (a cone or a bandage)')
+            worn = who['wears'] if isinstance(who['wears'], list) else [who['wears']]
+            if not worn or any(item not in WEARABLES for item in worn): fail(f'character "{name}": "wears" must be {" or ".join(WEARABLES)}, or a list of them — got {js(who["wears"])}')
+            who['wears'] = worn
         if pet and who.get('seated') not in (None, False, True): fail(f'character "{name}": a pet has no chair — use "seated": true')
         if who.get('seated') not in (None, False, True, 'chair', 'stool'): fail(f'character "{name}": "seated" must be true, "chair" or "stool"')
         frame = PET if pet else PERSON
@@ -545,7 +558,7 @@ def main():
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
                 if stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]})")
-                elif stage_set is not None and actor and step[0] in ('listen', 'inject'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
+                elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
                 else: parts.append(item[1:])
             else:
                 parts.append(js(item))
@@ -663,7 +676,9 @@ def main():
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
-    views, emitted, reach_notes = [], [flat], []
+    views, emitted, reach_notes, pace_notes = [], [flat], [], []
+    # Máy quay HIỆN TẠI (để tính quãng lia của mỗi "view"): góc máy đầu cảnh, cộng dồn qua từng view.
+    camera_now = {key: float(value) for key, value in dict(CAMERA_START, **(stage_set.get('camera', {}) if stage_set is not None else {})).items() if key in CAMERA_SPEED}
     def view_of(turn, where):
         view = turn.get('view')
         if view is None: return
@@ -692,8 +707,18 @@ def main():
         leaving = bool(views) and views[-1]['wide'] and not wide
         if leaving:
             values = dict({'lens': NORMAL_LENS, 'distance': float(stage_set.get('camera', {}).get('distance', 1750)), 'zoom': float(stage_set.get('camera', {}).get('zoom', 1))}, **values)
-        views.append({'turn': emitted[0], 'values': values, 'wide': wide, 'cut': bool(view.get('cut')) or wide or leaving,
-                      'dur': float(view.get('dur', 1.5)), 'ease': view.get('ease', 'sine.inOut'), 'where': where})
+        cut = bool(view.get('cut')) or wide or leaving
+        # THỜI LƯỢNG LIA mặc định theo QUÃNG ĐƯỜNG: 1,5 s cho mọi cú lia thì cú lia dài thành cú quét — ở 30 khung/giây
+        # hình dời 40+ px mỗi khung, mắt thấy giật cục dù từng khung đều đúng (cảnh thử đợt 5, giây 19). Giữ tốc độ dưới
+        # các ngưỡng CAMERA_SPEED (mỗi giây), tối đa 4 s. Tự cho `dur` thì giữ nguyên, chỉ nhắc nếu quá nhanh.
+        need = max([abs(float(values[key]) - float(camera_now[key])) / CAMERA_SPEED[key] for key in CAMERA_SPEED if key in values and key in camera_now] + [0])
+        if 'dur' in view:
+            seconds = float(view['dur'])
+            if not cut and need > seconds * 1.25: pace_notes.append(f'{where}: the camera covers this move in {seconds:g} s — a pan that fast judders at 30 fps; about {min(4.0, need):.1f} s reads smoothly (or leave out "dur")')
+        else: seconds = 1.5 if cut else round(min(4.0, max(1.5, need)), 2)
+        camera_now.update({key: float(value) for key, value in values.items()})
+        views.append({'turn': emitted[0], 'values': values, 'wide': wide, 'cut': cut,
+                      'dur': seconds, 'ease': view.get('ease', 'sine.inOut'), 'where': where})
     for index, entry in enumerate(script):
         where = f'script[{index}]'
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
@@ -715,7 +740,7 @@ def main():
             who = names[turn['who']]
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush') and isinstance(step[1], str) and step[1][1:] in names): continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
@@ -781,7 +806,7 @@ def main():
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
 
     # ── người NGỒI sau một đạo cụ "front" cao quá ngực thì chỉ còn thấy cái đầu: báo trước ──
-    notes = list(camera_notes) + reach_notes
+    notes = list(camera_notes) + reach_notes + pace_notes
     for prop in props:
         if not prop['front'] or prop['kind'] not in ('counter', 'table'): continue
         unit = prop['host_height'] / PERSON[1]
@@ -1015,7 +1040,7 @@ def main():
                 name = copy_asset(base, out, item['image'], copied)
                 item = dict(item, image=name)
             held[side] = item
-        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])} }})" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
+        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])}" + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
         if stage_set is not None:
             boxes = [box.get('name') for box in stage_set.get('boxes', [])]
@@ -1064,9 +1089,11 @@ def main():
     caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), 0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
-    timeline_hook, view_code = '', ''
+    timeline_hook, view_code, drive_code = '', '', ''
     if stage_set is not None:
         timeline_hook = ', onUpdate: set.update'
+        # Máy quay áp ở MỌI khung kể cả khi bộ dựng tua bằng seek() (tắt onUpdate) — không có thì hình chớp lúc máy lia.
+        drive_code = "\n    set.drive(tl);       // the camera is applied on every frame, also when the renderer seeks without callbacks"
         moves = []
         for view in views:
             values = ', '.join(f'{key}: {value:g}' for key, value in view['values'].items())
@@ -1104,7 +1131,7 @@ def main():
 
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
     talk.addTo(tl, 0);
-{caption_code}{view_code}
+{caption_code}{view_code}{drive_code}
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.

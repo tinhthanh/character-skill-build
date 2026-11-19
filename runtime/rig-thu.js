@@ -75,6 +75,7 @@ const NGHI = Object.freeze({
   dau: 0, dauX: 0, dauY: 0, taiL: 0, taiR: 0,
   matY: 0, nhinX: 0, nhinY: 0, dongTu: 1, mieng: 0, luoi: 0, cuoi: 0.4,
   duoi: 0, duoiCong: 0,
+  nuoc: 0,                 // 0…1 các giọt nước văng ra quanh thân (`shakeOff`)
   tnX: 0, tnY: 0, tnNhac: 0, tnGoc: 0, txX: 0, txY: 0, txNhac: 0, txGoc: 0,
   snX: 0, snY: 0, sxX: 0, sxY: 0,
 });
@@ -229,7 +230,9 @@ function khop(R, T, a, b, raTruoc) {
 }
 
 // Động tác TRIỆU CHỨNG và chăm sóc, chung cho chó và mèo (nội dung thú y: ngứa, khập khiễng, sợ hãi, biếng ăn, ho…).
-const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth'];
+const SYMPTOMS = ['scratchItch', 'limp', 'tremble', 'eat', 'drink', 'cough', 'openMouth', 'shakeOff', 'sneeze', 'pant', 'yawn'];
+// Phụ kiện đeo (`wear`): loa chống liếm sau mổ, băng ở chân trước phía người xem.
+const WEARABLES = ['cone', 'bandage'];
 
 export class RigThu {
   static KHUNG = KHUNG;
@@ -263,6 +266,7 @@ export class RigThu {
     this.DONG_TAC = RigThu.DONG_TAC[nv.loai];
     this.NGHI = Object.freeze({ ...NGHI, ...(nv.nghi || {}) });
     this.id = `thu${++RigThu.#dem}`;
+    this.wearing = new Set();
     this.s = this.#theoDoi({ ...this.NGHI });
     this.#dungLai();
   }
@@ -273,6 +277,7 @@ export class RigThu {
   // không có nó thì trạng thái đổi mà hình đứng yên. Vẽ lại hai lần trong một lượt
   // không sao, `apDung` chỉ là hàm của trạng thái.
   #choVe = false;
+  #legNear = null;
   #theoDoi(o) {
     return new Proxy(o, { set: (dich, k, v) => {
       dich[k] = v;
@@ -293,7 +298,7 @@ export class RigThu {
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi',
-      'duiN', 'duiX', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
+      'duiN', 'duiX', 'nuoc', 'cone', 'bang', 'bangP', 'bangNet', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
     this.apDung();
   }
 
@@ -334,12 +339,22 @@ export class RigThu {
     <g id="${p}-chanGan"${V}>
       <circle id="${p}-duiN" r="${nv.chanS.dui}" fill="${m.long}"/>
       ${chan('sn', m.long, nv.chanS)}${chan('tn', m.long, nv.chanT)}
+      <!-- BĂNG CHÂN (wear('bandage')): băng thú y màu XANH NHẠT quấn ống chân trước phía người xem, hai vạch quấn trắng —
+           băng trắng thì lẫn vào bàn chân trắng của mèo (Gemini, đợt 5). -->
+      <g id="${p}-bang" style="display:none"><path id="${p}-bangP" stroke="#7cc4e6" stroke-width="${(nv.chanT.rong + 3).toFixed(1)}" fill="none" stroke-linecap="round"/>
+        <path id="${p}-bangNet" stroke="#ffffff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
     </g>
     <g${V}>
       <path id="${p}-vong" stroke="${m.vongCo}" stroke-width="6" fill="none" stroke-linecap="round"/>
       <circle id="${p}-the" r="4.200" fill="${m.the}" stroke="${m.vienNet}" stroke-width="0.900"/>
     </g>
-    <g id="${p}-dau"${V}>${nv.veDau(p, m, nv)}</g>
+    <g id="${p}-nuoc" style="display:none">${[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `<path data-drop="${n}" d="M 0 -10 Q 6.5 0 0 6.5 Q -6.5 0 0 -10 Z" fill="#7cc8f0" stroke="#3a8cc4" stroke-width="1.2"/>`).join('')}</g>
+    <g id="${p}-dau"${V}>
+      <!-- LOA CHỐNG LIẾM (wear('cone')): nhìn thẳng vào mặt, cái loa là một vành trong mờ bao quanh đầu, vẽ SAU đầu. -->
+      <g id="${p}-cone" style="display:none"><ellipse rx="70" ry="63" fill="#e6f3fa" fill-opacity=".78" stroke="#8fb8cf" stroke-width="3"/>
+        <ellipse rx="50" ry="45" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".55"/>
+        <path d="M -70 0 Q -66 -30 -40 -50 M 66 22 Q 58 44 36 56" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
+      ${nv.veDau(p, m, nv)}</g>
   </g>
 </svg>`;
   }
@@ -416,6 +431,7 @@ export class RigThu {
         dich = { x: pha(dich.x, treo.x, nh), y: pha(dich.y, treo.y, nh) };
       }
       const { J, T: ban } = khop(R, dich, c.a, c.b, !truoc);
+      if (k === 'tn') this.#legNear = { J, ban };
       e[k].setAttribute('d', `M ${fx(R.x)} ${fx(R.y)} L ${fx(J.x)} ${fx(J.y)} L ${fx(ban.x)} ${fx(ban.y)}`);
       e[k + 'Ban'].setAttribute('transform', `translate(${fx(ban.x + c.rong * 0.22)} ${fx(ban.y)})`);
       return R;
@@ -424,6 +440,27 @@ export class RigThu {
     dat('tn', xTruoc, false); dat('tx', xTruoc, true);
     const hn = dat('sn', xSau, false), hx = dat('sx', xSau, true);
     e.duiN.setAttribute('transform', `translate(${fx(hn.x + 3)} ${fx(hn.y)})`);
+    // Giọt nước khi rũ mình: toả ra từ giữa thân theo `nuoc`, hiện rồi tắt theo nửa chu kỳ sin.
+    if (e.nuoc) {
+      const w = clamp(s.nuoc, 0, 1);
+      e.nuoc.style.display = w > 0.02 && w < 0.98 ? '' : 'none';
+      if (w > 0.02) [...e.nuoc.children].forEach((drop, n) => {
+        const a = (n / 8) * Math.PI * 2 + 0.3, r = nv.dayThan * 1.3 + w * 46;
+        drop.setAttribute('transform', `translate(${fx(mx + Math.cos(a) * r * 1.4)} ${fx(my - 6 + Math.sin(a) * r)}) rotate(${fx(a / RAD + 90)})`);
+        drop.style.opacity = Math.sin(Math.PI * w).toFixed(2);
+      });
+    }
+    // Phụ kiện: loa quanh đầu, băng quấn ống chân trước (từ 25% tới 80% đoạn khuỷu → bàn chân).
+    if (e.cone) e.cone.style.display = this.wearing.has('cone') ? '' : 'none';
+    if (e.bang) {
+      e.bang.style.display = this.wearing.has('bandage') ? '' : 'none';
+      if (this.wearing.has('bandage') && this.#legNear) {
+        const { J, ban } = this.#legNear, at = (k) => ({ x: pha(J.x, ban.x, k), y: pha(J.y, ban.y, k) }), a = at(0.22), b = at(0.8);
+        e.bangP.setAttribute('d', `M ${fx(a.x)} ${fx(a.y)} L ${fx(b.x)} ${fx(b.y)}`);
+        const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len * (nv.chanT.rong * 0.55), ny = dx / len * (nv.chanT.rong * 0.55);
+        e.bangNet.setAttribute('d', [0.35, 0.65].map((k) => { const c = { x: pha(a.x, b.x, k), y: pha(a.y, b.y, k) }; return `M ${fx(c.x - nx)} ${fx(c.y - ny + 2)} L ${fx(c.x + nx)} ${fx(c.y + ny - 2)}`; }).join(' '));
+      }
+    }
     e.duiX.setAttribute('transform', `translate(${fx(hx.x + 3)} ${fx(hx.y)})`);
 
     // ---- đuôi: ba đoạn nối nhau, mỗi đoạn lệch thêm một góc `cong` → cuộn hoặc lượn chữ S
@@ -515,12 +552,26 @@ export class RigThu {
 
   datNghi() { Object.assign(this.s, this.NGHI); this.apDung(); }
 
+  /**
+   * ĐEO / THÁO phụ kiện — có hiệu lực ngay và suốt mọi động tác sau (không phải một động tác trên timeline):
+   *   wear('cone')       loa chống liếm sau mổ          wear('bandage')   băng ở chân trước phía người xem
+   *   wear('cone', false) tháo ra. Trả về chính rig để gọi nối.
+   */
+  wear(kind, on = true) {
+    if (!WEARABLES.includes(kind)) throw new Error(`[character] wear: no accessory "${kind}" (available: ${WEARABLES.join(', ')})`);
+    if (on) this.wearing.add(kind); else this.wearing.delete(kind);
+    this.apDung();
+    return this;
+  }
+  static WEARABLES = WEARABLES;
+
   /** Tên tiếng Việt của từng động tác — cho giao diện. */
   static TEN_DONG_TAC = {
     idle: 'Đứng yên', walk: 'Đi', enter: 'Chạy vào', exit: 'Chạy ra', tiltHead: 'Nghiêng đầu',
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
     sleep: 'Ngủ', unwell: 'Mệt / ốm',
+    shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
   };
 
@@ -863,6 +914,52 @@ export class RigThu {
     t.to(s, { dau: -10, dauY: -3, mieng: 0.95, luoi: 0.25, matY: 0.3, taiL: 0.3, taiR: 0.3, duration: 0.3, ease: 'power2.out' }, 0);
     t.to(s, { mieng: 0.85, duration: hold * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.3);
     this.#khep(t, 0.35, 0.3 + hold);
+    return t;
+  }
+
+  /** RŨ NƯỚC sau khi tắm: cả người lắc mạnh từ đầu tới đuôi, tai văng ra, mắt nhắm. */
+  shakeOff() {
+    const t = this.tl(), s = this.s;
+    const at = this.#dung(t, 0);
+    t.to(s, { matY: 0.85, cuoi: 0.5, truocY: 3, sauY: 3, duration: 0.15 }, at);
+    t.fromTo(s, { nuoc: 0 }, { nuoc: 1, duration: 0.75, ease: 'none', immediateRender: false }, at + 0.15);
+    for (let i = 0; i < 10; i++) {
+      const g = i % 2 ? -1 : 1, fade = 1 - i / 14;
+      t.to(s, { dau: g * 18 * fade, dauX: g * 5 * fade, truocX: g * 4 * fade, sauX: -g * 3 * fade, taiL: g * 1.6 * fade, taiR: -g * 1.6 * fade, duoi: g * 35 * fade,
+                duration: 0.07, ease: 'sine.inOut' }, at + 0.15 + i * 0.07);
+    }
+    this.#khep(t, 0.35, at + 0.9, { nuoc: 0 });
+    return t;
+  }
+
+  /** HẮT HƠI: hít vào ngửa đầu, rồi gập đầu xuống thật nhanh, mắt nhắm, miệng bật mở. */
+  sneeze() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dau: -14, dauY: -5, matY: 0.6, mieng: 0.35, taiL: 0.4, taiR: 0.4, duration: 0.35, ease: 'sine.in' }, 0);
+    // Gập đầu thật mạnh và GIỮ một nhịp (0,25 s): chỉ vài khung thì ở khung trung không ai nhận ra (Gemini, đợt 5).
+    t.to(s, { dau: 24, dauY: 13, dauX: 6, matY: 1, mieng: 0.8, truocY: 6, sauY: -2, taiL: -0.9, taiR: -0.9, duration: 0.1, ease: 'power3.out' }, 0.45);
+    t.to(s, { dau: 4, dauY: 3, dauX: 0, mieng: 0.05, matY: 0.3, truocY: 0, sauY: 0, duration: 0.3, ease: 'sine.inOut' }, 0.8);
+    this.#chop(t, 1.25);
+    this.#khep(t, 0.35, 1.45);
+    return t;
+  }
+
+  /** THỞ HỔN HỂN `dur` giây: há miệng, lưỡi thè dài, ngực phập phồng nhanh — trời nóng, say nắng, vừa chạy xong. */
+  pant(dur = 2) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { mieng: 0.75, luoi: 1, matY: 0.35, taiL: -0.3, taiR: -0.3, cuoi: 0.3, duration: 0.25 }, 0);
+    for (let a = 0.25, i = 0; a + 0.13 <= 0.25 + dur; a += 0.13, i++) t.to(s, { tho: i % 2 ? 0 : 1, dauY: i % 2 ? 0 : 2, mieng: i % 2 ? 0.7 : 0.82, duration: 0.13, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.4, 0.25 + dur);
+    return t;
+  }
+
+  /** NGÁP: ngửa đầu, há miệng thật to, nhắm mắt, lưỡi cong, rồi chép miệng. */
+  yawn() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dau: -12, dauY: -4, mieng: 1, luoi: 0.3, matY: 1, taiL: -0.5, taiR: -0.5, duration: 0.5, ease: 'sine.inOut' }, 0);
+    t.to(s, { mieng: 0.05, luoi: 0, dau: 0, dauY: 0, matY: 0.4, duration: 0.35, ease: 'sine.inOut' }, 1.15);
+    t.to(s, { mieng: 0.15, duration: 0.1, yoyo: true, repeat: 1 }, 1.55);
+    this.#khep(t, 0.35, 1.8);
     return t;
   }
 

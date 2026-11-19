@@ -740,6 +740,42 @@ try {
           set.place(far, { x: -200, z: -600, height: 300 }); set.place(near, { x: 200, z: -100, height: 300 });
           const between = set.box({ x: -100, z: -300, width: 200, depth: 100, height: 120 }), behind = set.box({ x: -100, z: -900, width: 200, depth: 100, height: 120 }), front = set.box({ x: -100, z: 150, width: 200, depth: 100, height: 120 });
           set.update();
+          // `set.drive(tl)`: máy quay vẫn được áp khi bộ dựng tua bằng seek() (tắt onUpdate) — không thì khung ấy mang góc
+          // máy của lần vẽ trước, và khi máy lia các khung chụp song song chớp qua lại.
+          {
+            const tl = gsap.timeline({ paused: true, onUpdate: set.update });
+            tl.add(set.move({ yaw: 20, x: 300 }, 2), 0); tl.to({}, { duration: 3 }, 0);
+            set.drive(tl);
+            tl.seek(0.5); tl.seek(1.6, true); await Promise.resolve(); await Promise.resolve();
+            const seeked = set.camera.yaw; tl.time(0.2); tl.time(1.6); const played = set.camera.yaw;
+            if (Math.abs(seeked - played) > 0.01) hong('3D set', `after seek() (no callbacks) the camera yaw is ${seeked.toFixed(2)}, while playing to the same time gives ${played.toFixed(2)} — set.drive(tl) should apply the camera on every frame`);
+            tl.time(0); tl.kill(); set.update();
+          }
+          // Người và con vật đứng sát nhau, cùng độ sâu (con vật trên bàn khám cạnh bác sĩ): người ở trên con vật ở MỌI góc
+          // máy — thứ tự lớp đảo giữa lúc lia là con vật bật từ sau ra trước tay người trong một khung. Bối cảnh riêng.
+          {
+            const room = document.createElement('div'); room.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:600px'; host.parentNode.appendChild(room);
+            const exam = L.createSet(room, { origin: [500, 340], camera: { yaw: 0, pitch: 4, distance: 1200, lens: 1700, x: 0, y: 200, z: -300 } });
+            const doc = L.createCharacter(document.createElement('div'), { id: 'vet' }).rig, patient = L.createPet(document.createElement('div'), { species: 'dog' }).rig;
+            exam.place(doc, { x: -60, z: -500, height: 300 }); exam.place(patient, { x: 60, z: -500, y: 120, height: 110 });
+            const flips = [];
+            for (let yaw = -40; yaw <= 40; yaw += 5) { exam.look({ yaw }); if (!(+doc.host.style.zIndex > +patient.host.style.zIndex)) flips.push(yaw); }
+            if (flips.length) hong('3D set', `a pet beside a person at the same depth is stacked above the person at camera yaw ${flips.join(', ')}° — the order must not change while the camera turns`);
+            // Thêm cái bàn khám: con vật ĐỨNG TRÊN bàn, người đứng cạnh bàn ngang giữa bề sâu của nó. Thứ tự bàn / người /
+            // con vật không được đổi khi máy xoay hay khi người bước nhích (cái bàn nhảy trước / sau người là hình giật).
+            const table = exam.box({ x: 0, z: -420, width: 200, depth: 160, height: 120 });
+            exam.place(patient, { x: 60, z: -500, y: table.top, height: 110 });
+            const layerOf = () => +table.group.parentNode.style.zIndex, orders = new Set();
+            for (let yaw = -30; yaw <= 30; yaw += 3) for (const step of [0, 25, 50]) {
+              exam.look({ yaw }); doc.s.x = step; exam.update();
+              const t = layerOf(), p = +doc.host.style.zIndex, d = +patient.host.style.zIndex;
+              orders.add([t > p ? 'table>person' : 'person>table', d > t ? 'pet>table' : 'table>pet'].join(' '));
+            }
+            doc.s.x = 0;
+            if (orders.size !== 1) hong('3D set', `a table, a pet standing on it and a person beside it change stacking order as the camera turns: ${[...orders].join(' | ')}`);
+            else if (![...orders][0].includes('pet>table')) hong('3D set', 'a pet standing on a table is drawn behind the table');
+            room.remove();
+          }
           const aim = set.project(0, 200, -300);
           if (Math.abs(aim.x - 500) > 0.5 || Math.abs(aim.y - 340) > 0.5 || Math.abs(aim.scale - 1) > 0.01) hong('3D set', `the point the camera aims at projects to ${aim.x.toFixed(1)}, ${aim.y.toFixed(1)} at scale ${aim.scale.toFixed(2)} — expected the origin 500, 340 at scale 1`);
           const scaleOf = (rig) => parseFloat(/scale\(([\d.]+)/.exec(rig.host.style.transform)[1]);
@@ -1527,9 +1563,9 @@ try {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
       const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
       const build = (id, entry, left) => {
-        const pet = entry.pet ? L.createPet(spot(`left:${left + 110}px;top:108px;width:100px;height:82px`), { species: entry.pet }).rig : null;
+        const pet = entry.pet ? L.createPet(spot(`left:${left + 110}px;top:108px;width:100px;height:82px`), { species: entry.pet, wear: entry.wear || [] }).rig : null;
         const host = spot(`left:${left}px;top:0;width:200px;height:235px`);
-        const rig = id in RigThu.LOAI ? L.createPet(host, { species: id }).rig
+        const rig = id in RigThu.LOAI ? L.createPet(host, { species: id, wear: entry.wear || [] }).rig
           : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
         return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg)) };
@@ -1634,6 +1670,41 @@ try {
         if (!test()) hong(name, what);
         line.progress(1); if (actor.s.ovL || actor.s.ovR) hong(name, 'the gesture pose stays after the action'); line.kill(); actor.datNghi();
       }
+      // Đợt 5: hình bàn tay đúng lúc giữ dáng; trái tim bắn tim hiện rồi tắt; viên thuốc / lược hiện trong tay.
+      for (const [name, args, when, check, what] of [
+        ['thumbsDown', [], 0.7, () => actor.s.tayL === 'xuong' || actor.s.tayR === 'xuong', 'the hand is not a thumb pointing down'],
+        ['vSign', [], 0.7, () => actor.s.tayR === 'hai' && at(actor.el.coTayR)[1] < actor.el.ao.getBoundingClientRect().top + 30, 'no V sign raised by the face'],
+        ['fingerHeart', [], 0.9, () => { const heart = actor.el.tayG.R.querySelector('[data-heart]'); return actor.s.tayR === 'tim' && heart.style.opacity === '1' && heart.getBoundingClientRect().width > 6; }, 'no heart shown over the finger heart'],
+        ['stopSign', [], 0.7, () => actor.s.tayR === 'xoe' && actor.s.ovR > 0.9, 'the palm is not held up'],
+      ]) {
+        const line = actor[name](...args); line.time(when);
+        if (!check()) hong(name, what);
+        line.progress(1); if (actor.s.heartL || actor.s.heartR || actor.s.ovL || actor.s.ovR) hong(name, 'the gesture stays after the action'); line.kill(); actor.datNghi();
+      }
+      for (const [name, args, kind] of [['giveTreat', [dog, { kind: 'pill' }], 3], ['brush', [dog], 4]]) {
+        const line = vet[name](...args); line.time(0.6);
+        if (!['L', 'R'].some((side) => Math.round(vet.s['gadget' + side]) === kind)) hong(name, `the ${kind === 3 ? 'pill' : 'brush'} is not in the hand`);
+        line.progress(1); line.kill();
+      }
+      // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
+      const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;
+      if (patient.el.cone.style.display === 'none') hong('wear', 'createPet({ wear: ["cone"] }) shows no cone');
+      patient.wear('bandage');
+      const wrap = patient.el.bangP.getBoundingClientRect(), paw = patient.el.tnBan.getBoundingClientRect();
+      if (patient.el.bang.style.display === 'none' || !(wrap.height > 5 && wrap.bottom <= paw.bottom + 2 && wrap.bottom > paw.top - 30)) hong('wear', 'the bandage is not on the lower front leg');
+      patient.wear('cone', false); if (patient.el.cone.style.display !== 'none') hong('wear', 'the cone stays after taking it off');
+      let unknown = ''; try { patient.wear('hat'); } catch (error) { unknown = error.message; }
+      if (!unknown.includes('cone, bandage')) hong('wear', 'an unknown accessory should be refused with the list of accessories');
+      const wet = patient.shakeOff(); wet.time(0.5);
+      if (patient.el.nuoc.style.display === 'none') hong('shakeOff', 'no water drops fly off');
+      wet.progress(1); if (patient.el.nuoc.style.display !== 'none' || patient.s.nuoc !== 0) hong('shakeOff', 'the water drops stay after shaking');
+      wet.kill(); patient.svg.remove();
+      // Bước lại gần quãng ngắn: nhích sang ngang, KHÔNG quay người (quay ngang rồi quay lại cho 40 đơn vị là giật).
+      { const x0 = actor.s.x, h0 = actor.s.huong, nudge = actor.walk(4, 40); let turned = 0;
+        for (let time = 0; time <= nudge.duration(); time += 1 / 30) { nudge.time(time); turned = Math.max(turned, Math.abs(actor.s.huong - h0)); }
+        if (turned > 0.05) hong('walk', `a 40-unit step closer turns the body sideways (facing changes by ${turned.toFixed(2)})`);
+        if (Math.abs(actor.s.x - x0 - 40) > 0.5) hong('walk', `a 40-unit step closer moves ${(actor.s.x - x0).toFixed(1)} units`);
+        nudge.kill(); actor.datNghi(); }
       const brisk = actor.hurry(6), calm = actor.walk(6);
       if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
       brisk.kill(); calm.kill();

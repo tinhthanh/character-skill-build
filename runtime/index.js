@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.44.0';
+export const VERSION = '0.45.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -275,7 +275,7 @@ export function createCharacter(host, { id = 'vet', config, items = null, itemsH
  *   species  'dog' | 'shiba' | 'cat' | 'orange_cat' | 'black_cat'
  *   config   { shape: {…}, colors: {…} } — quy tắc mặc định như createCharacter
  */
-export function createPet(host, { species = 'dog', config } = {}) {
+export function createPet(host, { species = 'dog', config, wear = [] } = {}) {
   if (!RigThu.LOAI[species]) throw new Error(`[character] no species "${species}" (available: ${Object.keys(RigThu.LOAI).join(', ')})`);
   if (config === undefined) config = bakedConfigs[species] || null;
   assertConfig(config, 'pet', species);
@@ -283,6 +283,7 @@ export function createPet(host, { species = 'dog', config } = {}) {
   const rig = new RigThu(host, species);
   rig.publicId = species;
   applyConfig(rig, config);
+  for (const kind of Array.isArray(wear) ? wear : [wear]) rig.wear(kind);      // phụ kiện đeo sẵn: 'cone', 'bandage'
   return { rig, id: species };
 }
 

@@ -98,13 +98,13 @@ def main():
       if (isPet) {{
         const h = personH * 0.6, w = h * 300 / 248;
         const host = add('pet', `left:${{{WIDTH} / 2 - w / 2}}px;top:${{{HEIGHT} * 0.86 - h}}px;width:${{w}}px;height:${{h}}px`);
-        rig = VGCharacter.createPet(host, {{ species: id }}).rig; parts.push(host);
+        rig = VGCharacter.createPet(host, {{ species: id, wear: entry.wear || [] }}).rig; parts.push(host);
       }} else {{
         if (entry.pet) {{
           const w = personW * 0.5, h = personH * 0.35, left = personX + personW * 0.55, top = personY + personH * 0.46;
           const table = add('table', `left:${{left - w * 0.15}}px;top:${{top + h * 0.93}}px;width:${{w * 1.3}}px;height:${{personY + personH - top - h * 0.93}}px`);
           const petHost = add('pet', `left:${{left}}px;top:${{top}}px;width:${{w}}px;height:${{h}}px`);
-          pet = VGCharacter.createPet(petHost, {{ species: entry.pet }}).rig; parts.push(table, petHost);
+          pet = VGCharacter.createPet(petHost, {{ species: entry.pet, wear: entry.wear || [] }}).rig; parts.push(table, petHost);
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
         rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }}).rig;
