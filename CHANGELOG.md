@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.49.1
+
+Fixed
+- **A picture cutout in a 3D set drawn stretched sideways when its file was bigger than its scene
+  size.** `tools/scene.py` writes the file's pixel size on the `<img>` (so it is centred before it
+  loads), and `set.stand` cleared the width with `style.width = ''`, which leaves that attribute in
+  force: a 2x PNG stood at its scene `height` kept its 2x width and showed twice as wide. `stand` now
+  sets `width: auto`, so the picture keeps its own proportions at any resolution — export cutouts at
+  2x for sharp close-ups.
+
 ## 0.49.0
 
 Added — notifications on screens in a set

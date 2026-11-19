@@ -1,4 +1,4 @@
-/* VGCharacter v0.49.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.49.1 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -7636,7 +7636,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (host.parentNode !== view) view.appendChild(host);
     host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
     Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
-    if (height) { host.style.height = height + 'px'; host.style.width = ''; }
+    // `auto`, not '': an <img> stood with its file's width/height attributes (tools/scene.py writes them so it can be
+    // centred before it loads) would otherwise keep the attribute's width — a 2x picture showed twice as wide.
+    if (height) { host.style.height = height + 'px'; host.style.width = 'auto'; }
     const spot = { x, y, z };
     // BÓNG NẰM TRÊN SÀN: một hình elip mờ trên mặt phẳng nằm ngang của bối cảnh, nên nó dẹt lại và xoay đúng theo góc
     // máy. Bóng rig tự vẽ (một elip trong khung phẳng của nó) bị ẩn đi — nó đứng thẳng cùng tấm bìa.
@@ -8039,7 +8041,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.49.0';
+const VERSION = '0.49.1';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
