@@ -433,10 +433,12 @@ it always faces the lens and stays sharp at any distance. Its shadow lies on the
 its soles, so it flattens and turns with the camera.
 
 **Framing.** `set.framing()` lists who the frame edge cuts through at the current frame
-(`[{ name, shown, edge }]`, `shown` = the part still in the frame). `tools/scene.py` sweeps the
-whole scene with it and warns when a `"view"` leaves a character half in the frame for 2 s or more
-— a close-up that slices the person beside the speaker. Widen the view to take them in, or move it
-so they are fully out.
+(`[{ name, shown, edge, pet }]`, `shown` = the part of the head and body still in the frame).
+`tools/scene.py` sweeps the whole scene with it and warns when a `"view"` leaves a character half in
+the frame for 2 s or more — a close-up that slices the person beside the speaker. Widen the view to
+take them in, or move it so they are fully out. A person cut at the knees by the bottom edge is a
+normal medium shot and is not reported; a pet cut there is. Pet expressions read only in a close
+view on the pet.
 
 **The camera stays near eye level.** The characters are drawn at eye level and stand upright;
 from higher up they read as cards standing on the floor. So `pitch` is limited to −8…15° and

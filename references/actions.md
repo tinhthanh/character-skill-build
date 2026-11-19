@@ -239,6 +239,32 @@ shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `wear`) plus:
 | `hop` | `(times = 2)` | hops on the spot: a crouch, a leap with the hind legs out and the ears swept back, a landing | 0.7 + 0.66 × `times` |
 | `thump` | `(times = 2)` | alert: ears straight up, eyes wide, the hind feet thump the ground | 0.85 + 0.4 × `times` |
 
+**Pet expressions** (every species and breed). A pet has no eyebrows, so its feelings are in
+the ears, eyes, pupils, mouth, head and tail:
+
+| Name | What you see |
+|---|---|
+| `happy` | ears up, eyes half shut, tongue out; a dog wags, a cat raises its tail |
+| `excited` | as happy, bouncing on the spot, tail going fast |
+| `sad` | ears down, head low, wet eyes looking up ("puppy eyes"), tail low, a sigh |
+| `scared` | ears pinned back, crouching, tail tucked, pupils wide, shaking |
+| `angry` | a dog lowers its head and bares its fangs with a growl; a cat arches, puffs its fur and tail and hisses |
+| `curious` | head tilted one way then the other, one ear up, big pupils |
+| `guilty` | head down, eyes glancing up, ears back, wet eyes; a dog wags low |
+| `pain` | eyes squeezed shut (> <), ears down, mouth trembling |
+| `sleepy` | drooping eyes, head nodding off, a yawn when there is time |
+
+- `express(name, hold = 1.4)`: one beat of that face, then back (≈ `hold` + 0.8 s).
+- `mood(name)`: hold the face through the actions that follow (`mood('pain')`, then `limp(4, 120)`);
+  every action comes back to that face instead of the rest face. `mood(null)` ends it.
+  Only the face, ears and tail are held; the body still does each action.
+- In a scene file, `"mood"` on a pet's turn: alone it is one beat of the face; with `"do"` the pet
+  keeps the face through those actions (`{ "who": "dog", "mood": "pain", "do": [["limp", 4, 120]] }`).
+- Pet faces are small in a wide shot: give the turn a close `"view"` on the pet.
+
+New face channels on `rig.s` (0…1): `lanh` (wet, shining eyes), `nhan` (eyes squeezed shut > <) and
+`nanh` (bared fangs).
+
 `rig.actions` lists the actions valid for that rig. Distances for pets are in the pet frame,
 400 × 330 units. A pet strolls short distances (about 80 units a second) and trots anything
 over 160 units (about 155 units a second).

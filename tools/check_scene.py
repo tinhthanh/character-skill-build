@@ -166,7 +166,7 @@ with tempfile.TemporaryDirectory() as work:
         ('enter on the character and on a turn', lambda s: s['script'][1].update({'enter': 'left'}), 'enter'),
         ('a missing music file', lambda s: s.update({'music': 'nope.mp3'}), 'nope.mp3'),
         ('an unknown mood', lambda s: s['script'][1].update({'mood': 'joyful'}), 'mood'),
-        ('a mood on a pet', lambda s: s['script'][0].update({'mood': 'happy'}), 'pet'),
+        ('a person\'s mood on a pet', lambda s: s['script'][0].update({'mood': 'surprised'}), 'of a pet'),
         ('a missing background image', lambda s: s['background'].update({'image': 'nope.jpg'}), 'nope.jpg'),
         ('the old prop key', lambda s: s['props'][0].update({'height_units': 100}), 'height_units'),
         ('shot on a together entry', lambda s: s['script'][-1].update({'shot': 'wide'}), 'together'),

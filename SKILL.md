@@ -134,7 +134,8 @@ clips for every voice file.
    `voice-tts` command installed, `"voice": "maichi"` on a character speaks its lines for you
    (Vietnamese; made once into `voice/` and reused). `mood` is the
    tone of the line (`happy`, `sad`, `surprised`, `angry`, `thinking`, `laughing`, `worried`,
-   `confused`, `tired`). `do` takes any action step; `"enter"` / `"exit"` on a turn bring a
+   `confused`, `tired`); on a pet's turn it is the pet's face (`happy`, `excited`, `sad`, `scared`, `angry`,
+   `curious`, `guilty`, `pain`, `sleepy`), held through that turn's `do` — give it a close `"view"`. `do` takes any action step; `"enter"` / `"exit"` on a turn bring a
    character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
    draws a room. Vertical video: `"width": 1080,
    "height": 1920`. **Opening and closing cards:** `"intro"` / `"outro"` (title, text, a call-to-action button, a logo).

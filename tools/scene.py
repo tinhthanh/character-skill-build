@@ -73,7 +73,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
-               crying, embarrassed, sleepy. Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
+               crying, embarrassed, sleepy. A PET's "mood": happy, excited, sad, scared, angry, curious, guilty,
+               pain, sleepy — alone it is one beat of that face; with "do" the pet keeps the face through those
+               actions (`{ "who": "dog", "mood": "pain", "do": [["limp", 4, 120]] }`). Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
                "headInHands", "bow", "wai", ["handshake", "@other"] (with the other's ["handshake", "@you"] in "together").
                "ponder", "crossArms", "handsOnHips", "introduce", "callOut", "relief", "startle", "lookAround",
                ["hurry", 6, 200]. Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
@@ -162,6 +164,7 @@ PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện ngườ
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup')
 SHOW_KEYS = ('title', 'bullets', 'image')
+PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 'pain', 'sleepy')      # RigThu.EXPRESSIONS
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
@@ -256,11 +259,13 @@ def fingerprint(html):
 
 
 def framing_notes(samples, step=0.25, least=2.0):
-    """Nhắc những đoạn (≥ `least` giây) mà mép khung cắt dở một nhân vật — còn 5…85 % hình trong khung. Ít hơn là chỉ
+    """Nhắc những đoạn (≥ `least` giây) mà mép khung cắt dở một nhân vật — còn 5…85 % hình trong khung (người ở mép dưới: 5…60 %). Ít hơn là chỉ
     lướt qua mép (đi vào / ra khỏi khung, máy đang lia qua), nhiều hơn là chỉ sượt chân tóc: không nhắc."""
     spans = {}
     for sample in samples:
-        if not 0.05 <= sample['shown'] <= 0.85: continue
+        # Mép DƯỚI cắt ngang chân NGƯỜI là cỡ cảnh trung (cận ngực, cận gối) — cách quay bình thường; chỉ nhắc khi mất quá
+        # nửa người (chỉ còn đầu lấp ló ở đáy khung). Con vật thấp, cả người nó là đầu và thân: mép dưới cắt nó cũng là lỗi.
+        if not 0.05 <= sample['shown'] <= (0.6 if sample['edge'] == 'bottom' and not sample.get('pet') else 0.85): continue
         runs = spans.setdefault((sample['name'], sample['edge']), [])
         if runs and sample['t'] - runs[-1][1] <= step * 1.5: runs[-1][1] = sample['t']; runs[-1][2].append(sample['shown'])
         else: runs.append([sample['t'], sample['t'], [sample['shown']]])
@@ -271,6 +276,21 @@ def framing_notes(samples, step=0.25, least=2.0):
             notes.append((start, f'{start:.1f}–{end + step:.1f} s: the {edge} edge of the frame cuts through "{name}" (about {round(100 * sum(shown) / len(shown))} % shows) — '
                                  f'frame them in or leave them out: change that turn\'s "view" (x, zoom, distance), or move "{name}"'))
     return [note for _, note in sorted(notes)]
+
+
+def quiet_notes(timings, shown_turns, longest=8.0):
+    """Nhắc những quãng DÀI không có lời nào (câu thoại, thẻ thông báo, thông báo trên màn hình) — hơn `longest` giây giữa
+    lúc cảnh bắt đầu, các câu, và thẻ kết thúc. Người xem quảng cáo ngắn rời đi trong quãng ấy (cảnh thử đợt 11: 20 s đầu
+    cảnh công viên chỉ có người đi và máy lia). Cảnh không có câu nào (một đoạn chỉ có động tác) thì không nhắc."""
+    lines, turns = timings.get('lines', []), timings.get('turns', [])
+    if not lines or not turns: return []
+    said = sorted([(float(line['start']), float(line['end'])) for line in lines] + [(turns[n][0], turns[n][0] + 2.5) for n in shown_turns if n < len(turns)])
+    start, end = turns[0][0], float(timings.get('outro') or timings['duration'])
+    notes, at = [], start
+    for begin, finish in said + [(end, end)]:
+        if begin - at > longest: notes.append(f'{at:.1f}–{begin:.1f} s: nothing is said or shown for {begin - at:.0f} s — viewers drift off; add a line, a "toast", or shorten what happens there')
+        at = max(at, finish)
+    return notes
 
 
 def read_timings(folder, target):
@@ -669,9 +689,15 @@ def main():
         if turn.get('exit') is True: turn['exit'] = who['_nearer']
         mood = turn.get('mood')
         if 'mood' in turn:
-            if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
-            if who['_pet']: fail(f'{where}: "{who["name"]}" is a pet — pets have no "mood"; use an action such as "wagTail" or "hiss"')
-            if 'say' not in turn: steps.append(f"['express', {js(mood)}, 0.9]")
+            if who['_pet']:
+                # Thú cưng: nét mặt của con vật (tai, mắt, đuôi). Lượt có động tác thì GIỮ nét mặt suốt các động tác ấy
+                # (`mood`, thôi giữ ở cuối lượt); lượt chỉ có mood thì là một nhịp biểu cảm.
+                if mood not in PET_MOODS: fail(f'{where}: "mood" of a pet must be one of {", ".join(PET_MOODS)} — got {js(mood)}')
+                if not turn.get('do'): steps.append(f"['express', {js(mood)}, 1.4]")
+                else: steps.append(f"['mood', {js(mood)}]")
+            else:
+                if mood not in MOODS: fail(f'{where}: "mood" must be one of {", ".join(MOODS)} — got {js(mood)}')
+                if 'say' not in turn: steps.append(f"['express', {js(mood)}, 0.9]")
         # Tuỳ chọn của bước NÓI: nét mặt giữ suốt câu, và — ở bố cục người dẫn khung ngang — tay diễn là tay phía BẢNG
         # NỘI DUNG (bảng nằm bên kia khung hình so với người dẫn). Không thì người dẫn mở tay ra ngoài, quay lưng với nội dung.
         options = []
@@ -720,6 +746,7 @@ def main():
             steps.append(f"{float(view.get('dur', 1.5)):g}")
         for step in turn.get('do', []):
             steps.append(step_code(step, where, who['name']))
+        if who['_pet'] and mood and turn.get('do'): steps.append("['mood', null]")
         if turn.get('exit'):
             # Quãng đi ra tính sẵn như `enter`: tới mép khung cộng phần đầu / thân, để nhân vật khuất hẳn rồi mới ẩn.
             leaving = (float(who['x']) if turn['exit'] == 'left' else width - float(who['x'])) + (0.39 if not who['_pet'] else 0.6) * who['_host_height']
@@ -823,15 +850,19 @@ def main():
             if 'image' in show and not os.path.isfile(os.path.join(base, show['image'])): fail(f'{where}: show.image not found: {show["image"]} (looked in {base})')
             shows.append(dict(show, turn=flat))
         flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
+        backs = []                                          # (người, quãng) — lùi lại sau lượt này
         # LẠI GẦN trước khi vuốt ve / đưa đồ: tay nhân vật ngắn (với tới chừng 0,2 × chiều cao host). Đích đứng xa hơn tầm
         # ấy thì chèn một lượt bước tới trước — người vuốt ve dừng cách con vật 0,24 × chiều cao, người đưa đồ dừng cách
         # người nhận 0,45 × chiều cao (hai cánh tay cùng vươn). Chỗ đứng mới được ghi lại cho các lượt sau.
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or turn.get('who') not in names: continue
             who = names[turn['who']]
-            if who['_pet'] or who.get('seated'): continue
+            if who['_pet']: continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
+                # Người đang NGỒI (ghế đá, ghế phòng chờ) không đứng dậy đi tới: con vật ĐI TỚI người (bế, vuốt ve…). Đích là
+                # người thì thôi — người ngồi chỉ với tới chỗ mình.
+                if who.get('seated') and not names[step[1][1:]]['_pet']: continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
@@ -843,9 +874,20 @@ def main():
                 wanted = {'handOver': 0.45, 'handOverPet': 0.42, 'handshake': 0.38, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
+                if who.get('seated'):
+                    # Con vật đi tới người ngồi (cảnh thử đợt 11: bà cụ trên ghế đá bế con mèo đứng sau ghế — con mèo
+                    # "nhảy" vào lòng trong 0,6 s vì nó ở ngoài tầm tay).
+                    pet = names[step[1][1:]]
+                    turns.append((f'  // {pet["name"]} comes over to {who["name"]} (seated) for "{step[0]}"', f"[{pet['name']}, ['walk', 4, {round(-move / pet['_unit'])}]]"))
+                    emitted[0] += 1
+                    pet['x'] = float(pet['x']) - move
+                    continue
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                 emitted[0] += 1
                 who['x'] = float(who['x']) + move
+                # Soi đèn / đưa bánh: người đứng SÁT con vật (0,16) — xong thì LÙI về chỗ cũ, không thì người (vẽ trước con
+                # vật đứng cạnh mình) che mất mặt nó suốt phần sau của cảnh (cảnh thử đợt 12: góc cận chó chỉ thấy tay bác sĩ).
+                if step[0] in ('examine', 'giveTreat'): backs.append((who, -move))
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -891,6 +933,10 @@ def main():
                 emitted[0] += 1
             turns.append((None, code))
             emitted[0] += 1
+        for who, move in backs:
+            turns.append((f'  // {who["name"]} steps back after reaching close', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+            emitted[0] += 1
+            who['x'] = float(who['x']) + move
 
     camera_notes = []
     # Máy quay vòng tới đâu thì người nhìn sang ngang được tới đó, không xa hơn: rig xoay tới nghiêng hẳn là hết (không
@@ -1393,6 +1439,7 @@ def main():
     for voice, line in zip(voices, timings['speech']):
         print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
     notes += framing_notes(timings.get('framing', []))
+    notes += quiet_notes(timings, [note['turn'] for note in toasts] + [pop['turn'] for pop in popups])
     for note in notes: print(f'  ! {note}')
     if preset_note: print(f'  · {preset_note}')
     print(f'next: sh tools/peek.sh {os.path.relpath(target)}      # timings, warnings and a contact sheet')

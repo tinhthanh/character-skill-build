@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.52.0
+
+Added — pet expressions
+- **`pet.express(name, hold)`**: nine faces for every species and breed — happy, excited, sad, scared,
+  angry, curious, guilty, pain, sleepy. Ears, eyes, pupils, mouth, head and tail act together (a dog wags
+  when happy, bares its fangs when angry; a cat arches and hisses; a rabbit's ears spread out when sad).
+- **`pet.mood(name)`** holds a face through the actions that follow; `mood(null)` ends it.
+- Three new face channels: `lanh` (wet, shining "puppy eyes"), `nhan` (eyes squeezed shut, > <) and
+  `nanh` (bared fangs).
+- Scene files: `"mood"` on a pet's turn — one beat alone, or held through that turn's `"do"`.
+- The action catalog (`tools/actions.sh`, `tools/reel.py`) has a row for each pet expression.
+
+Changed
+- `tools/scene.py`: a person who **sits** (bench, waiting-room chair) no longer stays out of reach of a pet
+  they carry or stroke — the pet walks over first (it used to jump into their arms in 0.6 s).
+- After `examine` / `giveTreat`, for which a person steps right up to the pet, they step back to where
+  they stood — standing that close they hid the pet's face for the rest of the scene.
+- `tools/scene.py` warns about long stretches with nothing said or shown (more than 8 s without a line, a
+  toast or a popup).
+- Framing check: measures the head and body that are drawn (not the whole 400 × 470 frame, nor a leash
+  or a held item); a person cut at the knees by the bottom edge is a normal medium shot, a pet cut there
+  is not.
+
+Fixed
+- A rabbit's long ears crossed over each other when they drooped (`unwell`, `tremble`); they now spread
+  out to the sides.
+
 ## 0.51.0
 
 Added — finishing a film
