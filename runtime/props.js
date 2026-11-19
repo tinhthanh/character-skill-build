@@ -111,6 +111,16 @@ const DRAW = {
     <circle cx="${200 - r * 0.35}" cy="${F - 455}" r="${r * 0.3}" fill="#ffffff" opacity=".18"/>`;
   },
   // CỘT ĐÈN đường: cột mảnh, đế loe, chụp đèn ở đỉnh (cao hơn người).
+  // ĐÈN CÂY trong nhà: đế tròn, thân mảnh, chụp vải hình nón cụt — bóng đèn trong chụp ở cao 0,82 × khung người.
+  floorlamp: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - 400;
+    return `
+    <ellipse cx="200" cy="${F - 6}" rx="34" ry="8" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="197" y="${top + 60}" width="6" height="${400 - 66}" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <path d="M 168 ${top} H 232 L 252 ${top + 66} H 148 Z" fill="${color}" stroke="${line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
+    <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
+  },
   lamp: ({ color, dark, line }) => {
     const F = PROP_FRAME.floor;
     return `
@@ -160,7 +170,7 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 

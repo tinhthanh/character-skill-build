@@ -35,7 +35,15 @@ Một tệp kịch bản:
     tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
+    thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
+
+  "mở đầu: hook | Tiêu đề | dòng phụ" — chữ lớn bật lên trên cảnh đầu đang diễn, thay cho thẻ tĩnh (video ngắn).
+
+  PHIM NHIỀU CẢNH: mỗi dòng "=== tên · bối cảnh: … · ánh sáng: … · máy: …" mở một cảnh. Phần trước dòng === đầu tiên
+  là phần chung: khung, nhạc (nhạc nền cả phim), mở đầu (cảnh đầu), kết thúc (cảnh cuối), logo, dàn nhân vật (mỗi cảnh
+  chỉ giữ ai có mặt; một dòng nhân vật trong cảnh thêm / đổi người cho cảnh ấy). Viết kich-ban-1.scene.json,
+  kich-ban-2.scene.json…, kich-ban.film.json rồi dựng cả phim (tools/film.py → kich-ban.mp4, .srt, .jpg).
 """
 import argparse, json, os, re, subprocess, sys, unicodedata
 
@@ -69,6 +77,7 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
             'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None)}
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music'}
+HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 
@@ -85,10 +94,10 @@ def slug(text):
     return ('nv_' + name) if name[0].isdigit() or name in ('set', 'tl', 'talk', 'host', 'frameAt', 'CUTS', 'T0', 'T1') else name
 
 
-def parse(text):
+def parse(text, first_line=1):
     """Trả về (tuỳ chọn đầu, danh sách nhân vật, danh sách mục kịch bản). Lỗi: ScriptError có số dòng."""
     head, cast, lines = {}, [], []
-    for number, raw in enumerate(text.splitlines(), 1):
+    for number, raw in enumerate(text.splitlines(), first_line):
         line = raw.strip()
         if not line or line.startswith('#'): continue
         where = f'dòng {number}'
@@ -103,7 +112,7 @@ def parse(text):
         # Dòng đầu: "khoá: giá trị · khoá: giá trị" với khoá đã biết.
         pairs = [part for part in re.split(r'\s*·\s*', line)]
         keys = [part.split(':', 1)[0].strip().lower() for part in pairs if ':' in part]
-        if not lines and keys and all(key in ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng') for key in keys):
+        if not lines and keys and all(key in HEAD_KEYS for key in keys):
             for part in pairs:
                 key, value = part.split(':', 1)
                 head[key.strip().lower()] = value.strip()
@@ -113,7 +122,10 @@ def parse(text):
 
 
 def build_scene(text, base):
-    head, cast, lines = parse(text)
+    return build_parsed(*parse(text), base)
+
+
+def build_parsed(head, cast, lines, base, soft_boxes=False):
     if not cast: raise ScriptError('chưa có dòng nhân vật, ví dụ: bác sĩ (vet) · chó (corgi, trên bàn)')
     preset = PRESETS.get(head.get('bối cảnh', 'phòng khám').lower())
     if not preset: raise ScriptError(f'bối cảnh "{head.get("bối cảnh")}" chưa có — dùng: {", ".join(sorted(set(PRESETS)))}')
@@ -137,6 +149,7 @@ def build_scene(text, base):
             if low.startswith('trên ') or low == 'ngồi':
                 word = low[4:].strip() if low.startswith('trên ') else 'ghế'
                 choice = next((box for box in ON_WORDS.get(word, ()) if box in boxes), None)
+                if not choice and soft_boxes: continue                   # phim nhiều cảnh: cảnh này không có cái bàn ấy — đứng dưới sàn
                 if not choice: raise ScriptError(f'{who["where"]}: bối cảnh này không có "{word}" để {who["label"]} lên — có: {", ".join(boxes) or "không có hộp nào"}')
                 entry['on'] = choice
                 if low == 'ngồi' or (not pet and word in ('ghế', 'sofa', 'ghế đá')): entry['seated'] = True
@@ -152,9 +165,14 @@ def build_scene(text, base):
     floor = [c for c in characters if 'on' not in c]
     if anchor:
         x = anchor[0] - 130                 # cách mép hộp một chút: góc cận con vật trên hộp không dính người; khám / cho thuốc thì tự bước lại
+        # Ai có lượt "→ …" (khám, cho thuốc) đứng GẦN hộp nhất: đi tới con vật không phải băng ngang người khác — không thì
+        # máy không loại được người đứng giữa ra khỏi góc hai nhân vật (Gemini soát phim đợt 18: bà chủ lẹm nửa người suốt lượt khám).
+        doers = {re.split(r'\s*→', line, 1)[0].strip().lower() for _, line in lines if '→' in line}
+        name_of = {v: k for k, v in labels.items()}
+        floor.sort(key=lambda c: name_of.get(c['name']) not in doers)
         for c in floor:
             c['x'] = x
-            x -= 300 if 'id' in c else 220
+            x -= 400 if 'id' in c else 240        # đủ xa để góc trung cảnh của người bên cạnh không lẹm nửa người này (khung dọc)
     else:
         step = 300
         for n, c in enumerate(floor): c['x'] = round((n - (len(floor) - 1) / 2) * step)
@@ -201,16 +219,28 @@ def build_scene(text, base):
             turn['say'] = rest
         return turn
 
-    script = []
+    script, pending = [], None
     for where, line in lines:
+        if line.lower().startswith('thông báo:'):
+            # THÔNG BÁO của ứng dụng ("thông báo: Nhắc lịch tái khám | Thứ Bảy 9:00"): thẻ trượt vào khung ở lượt KẾ TIẾP.
+            parts = [part.strip() for part in line.split(':', 1)[1].split('|')]
+            if not parts[0]: raise ScriptError(f'{where}: "thông báo:" cần một tiêu đề — "thông báo: Nhắc lịch tái khám | Thứ Bảy 9:00"')
+            pending = {'title': parts[0], **({'text': parts[1]} if len(parts) > 1 and parts[1] else {})}
+            continue
         if line.lower().startswith('cùng lúc:'):
             parts = [part.strip() for part in line.split(':', 1)[1].split('|') if part.strip()]
             if len(parts) < 2: raise ScriptError(f'{where}: "cùng lúc:" cần ít nhất hai lượt, cách nhau bằng "|"')
             script.append({'together': [turn_of(part, where) for part in parts]})
+            if pending: script[-1]['together'][0]['toast'] = pending; pending = None
         else:
             script.append(turn_of(line, where))
+            if pending: script[-1]['toast'] = pending; pending = None
+    if pending and script: (script[-1]['together'][0] if 'together' in script[-1] else script[-1])['toast'] = pending
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
 
+    # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
+    used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
+    characters = [c for c in characters if c['name'] in used] or characters
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
     if head.get('ánh sáng'):
         mood = LIGHTS.get(head['ánh sáng'].lower())
@@ -219,12 +249,54 @@ def build_scene(text, base):
     if portrait: scene['width'], scene['height'] = 1080, 1920
     if camera == 'tự động': scene['camera'] = 'auto'
     for key, card in (('mở đầu', 'intro'), ('kết thúc', 'outro')):
+        if head.get(key) and key == 'mở đầu' and head[key].split('|')[0].strip().lower() == 'hook':
+            # "mở đầu: hook | Tiêu đề | dòng phụ": chữ lớn bật lên trên cảnh đầu (không phải thẻ tĩnh).
+            parts = [part.strip() for part in head[key].split('|')[1:]]
+            if not parts or not parts[0]: raise ScriptError('"mở đầu: hook | Tiêu đề | dòng phụ" — thiếu tiêu đề')
+            scene['hook'] = {'title': parts[0], **({'text': parts[1]} if len(parts) > 1 and parts[1] else {})}
+            continue
         if head.get(key):
             parts = [part.strip() for part in head[key].split('|')]
             scene[card] = {k: v for k, v in zip(('title', 'text', 'cta'), parts) if v}
             if head.get('logo'): scene[card]['logo'] = head['logo']
     if head.get('nhạc'): scene['music'] = head['nhạc']
     return scene
+
+
+def build_film(text, base):
+    """Một kịch bản → danh sách tệp cảnh (+ tuỳ chọn film.json). Có dòng "=== …" thì mỗi dòng ấy mở một cảnh:
+    "=== tên · bối cảnh: … · ánh sáng: … · máy: …". Phần trước dòng "===" đầu tiên là phần chung (khung, nhạc, mở đầu,
+    kết thúc, logo, dàn nhân vật); mở đầu vào cảnh đầu, kết thúc vào cảnh cuối, nhạc thành nhạc nền của cả phim."""
+    raw = text.splitlines()
+    marks = [n for n, line in enumerate(raw) if line.strip().startswith('===')]
+    if not marks: return [build_scene(text, base)], {}
+    head, cast, loose = parse('\n'.join(raw[:marks[0]]))
+    if loose: raise ScriptError(f'{loose[0][0]}: dòng kịch bản nằm trước cảnh đầu tiên — đặt nó sau một dòng "=== tên cảnh · bối cảnh: …"')
+    scenes = []
+    for index, start in enumerate(marks):
+        end = marks[index + 1] if index + 1 < len(marks) else len(raw)
+        marker = raw[start].strip().lstrip('=').strip()
+        local = {}
+        for part in re.split(r'\s*·\s*', marker):
+            if ':' in part:
+                key, value = part.split(':', 1)
+                if key.strip().lower() not in HEAD_KEYS: raise ScriptError(f'dòng {start + 1}: không hiểu "{key.strip()}" — dùng: {", ".join(HEAD_KEYS)}')
+                local[key.strip().lower()] = value.strip()
+        section_head, section_cast, lines = parse('\n'.join(raw[start + 1:end]), start + 2)
+        merged = dict({k: v for k, v in head.items() if k not in ('mở đầu', 'kết thúc', 'nhạc', 'âm lượng nhạc')}, **local, **section_head)
+        if index == 0 and head.get('mở đầu'): merged['mở đầu'] = head['mở đầu']
+        if index == len(marks) - 1 and head.get('kết thúc'): merged['kết thúc'] = head['kết thúc']
+        roster = {who['label'].lower(): who for who in cast}
+        roster.update({who['label'].lower(): who for who in section_cast})
+        name = f'{os.path.splitext(base)[0]}-{index + 1}'
+        scenes.append(build_parsed(merged, list(roster.values()), lines, name, soft_boxes=True))
+    film = {'transition': 'fade'}
+    if head.get('nhạc'): film['music'] = head['nhạc']
+    if head.get('âm lượng nhạc'):
+        try: film['musicVolume'] = float(head['âm lượng nhạc'])
+        except ValueError: raise ScriptError(f'âm lượng nhạc phải là một số (0.2) — "{head["âm lượng nhạc"]}"')
+    for scene in scenes: scene.pop('music', None)
+    return scenes, film
 
 
 def main():
@@ -234,13 +306,24 @@ def main():
     args = parser.parse_args()
     try: text = open(args.script, encoding='utf-8').read()
     except OSError as error: sys.exit(f'script: không đọc được {args.script}: {error}')
-    try: scene = build_scene(text, args.script)
+    stem = os.path.splitext(args.script)[0]
+    try: scenes, film = build_film(text, args.script)
     except ScriptError as error: sys.exit(f'script: {args.script}: {error}')
-    out = os.path.splitext(args.script)[0] + '.scene.json'
-    json.dump(scene, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    print(out)
+    files = []
+    for number, scene in enumerate(scenes, 1):
+        out = stem + (f'-{number}' if len(scenes) > 1 else '') + '.scene.json'
+        json.dump(scene, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        files.append(out); print(out)
+    if len(scenes) > 1:
+        # PHIM NHIỀU CẢNH: film.json cho tools/film.py (chuyển cảnh, nhạc nền hạ khi có lời, phụ đề .srt, ảnh bìa).
+        film = dict(film, scenes=[os.path.basename(path) for path in files], output=os.path.basename(stem) + '.mp4')
+        film_path = stem + '.film.json'
+        json.dump(film, open(film_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        print(film_path)
+        if args.no_build: return
+        sys.exit(subprocess.run([sys.executable, os.path.join(HERE, 'film.py'), film_path]).returncode)
     if args.no_build: return
-    done = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), out, '--force'])
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), files[0], '--force'])
     sys.exit(done.returncode)
 
 

@@ -461,6 +461,11 @@ for a 3D set with `"camera": "auto"` and builds it; see `python3 tools/script.py
 every word it knows (sets, moods, actions, actions toward someone). The scene file it writes is an ordinary
 one: edit it and build it with `tools/scene.py` like any other.
 
+A script can hold a whole film: each `=== name · bối cảnh: … · ánh sáng: …` line opens a scene; the lines before
+the first `===` are shared (frame, music, opening, closing, logo, cast). `script.py` writes one scene file per
+scene and a `film.json`, then builds the film. `"hook": { "title", "text" }` in a scene file pops big words
+over its first moments instead of an opening card.
+
 **Vertical video** (`"width": 1080, "height": 1920`) with `"camera": "auto"`: each speaker is shown alone
 at chest height (shot / reverse shot), and the opening wide shot keeps to the group around the first turn.
 

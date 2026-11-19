@@ -233,10 +233,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * mặc định bật khi trời tối / chiều. `windows`: [{ x, y, width, height, z }] — ô cửa trên tường sau (góc trên-trái), hắt
      * vệt nắng lên sàn ban ngày / chiều. Gọi một lần sau khi dựng phòng; `lamp(name, on)` bật / tắt trên timeline.
      */
-    light({ mood = 'day', lamps = [], windows = [], gloss = false } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
-      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [] };
+      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [], shading };
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
           power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
@@ -564,16 +564,20 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // như dán lên (Gemini soát ánh sáng đợt 16). Phía nào: theo vị trí đèn TRÊN MÀN HÌNH so với nhân vật.
           // ĐỔ BÓNG TRÊN THÂN: hướng ánh sáng trên màn hình (từ nguồn sáng tới nhân vật) — đèn gần nhất, hay hướng sáng
           // chính / nắng khi không có đèn đủ mạnh. Ban ngày nhẹ, tối có đèn thì rõ.
-          if (actor.rig && typeof actor.rig.lightShade === 'function') {
+          if (actor.rig && typeof actor.rig.lightShade === 'function' && lighting.shading) {
             const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
             let from, amount, glow = 0, rgb = '255,255,255';
             if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34); rgb = L.rim.rgb; }
             else { const key = mood.sun && mood === MOODS.evening ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood === MOODS.night ? 0.12 : mood === MOODS.evening ? 0.3 : 0.16; }
             const a = set.project(...from), b = set.project(...centre);
+            // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
+            if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade);
           }
           if (L.rim && L.rim.k > 0.08 && actor.rig) {
-            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (2.2 * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
+            // Phòng tối: viền dày hơn (3,4 px trên màn hình) — viền sáng là thứ tách nhân vật khỏi nền tối.
+            const width = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
+            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (width * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
             lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
           }
         }
@@ -712,7 +716,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * hẳn ngoài khung, không được thì nới khung lấy trọn họ vào. `{ at: [t0, t1], seek }`: chủ thể đi lại — khung chứa
      * mọi chỗ họ đứng ở các lúc ấy (`seek(t)` tua cảnh tới lúc t).
      */
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -730,7 +734,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (hidden) host.style.display = 'none';
         if (!r.width || !at.scale) return null;
         const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function') };
+        // ĐẦU (người): góc cận né theo đầu — mặt người bên cạnh ra hẳn khỏi khung, cánh tay đang khám / cho thuốc thì được lấn vào.
+        const headEl = actor.rig.el && actor.rig.el.dau, h = headEl ? headEl.getBoundingClientRect() : null;
+        const head = h && h.width ? { x0: toX(h.left), x1: toX(h.right), top: toY(h.top), base: toY(h.bottom) } : null;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head };
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
@@ -742,9 +749,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
       const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
-      let shots = wanted.map(measure);
-      if (Array.isArray(at) && seek) {
-        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); }
+      // Người KHÁC cũng đo qua các mốc: bác sĩ bước tới khám rồi lùi về ngay trong nhịp — đo ở đầu / cuối nhịp thì không thấy
+      // lúc họ đứng sát con vật (đợt 18: góc cận con mèo vẫn lẹm nửa mặt bác sĩ).
+      const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
+      const mergeHead = (a, b) => (a && b ? merge(a, b) : a || b);
+      const mergeOther = (a, b) => (a && b ? { ...merge(a, b), head: mergeHead(a.head, b.head) } : a || b);
+      // Có các mốc `at`: chỉ đo ĐÚNG ở các mốc ấy — đo thêm ở lúc hiện tại (trước khi tua) thì vị trí cũ của người vừa bước
+      // tới bị gộp vào, khung rộng ra cả quãng đi.
+      const timed = Array.isArray(at) && at.length && seek;
+      let shots = timed ? wanted.map(() => null) : wanted.map(measure), seen = timed ? otherActors.map(() => null) : otherActors.map(measure);
+      if (timed) {
+        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); seen = seen.map((m, n) => mergeOther(m, measure(otherActors[n]))); }
         seek(at[0]);
       }
       shots = shots.filter(Boolean);
@@ -773,8 +788,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
         if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3)) { region = wider; cam = test; }
       }
-      const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
-        .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
+      const others = seen.filter(Boolean)
+        // Góc cận: người bên cạnh tính theo ĐẦU (Gemini soát phim đợt 18: góc cận con mèo lấy nửa mặt bác sĩ ở mép khung).
+        .map((m) => (size === 'close' && m.person && m.head ? { ...m, ...m.head } : m));
       for (let pass = 0; pass < 3; pass++) {
         const half = (W / 2) * cam.distance / k;
         const edge = half * 0.06;
@@ -786,7 +802,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
         // Góc CẬN: không đẩy ra được thì giữ cỡ cận — người bên cạnh lẹm vào mép (kiểu "cận bẩn" quen thuộc). Nới khung lấy
         // trọn họ thì góc cận con chó thành góc hai người nhỏ xíu (khung dọc, bác sĩ đứng sát bàn — cảnh thử đợt 15).
-        else if (size === 'close') break;
+        // Góc cận, người bên cạnh không đẩy ra được: lấy trọn ĐẦU họ vào (góc hai nhân vật: đầu, vai người cạnh con vật) —
+        // không để nửa khuôn mặt ở mép khung (Gemini, đợt 18). Vật / con vật khác thì giữ cỡ cận, cho lẹm mép.
+        else if (size === 'close' && cut.person) { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: region.y0, y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
+        else if (tight && cut.person) {
+          // `tight`: lấy trọn người lẹm mép nếu chỉ phải lùi máy ≤ 30 % (ba người cùng khung, không ai bị cắt đôi mặt); không
+          // thì giữ cỡ cảnh, cho họ lẹm mép (Gemini soát phim đợt 18: bà chủ cắt nửa người ở mép trái suốt lượt khám).
+          const wider = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: region.y0, y1: Math.max(region.y1, cut.top) }, test = solve(wider);
+          if (test.distance > cam.distance * 1.3) break;
+          region = wider; cam = test;
+        }
+        else if (size === 'close' || tight) break;                                       // `tight`: giữ cỡ cảnh, người khác lẹm mép
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
       // Theo CHIỀU DỌC: ai đó chỉ ló lên ở đáy khung (tai con chó trên bàn dưới góc cận mặt bác sĩ) — nâng khung lên cho họ
@@ -843,7 +869,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         let values;
         // Đo ở cả ĐẦU và CUỐI nhịp: nhịp có người đi (lại gần con vật để đưa thuốc, rồi lùi về) thì khung phải chứa cả hai
         // chỗ đứng — đo một lúc thì người đi ra khỏi khung (Gemini soát cảnh thử đợt 14).
-        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        // `mid`: đo đúng lúc GIỮA nhịp (đang khám / cho thuốc) — không phải cả quãng người bước tới rồi lùi về.
+        const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);

@@ -1,4 +1,4 @@
-/* VGCharacter v0.57.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.58.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -4645,6 +4645,15 @@ const DRAW = {
     <circle cx="200" cy="${F - 430}" r="${r * 1.05}" fill="${color}" stroke="${line}" stroke-width="1.6"/>
     <circle cx="${200 - r * 0.35}" cy="${F - 455}" r="${r * 0.3}" fill="#ffffff" opacity=".18"/>`;
   },
+  floorlamp: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - 400;
+    return `
+    <ellipse cx="200" cy="${F - 6}" rx="34" ry="8" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="197" y="${top + 60}" width="6" height="${400 - 66}" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <path d="M 168 ${top} H 232 L 252 ${top + 66} H 148 Z" fill="${color}" stroke="${line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
+    <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
+  },
   lamp: ({ color, dark, line }) => {
     const F = PROP_FRAME.floor;
     return `
@@ -4683,7 +4692,7 @@ function screen(x, y, w, h, image) {
   return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
     <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
 }
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450' };
+const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd' };
 const PROP_KINDS = Object.keys(DRAW);
 function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
@@ -5260,10 +5269,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const set = {
     camera,
     view,
-    light({ mood = 'day', lamps = [], windows = [], gloss = false } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
-      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [] };
+      lighting = { mood: preset, key: norm(preset.key), lamps: [], windows, gloss, dust: [], shading };
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
           power: spec.power ?? 1, range: spec.range ?? Math.max(760, (spec.y ?? 600) * 1.7), kind: spec.kind || 'point', level: (spec.on ?? preset.lampsOn) ? 1 : 0 };      // tầm sáng: đủ xuống tới sàn từ bóng đèn trên cao
@@ -5480,16 +5489,18 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (lighting && !actor.lamp) {
           const L = lightAt(actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z);
           if (Math.abs(L.level - 1) > 0.004 || L.warm > 0.004) lit = `brightness(${L.level.toFixed(3)}) sepia(${L.warm.toFixed(3)})`;
-          if (actor.rig && typeof actor.rig.lightShade === 'function') {
+          if (actor.rig && typeof actor.rig.lightShade === 'function' && lighting.shading) {
             const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
             let from, amount, glow = 0, rgb = '255,255,255';
             if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34); rgb = L.rim.rgb; }
             else { const key = mood.sun && mood === MOODS.evening ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood === MOODS.night ? 0.12 : mood === MOODS.evening ? 0.3 : 0.16; }
             const a = set.project(...from), b = set.project(...centre);
+            if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade);
           }
           if (L.rim && L.rim.k > 0.08 && actor.rig) {
-            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (2.2 * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
+            const width = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
+            const side = set.project(L.rim.x, L.rim.y, L.rim.z).x < at.x ? -1 : 1, px = (width * Math.min(1, L.rim.k * 1.6) / Math.max(0.3, at.scale)).toFixed(2);
             lit += ` drop-shadow(${side * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
           }
         }
@@ -5582,7 +5593,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -5598,7 +5609,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (hidden) host.style.display = 'none';
         if (!r.width || !at.scale) return null;
         const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function') };
+        const headEl = actor.rig.el && actor.rig.el.dau, h = headEl ? headEl.getBoundingClientRect() : null;
+        const head = h && h.width ? { x0: toX(h.left), x1: toX(h.right), top: toY(h.top), base: toY(h.bottom) } : null;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head };
       };
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
       const regionOf = (m) => {
@@ -5607,9 +5620,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
       };
       const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
-      let shots = wanted.map(measure);
-      if (Array.isArray(at) && seek) {
-        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); }
+      const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
+      const mergeHead = (a, b) => (a && b ? merge(a, b) : a || b);
+      const mergeOther = (a, b) => (a && b ? { ...merge(a, b), head: mergeHead(a.head, b.head) } : a || b);
+      const timed = Array.isArray(at) && at.length && seek;
+      let shots = timed ? wanted.map(() => null) : wanted.map(measure), seen = timed ? otherActors.map(() => null) : otherActors.map(measure);
+      if (timed) {
+        for (const time of at) { seek(time); shots = shots.map((m, n) => merge(m, measure(wanted[n]))); seen = seen.map((m, n) => mergeOther(m, measure(otherActors[n]))); }
         seek(at[0]);
       }
       shots = shots.filter(Boolean);
@@ -5630,8 +5647,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
         if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3)) { region = wider; cam = test; }
       }
-      const others = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig))
-        .map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean).map(measure).filter(Boolean);
+      const others = seen.filter(Boolean)
+        .map((m) => (size === 'close' && m.person && m.head ? { ...m, ...m.head } : m));
       for (let pass = 0; pass < 3; pass++) {
         const half = (W / 2) * cam.distance / k;
         const edge = half * 0.06;
@@ -5640,7 +5657,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
         const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
-        else if (size === 'close') break;
+        else if (size === 'close' && cut.person) { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: region.y0, y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
+        else if (tight && cut.person) {
+          const wider = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: region.y0, y1: Math.max(region.y1, cut.top) }, test = solve(wider);
+          if (test.distance > cam.distance * 1.3) break;
+          region = wider; cam = test;
+        }
+        else if (size === 'close' || tight) break;                                       // `tight`: giữ cỡ cảnh, người khác lẹm mép
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
       {
@@ -5677,7 +5700,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const next = beats.slice(index + 1).find((later) => later.fixed);
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
         let values;
-        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, at: [at, Math.max(at, beat.end - 0.05)], seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
@@ -5993,7 +6017,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.57.0';
+const VERSION = '0.58.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

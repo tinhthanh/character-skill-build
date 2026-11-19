@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.58.0
+
+Added — a whole film from one script
+- **`tools/script.py`, scenes**: each line `=== name · bối cảnh: … · ánh sáng: … · máy: …` opens a scene. The
+  part before the first `===` is shared — frame, music (for the whole film), opening (first scene), closing
+  (last scene), logo, cast (a scene keeps only who appears in it; a cast line inside a scene adds or changes
+  people for it, e.g. the cat "on the table" only in the clinic). It writes `kich-ban-1.scene.json`, …,
+  `kich-ban.film.json` and builds the film with `tools/film.py` (fades, music ducked under speech, `.srt`,
+  poster).
+- **Hook opening**: `"hook": { "title", "text", "dur" }` in a scene file (`mở đầu: hook | … | …` in a script) —
+  big words pop over the first moments of the scene, which starts at once, instead of a static card.
+- **App notifications in a script**: `thông báo: Tiêu đề | nội dung` slides a notification card in on the
+  next turn.
+- `"set": { "shading": false }` turns the shading on the characters off.
+- **Floor lamp** prop (`"kind": "floorlamp"`, in the living room): a real light source beside the sofa.
+
+Fixed — after a Gemini review of a 3-scene vertical film
+- **Auto camera, examine / give a pill** in a vertical frame: one medium shot of the person with the pet for
+  the whole action (`mid` beats), measured at the times it covers only, instead of a close shot of the pet
+  with half a face at the edge.
+- **Close shots**: a person beside the subject who cannot be pushed out of the frame is taken in up to the
+  head, never cut through the face; a medium two-shot (`tight`) takes in a third person when that widens it
+  by 30 % at most.
+- **Where people stand (script)**: whoever examines or treats the pet stands nearest it, so they never walk
+  across the owner; people stand farther apart.
+- In a vertical frame the notification card sits at 27 % of the height, clear of the captions.
+- Pets: stronger shading and a wider rim of light.
+
+Not done
+- Reflections of the characters on a shiny floor: `-webkit-box-reflect` does not render in the capture
+  path; dropped.
+
+Measured
+- The shading on the characters (0.57.0) costs about 3 % of the render time (a 29.5 s film: 39.0 s with it,
+  37.8 s without); the slower figure reported for 0.57.0 was the machine being busy.
+
 ## 0.57.0
 
 Added — characters in the light, the air of the room

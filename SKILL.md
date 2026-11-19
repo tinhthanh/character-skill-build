@@ -139,7 +139,10 @@ clips for every voice file.
    character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
    draws a room. Vertical video: `"width": 1080,
    "height": 1920`. **Opening and closing cards:** `"intro"` / `"outro"` (title, text, a call-to-action button, a logo).
-   **A scene from plain words:** `python3 tools/script.py kich-ban.txt` — a header (`bối cảnh: phòng khám · máy: tự
+   **A whole film from plain words:** the same script with `=== tên cảnh · bối cảnh: …` lines — one scene each,
+   built and joined into one film (`mở đầu: hook | …` for a hook opening, `thông báo: … | …` for an app notification).
+
+**A scene from plain words:** `python3 tools/script.py kich-ban.txt` — a header (`bối cảnh: phòng khám · máy: tự
    động · khung: dọc`), the cast (`bác sĩ (vet) · chó (corgi, trên bàn)`), then `bác sĩ (vui): lời`, `chó: [sợ]`,
    `bác sĩ → chó: cho thuốc`, `cùng lúc: … | …` — written to a `.scene.json` and built (`--help` for every word).
 

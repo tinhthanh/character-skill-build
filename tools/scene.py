@@ -166,7 +166,7 @@ def known(where, given, allowed):
         fail(f'{where}: unknown key "{key}"{hint}')
 
 
-TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds')
+TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds', 'hook')
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
@@ -180,7 +180,7 @@ PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
-SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps')
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps', 'shading')
 LIGHT_MOODS = ('day', 'evening', 'night')
 LAMP_KEYS = ('name', 'x', 'y', 'z', 'color', 'power', 'range', 'on', 'kind')
 # BỐI CẢNH DỰNG SẴN (`"set": { "preset": "reception" }`): đồ đạc của một căn phòng quen thuộc, đặt theo phòng mặc định
@@ -236,7 +236,7 @@ SET_PRESETS = {
         'boxes': [{'name': 'sofa', 'x': -560, 'z': -860, 'width': 520, 'depth': 180, 'height': 110, 'color': '#7a9e9f', 'top': '#8fb3b4', 'side': '#68898a'},
                   {'name': 'coffee-table', 'x': 80, 'z': -700, 'width': 220, 'depth': 120, 'height': 80, 'color': '#a47551', 'top': '#b88a63', 'side': '#8c6243'}],
         'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff'}],
-        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'lamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470}],
+        'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'floorlamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470}],
         'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
@@ -244,9 +244,9 @@ ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wa
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
 CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
@@ -592,7 +592,7 @@ def main():
             if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
             if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
-            if 'on' in item and (item.get('kind') != 'lamp' or item['on'] not in (True, False)): fail(f'set.cutouts[{n}].on is for a "lamp": true (lit) or false (off until a turn switches it on with "lamp")')
+            if 'on' in item and (item.get('kind') not in ('lamp', 'floorlamp') or item['on'] not in (True, False)): fail(f'set.cutouts[{n}].on is for a "lamp": true (lit) or false (off until a turn switches it on with "lamp")')
             if 'door' in item and (item.get('kind') != 'carrier' or item['door'] not in ('left', 'right')): fail(f'set.cutouts[{n}].door must be "left" or "right" (carrier only)')
             if 'reading' in item and (item.get('kind') != 'scale' or not isinstance(item['reading'], str)): fail(f'set.cutouts[{n}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         # ÁNH SÁNG: "light" (giờ trong ngày), "lamps" (đèn), panel "window": true (cửa sổ hắt nắng).
@@ -982,7 +982,9 @@ def main():
             targets = [step[1][1:] for step in turn.get('do', []) if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names]
             # Khung dọc: khám / cho thuốc / vuốt ve con vật — cận vào CON VẬT (tay người lấn vào khung). Hai người cạnh nhau
             # trong khung dọc là hai hình nhỏ: không thấy đèn khám, viên thuốc (Gemini soát phim dọc đợt 15).
-            if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[names[targets[0]]['name']], size='close')
+            # → người + con vật ở cỡ trung, đo lúc GIỮA nhịp (đang khám, hai bên đứng sát nhau) — cận riêng con vật thì lẹm nửa
+            # mặt người đứng sát nó (Gemini, đợt 18).
+            if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='medium', mid=True)
             return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='medium' if targets else 'full')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
         subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
@@ -1283,9 +1285,11 @@ def main():
         # chỗ bóng đèn của nó (554 / 470 chiều cao khung); "lamps" thêm đèn tuỳ ý (đèn trần: "kind": "ceiling").
         lamps = [dict(item) for item in stage_set.get('lamps', [])]
         for n, item in enumerate(stage_set.get('cutouts', [])):
-            if item.get('kind') != 'lamp': continue
+            if item.get('kind') not in ('lamp', 'floorlamp'): continue
             tall = float(item.get('height', round(person_default * 1)))
-            lamps.append(dict({'name': item.get('name', f'cutout{n + 1}'), 'x': item['x'], 'z': float(item['z']) + 1, 'y': round(float(item.get('y', 0)) + tall * 554 / 470), 'power': 0.9},
+            # Bóng đèn: đèn đường ở 554 / 470 chiều cao khung, đèn cây (trong chụp) ở 340 / 470.
+            bulb = 554 if item['kind'] == 'lamp' else 340
+            lamps.append(dict({'name': item.get('name', f'cutout{n + 1}'), 'x': item['x'], 'z': float(item['z']) + 1, 'y': round(float(item.get('y', 0)) + tall * bulb / 470), 'power': 0.9},
                               **({'on': item['on']} if 'on' in item else {})))
         # Đèn mà kịch bản BẬT ở một lượt (và chưa ghi "on") thì lúc đầu tắt — đèn sáng sẵn rồi lượt "bật đèn" làm nó tắt
         # phụt rồi sáng lại. Đèn bị TẮT ở một lượt thì lúc đầu sáng.
@@ -1301,6 +1305,7 @@ def main():
                 lamps.append({'name': f'screen{n + 1}', 'kind': 'screen', 'x': item['x'], 'z': float(item['z']) + 30, 'y': round(float(item.get('y', 0)) + tall * 0.3), 'color': '#a8d8ff', 'power': 0.5, 'range': 420, 'on': True})
         light = {'mood': stage_set.get('light', 'day')}
         if room.get('gloss'): light['gloss'] = True
+        if stage_set.get('shading') is False: light['shading'] = False        # không đổ bóng trên thân nhân vật: render nhanh hơn
         if lamps: light['lamps'] = lamps
         if windows: light['windows'] = windows
         lamp_names = [lamp.get('name', f'lamp{n + 1}') for n, lamp in enumerate(lamps)]
@@ -1491,7 +1496,9 @@ def main():
     if toasts:
         unit = min(width, height)
         card_w = round(width * (0.36 if width >= height else 0.82))
-        style.append(f'  .toast {{ position: absolute; top: {round(height * 0.05)}px; {"right" if width >= height else "left"}: {round(width * 0.04) if width >= height else round((width - card_w) / 2)}px; width: {card_w}px; box-sizing: border-box; '
+        # Khung dọc: thẻ thông báo ở 27 % chiều cao — dưới phụ đề (17 %), trong vùng an toàn; sát đỉnh khung là chỗ thanh tab
+        # của TikTok che mất (Gemini soát phim đợt 18). Khung ngang: góc trên phải như cũ.
+        style.append(f'  .toast {{ position: absolute; top: {round(height * (0.05 if width >= height else 0.27))}px; {"right" if width >= height else "left"}: {round(width * 0.04) if width >= height else round((width - card_w) / 2)}px; width: {card_w}px; box-sizing: border-box; '
                      f'padding: {round(unit * 0.018)}px {round(unit * 0.022)}px {round(unit * 0.018)}px {round(unit * 0.085)}px; border-radius: {round(unit * 0.022)}px; background: rgba(255, 255, 255, 0.97); '
                      f'box-shadow: 0 {round(unit * 0.01)}px {round(unit * 0.03)}px rgba(0, 0, 0, 0.22); font-family: system-ui, sans-serif; color: #16303a; }}')
         bell = _svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4c-3 0-5 2.2-5 5.2v3.6L5.6 15h12.8L17 12.8V9.2C17 6.2 15 4 12 4zm-2 12.5a2 2 0 004 0' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/></svg>")
@@ -1542,6 +1549,28 @@ def main():
             card_lines.append(f"    // Opening card: the words come in, then the whole card fades into the scene.\n    gsap.utils.toArray('.card-intro:not(#intro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, 0.15 + n * 0.15));\n    tl.to('.card-intro', {{ opacity: 0, duration: 0.45, ease: 'power1.in' }}, T0 - 0.45);")
         else:
             card_lines.append(f"    // Closing card after the last turn: it fades in over the scene, then the words come in.\n    tl.from('#outro-bg', {{ opacity: 0, duration: 0.5 }}, T1); gsap.utils.toArray('.card-outro:not(#outro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, T1 + 0.3 + n * 0.15));\n    tl.to({{}}, {{ duration: {dur:g} }}, T1);")
+    # MỞ ĐẦU KIỂU "HOOK" (`"hook": { "title", "text", "dur" }`): chữ lớn BẬT lên đè trên cảnh đầu đang diễn rồi tắt — video
+    # ngắn không mở bằng một thẻ tĩnh (Gemini chê ba giây đầu chậm). Cảnh không đợi: lượt đầu bắt đầu ngay từ giây 0.
+    hook = scene.get('hook')
+    if hook is not None:
+        if not isinstance(hook, dict) or set(hook) - {'title', 'text', 'dur'} or not hook.get('title'): fail('"hook" is { "title": "…", "text": "…", "dur": 2.2 } — big words over the first moments of the scene')
+        hook_dur = float(hook.get('dur', 2.2))
+        if not 1 <= hook_dur <= 5: fail('hook.dur must be 1…5 seconds')
+        unit = min(width, height)
+        hook_top = 0.2 if width < height else 0.16
+        def hook_clip(kind, css, content=''):
+            style.append(f'  #hook-{kind} {{ {css} z-index: 45; }}')
+            body.append(f'  <div id="hook-{kind}" class="clip card-hook" data-start="0" data-duration="{hook_dur:g}" data-track-index="{track[0]}" data-layout-ignore="">{content}</div>')
+            track[0] += 1
+        hook_clip('shade', 'position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(8,14,22,.55), rgba(8,14,22,.15) 60%, rgba(8,14,22,0));')
+        hook_clip('title', f'position: absolute; left: 6%; right: 6%; top: {round(height * hook_top)}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 900; font-size: {round(unit * 0.095)}px; line-height: 1.08; color: #ffffff; -webkit-text-stroke: {max(2, round(unit * 0.004))}px #0f2a38; paint-order: stroke fill; text-shadow: 0 6px 24px rgba(0,0,0,.45);',
+                  html_text(str(hook['title']).replace('-', '\u2011')))
+        if hook.get('text'):
+            hook_clip('text', f'position: absolute; left: 10%; right: 10%; top: {round(height * (hook_top + (0.2 if width < height else 0.24)))}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 700; font-size: {round(unit * 0.048)}px; line-height: 1.25; color: #ffe08a; text-shadow: 0 3px 14px rgba(0,0,0,.5);', html_text(str(hook['text'])))
+        card_lines.append(f"    // Hook: big words pop over the opening moments, then fade — the scene itself starts at once.\n"
+                          f"    tl.from('#hook-shade', {{ opacity: 0, duration: 0.25 }}, 0); tl.from('#hook-title', {{ opacity: 0, scale: 0.55, duration: 0.45, ease: 'back.out(2.4)' }}, 0.05);\n"
+                          f"    if (document.getElementById('hook-text')) tl.from('#hook-text', {{ opacity: 0, y: 24, duration: 0.4, ease: 'power2.out' }}, 0.45);\n"
+                          f"    tl.to('.card-hook', {{ opacity: 0, duration: 0.35, ease: 'power1.in' }}, {hook_dur - 0.35:g});")
     card_code = "\n    const T1 = tl.duration();                 // the closing card (if any) starts here\n" + "\n".join(card_lines) if card_lines else "\n    const T1 = tl.duration();"
     camera = False if stage_set is not None or layout == 'split' else scene.get('camera', layout != 'presenter')        # người dẫn đứng cạnh nội dung: máy quay không cắt cận, trừ khi kịch bản yêu cầu
     camera_code = ''
@@ -1611,7 +1640,7 @@ def main():
             items = []
             for beat in beats:
                 time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
-                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', lamp: true' if beat.get('lamp') else '') + ' }')
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + ' }')
             moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n"
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
