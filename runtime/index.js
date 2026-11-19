@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.54.0';
+export const VERSION = '0.55.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -642,7 +642,8 @@ export function captions(source, element, { fade = 0.15, hold = 0.3, speaker = f
     if (cut !== undefined) line.end = Math.max(spoken, cut - fade);
   });
   if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
-  const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;
+  // Gạch nối KHÔNG NGẮT DÒNG (U+2011): phụ đề hai dòng không bị ngắt giữa "sô-" / "cô-la".
+  const label = (line) => ((speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text).replace(/-/g, '\u2011');
   const slot = element.querySelector('[data-caption-text]') || element;
   // BONG BÓNG: vị trí phía trên đầu người nói, tính một lần cho từng câu (ở giữa câu ấy).
   if (follow) {

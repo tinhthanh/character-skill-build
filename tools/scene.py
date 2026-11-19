@@ -942,6 +942,9 @@ def main():
             spoken.append(who['name'])
             # Lượt `together` có lời: người nói cùng những ai diễn với họ trong lượt ấy (bác sĩ khen — con chó vẫy đuôi).
             company = [names[turn['who']]['name'] for turn in group if turn is not talker]
+            # KHUNG DỌC (9:16) hẹp ngang: hai người cạnh nhau là hai hình nhỏ xíu — quay NGƯỜI NÓI một mình (góc đơn), câu
+            # đáp của người kia sẽ là góc đơn của họ: kiểu "người nói / người nghe" quen thuộc của video dọc.
+            if height > width * 1.2 and talker.get('mood') not in STRONG: return dict(span, subjects=[who['name']], size='medium', speech=True)
             if company: return dict(span, subjects=[who['name']] + company, size='medium', speech=True)
             if talker.get('mood') in STRONG or not listener: return dict(span, subjects=[who['name']], size='close' if talker.get('mood') in STRONG else 'medium', speech=True)
             return dict(span, subjects=[who['name'], listener], size='medium', speech=True)
@@ -949,6 +952,9 @@ def main():
             turn, who = group[0], names[group[0]['who']]
             if who['_pet']: return dict(span, subjects=[who['name']], size='close')
             targets = [step[1][1:] for step in turn.get('do', []) if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names]
+            # Khung dọc: khám / cho thuốc / vuốt ve con vật — cận vào CON VẬT (tay người lấn vào khung). Hai người cạnh nhau
+            # trong khung dọc là hai hình nhỏ: không thấy đèn khám, viên thuốc (Gemini soát phim dọc đợt 15).
+            if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[names[targets[0]]['name']], size='close')
             return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='medium' if targets else 'full')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
         subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
@@ -1338,14 +1344,19 @@ def main():
         look = f'padding: 10px 30px; border-radius: 14px; box-sizing: border-box; white-space: nowrap; background: rgba(8, 12, 16, 0.78); color: #f5f8fa; font: 600 {round(min(width, height) * 0.041)}px/1.25 system-ui, sans-serif; text-align: center; opacity: 0;'
         # `data-layout-ignore`: phụ đề đi theo LỜI NÓI, mà người nói nhanh hơn tốc độ đọc mà `hyperframes check` đòi cho
         # chữ trên màn hình (0,5 s + 0,3 s mỗi từ) — khán giả nghe câu ấy chứ không chỉ đọc. Vị trí phụ đề do công cụ tính.
-        caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.15 if stage_set is not None else 0.52))
+        # Bối cảnh 3D, khung dọc: 17 % chiều cao — trong vùng an toàn (15–65 %), dưới thanh tab của ứng dụng (~10 %) và TRÊN
+        # đầu nhân vật: máy quay (set.frameOn) đặt nhân vật thấp để chừa khoảng tường cho chữ. Phụ đề ở giữa khung thì đè lên
+        # mặt — đầu chibi chiếm nửa thân (Gemini soát phim dọc đợt 15).
+        caption_top = round(height * (0.4 if scene.get('layout') == 'presenter' else 0.17 if stage_set is not None else 0.52))
         if width >= height:
             clip('caption', f'position: absolute; left: 50%; bottom: {round(height * 0.03)}px; transform: translateX(-50%); ' + look, extra=' data-layout-ignore=\"\"')
         else:
             # Khung DỌC: chữ phải nằm trong vùng mà giao diện TikTok / Reels / Shorts không che — theo bảng của
             # HyperFrames là từ 15% tới 65% chiều cao, và ở nửa dưới của vùng ấy thì lùi khỏi cột nút bên phải
             # (11%–72% bề ngang). Neo bằng `top` để ba dòng chữ vẫn nằm trọn trong vùng.
-            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {caption_top}px; overflow: hidden; ' + look, extra=' data-layout-ignore=\"\"')
+            # Bối cảnh 3D: HAI dòng (xuống dòng tự nhiên) — một dòng 24 chữ thì câu bị cắt thành ba bốn mảnh vụn.
+            two = stage_set is not None
+            clip('caption', f'position: absolute; left: {round(width * 0.115)}px; width: {round(width * 0.6)}px; top: {caption_top}px; overflow: hidden; ' + (look.replace('white-space: nowrap', 'white-space: normal') if two else look), extra=' data-layout-ignore=\"\"')
     for voice in voices:
         body.append(f'  <audio id="voice-{voice["key"].replace("_", "-")}" class="clip" src="{voice["file"]}" data-start="__START_{voice["key"]}__" data-duration="{voice["length"]:.2f}" data-track-index="{track[0]}" data-volume="1"></audio>')
         track[0] += 1
@@ -1451,7 +1462,7 @@ def main():
             card_clip('logo', f'position: absolute; left: 50%; top: {round(height * 0.16)}px; height: {round(unit * 0.16)}px; transform: translateX(-50%);', tag='img', extra=f' src="{name}" alt=""')
             top = 0.38
         if card.get('title'):
-            card_clip('title', f'position: absolute; left: 8%; right: 8%; top: {round(height * top)}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 800; font-size: {round(unit * 0.085)}px; line-height: 1.12; color: #ffffff; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);', content=html_text(card['title']))
+            card_clip('title', f'position: absolute; left: 8%; right: 8%; top: {round(height * top)}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 800; font-size: {round(unit * 0.085)}px; line-height: 1.12; color: #ffffff; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);', content=html_text(str(card['title']).replace('-', '\u2011')))
         if card.get('text'):
             card_clip('text', f'position: absolute; left: 12%; right: 12%; top: {round(height * (top + 0.2))}px; text-align: center; font-family: system-ui, sans-serif; font-weight: 500; font-size: {round(unit * 0.042)}px; line-height: 1.3; color: #e6f4f1;', content=html_text(card['text']))
         if card.get('cta'):
@@ -1482,6 +1493,7 @@ def main():
     # nào hiện đúng lúc lời nói tới cụm ấy. Hộp chữ hai ba dòng che mất nhân vật thấp và cử chỉ tay. Bề ngang một chữ
     # ≈ 0,55 cỡ chữ; trừ lề trong 60px.
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
+    if not landscape and stage_set is not None: caption_chars *= 2                 # khung dọc trong bối cảnh 3D: phụ đề hai dòng
     caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false, cuts: (typeof CUTS === 'undefined' ? [] : CUTS.map((time) => time - T0)) }}).paused(false), T0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
     if popups:
         caption_code += "\n    // Notifications on the screens of props in the set (they follow the camera with the prop)."
@@ -1512,6 +1524,14 @@ def main():
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
         # Các lần CẮT CẢNH của kịch bản (và của đạo diễn tự động): phụ đề không sót qua chúng.
         moves.append('    const CUTS = [' + ', '.join(f'T0 + talk.turns[{view["turn"]}].start' for view in views if view['cut']) + '];')
+        if director and height > width * 1.2 and len(beats) > 1:
+            # Khung dọc: toàn cảnh mở đầu chỉ lấy CỤM nhân vật quanh nhịp đầu tiên — bốn người dàn ngang trong khung hẹp là
+            # bốn hình tí hon.
+            lead = next((beat for beat in beats[1:] if beat.get('subjects')), None)
+            if lead:
+                centre = sum(float(names[name]['x']) for name in lead['subjects']) / len(lead['subjects'])
+                near = [who['name'] for who in names.values() if abs(float(who['_x0']) - centre) <= 700]
+                beats[0]['subjects'] = near or lead['subjects']
         if director:
             items = []
             for beat in beats:

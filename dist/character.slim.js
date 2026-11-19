@@ -1,4 +1,4 @@
-/* VGCharacter v0.54.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.55.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5346,7 +5346,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
       const regionOf = (m) => {
         const h = m.top - m.base;
-        if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
+        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
       };
       const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
@@ -5357,11 +5357,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
-      const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
+      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.8 };
+      const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region) => {
-        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (0.75 * W)));
-        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - 0.07 * H * distance / k, distance };
+        const across = H > W * 1.2 ? 0.9 : 0.75;
+        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (across * W)));
+        const middle = H > W * 1.2 ? 0.55 : 0.5;
+        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
       };
       let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
       let cam = solve(region);
@@ -5375,6 +5378,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
         const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        else if (size === 'close') break;
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
       {
@@ -5727,7 +5731,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.54.0';
+const VERSION = '0.55.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -6111,7 +6115,7 @@ function captions(source, element, { fade = 0.15, hold = 0.3, speaker = false, f
     if (cut !== undefined) line.end = Math.max(spoken, cut - fade);
   });
   if (!lines.length) throw new Error('[character] captions: no spoken text found — speak / explain take the text as their first argument; for speakCues pass { text } as the fourth item of the step');
-  const label = (line) => (speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text;
+  const label = (line) => ((speaker && line.rig ? `${list().people[line.rig.publicId] || line.rig.publicId || ''}: ` : '') + line.text).replace(/-/g, '\u2011');
   const slot = element.querySelector('[data-caption-text]') || element;
   if (follow) {
     const root = element.closest('[data-composition-id]') || element.offsetParent || element.parentElement;

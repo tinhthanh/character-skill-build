@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.55.0
+
+Added — scripts in plain words, vertical video
+- **`tools/script.py kich-ban.txt`**: write the scene as plain Vietnamese text — a header (`bối cảnh: phòng
+  khám · máy: tự động · khung: dọc`, opening / closing cards, logo, music), one line naming the cast
+  (`bác sĩ (vet) · chó (corgi, trên bàn, đeo loa)`), then one line per turn: `bác sĩ (vui): lời`,
+  `chó: [sợ, run]`, `bác sĩ → chó: cho thuốc`, `cùng lúc: … | …`. It places everyone for the set (a pet
+  "on the table" on it, the first person beside it, the rest along the room), writes `kich-ban.scene.json`
+  (still editable by hand) and builds it. Errors name the line, in Vietnamese. Actions and moods are
+  written in Vietnamese or by their own names.
+- **Vertical video with `"camera": "auto"`** (1080 × 1920): a speaker is shown alone at chest height —
+  shot / reverse shot instead of two small people side by side — and the opening wide shot takes only the
+  group around the first turn.
+
+Fixed (Gemini review of the vertical trial film)
+- Vertical captions sat at the very top, under the app's tabs, and were cut into one-line scraps: they now
+  sit at 17 % of the height above the characters' heads (the camera places people lower in a vertical
+  frame to leave that space), on up to two lines.
+- In a vertical frame, examining / giving a pill / stroking a pet is a close shot of the pet (the hand
+  comes in), not two small people far away; a pet's shot leaves room for its emotion mark.
+- Vertical shots of people are smaller (a medium shot was one big head filling the frame); a vertical wide
+  shot uses more of the width, so less empty wall above.
+- Hyphens do not break across lines in cards and captions ("sô-cô-la").
+
+Changed
+- `set.frameOn`, close shots: when someone standing right beside the subject cannot be moved out of the
+  frame, the shot stays close (they are cut at the edge) instead of widening into a small two-shot.
+
 ## 0.54.0
 
 Added — automatic direction

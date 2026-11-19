@@ -467,7 +467,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
       const regionOf = (m) => {
         const h = m.top - m.base;
-        if (!m.person) return { x0: m.x0, x1: m.x1, y0: m.base, y1: m.top };
+        // Con vật: chừa chỗ cho DẤU CẢM XÚC trên đầu (! ? zzz) — không thì dấu ló ra ngoài mép khung (phim dọc đợt 15).
+        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
@@ -479,12 +480,19 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
-      const fill = FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size] || 0.5;
+      // Khung DỌC: người chiếm ít chiều cao hơn — trung cảnh ở 86 % là một cái đầu to đầy khung, mặt rơi đúng chỗ phụ đề.
+      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.8 };
+      const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region) => {
-        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (0.75 * W)));
-        // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung.
-        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - 0.07 * H * distance / k, distance };
+        // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
+        const across = H > W * 1.2 ? 0.9 : 0.75;
+        const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (fill * H), (region.x1 - region.x0) / (across * W)));
+        // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung. Khung DỌC: đặt vùng
+        // THẤP hơn (55 %) — phụ đề hai dòng nằm trên đầu nhân vật, ở khoảng tường trống (phim dọc đợt 15: phụ đề ở giữa
+        // khung thì đè ngang mặt — đầu chibi chiếm nửa thân, miệng luôn ở gần giữa vùng).
+        const middle = H > W * 1.2 ? 0.55 : 0.5;
+        return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
       };
       let region = shots.map(regionOf).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
       let cam = solve(region);
@@ -499,6 +507,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
         const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        // Góc CẬN: không đẩy ra được thì giữ cỡ cận — người bên cạnh lẹm vào mép (kiểu "cận bẩn" quen thuộc). Nới khung lấy
+        // trọn họ thì góc cận con chó thành góc hai người nhỏ xíu (khung dọc, bác sĩ đứng sát bàn — cảnh thử đợt 15).
+        else if (size === 'close') break;
         else { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: Math.min(region.y0, cut.base), y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
       }
       // Theo CHIỀU DỌC: ai đó chỉ ló lên ở đáy khung (tai con chó trên bàn dưới góc cận mặt bác sĩ) — nâng khung lên cho họ

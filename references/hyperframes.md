@@ -440,6 +440,14 @@ is built, by `set.frameOn(subjects, size, { avoid })`: it measures the drawn fig
 start of the turn and moves the camera so nobody else is cut in half by the frame edge. Sizes: a person
 `close` = head, `medium` = from the waist, `full` = whole; a pet is always shown whole (`close` biggest).
 
+**Scripts in plain words.** `tools/script.py kich-ban.txt` turns a plain Vietnamese script into a scene file
+for a 3D set with `"camera": "auto"` and builds it; see `python3 tools/script.py --help` for the format and
+every word it knows (sets, moods, actions, actions toward someone). The scene file it writes is an ordinary
+one: edit it and build it with `tools/scene.py` like any other.
+
+**Vertical video** (`"width": 1080, "height": 1920`) with `"camera": "auto"`: each speaker is shown alone
+at chest height (shot / reverse shot), and the opening wide shot keeps to the group around the first turn.
+
 **Automatic direction.** `"camera": "auto"` at the top of a scene file with a `"set"`: no `"view"` needed.
 The scene opens wide; each speaker is framed with the one they answer (with whoever acts with them in a
 `together`); a strong mood (angry, worried, sad, surprised…) is a close shot of the speaker; a pet's
