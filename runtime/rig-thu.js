@@ -31,6 +31,12 @@
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
 const KHUNG = { w: 400, h: 330 };
+// DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
+// THẾ GIỮ (như `ngoi`): đang nằm thì mọi động tác khép về dáng này chứ không về dáng đứng.
+const LIE = { truocY: 48, sauY: 44, tnX: 46, txX: 46, snX: -8, sxX: -8 };
+// DÁNG ĐƯỢC BẾ: thân gọn, chân trước GẬP dưới ngực, chân sau thu vào, đầu ngẩng nhìn ra. Dùng dáng nằm dưới sàn (chân
+// trước duỗi) thì trong vòng tay con vật như đang trượt ra khỏi tay người bế.
+const HELD = { truocY: 30, sauY: 38, tnX: -4, txX: 2, snX: -10, sxX: -10, dauY: -4 };
 const DAT = 292;                                   // cao độ mặt nền
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -62,7 +68,7 @@ function assertColors(palette, where) {
 
 const NGHI = Object.freeze({
   x: 0, y: 0, mo: 1, co: 1, huong: 1,
-  ngoi: 0, tho: 0, truocX: 0, truocY: 0, sauX: 0, sauY: 0, cong: 0, xu: 0,
+  ngoi: 0, nam: 0, tho: 0, truocX: 0, truocY: 0, sauX: 0, sauY: 0, cong: 0, xu: 0,
   dau: 0, dauX: 0, dauY: 0, taiL: 0, taiR: 0,
   matY: 0, nhinX: 0, nhinY: 0, dongTu: 1, mieng: 0, luoi: 0, cuoi: 0.4,
   duoi: 0, duoiCong: 0,
@@ -224,8 +230,8 @@ export class RigThu {
   static NGHI = NGHI;
   static LOAI = LOAI;
   static DONG_TAC = {
-    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'walk', 'enter', 'exit'],
-    cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'walk', 'enter', 'exit'],
+    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit'],
+    cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit'],
   };
   static gieo(hat) { gieoHat(hat); }
   static #dem = 0;
@@ -338,8 +344,18 @@ export class RigThu {
   }
 
   // Hông H và vai S theo trạng thái. Ngồi: mông hạ xuống chạm nền và dịch tới, vai lùi nhẹ.
+  // Trạng thái để VẼ. Con vật đang được BẾ (SVG của nó nằm lồng trong SVG một người — xem `carry` của rig người) thì
+  // vẽ ở dáng nằm cuộn trong tay, CỘNG THÊM vào trạng thái của chính nó: timeline riêng của con vật (gừ gừ, vẫy đuôi)
+  // vẫn chạy, chỉ thân và chân được đặt nằm, không đứng / ngồi trên không trung.
+  #view() {
+    if (!(this.svg && this.svg.ownerSVGElement)) return this.s;
+    const s = this.s;
+    // Khoá nào có trong HELD thì lấy dáng bế; riêng đầu (dauY) CỘNG thêm để con vật vẫn gật / nghiêng đầu được.
+    return new Proxy(s, { get: (o, key) => (key === 'ngoi' ? 0 : key === 'dauY' ? o[key] + HELD.dauY : key in HELD ? HELD[key] : o[key]) });
+  }
+
   #khung() {
-    const s = this.s, nv = this.nv, ng = mem(s.ngoi);
+    const s = this.#view(), nv = this.nv, ng = mem(s.ngoi);
     const H = { x: nv.H0.x + 22 * ng + s.sauX, y: pha(nv.H0.y, DAT - nv.dayThan + 3, ng) + s.sauY };
     // Ngồi thì VAI NHẤC LÊN cho hai chân trước gần duỗi thẳng (96% chiều dài chân): để vai
     // ở cao độ lúc đứng thì chân trước khuỵu gập, nhìn ra con vật đang giơ tay chứ không ngồi.
@@ -351,7 +367,8 @@ export class RigThu {
   /* ------------------------------------------------------ đổ trạng thái */
 
   apDung() {
-    const s = this.s, e = this.el, nv = this.nv, { H, S, ng } = this.#khung();
+    const s = this.#view(), e = this.el, nv = this.nv, { H, S, ng } = this.#khung();
+    const held = s !== this.s;
     const fx = (v) => v.toFixed(2);
     // Cả con lật theo `huong` quanh trục giữa khung; co dãn quanh điểm chạm đất.
     // Giữa chừng cú lật KHÔNG ép con vật dẹt về 0: bề ngang chỉ co tới 30% rồi đổi bên. Co về 0 thì có một khung hình
@@ -363,7 +380,7 @@ export class RigThu {
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
     e.bong.setAttribute('rx', fx(((S.x - H.x) / 2 + nv.dayThan + 14) * (1 - cao * 0.3)));
     e.bong.setAttribute('transform', `translate(0 ${fx(-s.y / (s.co || 1))})`);   // bóng ở lại mặt nền khi nhảy
-    e.bong.setAttribute('opacity', 0.26 - cao * 0.12);
+    e.bong.setAttribute('opacity', held ? 0 : 0.26 - cao * 0.12);       // đang được bế: không có bóng dưới chân
 
     // ---- thân: hai khối tròn ở hông và vai, nối bằng một elip xoay theo đường hông–vai
     const mx = (H.x + S.x) / 2, my = (H.y + S.y) / 2, goc = Math.atan2(S.y - H.y, S.x - H.x) / RAD;
@@ -493,6 +510,7 @@ export class RigThu {
     idle: 'Đứng yên', walk: 'Đi', enter: 'Chạy vào', exit: 'Chạy ra', tiltHead: 'Nghiêng đầu',
     wagTail: 'Vẫy đuôi', bark: 'Sủa', sit: 'Ngồi', jump: 'Nhảy mừng', beg: 'Đứng xin', givePaw: 'Bắt tay', sniff: 'Đánh hơi',
     meow: 'Kêu meo', purr: 'Gừ gừ', lickPaw: 'Liếm chân', stretch: 'Vươn vai', hiss: 'Xù lông', tailSwish: 'Quẫy đuôi', pounce: 'Rình vồ',
+    sleep: 'Ngủ', unwell: 'Mệt / ốm',
   };
 
   /* ------------------------------------------------------------ tiện ích */
@@ -506,7 +524,10 @@ export class RigThu {
     // đúng giá trị lúc nó bắt đầu chứ không về tư thế nghỉ — chó đã `sitDown()` thì sủa, nghiêng
     // đầu xong vẫn ngồi; con vật đã `face('left')` thì vẫn quay trái. (Như rig người.)
     const { x, ...so } = this.NGHI;
-    so.ngoi = this.s.ngoi; so.huong = this.s.huong;
+    so.ngoi = this.s.ngoi; so.huong = this.s.huong; so.nam = this.s.nam;
+    // Đang NẰM (hoặc động tác này đặt nằm xuống): khép về dáng nằm, không ngồi — trừ khoá nào động tác tự giữ.
+    const lying = (giu.nam ?? so.nam) > 0.5;
+    if (lying) Object.assign(so, LIE, { ngoi: 0 });
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     return t;
   }
@@ -608,7 +629,8 @@ export class RigThu {
   /* ----------------------------------------------------------- thế đứng */
 
   // Động tác đổi THẾ ĐỨNG và giữ nguyên cho các động tác sau.
-  static STANCE = ['sitDown', 'standUp', 'face'];
+  // `sleep` cũng đổi thế: ngủ xong con vật vẫn NẰM (thức dậy tại chỗ).
+  static STANCE = ['sitDown', 'standUp', 'face', 'lieDown', 'sleep'];
   static FLIP_MIN = 0.3;                 // bề ngang nhỏ nhất của con vật giữa một cú lật hướng
 
   /** Hoành độ TÂM con vật trên màn hình (px), tính cả quãng đã đi. */
@@ -634,8 +656,38 @@ export class RigThu {
   /** NGỒI XUỐNG và ở yên trong dáng ngồi. */
   sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
 
-  /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). */
-  standUp() { return this.#khep(this.tl(), 0.35, 0, { ngoi: 0 }); }
+  /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). Đang nằm thì cũng đứng dậy. */
+  standUp() { return this.#khep(this.tl(), this.s.nam > 0.5 ? 0.55 : 0.35, 0, { ngoi: 0, nam: 0 }); }
+
+  /** NẰM XUỐNG và ở yên trong dáng nằm: các động tác sau (vẫy đuôi, gừ gừ, nghiêng đầu…) diễn khi đang nằm. `standUp` để dậy. */
+  lieDown() { return this.#khep(this.tl(), 0.6, 0, { nam: 1, ngoi: 0 }); }
+
+  /**
+   * NGỦ `dur` giây: nằm xuống (nếu chưa nằm), gục đầu, nhắm mắt, tai thả, thở chậm và sâu, đuôi cuộn vào thân. Xong thì
+   * mở mắt, vẫn NẰM (thức dậy tại chỗ). `standUp()` để dậy hẳn.
+   */
+  sleep(dur = 3) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { ...LIE, nam: 1, ngoi: 0, duration: s.nam > 0.5 ? 0.2 : 0.6, ease: 'power2.inOut' }, 0);
+    t.to(s, { dauY: 16, dauX: 6, dau: -4, matY: 1, taiL: -0.5, taiR: -0.5, duoi: -20, duoiCong: 0.6, cuoi: 0.5, duration: 0.6, ease: 'sine.inOut' }, 0.3);
+    // Thở ngủ: chậm (1,6 s một nhịp) và sâu hơn thở thường; đầu nhấp nhô theo.
+    for (let a = 0.9; a + 1.6 <= 0.9 + dur; a += 1.6) {
+      t.to(s, { tho: 1, dauY: 17.5, duration: 0.8, ease: 'sine.inOut' }, a).to(s, { tho: 0, dauY: 16, duration: 0.8, ease: 'sine.inOut' }, a + 0.8);
+    }
+    this.#khep(t, 0.5, 0.9 + dur, { nam: 1 });
+    return t;
+  }
+
+  /** MỆT / ỐM `hold` giây: tai cụp, mắt lờ đờ, đầu cúi thấp, đuôi rủ, thở dài một hơi. Đứng hay nằm đều được. */
+  unwell(hold = 2.5) {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 10, dau: -3, matY: 0.55, nhinY: 1.2, taiL: -1, taiR: -1, duoi: -65, duoiCong: -0.2, cuoi: -0.3, duration: 0.6, ease: 'sine.inOut' }, 0);
+    // Thở dài: một hơi sâu, đầu trĩu xuống thêm rồi thôi.
+    t.to(s, { tho: 1, dauY: 13, duration: 0.7, ease: 'sine.inOut' }, 0.7).to(s, { tho: 0, dauY: 10, duration: 0.9, ease: 'sine.inOut' }, 1.4);
+    if (hold > 2) this.#chop(t, 0.6 + hold * 0.6);
+    this.#khep(t, 0.6, 0.6 + hold);
+    return t;
+  }
 
   /**
    * QUAY ĐẦU về một phía và giữ: face('left') · face('right') · face(element) · face(otherRig).

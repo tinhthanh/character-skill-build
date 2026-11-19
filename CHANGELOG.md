@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.42.0
+
+Added — the vet's work and pets in the clinic
+- **`listen(pet, hold)`** — bend to the pet and put a stethoscope on its body (it appears in the
+  hand, tube up to the neck), listen with the head tilted, move it once, nod.
+- **`inject(pet)`** with a new held item **`'syringe'`**: needle toward the pet's body, the plunger
+  goes down (a `plunger` state channel), pull back, smile. The pet must be on the side of the
+  syringe hand; otherwise a clear error. New item **`'pills'`** (a medicine bottle).
+- **`carry(pet)` / `putDown()`** — a held stance: bend down, take the pet in both hands and hold it
+  in front of the chest, its head between the arms, front paws tucked, slightly enlarged (1.15×)
+  so it reads, both hands closed around it; the carrier turns to face the viewer while carrying
+  (a three-quarter hug put the far arm across the pet's face) and back on `putDown`. Speech and other steps
+  play while carrying, and the pet keeps doing its own actions in the arms. The pet's SVG moves
+  into a slot of the person's SVG between the torso and the arms (the hands hug it), as a function
+  of the state, so any frame renders the same. `putDown` returns it to where it was picked up;
+  putting it down after walking away is refused. In a 3D set the carried pet's floor shadow hides.
+- **Pets: `lieDown()`** (a held stance, like `sitDown`), **`sleep(dur)`** (lies down, head down,
+  eyes closed, slow breathing; stays lying when it wakes) and **`unwell(hold)`** (ears down, sleepy
+  eyes, head low, tail drooping, a sigh).
+- `set.target(from, to, 'body')` aims at the pet's body instead of its face; `tools/scene.py`
+  uses it for `listen` and `inject`, and walks the person up to the pet first for `listen`,
+  `inject` and `carry`, as for `stroke`.
+
+Fixed
+- **Reaching down to a pet while turned three-quarter toward it** (stroke, listen, inject, carry):
+  the arm angles were blended with the turn, so the arm came out short and low — at an exam table
+  the hand stopped at the table's edge, 80 px short of the cat. The reaching arm now uses screen
+  angles (`aim`), like pointing and handing over.
+- A tilted held item is only lifted in the palm if it is a cup (to bring its rim to the lips); a
+  tilted syringe floated away from the hand.
+
 ## 0.41.0
 
 Added — phones and computers, for videos about software

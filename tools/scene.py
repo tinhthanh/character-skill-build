@@ -62,7 +62,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). Interaction steps: "drink", "write", ["stroke", "@pet"]
-               (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), phone and
+               (in a turn without `say` the pet answers at the same time: a cat purrs, a dog wags), exam steps
+               ["listen", "@pet"] (stethoscope), ["inject", "@pet"] (needs "holds": "syringe", pet on that hand's side),
+               ["carry", "@pet"] … "putDown" (pick the pet up and hold it; pets: "lieDown", ["sleep", 3], "unwell"), phone and
                computer steps ["showPhone", 1.8], ["tapPhone", 1.6], ["typing", 2], ["call", null, 2] (listening), and
                ["handOver", "@other"] together with the other's ["take", "@giver"]. A character that strokes
                or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
@@ -137,7 +139,7 @@ PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
 CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing')
 CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-ITEM_KINDS = ('cup', 'clipboard', 'phone')
+ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
@@ -403,7 +405,7 @@ def main():
                 if isinstance(item, dict): return item.get('kind') in ITEM_KINDS and set(item) <= {'kind', 'image'} and (not item.get('image') or item['kind'] == 'phone')
                 return item in ITEM_KINDS
             if not isinstance(held, dict) or not held or any(side not in ('L', 'R') or not item_ok(item) for side, item in held.items()):
-                fail(f'character "{name}": "holds" must be "cup", "clipboard" or "phone", an object such as {{"L": "cup"}}, or {{"R": {{"kind": "phone", "image": "app.png"}}}} — got {js(who.get("holds"))}')
+                fail(f'character "{name}": "holds" must be one of {", ".join(ITEM_KINDS)}, an object such as {{"L": "cup"}}, or {{"R": {{"kind": "phone", "image": "app.png"}}}} — got {js(who.get("holds"))}')
             for item in held.values():
                 if isinstance(item, dict) and item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'character "{name}": holds image not found: {item["image"]}')
             if who.get('holdsHidden') not in (None, False, True): fail(f'character "{name}": "holdsHidden" must be true or false')
@@ -450,6 +452,7 @@ def main():
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
                 if stage_set is not None and actor and step[0] in ('point', 'stroke'): parts.append(f"set.target({actor}, {item[1:]})")
+                elif stage_set is not None and actor and step[0] in ('listen', 'inject'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
                 else: parts.append(item[1:])
             else:
                 parts.append(js(item))
@@ -619,13 +622,13 @@ def main():
             who = names[turn['who']]
             if who['_pet'] or who.get('seated'): continue
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry') and isinstance(step[1], str) and step[1][1:] in names): continue
                 if stage_set is not None and abs(float(names[step[1][1:]].get('z', -300)) - float(who.get('z', -300))) > 60:
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
-                    reach_notes.append(f'{where}: "{who["name"]}" {step[0]}s "{step[1][1:]}", which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
+                    reach_notes.append(f'{where}: "{who["name"]}" reaches for "{step[1][1:]}" ({step[0]}), which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
                 gap = float(names[step[1][1:]]['x']) - float(who['x'])
-                wanted = (0.24 if step[0] == 'stroke' else 0.45) * who['_host_height']
+                wanted = (0.45 if step[0] == 'handOver' else 0.24) * who['_host_height']      # chạm tới con vật: gần như vuốt ve
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
                 turns.append((f'  // {who["name"]} steps closer to {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))

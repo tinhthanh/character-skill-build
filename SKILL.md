@@ -9,8 +9,9 @@ A library of **100% SVG characters driven by GSAP** and the tools to put them in
 [HyperFrames](https://github.com/heygen-com/hyperframes) video. A character is a small JS
 definition on a shared skeleton, so every character can already wave, talk, walk, sit,
 cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, show an app on
-the phone, type on a laptop (32 actions) and hold a stance (sit down, face someone, put an item
-away, keep the phone at the cheek).
+the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up
+(36 actions) and hold a stance (sit down, face someone, put an item away, keep the phone at the
+cheek, carry a pet). Pets can also lie down, sleep and look unwell.
 
 There are two jobs. Do the one you were asked for; most videos need both.
 

@@ -277,6 +277,25 @@ with tempfile.TemporaryDirectory() as work:
         if not re.search(r"\['explain', \"Dạ chiều nay ba giờ được không ạ, cô cho em xin tên bé mèo nhé\?\", 2(?:\.0)?\],\s*([0-9.]+),\s*\['phoneDown'\]", html): problems.append('a long phone line with a short "dur": the phone is put down before its caption is gone (no pause before phoneDown)')
         if not re.search(r'1\.5, \["tapPhone", 1\.2\]', html): problems.append('a turn without a line whose camera pans in: the hand action does not wait for the camera (expected a 1.5 s pause before tapPhone)')
 
+    # Khám bệnh và bế thú: nghe / tiêm nhắm vào THÂN con vật (set.target …, 'body'), bế / đặt xuống, thú nằm / ngủ / mệt.
+    exam = json.load(open(stage, encoding='utf-8'))
+    exam['characters'][0]['holds'] = 'syringe'
+    exam['characters'][2] = {'name': 'cat', 'species': 'cat', 'x': 40, 'z': -300, 'height': 200}
+    exam['script'].append({'who': 'vet', 'do': [['listen', '@cat', 1.5], ['inject', '@cat']]})
+    exam['script'].append({'who': 'cat', 'do': ['lieDown', ['sleep', 2], 'unwell', 'standUp']})
+    exam['script'].append({'who': 'boy', 'do': [['carry', '@cat'], 'nod', 'putDown']})
+    path = os.path.join(os.path.dirname(stage), '_check_exam.json')
+    try:
+        json.dump(exam, open(path, 'w', encoding='utf-8'))
+        done = build(path, os.path.join(work, 'exam3d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('a 3D scene with an exam and a carried pet does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'exam3d', 'index.html'), encoding='utf-8').read()
+        for needle in ('["listen", set.target(vet, cat, \'body\'), 1.5]', '["inject", set.target(vet, cat, \'body\')]', '["carry", cat]', '"putDown"', '["sleep", 2]'):
+            if needle not in html: problems.append(f'exam / carry steps: {needle} is not in the composition')
+
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene
     for label, change, needle in [

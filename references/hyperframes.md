@@ -46,6 +46,10 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
   `"holds": { "R": { "kind": "phone", "image": "app.png" } }` puts a picture (the app) on the
   phone's screen. A turn with `"phone": true` says its line ON THE PHONE (phone to the cheek
   before, down after; works with a recorded voice); listening is `"do": [["call", null, 2]]`.
+  Exam and pets: `["listen", "@cat"]` (stethoscope), `["inject", "@cat"]` (`"holds": "syringe"`, the pet
+  on that hand's side), `["carry", "@cat"]` … `"putDown"` (hold the pet in the arms); pets also do
+  `"lieDown"`, `["sleep", 3]`, `"unwell"`. Put the pet on a box (`"on": "table"`) at the same `z` as
+  the person, beside the table rather than inside it, within about 0.25 × the person's height.
   Phone and computer steps: `["showPhone", 1.8]` (screen to the viewer, enlarged), `["tapPhone", 1.6]`,
   `["typing", 2]` (with a laptop in front).
   Other interaction steps for `do`: `"drink"`, `"write"`, and `["stroke", "@pet"]` — in a turn
@@ -540,7 +544,7 @@ character facing right is seen more from the front as the camera moves to the ri
 | `set.camera` | the camera as last computed (read-only) |
 | `set.update()` | apply the camera at the timeline's current time — pass it as the master timeline's `onUpdate`. Seek with `tl.time(t)`: GSAP's `tl.seek(t)` skips `onUpdate` |
 | `set.project(x, y, z)` | where a point of the set lands: `{ x, y, scale, depth }` |
-| `set.target(from, to)` | aim for `from.point(…)` / `from.stroke(…)` at `to`'s head, from positions in the room — use it instead of passing the rig: those actions otherwise aim for the camera angle at build time. The hand reaches in `from`'s own plane only: give both the same `z` |
+| `set.target(from, to, part = 'head')` | aim for `from.point(…)` / `from.stroke(…)` at `to`'s head — or with `'body'` at its body, for `listen` / `inject` — from positions in the room — use it instead of passing the rig: those actions otherwise aim for the camera angle at build time. The hand reaches in `from`'s own plane only: give both the same `z` |
 
 Limits to know before you plan a shot:
 

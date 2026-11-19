@@ -138,3 +138,33 @@ export function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, 
         </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}`;
 }
 let phoneClipCount = 0;
+
+/**
+ * ỐNG TIÊM cầm dọc, mũi kim chúc xuống: thân trong suốt có vạch, thuốc màu `liquid`, pít-tông (`data-plunger`) trượt
+ * xuống khi tiêm (`rig.inject()` lái kênh `plunger`). Ngón cái đè lên mặt trước. `data-syringe` để `inject` nhận ra.
+ */
+export function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-syringe="1" transform="translate(0 10) rotate(90) translate(0 -4)">
+          <g data-plunger="9"><rect x="-1.4" y="-26" width="2.8" height="14" fill="#c9ced6" stroke="${line}" stroke-width=".7"/><rect x="-5" y="-28" width="10" height="3" rx="1.2" fill="#e8ebef" stroke="${line}" stroke-width=".8"/></g>
+          <rect x="-4" y="-14" width="8" height="24" rx="1.5" fill="#f4f8fb" fill-opacity=".85" stroke="${line}" stroke-width=".9"/>
+          <rect x="-3.2" y="-3" width="6.4" height="12.4" fill="${liquid}" opacity=".85"/>
+          <path d="M -4 -6 h 3 M -4 -1 h 3 M -4 4 h 3" stroke="${line}" stroke-width=".6" opacity=".6"/>
+          <rect x="-6" y="-15.5" width="12" height="2.4" rx="1" fill="#e8ebef" stroke="${line}" stroke-width=".7"/>
+          <path d="M -1.6 10 h 3.2 l -1 3 h -1.2 z" fill="#c9ced6" stroke="${line}" stroke-width=".5"/>
+          <path d="M 0 13 V 25" stroke="#9aa3ad" stroke-width="1" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
+}
+
+/** LỌ THUỐC (hộp thuốc viên có nắp, nhãn): đưa cho chủ nuôi, giới thiệu đơn thuốc. */
+export function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(0 12) rotate(90)">
+          <rect x="-9" y="-13" width="18" height="24" rx="3" fill="${color}" stroke="${line}" stroke-width="1"/>
+          <rect x="-10" y="-19" width="20" height="7" rx="2" fill="${cap}" stroke="${line}" stroke-width="1"/>
+          <rect x="-7" y="-7" width="14" height="10" rx="1.2" fill="${label}" stroke="${line}" stroke-width=".6"/>
+          <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
+}

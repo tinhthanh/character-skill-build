@@ -205,7 +205,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * các bước đi trước đã được dựng: `from.point(set.target(from, cat))`.
      * Tay vươn trong mặt phẳng của `from`: đứng lệch nhau theo chiều sâu (z) thì bàn tay không chạm được.
      */
-    target(from, to) {
+    target(from, to, part = 'head') {
       const of = (rig) => actors.find((actor) => actor.rig === rig);
       if (!of(from) || !of(to)) throw new Error('[character] set.target(from, to): both must be rigs placed with set.place()');
       const frameOf = (rig) => (rig.constructor && rig.constructor.KHUNG) || { w: 400, h: 470 };
@@ -216,8 +216,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { size, unit, ground, x: actor.spot.x + (actor.rig.s.x || 0) * unit };
       };
       const head = () => {
-        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox('face') : null;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height / 2 : f.ground * 0.6;
+        // `part`: 'head' (mặt — chỉ tay, vuốt ve) hay 'body' (giữa thân — nghe tim phổi, tiêm): khung toàn thân, dưới
+        // tâm một chút (con vật nằm ngang: phần dưới khung là thân, phần trên là đầu).
+        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
+        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * (part === 'body' ? 0.5 : 0.5) : f.ground * (part === 'body' ? 0.4 : 0.6);
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       return {
@@ -322,7 +324,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
           const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
-          const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away ? 0 : 1);
+          // Con vật đang được BẾ: SVG của nó nằm trong tay một người (rời khỏi host) — host trống, không có bóng trên sàn.
+          const carried = rig && rig.svg && !host.contains(rig.svg);
+          const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
             transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - 0.5).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }

@@ -163,7 +163,7 @@ try {
   { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
     const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
     for (const name of rig.actions) {
-      if (['walkAway', 'exit', 'handOver', 'take'].includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ — có bài kiểm riêng
+      if (['walkAway', 'exit', 'handOver', 'take', 'carry'].includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ — có bài kiểm riêng
       rig.reset();
       const t = name === 'point' ? rig.point({ x: 60, y: 80 }) : rig[name](); t.progress(1); rig.apDung();
       if (Math.abs(rig.state.headTilt - 4) > 1e-3 || rig.state.handR !== 'fist') hong('restPose', `${name}: ends with headTilt ${rig.state.headTilt}, handR ${rig.state.handR} instead of the character's rest pose (4, fist)`);
@@ -1357,6 +1357,79 @@ try {
       let refused = ''; try { L.createProp(deviceHost, 'laptop', { facing: 'up' }); } catch (error) { refused = error.message; }
       if (!refused.includes("'away' or 'viewer'")) hong('laptop', 'an unknown facing is not refused');
       deviceHost.remove();
+    }
+    // KHÁM BỆNH VÀ BẾ THÚ: thú nằm / ngủ / mệt; nghe tim phổi (ống nghe áp vào thân); tiêm (pít-tông, kim không rời tay);
+    // bế lên (SVG con vật vào ngăn giữa thân và tay, trước bụng) và đặt xuống (về host, đúng chỗ cũ).
+    {
+      const ring = document.createElement('div'); ring.style.cssText = 'position:absolute;left:0;top:0;width:600px;height:300px'; document.body.appendChild(ring);
+      const place = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; ring.appendChild(d); return d; };
+      // Thú: nằm giữ qua động tác khác; ngủ xong vẫn nằm, mắt mở; mệt thì tai cụp; đứng dậy về dáng đứng.
+      const pet = L.createPet(place('left:300px;top:150px;width:120px;height:99px'), { species: 'dog' }).rig;
+      const lying = L.sequence(pet, [['lieDown'], ['tiltHead'], ['sleep', 1.6], ['unwell', 1.4], ['standUp']]);
+      const st = lying.data.steps;
+      lying.time(st[1].start + 1); if (Math.abs(pet.s.truocY - 48) > 1) hong('lieDown', `tilting its head while lying, the chest is at ${pet.s.truocY.toFixed(1)} — the lying stance is not held`);
+      lying.time(st[2].start + 1.2); if (pet.s.matY < 0.9) hong('sleep', 'the eyes are not closed while sleeping');
+      lying.time(st[3].start - 0.05); if (pet.s.nam < 0.99 || pet.s.matY > 0.1) hong('sleep', 'after sleeping the pet should still lie, eyes open');
+      lying.time(st[3].start + 1); if (!(pet.s.taiL < -0.9)) hong('unwell', 'the ears are not down while unwell');
+      lying.time(lying.duration()); if (pet.s.nam !== 0 || Math.abs(pet.s.truocY) > 1e-6) hong('standUp', 'standUp does not end the lying stance');
+      lying.kill();
+      // Người: nghe tim phổi, tiêm, bế.
+      const vet = L.createCharacter(place('left:140px;top:0;width:200px;height:235px'), { id: 'vet', items: { R: 'syringe' } }).rig;
+      // Con vật trên BÀN KHÁM, ngang tầm tay (dưới sàn thì ngoài tầm với của tay chibi — như `stroke`).
+      const cat = L.createPet(place('left:250px;top:105px;width:100px;height:82px'), { species: 'cat' }).rig;
+      const near = (a, b, slack) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return Math.hypot((p.left + p.right - q.left - q.right) / 2, (p.top + p.bottom - q.top - q.bottom) / 2) < slack; };
+      const doctor = L.createCharacter(place('left:140px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;      // tay không: tay phía con vật nghe
+      const exam = doctor.listen(cat, 1.2); exam.time(1.0);
+      const tool = doctor.el.toolL.style.display !== 'none' ? doctor.el.toolL : doctor.el.toolR;
+      if (tool.style.display === 'none') hong('listen', 'the stethoscope is not in the hand while listening');
+      else {
+        const disc = tool.querySelector('circle').getBoundingClientRect(), body = cat.el.thanE.getBoundingClientRect(), pad = 8;
+        if (!(disc.right > body.left - pad && disc.left < body.right + pad && disc.bottom > body.top - pad && disc.top < body.bottom + pad)) hong('listen', `the stethoscope is not on the pet's body (disc ${disc.left.toFixed(0)}–${disc.right.toFixed(0)}, ${disc.top.toFixed(0)}–${disc.bottom.toFixed(0)}; body ${body.left.toFixed(0)}–${body.right.toFixed(0)}, ${body.top.toFixed(0)}–${body.bottom.toFixed(0)})`);
+      }
+      exam.progress(1); if (doctor.el.toolL.style.display !== 'none' || doctor.el.toolR.style.display !== 'none') hong('listen', 'the stethoscope stays in the hand after listening');
+      exam.kill(); doctor.svg.remove();
+      const shot = vet.inject(cat); shot.time(1.3);
+      if (!(vet.s.plungerR > 0.5)) hong('inject', `the plunger is not pressed (${vet.s.plungerR.toFixed(2)})`);
+      // Ống tiêm ở trong NẮM TAY: giữa thân ống cách lòng bàn tay (0, 10 trong hệ cổ tay) không quá 17 đơn vị khung (bản để ống tiêm bị nhấc theo độ nghiêng: 23).
+      const palm = new DOMPoint(0, 10).matrixTransform(vet.el.coTayR.getScreenCTM()), tube = vet.el.itemR.querySelector('[data-syringe] rect:nth-of-type(1)').getBoundingClientRect();
+      const offPalm = Math.hypot((tube.left + tube.right) / 2 - palm.x, (tube.top + tube.bottom) / 2 - palm.y) / vet.svg.getScreenCTM().a;
+      if (offPalm > 17) hong('inject', `the syringe has left the hand (${offPalm.toFixed(1)} units from the palm)`);
+      shot.progress(1); if (vet.s.plungerR !== 0) hong('inject', 'the plunger does not come back after the injection');
+      shot.kill();
+      const leftCat = L.createPet(place('left:80px;top:105px;width:100px;height:82px'), { species: 'cat' }).rig;
+      let wrongSide = ''; try { vet.inject(leftCat); } catch (error) { wrongSide = error.message; }
+      if (!wrongSide.includes('stand the pet on the right')) hong('inject', 'a pet on the side of the empty hand should be refused with a clear message');
+      let noSyringe = ''; try { L.createCharacter(place('left:0;top:0;width:10px;height:12px'), { id: 'boy' }).rig.inject(cat); } catch (error) { noSyringe = error.message; }
+      if (!noSyringe.includes('items: { R: "syringe" }')) hong('inject', 'without a syringe it should say how to give one');
+      // Bế: giữa chừng con vật nằm trong SVG của người, trước bụng; đặt xuống thì về host cũ, đúng chỗ cũ.
+      const holder = L.createCharacter(place('left:140px;top:0;width:200px;height:235px'), { id: 'girl' }).rig;
+      const before = cat.svg.getBoundingClientRect(), home = cat.svg.parentNode;
+      holder.state.facing = 0.55;                                                     // bắt đầu ở dáng 3/4 về phía con vật
+      const hug = L.sequence(holder, [['carry', cat], ['nod'], ['putDown']]);
+      hug.time(hug.data.steps[1].start + 0.6);
+      const torso = holder.el.ao.getBoundingClientRect(), body = cat.el.thanE.getBoundingClientRect();
+      if (!holder.svg.contains(cat.svg)) hong('carry', 'while carried, the pet is not in the arms (its SVG is not inside the person)');
+      else if (!((body.top + body.bottom) / 2 > torso.top && (body.top + body.bottom) / 2 < torso.bottom && (body.left + body.right) / 2 > torso.left && (body.left + body.right) / 2 < torso.right)) hong('carry', 'the carried pet is not in front of the torso');
+      if (cat.el.bong.getAttribute('opacity') !== '0') hong('carry', 'a carried pet still has a shadow under its feet');
+      // Ôm bằng HAI tay, cả hai nằm trên con vật; quay về nhìn thẳng; đầu con vật ló ra GIỮA hai cánh tay (không bị cánh
+      // tay nào vẽ đè ngang mặt).
+      const hugs = (arm) => arm.parentNode === holder.el.tren && !!(holder.el.om.compareDocumentPosition(arm) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (!hugs(holder.el.batL) || !hugs(holder.el.batR)) hong('carry', 'both arms should hug the pet (drawn over it) — one is behind it or behind the body');
+      if (Math.abs(holder.s.huong) > 0.02) hong('carry', `the carrier should face the viewer while carrying (facing ${holder.s.huong.toFixed(2)})`);
+      // Giữa MÉP TRONG của hai bắp tay (khoảng trống trước ngực), không chỉ giữa hai khuỷu.
+      const petHead = cat.el.dau.getBoundingClientRect(), upperL = holder.el.canhHinhL.getBoundingClientRect(), upperR = holder.el.canhHinhR.getBoundingClientRect();
+      const headX = (petHead.left + petHead.right) / 2, gapFrom = Math.min(upperL.right, upperR.right), gapTo = Math.max(upperL.left, upperR.left);
+      if (!(headX > gapFrom && headX < gapTo)) hong('carry', `the carried pet's head (x ${headX.toFixed(0)}) is not in the gap between the arms (${gapFrom.toFixed(0)}–${gapTo.toFixed(0)}) — an arm is drawn across its face`);
+      hug.time(hug.duration());
+      if (Math.abs(holder.s.huong - 0.55) > 0.01) hong('putDown', `the carrier does not turn back to the facing it had (${holder.s.huong.toFixed(2)})`);
+      const after = cat.svg.getBoundingClientRect();
+      if (cat.svg.parentNode !== home) hong('putDown', 'the pet does not go back to its own host');
+      else if (Math.abs(after.left - before.left) > 0.5 || Math.abs(after.width - before.width) > 0.5) hong('putDown', `the pet is not back where it was (moved ${(after.left - before.left).toFixed(1)} px, size ${(after.width - before.width).toFixed(1)} px)`);
+      hug.kill();
+      const walker = L.createCharacter(place('left:140px;top:0;width:200px;height:235px'), { id: 'boy' }).rig;
+      let walked = ''; try { L.sequence(walker, [['carry', cat], ['walk', 4, 120], ['putDown']]); } catch (error) { walked = error.message; }
+      if (!walked.includes('walk back first')) hong('putDown', 'putting a pet down after walking away should be refused with a clear message');
+      ring.remove();
     }
     // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
     {
