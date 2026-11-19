@@ -255,6 +255,24 @@ def fingerprint(html):
     return hashlib.sha256(re.sub(r'<!-- scene\.py:[0-9a-f]{16} -->\n?', '', html).encode('utf-8')).hexdigest()[:16]
 
 
+def framing_notes(samples, step=0.25, least=2.0):
+    """Nhắc những đoạn (≥ `least` giây) mà mép khung cắt dở một nhân vật — còn 5…85 % hình trong khung. Ít hơn là chỉ
+    lướt qua mép (đi vào / ra khỏi khung, máy đang lia qua), nhiều hơn là chỉ sượt chân tóc: không nhắc."""
+    spans = {}
+    for sample in samples:
+        if not 0.05 <= sample['shown'] <= 0.85: continue
+        runs = spans.setdefault((sample['name'], sample['edge']), [])
+        if runs and sample['t'] - runs[-1][1] <= step * 1.5: runs[-1][1] = sample['t']; runs[-1][2].append(sample['shown'])
+        else: runs.append([sample['t'], sample['t'], [sample['shown']]])
+    notes = []
+    for (name, edge), runs in spans.items():
+        for start, end, shown in runs:
+            if end + step - start < least: continue
+            notes.append((start, f'{start:.1f}–{end + step:.1f} s: the {edge} edge of the frame cuts through "{name}" (about {round(100 * sum(shown) / len(shown))} % shows) — '
+                                 f'frame them in or leave them out: change that turn\'s "view" (x, zoom, distance), or move "{name}"'))
+    return [note for _, note in sorted(notes)]
+
+
 def read_timings(folder, target):
     """Load the composition once in headless Chrome and return its window.__sceneTimings."""
     chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
@@ -270,7 +288,7 @@ def read_timings(folder, target):
         with tempfile.TemporaryDirectory() as work:
             log = os.path.join(work, 'log')
             probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '45', '--fail-on-error',
-                                    '--eval', 'window.__sceneTimings', '--log', log], capture_output=True, text=True)
+                                    '--eval', 'Object.assign({}, window.__sceneTimings, { framing: window.__framing ? window.__framing() : [] })', '--log', log], capture_output=True, text=True)
             errors = open(log, encoding='utf-8').read().strip() if os.path.exists(log) else ''
         if probe.returncode != 0 or not probe.stdout.strip() or probe.stdout.strip() == 'null':
             fail('the composition did not build:\n  ' + (errors or probe.stderr.strip() or 'no error message').replace('\n', '\n  ') + f'\n  (see {target})')
@@ -452,6 +470,8 @@ def main():
     parser.add_argument('--retime', metavar='INDEX_HTML', help='re-time a generated composition after hand edits: fix every <audio> clip and the total duration in place')
     parser.add_argument('-o', '--output', help='output folder (default: <scene folder>/<id>)')
     parser.add_argument('--force', action='store_true', help='overwrite index.html even if it was edited by hand since the tool wrote it')
+    parser.add_argument('--no-intro', action='store_true', help='leave out the scene\'s "intro" card (tools/film.py: only the first scene of a film opens with one)')
+    parser.add_argument('--no-outro', action='store_true', help='leave out the scene\'s "outro" card (tools/film.py: only the last scene of a film closes with one)')
     parser.add_argument('--cues', default='auto', choices=['auto', 'rhubarb', 'spectral', 'amplitude'], help='lip-sync method for voice files')
     args = parser.parse_args()
     if args.retime: return retime(args.retime)
@@ -462,6 +482,8 @@ def main():
     except json.JSONDecodeError as error:
         fail(f'{args.scene} is not valid JSON: {error}')
     if not isinstance(scene, dict): fail('the scene file must be a JSON object')
+    if args.no_intro: scene.pop('intro', None)
+    if args.no_outro: scene.pop('outro', None)
     known('scene', scene, TOP_KEYS)
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
@@ -1153,8 +1175,10 @@ def main():
         # Nhạc nền: một clip tiếng chạy suốt cảnh, nhỏ hơn giọng nói. data-role để tools/peek.sh không coi nó là giọng thiếu người nhép.
         body.append(f'  <audio id="music" class="clip" src="{os.path.basename(music)}" data-role="music" data-start="0" data-duration="__TOTAL__" data-track-index="{track[0]}" data-volume="{float(scene.get("musicVolume", 0.15)):g}"></audio>')
         track[0] += 1
+    # Bối cảnh 3D: host của nhân vật do createSet đặt — mang tên trong kịch bản (data-name) để `set.framing()` nhắc đúng người.
+    if stage_set is not None: setup.append("    const host = (name) => { const element = document.createElement('div'); element.dataset.name = name; return element; };")
     for who in names.values():
-        mount = "document.createElement('div')" if stage_set is not None else f"$('{who['_element']}')"
+        mount = f"host({js(who['name'])})" if stage_set is not None else f"$('{who['_element']}')"
         held = {}
         for side, item in (who.get('holds') or {}).items():
             # Ảnh trên màn hình điện thoại đi theo bản dựng như mọi ảnh khác: chép vào thư mục ra, gọi bằng tên tệp.
@@ -1298,6 +1322,13 @@ def main():
             call = f"set.cut({{ {values} }})" if view['cut'] else f"set.move({{ {values} }}, {view['dur']:g}, {js(view['ease'])})"
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
         if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
+    # SOÁT GÓC MÁY (bối cảnh 3D): tua cả cảnh, mỗi 0,25 s hỏi set.framing() ai đang bị mép khung cắt dở. tools/scene.py gọi
+    # hàm này một lần khi dựng (read_timings) rồi nhắc; lúc render không ai gọi nó.
+    framing_code = ''
+    if stage_set is not None:
+        framing_code = ("    // Read by tools/scene.py: who the frame edge cuts through, every 0.25 s (not called in a render).\n"
+                        "    window.__framing = () => { const cut = []; for (let t = T0; t < (T1 || tl.duration()); t += 0.25) { tl.seek(t, false); set.update(); "
+                        "set.framing().forEach((c) => cut.push(Object.assign({ t: +t.toFixed(2) }, c))); } tl.seek(0, false); set.update(); return cut; };\n")
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
 <html lang="en">
@@ -1331,10 +1362,11 @@ def main():
     const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
     talk.addTo(tl, T0);
 {caption_code}{view_code}{card_code}{drive_code}
-    window.__timelines = window.__timelines || {{}};
+{framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
-    window.__sceneTimings = {{ duration: tl.duration(), outro: T1, turns: talk.turns.map((turn) => [T0 + turn.start, T0 + turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: T0 + step.start, sound: step.sound, length: step.speech }}))) }};
+    window.__sceneTimings = {{ duration: tl.duration(), outro: T1, turns: talk.turns.map((turn) => [T0 + turn.start, T0 + turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: T0 + step.start, sound: step.sound, length: step.speech }}))),
+      lines: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.text).map((step) => ({{ start: T0 + step.start, end: T0 + step.start + (step.speech || step.duration), text: step.text }}))) }};
   </script>
 </div>
 </body>
@@ -1350,6 +1382,8 @@ def main():
         final = final.replace(f'__START_{voice["key"]}__', f'{line["start"]:.2f}')
     final = place_shows(final, timings, total)
     final = place_toasts(final, timings, total)
+    # Thời gian của cảnh cho tools/film.py (phụ đề .srt của cả phim): tổng độ dài và từng câu thoại.
+    json.dump({'duration': total, 'lines': timings.get('lines', [])}, open(os.path.join(out, 'timings.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     if outro: final = final.replace('__OUTRO_START__', f'{timings["outro"]:.2f}').replace('__OUTRO_DUR__', f'{max(0.5, total - timings["outro"]):.2f}')
     # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
     final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')
@@ -1358,6 +1392,7 @@ def main():
     print(f'  {len(names)} characters · {len(script)} script entries · {len(voices)} voice lines · {total:g} s')
     for voice, line in zip(voices, timings['speech']):
         print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
+    notes += framing_notes(timings.get('framing', []))
     for note in notes: print(f'  ! {note}')
     if preset_note: print(f'  · {preset_note}')
     print(f'next: sh tools/peek.sh {os.path.relpath(target)}      # timings, warnings and a contact sheet')

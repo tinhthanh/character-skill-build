@@ -413,10 +413,20 @@ with tempfile.TemporaryDirectory() as work:
         starts = re.findall(r'id="outro-bg"[^>]*data-start="([\d.]+)"', html)
         toast = re.findall(r'id="toast-1"[^>]*data-start="([\d.]+)"', html)
         if not starts or not toast or not float(toast[0]) > 2.6: problems.append(f'cards: the turns are not shifted after the opening card (toast at {toast})')
+    # Đợt 11: tools/film.py bỏ thẻ của các cảnh giữa phim (--no-intro / --no-outro).
+    try:
+        json.dump(cards, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), path, '-o', os.path.join(work, 'nocards'), '--no-intro', '--no-outro'], capture_output=True, text=True)
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('--no-intro / --no-outro: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'nocards', 'index.html'), encoding='utf-8').read()
+        if 'id="intro-bg"' in html or 'id="outro-bg"' in html or 'const T0 = 0;' not in html: problems.append('--no-intro / --no-outro: the cards are still in the composition')
     bad_film = os.path.join(work, 'bad-film.json')
-    json.dump({'scenes': ['x.json'], 'music': 'a.mp3'}, open(bad_film, 'w'))
+    json.dump({'scenes': ['x.json'], 'soundtrack': 'a.mp3'}, open(bad_film, 'w'))
     done = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'film.py'), bad_film], capture_output=True, text=True)
-    if done.returncode == 0 or 'music' not in done.stderr: problems.append('film.py: an unknown key in film.json is not refused clearly — ' + done.stderr.strip()[:160])
+    if done.returncode == 0 or 'soundtrack' not in done.stderr: problems.append('film.py: an unknown key in film.json is not refused clearly — ' + done.stderr.strip()[:160])
 
     for outdoor in ('park', 'street'):
         scene = {'id': outdoor, 'set': {'preset': outdoor}, 'characters': [{'name': 'boy', 'id': 'boy', 'x': -200, 'z': -500, 'holds': 'leash'}, {'name': 'dog', 'species': 'dog', 'x': 0, 'z': -500}],
@@ -430,6 +440,16 @@ with tempfile.TemporaryDirectory() as work:
             if os.path.exists(path): os.remove(path)
         if done.returncode != 0: problems.append(f'set.preset "{outdoor}" does not build: ' + done.stderr.strip()[:300])
         elif '"tree"' not in open(os.path.join(work, outdoor, 'index.html'), encoding='utf-8').read(): problems.append(f'set.preset "{outdoor}": no tree cutout')
+        elif 'window.__framing' not in open(os.path.join(work, outdoor, 'index.html'), encoding='utf-8').read(): problems.append(f'set.preset "{outdoor}": no framing sweep (window.__framing)')
+
+    # Đợt 11: nhắc góc máy cắt dở nhân vật — chỉ đoạn đủ dài (≥ 2 s), chỉ khi còn 5…85 % hình trong khung.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('scene_tool', os.path.join(HERE, 'scene.py')); scene_tool = importlib.util.module_from_spec(spec); spec.loader.exec_module(scene_tool)
+    samples = [{'t': 1 + n * 0.25, 'name': 'boy', 'shown': 0.5, 'edge': 'left'} for n in range(12)]           # 3 s bị cắt đôi
+    samples += [{'t': 6 + n * 0.25, 'name': 'cat', 'shown': 0.4, 'edge': 'bottom'} for n in range(4)]         # 1 s: máy lia qua
+    samples += [{'t': 9 + n * 0.25, 'name': 'vet', 'shown': 0.95, 'edge': 'top'} for n in range(20)]          # chỉ sượt tóc
+    notes = scene_tool.framing_notes(samples)
+    if len(notes) != 1 or '"boy"' not in notes[0] or 'left edge' not in notes[0]: problems.append(f'framing notes: expected one note about "boy" at the left edge — got {notes}')
 
     def variant3d(change):
         scene = json.load(open(stage, encoding='utf-8')); change(scene); return scene

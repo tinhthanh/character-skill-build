@@ -1,4 +1,4 @@
-/* VGCharacter v0.50.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.51.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5065,6 +5065,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const [cx0, cy0, cx1, cy1] = actor.content, w = actor.width * at.scale, h = actor.height * at.scale;
         const left = at.x - w / 2, top = at.y - h * (actor.ground || 1);
         const away = camera.lens - at.depth < 60 || left + cx0 * w > view.clientWidth || left + cx1 * w < 0 || top + cy0 * h > view.clientHeight || top + cy1 * h < 0;
+        actor.box = away ? null : [left + cx0 * w, top + cy0 * h, left + cx1 * w, top + cy1 * h];      // phần có hình trên màn hình (cho `framing()`)
         if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
         const margin = actor.width * 0.25, inside = room ? Math.min(actor.where - room[0], room[1] - actor.where) : Infinity;
         const present = room ? clamp((inside + margin) / (2 * margin), 0, 1) : 1;
@@ -5103,6 +5104,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         soften(item, item.element, item.filter, px);
       }
       return frame;
+    },
+    framing() {
+      const W = view.clientWidth, H = view.clientHeight, cut = [];
+      for (const actor of actors) {
+        if (!actor.rig || !actor.box || actor.host.style.display === 'none' || +(actor.host.style.opacity || 1) < 0.5) continue;
+        const [x0, y0, x1, y1] = actor.box, area = (x1 - x0) * (y1 - y0);
+        if (area <= 0) continue;
+        const inside = Math.max(0, Math.min(x1, W) - Math.max(x0, 0)) * Math.max(0, Math.min(y1, H) - Math.max(y0, 0));
+        const over = { left: -x0, right: x1 - W, top: -y0, bottom: y1 - H };
+        const edge = Object.keys(over).reduce((a, b) => (over[a] >= over[b] ? a : b));
+        if (over[edge] > 0) cut.push({ name: actor.host.id || actor.host.dataset.name || '?', shown: +(inside / area).toFixed(3), edge });
+      }
+      return cut;
     },
   };
   function stand(host, rig, { x, z, y, height, turn, ground, shadow: withShadow }) {
@@ -5391,7 +5405,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.50.0';
+const VERSION = '0.51.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

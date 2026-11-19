@@ -432,6 +432,12 @@ set projects the spot a character stands on and places its host as an ordinary 2
 it always faces the lens and stays sharp at any distance. Its shadow lies on the 3D floor under
 its soles, so it flattens and turns with the camera.
 
+**Framing.** `set.framing()` lists who the frame edge cuts through at the current frame
+(`[{ name, shown, edge }]`, `shown` = the part still in the frame). `tools/scene.py` sweeps the
+whole scene with it and warns when a `"view"` leaves a character half in the frame for 2 s or more
+— a close-up that slices the person beside the speaker. Widen the view to take them in, or move it
+so they are fully out.
+
 **The camera stays near eye level.** The characters are drawn at eye level and stand upright;
 from higher up they read as cards standing on the floor. So `pitch` is limited to −8…15° and
 `yaw` to ±60° (the rigs have no back), and a camera outside those limits is an error. For a view
@@ -629,7 +635,10 @@ The library draws characters only. A scene usually needs:
   height leaves only the head showing. Either keep the counter low, or raise the character's
   host (a taller stool) until the chest clears it, and check with `tools/peek.sh`.
 - **Several scenes in one film:** `python3 tools/film.py film.json` builds and renders each scene file and
-  joins them with fade / slide transitions (sound kept in step; silent scenes get a silent track). By hand:
+  joins them with fade / slide transitions (sound kept in step; silent scenes get a silent track). It can lay
+  background music under the whole film (`"music"`, looped, faded, lowered ~10 dB while someone speaks), and writes
+  subtitles (`film.srt`, every spoken line at its time in the film) and a poster frame (`film.jpg`). Only the first
+  scene's `"intro"` and the last scene's `"outro"` card are kept. By hand:
   render each scene at the same size and frame rate
   (`hyperframes render --fps 24 --output partN.mp4`; the default is 30 fps), then join them,
   re-encoding so sound and picture stay together:

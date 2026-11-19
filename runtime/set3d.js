@@ -340,6 +340,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const [cx0, cy0, cx1, cy1] = actor.content, w = actor.width * at.scale, h = actor.height * at.scale;
         const left = at.x - w / 2, top = at.y - h * (actor.ground || 1);
         const away = camera.lens - at.depth < 60 || left + cx0 * w > view.clientWidth || left + cx1 * w < 0 || top + cy0 * h > view.clientHeight || top + cy1 * h < 0;
+        actor.box = away ? null : [left + cx0 * w, top + cy0 * h, left + cx1 * w, top + cy1 * h];      // phần có hình trên màn hình (cho `framing()`)
         if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
         // RA KHỎI PHÒNG (bước vào / bước ra qua tường bên): mờ dần trong khoảng một phần tư bề ngang người hai bên mép sàn —
         // tường bên chỉ là một mặt phẳng nền, không che được ai đứng ngoài nó.
@@ -399,6 +400,25 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         soften(item, item.element, item.filter, px);
       }
       return frame;
+    },
+
+    /**
+     * Ai đang BỊ MÉP KHUNG CẮT DỞ ở khung vừa vẽ: `[{ name, shown, edge }]` — `shown` là phần hình còn trong khung (0…1),
+     * `edge` là mép cắt ('left' | 'right' | 'top' | 'bottom'). Chỉ nhân vật / con vật (có rig), không tính đồ vật hay
+     * người đã ra hẳn ngoài khung. Dùng để soát góc máy: `tools/scene.py` quét cả cảnh và nhắc chỗ nào cắt người làm đôi.
+     */
+    framing() {
+      const W = view.clientWidth, H = view.clientHeight, cut = [];
+      for (const actor of actors) {
+        if (!actor.rig || !actor.box || actor.host.style.display === 'none' || +(actor.host.style.opacity || 1) < 0.5) continue;
+        const [x0, y0, x1, y1] = actor.box, area = (x1 - x0) * (y1 - y0);
+        if (area <= 0) continue;
+        const inside = Math.max(0, Math.min(x1, W) - Math.max(x0, 0)) * Math.max(0, Math.min(y1, H) - Math.max(y0, 0));
+        const over = { left: -x0, right: x1 - W, top: -y0, bottom: y1 - H };
+        const edge = Object.keys(over).reduce((a, b) => (over[a] >= over[b] ? a : b));
+        if (over[edge] > 0) cut.push({ name: actor.host.id || actor.host.dataset.name || '?', shown: +(inside / area).toFixed(3), edge });
+      }
+      return cut;
     },
   };
 

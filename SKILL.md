@@ -138,13 +138,15 @@ clips for every voice file.
    character in or out mid-scene; `"background": { "preset": "clinic" }` (`lobby`, `home`)
    draws a room. Vertical video: `"width": 1080,
    "height": 1920`. **Opening and closing cards:** `"intro"` / `"outro"` (title, text, a call-to-action button, a logo).
-   **Several scenes into one film:** `python3 tools/film.py film.json` (transitions, sound in step).
+   **Several scenes into one film:** `python3 tools/film.py film.json` (transitions, sound in step, background
+   music that dips under speech, an `.srt` of every spoken line, a poster frame).
    **Phone call between two places:** `"layout": "split"` (two halves, each its own background; a
    `"side"` on every character), and `"toast"` on a turn for an app notification card. **Explainer with one presenter:** `"layout": "presenter"` and
    `"show": { "title", "bullets", "image" }` on a turn put titles, bullet points and pictures
    beside the character as they speak (`examples/scene-presenter/scene.json`).
    For a room with depth and a camera that changes angle (pan, push in, wide shot), add
    `"set"` and put `"view"` on turns (`examples/scene-3d/scene.json`; `references/hyperframes.md` → 3D sets).
+   `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
    **Look at the moves first.** Before you write the script, see what each action looks like on the
    characters you cast: `sh tools/actions.sh <id> [--turned]` saves a review sheet (one row per
    action, six moments through it, run through `sequence()` exactly as the scene will), and

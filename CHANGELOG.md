@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.51.0
+
+Added — finishing a film
+- **`tools/film.py`:** `"music"` (+ `"musicVolume"`) lays background music under the whole film —
+  looped to length, faded in and out, lowered about 10 dB while someone speaks (side-chain ducking on
+  the film's own sound); `"subtitles"` (default on) writes `film.srt` with every spoken line at its time
+  in the film; `"poster"` (default 1.0 s) writes `film.jpg`.
+- `tools/scene.py` writes `timings.json` next to each composition (length and spoken lines).
+- `tools/film.py` keeps only the first scene's `"intro"` card and the last scene's `"outro"` card — a
+  "download the app" card no longer cuts into the middle of the film — and says so when that leaves the
+  film without one. It builds every scene before rendering any, so a broken scene fails at once.
+- `tools/scene.py --no-intro / --no-outro` leave a scene's cards out.
+
+Added — framing check (3D sets)
+- `set.framing()` (runtime/set3d.js): who the frame edge is cutting through right now, with how much of
+  them shows and which edge.
+- `tools/scene.py` sweeps the whole scene every 0.25 s and warns when a "view" leaves a character half in
+  the frame for 2 s or more, e.g. `14.2–27.8 s: the left edge of the frame cuts through "boy" (about 61 %
+  shows)`. Passing through the edge during a pan is not reported.
+
 ## 0.50.0
 
 Added — more pets, opening and closing cards, films
