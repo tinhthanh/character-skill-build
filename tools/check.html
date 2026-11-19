@@ -1715,6 +1715,15 @@ try {
         if (!((top() - standing) / unit > 45)) hong('kneel', `kneeling lowers the head only ${((top() - standing) / unit).toFixed(0)} units — it does not read as kneeling`);
         down.progress(1); if (Math.abs(top() - standing) > 1 || actor.s.kneel !== 0) hong('kneel', 'standUp does not bring the character back up');
         down.kill(); actor.datNghi();
+        // Cầm lái xe máy: quay ngang, hông hạ, hai bàn tay ra TRƯỚC thân (về phía mặt) và nắm lại; xuống xe thì đứng thẳng lại.
+        { const bike = L.sequence(actor, ['ride', ['speak', 'Xin chào', 1], 'getOff', ['face', 'front']], { breathe: false });
+          bike.time(bike.data.steps[1].start + 0.5);
+          const unit = actor.svg.getScreenCTM().a, head = actor.el.dau.getBoundingClientRect(), hand = actor.el.tayG.L.getBoundingClientRect();
+          if (Math.abs(actor.s.huong) < 0.95) hong('ride', `riding is not side-on (facing ${actor.s.huong.toFixed(2)})`);
+          if (!((top() - standing) / unit > 45)) hong('ride', `riding lowers the head only ${((top() - standing) / unit).toFixed(0)} units — it does not read as sitting on a scooter`);
+          if (!((hand.left + hand.width / 2) - (head.left + head.width / 2) > 25 * unit)) hong('ride', 'the near hand does not reach forward to the handlebar while speaking');
+          bike.progress(1); if (Math.abs(top() - standing) > 1 || actor.s.ride !== 0) hong('ride', `getOff does not bring the character back up (head ${((top() - standing) / unit).toFixed(1)} units off, ride ${actor.s.ride})`);
+          bike.kill(); actor.datNghi(); }
         const giver = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig, taker = L.createCharacter(spot('left:90px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
         const kitty = L.createPet(spot('left:60px;top:150px;width:100px;height:82px'), { species: 'cat' }).rig, home = kitty.host;
         const give = L.sequence(giver, [['carry', kitty], ['handOverPet', taker]], { breathe: false }), take = L.sequence(taker, [['idle', give.data.steps[1].start - 0.1], ['takePet', giver]], { breathe: false });

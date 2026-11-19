@@ -100,6 +100,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
                is added at the same time; a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
                together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
+               "ride" … "getOff": a person astride a scooter, side-on, hands on the bars — stand a scooter picture
+               under them (its seat at rig.rideSeatY()); the first action of a later turn can be "getOff".
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.74.0
+
+Added — riding a scooter
+- **`ride` / `getOff`** — a held stance for people: astride a scooter or motorbike, full side-on (the
+  current side; from the front, right), thighs level, shins down to the footboard, a slight forward
+  lean, both fists on a handlebar in front of the chest. The rig draws no vehicle: stand a picture
+  under it with its seat at **`rig.rideSeatY()`** (frame y, like `seatY()` for a chair). Speaking,
+  nodding, looking keep the hands on the bars; `wave` / `point` let go of that hand and take it back.
+  A new state channel `ride`; `#khep` keeps it like `seat`, so following actions play riding.
+  In a scene file: `"do": ["ride"]`, … `"do": ["getOff", "wave"]`.
+
 ## 0.73.0
 
 Added — the machine measures the gesturing hands in the frame and the pet's reaction in its insert
