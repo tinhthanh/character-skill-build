@@ -370,6 +370,30 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
 
+    # Đợt 9: thông báo trên màn hình đạo cụ trong bối cảnh 3D, gọi theo tên.
+    screens = {'id': 'screens', 'set': {'preset': 'reception', 'cutouts': [{'kind': 'monitor', 'name': 'screen', 'x': -120, 'z': -460, 'y': 190}, {'kind': 'plant', 'name': 'fern', 'x': 600, 'z': 0}]},
+               'characters': [{'name': 'rec', 'id': 'receptionist', 'x': -300, 'z': -620}],
+               'script': [{'who': 'rec', 'do': ['nod'], 'popup': {'on': 'screen', 'title': 'Lịch hẹn mới', 'text': 'Milo 15:00'}}]}
+    def screen_scene(change):
+        scene = json.loads(json.dumps(screens)); change(scene)
+        path = os.path.join(os.path.dirname(stage), '_check_screens.json')
+        try:
+            json.dump(scene, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            return build(path, os.path.join(work, 'screens'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+    done = screen_scene(lambda s: None)
+    if done.returncode != 0: problems.append('a popup on a monitor does not build: ' + done.stderr.strip()[:300])
+    elif not re.search(r'cutout\d+Prop\.notify\(\{"title": "Lịch hẹn mới", "text": "Milo 15:00"\}, \{ hold: 2\.5 \}\)', open(os.path.join(work, 'screens', 'index.html'), encoding='utf-8').read()): problems.append('popup: the notification call is not in the composition')
+    for label, change, needle in [
+        ('a popup on a screen that does not exist', lambda s: s['script'][0]['popup'].update({'on': 'tv'}), '"tv"'),
+        ('a popup on a plant', lambda s: s['script'][0]['popup'].update({'on': 'fern'}), 'monitor'),
+        ('a popup without text', lambda s: s['script'][0].update({'popup': {'on': 'screen'}}), 'popup'),
+    ]:
+        done = screen_scene(change)
+        if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
+        elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
+
     for outdoor in ('park', 'street'):
         scene = {'id': outdoor, 'set': {'preset': outdoor}, 'characters': [{'name': 'boy', 'id': 'boy', 'x': -200, 'z': -500, 'holds': 'leash'}, {'name': 'dog', 'species': 'dog', 'x': 0, 'z': -500}],
                  'script': [{'who': 'boy', 'do': [['leash', '@dog']]}, {'together': [{'who': 'boy', 'do': [['walk', 4, 200]]}, {'who': 'dog', 'do': [['walk', 4, 300]]}]},

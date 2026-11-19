@@ -101,6 +101,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
   toast        `"toast": "Appointment moved"` or `{ "title": "VetGo", "text": "Bella: Saturday 9:00" }` on a turn: an
                app notification card slides in at the top of the frame as the turn starts and stays 2.5–4 s.
                A person holding a phone can also get one ON the phone: ["notify", "Reminder: Saturday 9:00"].
+  popup        3D sets: `"popup": { "on": "screen", "title": "New appointment", "text": "Milo, 15:00", "hold": 2.5 }` on a
+               turn pops a notification card up ON the screen of a set.cutouts "monitor" (or a "laptop" with "facing":
+               "viewer") given that "name" — it follows the camera with the screen.
   voice        `"voice": "maichi"` on a character (or on one turn) speaks its lines with the `voice-tts` command
                (Vietnamese; `voice-tts voices` lists them). Each line is synthesised ONCE into voice/ next to the
                scene file and reused — delete a file to have it spoken again. `"voice": false` on a turn keeps
@@ -153,7 +156,7 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
-TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast')
+TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup')
 SHOW_KEYS = ('title', 'bullets', 'image')
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
@@ -217,7 +220,7 @@ SET_PRESETS = {
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name')
 CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
 FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
@@ -735,6 +738,7 @@ def main():
     flat = sum(1 for who in names.values() if who['_pet'] and who.get('seated')) + len(arrivals)
     shows = []                                              # { turn: chỉ số phẳng, title, bullets, image } hoặc { turn, clear: True }
     toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
+    popups = []                                             # { turn, cutout: số thứ tự, title, text, hold } — thông báo trên màn hình đạo cụ 3D
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
     views, emitted, reach_notes, pace_notes = [], [flat], [], []
@@ -819,6 +823,20 @@ def main():
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
+        # THÔNG BÁO TRÊN MÀN HÌNH đạo cụ (`"popup"`): màn hình để bàn / laptop quay ra người xem trong bối cảnh 3D, gọi theo tên.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or 'popup' not in turn: continue
+            pop = turn['popup']
+            if stage_set is None: fail(f'{where}: "popup" shows a notification on a screen in a 3D set — add "set" with a named "monitor" or "laptop" cutout')
+            if not isinstance(pop, dict) or set(pop) - {'on', 'title', 'text', 'hold'} or not pop.get('on') or not (pop.get('title') or pop.get('text')):
+                fail(f'{where}: "popup" is {{ "on": "<cutout name>", "title": "…", "text": "…", "hold": 2.5 }} — got {js(pop)}')
+            cutouts = stage_set.get('cutouts', [])
+            index = next((i for i, item in enumerate(cutouts) if item.get('name') == pop['on']), None)
+            if index is None: fail(f'{where}: "popup" names "{pop["on"]}", but no set.cutouts entry has "name": "{pop["on"]}"')
+            screen_item = cutouts[index]
+            if screen_item.get('kind') not in SCREEN_KINDS or (screen_item['kind'] == 'laptop' and screen_item.get('facing') != 'viewer'):
+                fail(f'{where}: "popup" needs a screen the viewer sees — "{pop["on"]}" must be a "monitor", or a "laptop" with "facing": "viewer"')
+            popups.append({'turn': emitted[0], 'cutout': index + 1, 'title': pop.get('title', ''), 'text': pop.get('text', ''), 'hold': float(pop.get('hold', 2.5))})
         # THẺ THÔNG BÁO trên khung (`"toast"`): gắn với lượt của chính mục này (sau các bước lại gần vừa chèn).
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or 'toast' not in turn: continue
@@ -994,7 +1012,7 @@ def main():
                     if key in item: options[key] = item[key]
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
-                setup.append(f"    const cutout{n + 1} = document.createElement('div'); VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});")
+                setup.append(f"    const cutout{n + 1} = document.createElement('div'), cutout{n + 1}Prop = VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});" + (f"          // {item['name']}" if item.get('name') else ''))
             else:
                 name = copy_asset(base, out, item['image'], copied)
                 # Kích thước ảnh ghi sẵn: set.stand đo phần tử để căn giữa và đặt chân — ảnh chưa tải xong thì rộng 0, nên khung
@@ -1217,6 +1235,10 @@ def main():
     # ≈ 0,55 cỡ chữ; trừ lề trong 60px.
     caption_chars = int(((width * 0.7 if landscape else width * 0.6) - 60) / (min(width, height) * 0.041 * 0.55))
     caption_code = f"    tl.add(VGCharacter.captions(talk, $('caption'), {{ maxChars: {caption_chars}, avoid: false }}).paused(false), 0);     // the words of each line, one line at a time, each chunk when the speech reaches it" if captions else ''
+    if popups:
+        caption_code += "\n    // Notifications on the screens of props in the set (they follow the camera with the prop)."
+        for pop in popups:
+            caption_code += f"\n    tl.add(cutout{pop['cutout']}Prop.notify({js({'title': pop['title'], 'text': pop['text']})}, {{ hold: {pop['hold']:g} }}).paused(false), talk.turns[{pop['turn']}].start + 0.3);"
     if speakers:
         moves = ' '.join(f"tl.to('#dim-left', {{ opacity: {0 if side in ('left', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start); tl.to('#dim-right', {{ opacity: {0 if side in ('right', None) else 0.32}, duration: 0.3 }}, talk.turns[{turn}].start);" for turn, side in speakers)
         caption_code += "\n    // Split screen: the half that is not speaking dims a little.\n    " + moves

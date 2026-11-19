@@ -1780,6 +1780,20 @@ try {
         into.progress(1); if (!(pup.s.nam < 0.1 && Math.abs(pup.s.x) < 1)) hong('comeOut', `the pet does not come back out standing (lying ${pup.s.nam.toFixed(2)}, x ${pup.s.x.toFixed(1)})`);
         into.kill(); pup.svg.remove();
       }
+      // Đợt 9 — thông báo trên màn hình đạo cụ: thẻ hiện khi giữ, chữ nằm gọn trong thẻ, tắt khi xong; laptop quay lưng thì báo lỗi.
+      {
+        const deskHost = spot('left:0;top:0;width:200px;height:235px'), screenProp = L.createProp(deskHost, 'monitor', {});
+        const ping = screenProp.notify({ title: 'Lịch hẹn mới', text: 'Bé Milo — 15:00 hôm nay, phòng khám số 2' }, { hold: 1.5 });
+        const card = screenProp.svg.querySelector('[data-note]');
+        ping.time(0.9);
+        if (card.style.display === 'none') hong('prop.notify', 'no notification card on the monitor while it is shown');
+        const frame = card.querySelector('rect').getBoundingClientRect();
+        for (const line of card.querySelectorAll('text')) { const box = line.getBoundingClientRect(); if (box.right > frame.right + 1) hong('prop.notify', `the text "${line.textContent}" runs out of the card`); }
+        ping.progress(1); if (card.style.display !== 'none') hong('prop.notify', 'the card stays after the notification'); ping.kill();
+        let refused = ''; try { L.createProp(spot('left:0;top:0;width:200px;height:235px'), 'laptop', {}).notify('x'); } catch (error) { refused = error.message; }
+        if (!refused.includes('no screen showing')) hong('prop.notify', 'a notification on a laptop facing away should be refused with a clear message');
+        deskHost.remove();
+      }
       const brisk = actor.hurry(6), calm = actor.walk(6);
       if (!(brisk.duration() < calm.duration() * 0.8)) hong('hurry', `hurrying (${brisk.duration().toFixed(2)} s) is not quicker than walking (${calm.duration().toFixed(2)} s) for the same steps`);
       brisk.kill(); calm.kill();

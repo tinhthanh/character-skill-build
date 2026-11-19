@@ -1,4 +1,4 @@
-/* VGCharacter v0.48.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.49.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -6480,7 +6480,7 @@ const DRAW = {
     const base = `<rect x="${x0 - 6}" y="${top - 5}" width="${w + 12}" height="6" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1.200"/>`;
     if (facing === 'viewer') return `
     <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="#22262e" stroke="${line}" stroke-width="1.400"/>
-    ${screen(x0 + 5, top - h, w - 10, h - 10, image)}${base}`;
+    ${screen(x0 + 5, top - h, w - 10, h - 10, image)}${noteCard(x0 + 5, top - h, w - 10, h - 10)}${base}`;
     return `
     <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
     <circle cx="200" cy="${top - 5 - h / 2}" r="${w * 0.07}" fill="${shade(color, 0.45)}"/>${base}`;
@@ -6492,7 +6492,7 @@ const DRAW = {
     <path d="M 192 ${top - 28} h 16 l 5 24 h -26 z" fill="${dark}" stroke="${line}" stroke-width="1.200" stroke-linejoin="round"/>
     <rect x="172" y="${top - 6}" width="56" height="6" rx="3" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
     <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
-    ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}`;
+    ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}${noteCard(x0 + 6, y0 + 6, w - 12, h - 12)}`;
   },
   // BÁT ăn của thú cưng, trên sàn: `fill` 'food' (hạt), 'water' (nước) hoặc 'empty'. Đặt host CÙNG khung với con vật
   // (`bottom`, `height` như host của nó) rồi dời ra trước mõm — `eat` / `drink` cúi đầu xuống đúng cao độ sàn.
@@ -6550,6 +6550,21 @@ const DRAW = {
     <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
   },
 };
+
+// THẺ THÔNG BÁO trên màn hình (laptop quay ra người xem, màn hình để bàn): ẩn sẵn, `prop.notify()` bật nó lên. Nằm ở nửa
+// dưới màn hình, rộng gần bằng màn hình; chữ cỡ theo bề ngang màn hình.
+function noteCard(x, y, w, h) {
+  const cw = w * 0.9, ch = Math.min(h * 0.46, cw * 0.32), cx = x + (w - cw) / 2, cy = y + h - ch - h * 0.06, f = ch * 0.3, icon = ch * 0.56;
+  // Số ký tự vừa một dòng (chữ Arial ≈ 0,52 cỡ chữ mỗi ký tự, đậm ≈ 0,58): `notify` cắt bớt câu dài, thêm "…".
+  const room = cw - ch * 0.55 - icon, fitTitle = Math.floor(room / (f * 0.58)), fitText = Math.floor(room / (f * 0.88 * 0.52));
+  return `<g data-note="1" style="display:none" data-ox="${(cx + cw / 2).toFixed(1)}" data-oy="${(cy + ch / 2).toFixed(1)}" data-fit="${fitTitle},${fitText}">
+      <rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="${(ch * 0.18).toFixed(1)}" fill="#ffffff" stroke="#c8d3da" stroke-width="1"/>
+      <rect x="${cx + ch * 0.2}" y="${cy + (ch - icon) / 2}" width="${icon}" height="${icon}" rx="${(icon * 0.25).toFixed(1)}" fill="#2f9e8f"/>
+      <circle cx="${cx + ch * 0.2 + icon / 2}" cy="${cy + ch / 2}" r="${(icon * 0.22).toFixed(1)}" fill="none" stroke="#ffffff" stroke-width="${(icon * 0.09).toFixed(2)}"/>
+      <text data-note-title="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.44}" font-family="Arial, sans-serif" font-size="${f.toFixed(1)}" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
+      <text data-note-text="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.8}" font-family="Arial, sans-serif" font-size="${(f * 0.88).toFixed(1)}" fill="#3b5560" data-layout-ignore=""></text>
+    </g>`;
+}
 
 // Mặt màn hình: nền sáng, hoặc ảnh lấp đầy (cắt theo khung). Mỗi lần vẽ một id cắt riêng.
 let screenCount = 0;
@@ -6610,7 +6625,34 @@ function createProp(host, kind, options = {}) {
   host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
-  return { svg: host.firstElementChild, kind, seatY: seat };
+  const svg = host.firstElementChild;
+  return { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+}
+
+/**
+ * THÔNG BÁO trên màn hình của đạo cụ (`monitor`, hay `laptop` quay ra người xem): trả về một timeline GSAP (paused) — thẻ
+ * thông báo bật lên ở nửa dưới màn hình, giữ `hold` giây rồi tắt. `message`: một chuỗi (tiêu đề) hoặc { title, text }.
+ *   tl.add(prop.notify({ title: 'Lịch hẹn mới', text: 'Bé Milo — 15:00' }).paused(false), 4);
+ * Thẻ vẽ trong SVG của đạo cụ nên đi theo đạo cụ (cả trong bối cảnh 3D). Phát lại qua setter: tua kiểu nào cũng đúng.
+ */
+function notifyOn(svg, kind, message, { hold = 2.5 } = {}) {
+  const card = svg.querySelector('[data-note]');
+  if (!card) throw new Error(`[character] notify: the "${kind}" prop has no screen showing — a monitor, or a laptop with facing: 'viewer'`);
+  const note = typeof message === 'string' ? { title: message, text: '' } : (message || {});
+  const [fitTitle, fitText] = card.getAttribute('data-fit').split(',').map(Number);
+  const fit = (text, n) => (text.length <= n ? text : text.slice(0, Math.max(1, n - 1)).trimEnd() + '…');
+  card.querySelector('[data-note-title]').textContent = fit(String(note.title || ''), fitTitle);
+  card.querySelector('[data-note-text]').textContent = fit(String(note.text || ''), fitText);
+  const ox = card.getAttribute('data-ox'), oy = card.getAttribute('data-oy');
+  const show = (k) => {
+    card.style.display = k > 0.01 ? '' : 'none';
+    card.setAttribute('transform', `translate(${ox} ${oy}) scale(${(0.6 + 0.4 * k).toFixed(3)}) translate(${-ox} ${-oy})`);      // k vượt 1 một chút (back.out): thẻ nảy lên
+    card.style.opacity = Math.min(1, k).toFixed(3);
+  };
+  const state = { _k: 0, get k() { return this._k; }, set k(v) { this._k = v; show(v); } };
+  const tl = gsap.timeline({ paused: true });
+  tl.to(state, { k: 1, duration: 0.35, ease: 'back.out(1.8)' }, 0).to(state, { k: 0, duration: 0.3, ease: 'power2.in' }, 0.35 + hold);
+  return tl;
 }
 
 return { PROP_FRAME, PROP_KINDS, createProp };
@@ -7997,7 +8039,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.48.0';
+const VERSION = '0.49.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

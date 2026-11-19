@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.49.0
+
+Added — notifications on screens in a set
+- **`prop.notify(message, { hold })`** — `createProp` returns it for a `monitor` and a `laptop` facing
+  the viewer: a timeline that pops a notification card (icon, title, a line of text, cut with "…" to fit)
+  up on the screen. It is drawn inside the prop, so in a 3D set it stays on the screen as the camera
+  moves. A laptop facing away refuses with a clear message.
+- **`"popup"`** on a turn in a scene file with a 3D set: `{ "on": "<cutout name>", "title", "text",
+  "hold" }`; cutouts take a `"name"`.
+
 ## 0.48.0
 
 Added — waiting room, outdoors, accessories for people
