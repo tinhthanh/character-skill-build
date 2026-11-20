@@ -72,8 +72,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                ["listen", "@pet"] (stethoscope), ["inject", "@pet"] (needs "holds": "syringe", pet on that hand's side),
                ["carry", "@pet"] … "putDown" (pick the pet up and hold it; pets: "lieDown", ["sleep", 3], "unwell"), phone and
                computer steps ["showPhone", 1.8], ["tapPhone", 1.6], ["typing", 2], ["call", null, 2] (listening), and
-               ["handOver", "@other"] together with the other's ["take", "@giver"]. A character that strokes
-               or hands over walks up to the target first if it stands out of reach. `shot`: "face" | "wide" | false | ["vet", "bella"]
+               ["handOver", "@other"] (the other takes it at the same time if they have the item put away — "holds" +
+               "holdsHidden"; a single "holds" item sits in the hand on the side of whoever it is handed to / taken from).
+               A character that strokes or hands over walks up to the target first if it stands out of reach; a pet
+               walks over to a SEATED person (give the pet the same z). `shot`: "face" | "wide" | false | ["vet", "bella"]
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
                crying, embarrassed, sleepy. A PET's "mood": happy, excited, sad, scared, angry, curious, guilty,
@@ -95,8 +97,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
                A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene; a person's
                "wears": "mask" | "gloves" | "cap" (or a list). Pets: "greet", "play", ["goIn", 90] … ["comeOut", 90].
-               "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] together with the vet's
-               ["takePet", "@owner"] (a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
+               "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
+               is added at the same time; a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
                together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
@@ -175,7 +177,7 @@ PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front
 # Động tác mà bàn tay phải TỚI được đích: tới đầu / thân con vật, hay tới tay người kia (đợt 28: soát diễn xuất).
 # Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
 REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
-                 'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands'}
+                 'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body'}
 CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
@@ -227,10 +229,12 @@ SET_PRESETS = {
         'room': {'width': 2200, 'depth': 1500, 'floor': '#8cc46d', 'floor2': '#84bb66', 'tile': 260,
                  'wall': 'linear-gradient(#a9d8f2 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)', 'sideWall': 'linear-gradient(#b9e0f4 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)',
                  'skyline': 0.58},                   # trời vẽ trên tường tới 58 % bề cao: tối theo giờ như bầu trời, không như tường
-        'boxes': [{'name': 'bench', 'x': 220, 'z': -880, 'width': 340, 'depth': 110, 'height': 85, 'color': '#a47551', 'top': '#c08f66', 'side': '#8c6243'}],
+        # Ghế đá cao 100 — đúng mặt ghế của rig (~86 đơn vị khung ≈ 100 ở cỡ người mặc định): cao 85 thì người ngồi lơ lửng trên
+        # ghế 3,5 % chiều cao (đo bằng tools/acting_check.py, đợt 29).
+        'boxes': [{'name': 'bench', 'x': 220, 'z': -880, 'width': 340, 'depth': 110, 'height': 100, 'color': '#a47551', 'top': '#c08f66', 'side': '#8c6243'}],
         'cutouts': [{'kind': 'tree', 'x': -720, 'z': -1100}, {'kind': 'tree', 'x': 780, 'z': -1000, 'color': '#5f9a68'}, {'kind': 'lamp', 'x': -260, 'z': -1150},
                     {'kind': 'plant', 'x': 900, 'z': 60, 'height': 560, 'color': '#a47551'}],
-        'spots': 'walk the dog along x -600…600, z -500 · on the bench: "on": "bench", x 380, "seated": true (sits in front of it)',
+        'spots': 'walk the dog along x -600…600, z -500 · on the bench: "on": "bench", x 380, "seated": true (sits in front of it) · a pet the person on the bench strokes or picks up: the same z as the bench (-880), it walks over',
     },
     'street': {
         'room': {'width': 2200, 'depth': 1300, 'floor': '#cfcfc8', 'floor2': '#c2c2bb', 'tile': 150,
@@ -252,7 +256,7 @@ SET_PRESETS = {
         # KHUNG DỌC: TV xích lại gần sofa — để x 540 thì góc toàn dọc không lấy trọn được cả sofa lẫn TV (đợt 27: sofa lẹm mép);
         # sofa ngắn lại và dịch vào giữa — chỉ dời TV thì góc toàn vẫn lẹm đầu trái sofa (Gemini, đợt 28).
         'vertical': {'cutouts': {'tv': {'x': 330}}, 'boxes': {'sofa': {'x': -470, 'width': 440}}},
-        'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
+        'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 (a pet the owner on the sofa strokes or picks up: z -820, it walks over) · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall', 'gloss', 'skyline')
@@ -418,6 +422,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             pet = pet_of(op['target'])
             ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
+            if op['kind'] == 'carry': ask = [f'Is {op["who"]} holding the animal ({op["target"]}) in their arms, against the chest — not floating beside them?']
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]} {op["target"]}', 'ask': ask + ['Are the standing characters\' feet on the floor (not floating above it or sunk into it)?'],
                             'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
@@ -781,7 +786,20 @@ def main():
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
             held = who.get('holds')
-            if isinstance(held, str): held = {'R': held}
+            if isinstance(held, str):
+                # Một món đồ, không nói tay nào: cầm ở tay PHÍA NGƯỜI SẼ NHẬN / ĐƯA (lượt `handOver` / `take` đầu tiên của người
+                # này). Tay phải mặc định mà người kia đứng bên trái thì cánh tay phải vắt ngang bụng, bàn tay không ra khỏi thân
+                # (cảnh thử đợt 29: bác sĩ đưa thuốc, tay cách tay bà 20 % chiều cao).
+                side = 'R'
+                spots = {c.get('name'): float(c.get('x', 0)) for c in cast if isinstance(c, dict) and isinstance(c.get('x'), (int, float))}
+                turns_of = [t for entry in (scene.get('script') or []) for t in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry])]
+                # Người nhận đứng một mình trong kịch bản (`take` do công cụ thêm vào lượt `handOver` của người kia): tính theo người đưa.
+                swap = next((step[1][1:] if t.get('who') == name else t.get('who') for t in turns_of if isinstance(t, dict) and isinstance(t.get('do'), list)
+                             for step in t['do'] if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str)
+                             and ((t.get('who') == name and step[0] in ('handOver', 'take') and step[1][1:] in spots)
+                                  or (step[0] == 'handOver' and step[1] == '@' + name and t.get('who') in spots and who.get('holdsHidden')))), None)
+                if swap and name in spots and spots[swap] < spots[name]: side = 'L'
+                held = {side: held}
             # Một món đồ: tên, hoặc { "kind": "phone", "image": "app.png" } (ảnh trên màn hình điện thoại).
             def item_ok(item):
                 if isinstance(item, dict): return item.get('kind') in ITEM_KINDS and set(item) <= {'kind', 'image'} and (not item.get('image') or item['kind'] == 'phone')
@@ -839,9 +857,14 @@ def main():
                 if item[1:] not in names: fail(f'{where}: "{item}" refers to a character that is not in the scene')
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
+                # Đích ĐÃ ĐI khỏi chỗ đầu cảnh (con chó đi tới ông ngồi ghế đá): lúc dựng, trạng thái của nó còn ở chỗ cũ — báo cho
+                # set.target chỗ nó đứng ở lượt này, tính bằng đơn vị khung của nó (đợt 29: tay ông chìa ra chỗ con chó lúc đầu).
+                other = names[item[1:]]
+                walked = (float(other['x']) - float(other['_x0'])) / other['_unit'] if other.get('_unit') and other.get('_x0') is not None else 0
+                at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
                 if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
-                elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]})")
-                elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
+                elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
+                elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
                 else: parts.append(item[1:])
             else:
                 parts.append(js(item))
@@ -1170,12 +1193,13 @@ def main():
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
                     reach_notes.append(f'{where}: "{who["name"]}" reaches for "{step[1][1:]}" ({step[0]}), which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
                 gap = float(names[step[1][1:]]['x']) - float(who['x'])
-                # Đưa đồ: hai cánh tay cùng vươn (0,45); bắt tay: bàn tay gặp nhau ở giữa, đứng gần hơn (0,38); chạm tới con vật: gần như vuốt ve.
+                # Đưa đồ: hai bàn tay gặp nhau ở giữa như bắt tay (0,28 — đợt 29: 0,45 để tay cách tay 20 % chiều cao); trao con vật
+                # đang bế: 0,34 (0,42: 7,8 %); bắt tay: 0,22; chạm tới con vật: gần như vuốt ve.
                 # Soi đèn / đưa bánh thưởng tới ĐẦU con vật (cao hơn thân, xa vai hơn): đứng sát hơn nữa (0,16), không thì tay
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.45, 'handOverPet': 0.42, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
                     # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
@@ -1304,6 +1328,15 @@ def main():
             shaken = [name for name in shaken if name in names and not names[name]['_pet'] and name != entry.get('who')]
             if shaken and not pets and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
                 code = '{ together: [' + code + f", [{names[shaken[0]]['name']}, [\"handshake\", {names[entry['who']]['name']}]]] }}"
+                emitted[0] += 1
+            # `["handOver", "@người kia"]` / `["handOverPet", "@người kia"]` một mình: người kia NHẬN cùng lúc (`take` — nếu họ có
+            # món đồ đang cất, `"holdsHidden": true` —, `takePet`). Không thì món đồ / con vật trôi vào khoảng không: `handOverPet`
+            # một mình làm hỏng cả cảnh (`putDown` sau đó báo "không bế con vật nào") (đợt 29).
+            given = [(step[0], step[1][1:]) for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in ('handOver', 'handOverPet') and isinstance(step[1], str) and step[1].startswith('@')]
+            given = [(kind, name) for kind, name in given if name in names and not names[name]['_pet'] and name != entry.get('who') and (kind == 'handOverPet' or (names[name].get('holds') and names[name].get('holdsHidden')))]
+            if given and not pets and not shaken and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
+                kind, name = given[0]
+                code = '{ together: [' + code + f", [{names[name]['name']}, [{js('take' if kind == 'handOver' else 'takePet')}, {names[entry['who']]['name']}]]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
             # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).

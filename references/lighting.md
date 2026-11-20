@@ -103,3 +103,19 @@ What the scene tool now does for the acting, so the measurements pass without ex
 - `bác sĩ → bé: bắt tay` makes the other person **shake hands back**; they stand close enough for the short arms to
   meet, and the shot is a full one, so the hands are in it.
 - In a vertical frame the living room is laid out tighter (shorter sofa, TV nearer), so a full shot holds both.
+- `bé → ông: đưa` (`handOver`) makes the other person **take** it at the same time (when they have the item put
+  away), and `trao` (`handOverPet`) adds the other's `takePet`; both reach for the point between their shoulders, like a
+  handshake, and the item sits in the hand on the receiver's side.
+- A pet walks over to a **seated** person who strokes or picks it up; the hand aims at where the pet stands then.
+  `acting_check` also measures that a carried pet is in the arms and that a seated person sits on the seat
+  (within 3 % of their height of the top of the sofa / bench).
+
+## One side brighter
+
+The light on a character's body comes from one side: the half facing the main light (a lamp, the window, the sun) is
+brighter — warmed by it in daylight — and the other half darker and cooler. `python3 tools/light_side.py <scene dirs…>`
+measures it on the opening frame (where the reviewer is asked): it captures the frame, the frame without the
+characters (to find their pixels) and the frame without the body shading, and compares the brightness of the two
+halves of each person's head and upper body. The half facing the light must be at least 8 % brighter (or the shading
+must add 8 %). Backlit people (a bright window behind them) and people at night with no lamp near are reported but not
+judged. `--all` measures at the acting moments too.

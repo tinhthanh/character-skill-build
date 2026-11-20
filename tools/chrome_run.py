@@ -93,6 +93,8 @@ def main():
     parser.add_argument('--size', default='1280x800', help='viewport, WxH')
     parser.add_argument('--size-js', help='JavaScript evaluated after the page is finished; returns "W,H" for the screenshot')
     parser.add_argument('--log', help='write page errors here')
+    parser.add_argument('--steps', help='a JSON file: a list of {"eval": "JS"} and {"screenshot": "out.png"} run in order once the page is finished; '
+                                        'the values of the evals are printed as a JSON list (tools/light_side.py)')
     args = parser.parse_args()
     if not args.chrome:
         print('chrome_run: no Chrome given (--chrome or $CHROME_BIN)', file=sys.stderr); sys.exit(4)
@@ -136,6 +138,16 @@ def main():
             ok = title == 'ready' if args.wait_js else title in finished
             if args.evaluate and ok:
                 print(json.dumps(evaluate(args.evaluate)))
+            # NHIỀU BƯỚC trong một lần mở trang (đợt 29): tua, chụp, ẩn một nhân vật, chụp lại… — mở lại trang cho từng ảnh
+            # thì mỗi lần mất vài giây dựng cảnh.
+            if args.steps and ok:
+                values = []
+                for step in json.load(open(args.steps, encoding='utf-8')):
+                    if 'eval' in step: values.append(evaluate(step['eval']))
+                    if 'screenshot' in step:
+                        call('Runtime.evaluate', {'expression': 'new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))', 'awaitPromise': True})
+                        with open(step['screenshot'], 'wb') as f: f.write(base64.b64decode(call('Page.captureScreenshot', {'format': 'png'})['data']))
+                print(json.dumps(values))
             # Lỗi của trang: ngoại lệ không ai bắt và console.error.
             errors = []
             for event in tools.events:

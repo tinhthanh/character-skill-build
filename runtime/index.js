@@ -22,7 +22,7 @@ import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROU
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.68.0';
+export const VERSION = '0.69.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 
@@ -820,8 +820,8 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...written] = turn, mine = part(rig);
       // `face`, `handOver`, `take`, `stroke` nhận một NHÂN VẬT KHÁC làm đích: thay bằng mỏ neo (xem `anchor`).
-      // `handshake` cũng thế (đợt 28): không thì tay chìa về chỗ người kia đứng lúc đầu cảnh.
-      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+      // `handshake` cũng thế (đợt 28): không thì tay chìa về chỗ người kia đứng lúc đầu cảnh. Trao / nhận con vật cũng thế (đợt 29).
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake', 'handOverPet', 'takePet'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`

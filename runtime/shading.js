@@ -31,9 +31,20 @@ export function attachShade(svg, root) {
   const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
   const rise = defs.querySelectorAll('linearGradient')[1], riseStops = rise.querySelectorAll('stop');
   let box = null, last = '', lastBounce = '';
+  // Khung hình vẽ trong hệ toạ độ của `svg` (nơi chuyển sắc được tính, `userSpaceOnUse`). `getBBox()` của nhóm gốc là khung
+  // TRONG hệ của chính nhóm — chưa có phép dời của nó (`translate(s.x …)`: nhân vật đi trong khung của mình). Đo một lần rồi
+  // đổi theo phép biến đổi HIỆN TẠI của nhóm: không thì người đã đi vài bước đứng hẳn trong nửa tối (hay nửa sáng) của chuyển
+  // sắc — sáng tối hai bên biến mất (đợt 29: bà vừa đi tới bàn khám tối đều cả mặt).
   const frame = () => {
     if (!box || !box.width) { try { box = root.getBBox(); } catch (error) { box = null; } }
-    return box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+    const b = box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+    const list = root.transform && root.transform.baseVal;
+    if (!list || !list.numberOfItems) return b;
+    let m = new DOMMatrix();                                    // (không `consolidate()`: nó viết đè danh sách biến đổi của nhóm)
+    for (let i = 0; i < list.numberOfItems; i++) m = m.multiply(list.getItem(i).matrix);
+    const xs = [], ys = [];
+    for (const [x, y] of [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]]) { xs.push(m.a * x + m.c * y + m.e); ys.push(m.b * x + m.d * y + m.f); }
+    return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
   };
   return {
     cover,
@@ -44,7 +55,7 @@ export function attachShade(svg, root) {
      * tối hẳn. amount = 0 tắt lớp.
      */
     set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)}`;
+      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)},${root.getAttribute('transform')}`;
       if (key === last) return;
       last = key;
       if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
@@ -70,7 +81,7 @@ export function attachShade(svg, root) {
     },
     /** ÁNH SÁNG PHẢN XẠ từ sàn: màu `rgb` ("214,168,110"), độ mạnh `amount` 0…1 (0 tắt) — dày ở chân, tan hết ở ngang ngực. */
     bounce(rgb = '255,255,255', amount = 0) {
-      const key = `${rgb},${amount.toFixed(3)}`;
+      const key = `${rgb},${amount.toFixed(3)},${root.getAttribute('transform')}`;
       if (key === lastBounce) return;
       lastBounce = key;
       if (amount <= 0.004) { up.style.display = 'none'; return; }

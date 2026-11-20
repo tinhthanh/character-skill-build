@@ -367,7 +367,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * các bước đi trước đã được dựng: `from.point(set.target(from, cat))`.
      * Tay vươn trong mặt phẳng của `from`: đứng lệch nhau theo chiều sâu (z) thì bàn tay không chạm được.
      */
-    target(from, to, part = 'head') {
+    // `at`: chỗ `to` đứng Ở LƯỢT NÀY, tính bằng phần dời ngang trong khung của nó (như `s.x` sau các bước đi) — lúc dựng,
+    // trạng thái của nó có thể còn ở đầu cảnh (con chó đi tới người ngồi ở một lượt trước — đợt 29).
+    target(from, to, part = 'head', { at = null } = {}) {
       const of = (rig) => actors.find((actor) => actor.rig === rig);
       if (!of(from) || !of(to)) throw new Error('[character] set.target(from, to): both must be rigs placed with set.place()');
       const frameOf = (rig) => (rig.constructor && rig.constructor.KHUNG) || { w: 400, h: 470 };
@@ -375,7 +377,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         if (actor.ground === null) actor.ground = groundOf(actor.rig);
         const size = frameOf(actor.rig), unit = actor.height / size.h, ground = (actor.ground || 1) * size.h;
-        return { size, unit, ground, x: actor.spot.x + (actor.rig.s.x || 0) * unit };
+        return { size, unit, ground, x: actor.spot.x + (actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) * unit };
       };
       const head = () => {
         // `part`: 'head' (mặt — chỉ tay, vuốt ve) hay 'body' (giữa thân — nghe tim phổi, tiêm): khung toàn thân, dưới
@@ -625,6 +627,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (key) { from = [key.x, key.y, key.z]; amount = clamp(0.26 + key.k * 0.5, 0, 0.6); glow = clamp(key.k * 0.35, 0, 0.34) * (key.front ?? 1); rgb = key.rgb; }
             else { const key = mood.sun && mood.name === 'evening' ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood.name === 'night' ? 0.12 : mood.name === 'evening' ? 0.4 : 0.24; glow = mood.name === 'evening' ? 0.18 : 0; rgb = mood.name === 'evening' ? mood.sunColor : rgb; }
             const a = set.project(...from), b = set.project(...centre);
+            // BAN NGÀY, người: phía hướng về nắng / cửa sổ ỬNG SÁNG (màu nắng), phía kia tối hơn. Chỉ làm tối phía khuất (0,24, phía
+            // sáng không thêm gì) thì nửa phía nguồn sáng chỉ sáng hơn nửa kia 2–5 % (đo bằng tools/light_side.py, đợt 29) — người
+            // chấm thấy "sáng đều hai bên", câu hỏi duy nhất trượt ổn định (đợt 28). Đêm / chiều / cạnh đèn: giữ như cũ.
+            if (mood.name === 'day' && isPerson(actor)) { amount = Math.max(amount, 0.34); glow = Math.max(glow, 0.32); if (!key) rgb = mood.sunColor || '255,244,214'; }
             // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             // Ngược sáng: phía trước tối đều, không còn một phía được chiếu rõ.
@@ -637,6 +643,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
             actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
+            // Cho tools/light_side.py: giờ trong ngày, có nguồn sáng chính gần (đèn, cửa sổ) hay chỉ hướng sáng chung, ngược sáng bao nhiêu.
+            actor.lightInfo = { mood: mood.name, key: !!key, back: +dim.toFixed(3), amount: +amount.toFixed(3), glow: +glow.toFixed(3) };
             if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
@@ -832,7 +840,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Dấu cảm xúc trên đầu (! ? zzz) không phải là người / con vật: ẩn đi lúc đo, không thì có dấu là khung lùi xa hơn.
         const mark = actor.rig.markEl, shown = mark && mark.style.display;
         if (mark) mark.style.display = 'none';
-        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = part.getBoundingClientRect();
+        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = drawnRect(part);
         if (mark) mark.style.display = shown || '';
         if (hidden) host.style.display = 'none';
         if (!r.width || !at.scale) return null;
@@ -1086,14 +1094,22 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const rect = (r) => ({ x0: (r.left - box.left) * sx, y0: (r.top - box.top) * sy, x1: (r.right - box.left) * sx, y1: (r.bottom - box.top) * sy });
       const point = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); if (!ctm) return null; const p = new DOMPoint(x, y).matrixTransform(ctm); return { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; };
       const frameBox = (rig, b) => { const a = point(rig.svg, b.x, b.y), c = point(rig.svg, b.x + b.width, b.y + b.height); return a && c ? { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) } : null; };
-      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && actor.host.contains(actor.rig.svg)).map((actor) => {
-        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z);
+      // Con vật ĐANG ĐƯỢC BẾ: hình nó nằm trong hình người bế (không trong host của nó) — vẫn đo thân / mặt (`carried`: true),
+      // không đo chân (đợt 29: đo `carry`, `takePet`).
+      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && (actor.host.contains(actor.rig.svg) || (actor.rig.svg.isConnected && view.contains(actor.rig.svg)))).map((actor) => {
+        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z), carried = !actor.host.contains(rig.svg);
         const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0).map(rect);
         const hands = person ? ['L', 'R'].map((side) => e['coTay' + side] && { side, ...point(e['coTay' + side], 0, 10) }).filter((h) => h && Number.isFinite(h.x)) : [];
+        // NGƯỜI NGỒI trên một hộp (sofa, ghế đá): đường mặt ghế của rig (`seatY`, nơi mông đặt xuống) và mặt trên của hộp dưới
+        // họ, cả hai đo trên màn hình — lệch nhau là người lơ lửng trên ghế hay lún vào nó (đợt 29).
+        const sitting = person && rig.s && rig.s.seat > 0.5;
+        const under = sitting ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
+        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.seatY()) : null;
+        const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
-        return { name: actor.host.dataset.name || actor.host.id || '', person, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length ? Math.max(...feet.map((r) => r.y1)) : null,
-          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x };
+        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null };
       });
     },
 
@@ -1107,7 +1123,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const rig = actor.rig, parts = rig.el ? [rig.el.dau, rig.el.than].filter(Boolean) : [];
         if (!parts.length || !rig.svg || !actor.host.contains(rig.svg)) continue;          // đang được bế: nằm trong tay người khác
         const origin = view.getBoundingClientRect(), scale = origin.width / (W || 1) || 1;
-        const rects = parts.map((part) => part.getBoundingClientRect()).filter((r) => r.width > 0);
+        const rects = parts.map(drawnRect).filter((r) => r.width > 0);
         if (!rects.length) continue;
         const x0 = (Math.min(...rects.map((r) => r.left)) - origin.left) / scale, x1 = (Math.max(...rects.map((r) => r.right)) - origin.left) / scale;
         const y0 = (Math.min(...rects.map((r) => r.top)) - origin.top) / scale, y1 = (Math.max(...rects.map((r) => r.bottom)) - origin.top) / scale;
@@ -1121,6 +1137,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return cut;
     },
   };
+
+  // Khung HÌNH VẼ của một phần tử trên màn hình. Con vật ĐANG ĐƯỢC BẾ nằm trong hình người bế, mang theo lớp đổ bóng của nó
+  // (hình chữ nhật 4400 × 4400, cắt bằng mask) — getBoundingClientRect tính cả hình ấy: người bế "rộng" gấp mười, máy lùi ra
+  // xa tít suốt lúc bế, `framing()` báo người ấy bị mép khung cắt (cảnh thử đợt 29). Ẩn các lớp ấy lúc đo.
+  function drawnRect(element) {
+    const covers = [...element.querySelectorAll('svg svg [data-shade], svg svg [data-bounce]')].map((el) => [el, el.style.display]);
+    covers.forEach(([el]) => { el.style.display = 'none'; });
+    const r = element.getBoundingClientRect();
+    covers.forEach(([el, display]) => { el.style.display = display; });
+    return r;
+  }
 
   // Đưa một phần tử phẳng (host của rig, hay một tấm hình) vào bối cảnh. `rig` = null với tấm hình.
   function stand(host, rig, { x, z, y, height, turn, ground, shadow: withShadow }) {

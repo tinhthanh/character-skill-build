@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.69.0
+
+Added — handing over, seated people and the lit side, measured
+- **`tools/light_side.py <scene dirs…>`**: measures from the pixels whether the half of each character facing the main
+  light is brighter than the other half — the one lighting question the reviewer kept failing (0.68.0). It captures
+  the opening frame three times (as is, without the characters — their pixels are what differs —, and without the body
+  shading), and compares the brightness of the two halves of each person's head and upper body: the half facing the
+  light must be 8 % brighter (or the shading must add 8 %). Backlit people and people at night with no lamp near are
+  reported, not judged; `--all` also measures at the acting moments. `tools/chrome_run.py --steps` runs several
+  evaluations and screenshots in one page load for it.
+- `tools/acting_check.py` measures more: **`carry`** (the hand reaches the pet, and at the end of the turn the pet is in
+  the arms, against the body), and a **seated** person's seat line against the top of the sofa / bench under them
+  (within 3 % of their height; above is floating, below sunk in). Seated people's feet are checked too.
+- `["handOver", "@other"]` alone makes the other **take** it at the same time when they have the item put away;
+  `["handOverPet", "@other"]` alone adds the other's `takePet` (alone it broke the scene: a later `putDown` said
+  "not carrying a pet").
+- `tools/check_scene.py` builds a park scene (the boy hands his cup to grandpa on the bench, the dog walks over,
+  grandpa strokes it, picks it up and hands it to the boy) and runs both tools on it.
+
+Fixed — measured on 4 trial scenes (clinic: hand over the dog, hand over pills; living room: cup, carry, hand over the
+cat; sofa: stroke and carry a cat that walks over; bench: the same with a dog): 1 of 4 hand measurements passed with
+the 0.68.0 code (the clinic scene did not build: `handOverPet` alone), 18 of 18 now (hands, pet in the arms, seat)
+- **Handing over** aims at the point between the two shoulders, as the handshake does (a fixed pose held the item at the
+  belly): the hands come within 2.8–3.8 % of the height of each other, against 18.8–19.9 %. The givers stand 0.28 × the
+  height apart (0.45 before) and 0.34 for a carried pet (0.42 before: 7.8 % → 2.1–2.9 %); the pet is handed to where the
+  receiver stands at that turn. A single `"holds"` item sits in the hand on the side of the person it goes to or comes
+  from (the right hand reached across the belly towards someone on the left).
+- **Carrying**: the camera no longer flies back while someone holds a pet. The pet's body shading is a 4400-unit
+  rectangle cut by a mask, and measuring the carrier's drawing counted it — the carrier "was" ten times wider; the full
+  shot also warned that the frame cut the vet.
+- A pet that walked over before being picked up is held in the arms, not at the distance it walked (the cat flew out of
+  the frame when granny on the sofa picked it up).
+- A pet handed over and put down by the receiver goes down to the floor (it floated at the receiver's chest height,
+  then dropped).
+- A **seated** person reaches for where a pet that walked over stands at that turn, not where it stood when the scene
+  began (grandpa on the bench held his hand out level, 6.7 % of the height above the dog's back → 0.0 %).
+- The park bench is 100 high, a seated person's seat height (85: grandpa floated 3.5 % of his height above it; 0.9 % now).
+- **Light on one side**: the light and shade across a character's body followed where they stood when the scene began —
+  someone who had walked a few steps stood wholly in the dark (or light) half of it. And in daylight the side facing
+  the light got nothing, only the far side darkened: people in daylight are now warmed by the sun / window on that side
+  (0.32) and a little darker on the other (0.34, was 0.24). Night, evening and lamp-lit shading are unchanged.
+  Measured with `light_side.py` on 21 people in 8 scenes (the 4 above and the 4 lighting trial scenes from 0.66.0):
+  6 passed before, 19 now; median shading in daylight +4.7 % → +12.2 % of the brightness, visible difference between the
+  halves +5.9 % → +11.7 %. The 2 still below 8 % are grandpa partly backlit by the living-room window (+6.1 / +6.5 %).
+  Not judged: 2 night scenes with no lamp near (shading +4 %, as before).
+
+Known
+- A pet handed over and put down by the receiver goes back to the spot it was first picked up from, sliding across
+  the floor if the receiver stands elsewhere.
+- In the preset hints a pet on the floor stands at z -500, nearer the camera than the sofa: a seated owner cannot
+  reach it (the tool says so). The hints now say to give it the sofa's / bench's z.
+
 ## 0.68.0
 
 Added — the acting is measured

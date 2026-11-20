@@ -1,4 +1,4 @@
-/* VGCharacter v0.68.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.69.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -87,12 +87,19 @@ function attachShade(svg, root) {
   let box = null, last = '', lastBounce = '';
   const frame = () => {
     if (!box || !box.width) { try { box = root.getBBox(); } catch (error) { box = null; } }
-    return box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+    const b = box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+    const list = root.transform && root.transform.baseVal;
+    if (!list || !list.numberOfItems) return b;
+    let m = new DOMMatrix();                                    // (không `consolidate()`: nó viết đè danh sách biến đổi của nhóm)
+    for (let i = 0; i < list.numberOfItems; i++) m = m.multiply(list.getItem(i).matrix);
+    const xs = [], ys = [];
+    for (const [x, y] of [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]]) { xs.push(m.a * x + m.c * y + m.e); ys.push(m.b * x + m.d * y + m.f); }
+    return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
   };
   return {
     cover,
     set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)}`;
+      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)},${root.getAttribute('transform')}`;
       if (key === last) return;
       last = key;
       if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
@@ -111,7 +118,7 @@ function attachShade(svg, root) {
       stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
     },
     bounce(rgb = '255,255,255', amount = 0) {
-      const key = `${rgb},${amount.toFixed(3)}`;
+      const key = `${rgb},${amount.toFixed(3)},${root.getAttribute('transform')}`;
       if (key === lastBounce) return;
       lastBounce = key;
       if (amount <= 0.004) { up.style.display = 'none'; return; }
@@ -159,6 +166,7 @@ const NGHI = Object.freeze({
   khoc: 0, khocY: 0,            // nước mắt (0…1 hiện) và độ chảy của giọt nước mắt (0…1, xuống má)
   moHoi: 0, doMa: 0,            // giọt mồ hôi ở thái dương (ngượng, bối rối) · má đỏ thêm (0…1)         // 1 = đồng hồ đeo ở cổ tay ấy (`checkWatch`)
   omGive: 0,                    // 0…1 đang TRAO con vật đang bế (`handOverPet`): nó và hai cánh tay đi ra điểm giữa hai người
+  omHome: 0,                    // 1 trong lúc ĐẶT con vật xuống (`putDown`): nó hạ về CHỖ NHÀ của nó — kể cả khi nhận nó từ tay người khác
   om: 0, omRise: 0,             // đang BẾ một con vật (SVG của nó nằm trong ngăn `om`) / độ nhấc nó lên trước ngực 0…1           // 1 = mặt ống nghe hiện trong tay ấy (`listen`)
   plungerL: 0, plungerR: 0,     // 0…1 pít-tông ống tiêm ấn xuống (`inject`)         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
@@ -2044,8 +2052,9 @@ class RigSVG {
     else if (target && target.getBoundingClientRect) { const box = target.getBoundingClientRect(), dx = box.left + box.width / 2 - this.centerX(); if (Math.abs(dx) > 1) return dx < 0 ? -1 : 1; }
     return side === 'L' ? -1 : 1;
   }
-  #reach(t, side, dir, at) {
-    const s = this.s, N = this.NGHI, own = (side === 'R') === (dir > 0), [upper, fore] = own ? [44, 56] : [28, -124];
+  #reach(t, side, dir, at, target = null) {
+    const s = this.s, N = this.NGHI, own = (side === 'R') === (dir > 0), aimed = own && target ? this.#meetAngles(target, side, 0.5) : null;
+    const [upper, fore] = aimed ? [aimed.bat, aimed.cang] : own ? [44, 56] : [28, -124];
     t.to(s, { ['bat' + side]: upper, ['cang' + side]: fore, than: N.than - dir * 4, dau: N.dau + dir * 3, nhinX: dir * 1.6, cuoi: 0.8, mayL: 0.4, mayR: 0.4,
               duration: 0.42, ease: 'power2.out' }, at);
   }
@@ -2055,7 +2064,7 @@ class RigSVG {
     const t = this.tl(), dir = this.#towards(target, k);
     this.#stage(t, [k]);
     t.to(s, { ['bat' + k]: this.NGHI['bat' + k] - 3, ['carry' + k]: 0, duration: 0.12, ease: 'sine.in' }, 0);            // lấy đà
-    this.#reach(t, k, dir, 0.12);
+    this.#reach(t, k, dir, 0.12, target);
     t.to(s, { ['item' + k]: 0, duration: 0.15 }, 0.62);                                                // món đồ rời tay
     t.set(s, { ['tay' + k]: 'mo' }, 0.7);
     this.#khep(t, 0.45, 0.88, { ['item' + k]: 0 });
@@ -2067,7 +2076,7 @@ class RigSVG {
     const t = this.tl(), dir = this.#towards(source, k);
     this.#stage(t, [k]);
     t.set(s, { ['tay' + k]: 'mo', ['carry' + k]: 0 }, 0);
-    this.#reach(t, k, dir, 0.12);
+    this.#reach(t, k, dir, 0.12, source);
     t.set(s, { ['tay' + k]: 'nam' }, 0.62);
     t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0.62);                                                // món đồ vào tay
     this.#khep(t, 0.45, 0.88, { ['item' + k]: 1 });
@@ -2204,10 +2213,13 @@ class RigSVG {
       const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
       const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7 }[part] ?? 0.2;
       const node = body || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
+      const anchored = target !== live && typeof target.centerX === 'function' && typeof live.centerX === 'function' && typeof live.apDung === 'function';
+      if (anchored && node) live.apDung();
       if (node) {
         const r = node.getBoundingClientRect(), sv = this.svg.getBoundingClientRect();
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
-        tx = (r.left + r.width / 2 - ox) / unit - s.x; ty = (r.top + r.height * (body ? 0.35 : headAt) - oy) / unit - s.y - DOI_Y;
+        const shift = anchored ? (target.centerX() - live.centerX()) / unit : 0;
+        tx = (r.left + r.width / 2 - ox) / unit - s.x + shift; ty = (r.top + r.height * (body ? 0.35 : headAt) - oy) / unit - s.y - DOI_Y;
       }
     }
     let k = hand || (tx < HONG.x ? 'L' : 'R');
@@ -2661,18 +2673,19 @@ class RigSVG {
     e.om.setAttribute('transform', `matrix(${[m.a, m.b, m.c, m.d, m.e, m.f].map((v) => v.toFixed(4)).join(' ')})`);
     const lift = e.tren.transform.baseVal.consolidate(), fromThan = toRoot.multiply(lift ? lift.matrix.inverse() : new DOMMatrix());
     const belly = new DOMPoint(0, -62).matrixTransform(fromThan);
-    const rise = clamp(s.omRise, 0, 1), grow = c.giver ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = c.from.w * grow, h = c.from.h * grow;
+    const down = (s.omHome || 0) > 0.5, rise = clamp(s.omRise, 0, 1), grow = c.giver && !down ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = c.from.w * grow, h = c.from.h * grow;
     let fromX = c.from.x, fromY = c.from.y;
+    const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? (pet.s.x || 0) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
-    if (c.giver) {
+    if (c.giver && !down) {
       const q = toMine(RigSVG.#meetPoint(c.giver, this));
-      if (q) { fromX = q.x - w * c.middle; fromY = q.y - h * 0.66; }
+      if (q) { fromX = q.x - w * c.middle - offX; fromY = q.y - h * 0.66 - offY; }
     }
-    let x = pha(fromX, belly.x - w * c.middle, rise), y = pha(fromY, belly.y - h * 0.66, rise);
+    let x = pha(fromX, belly.x - w * c.middle - offX, rise), y = pha(fromY, belly.y - h * 0.66 - offY, rise);
     const give = clamp(s.omGive || 0, 0, 1);
     if (give && c.receiver) {
       const q = toMine(RigSVG.#meetPoint(this, c.receiver));
-      if (q) { x = pha(x, q.x - w * c.middle, give); y = pha(y, q.y - h * 0.66, give); }
+      if (q) { x = pha(x, q.x - w * c.middle - offX, give); y = pha(y, q.y - h * 0.66 - offY, give); }
     }
     for (const [name, value] of [['x', x], ['y', y], ['width', w], ['height', h]]) pet.svg.setAttribute(name, value.toFixed(2));
     pet.svg.style.overflow = 'visible';
@@ -2733,26 +2746,30 @@ class RigSVG {
       t.to(s, { ['aim' + k]: 1, ['bat' + k]: pose.bat, ['cang' + k]: pose.cang, duration: 0.45, ease: 'power2.inOut' }, at);
     }
   }
-  handOverPet(other) {
-    const s = this.s, c = this.carried;
+  handOverPet(target) {
+    const s = this.s, c = this.carried, other = target && target.live ? target.live : target;
     if (!c || s.om < 0.5) throw new Error('[character] handOverPet: the character is not carrying a pet — carry(pet) first');
     if (!other || !(other instanceof RigSVG) || other === this) throw new Error('[character] handOverPet(other): other must be another person rig (createCharacter(...).rig)');
-    const t = this.tl(), dir = this.#towards(other, 'R');
+    const t = this.tl(), dir = this.#towards(target, 'R');
     c.receiver = other;
-    this.#offerArms(t, other, 0);
+    this.#offerArms(t, target, 0);
     t.to(s, { omGive: 1, than: this.NGHI.than - dir * 5, dau: this.NGHI.dau - dir * 4, nhinX: dir * 2, cuoi: 1, duration: 0.5, ease: 'power2.inOut' }, 0);
     t.set(s, { om: 0 }, HANDOVER_AT);                                         // người kia đã đỡ: con vật sang tay họ
     this.#khep(t, 0.45, HANDOVER_AT + 0.1, { om: 0, omRise: 0, omGive: 0 });
     return t;
   }
-  takePet(giver) {
-    const from = giver && giver.carried;
+  takePet(source) {
+    const giver = source && source.live ? source.live : source, from = giver && giver.carried;
     if (!(giver instanceof RigSVG) || !from) throw new Error('[character] takePet(giver): the giver is not carrying a pet — run giver.carry(pet) first, then takePet together with giver.handOverPet');
-    const t = this.tl(), s = this.s, dir = this.#towards(giver, 'R');
+    const t = this.tl(), s = this.s, dir = this.#towards(source, 'R');
     const scale = (giver.svg.getScreenCTM().a || 1) / (this.svg.getScreenCTM().a || 1);       // đơn vị khung của người trao → của người nhận
-    this.carried = { pet: from.pet, host: from.host, attrs: from.attrs, from: { x: 0, y: 0, w: from.from.w * scale, h: from.from.h * scale },
+    RigSVG.#homePet(from.pet);
+    const inv = this.svg.getScreenCTM().inverse(), home = from.pet.svg.getBoundingClientRect();
+    const a = new DOMPoint(home.left, home.top).matrixTransform(inv), b = new DOMPoint(home.right, home.bottom).matrixTransform(inv);
+    const spot = home.width ? { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y } : { x: 0, y: 0, w: from.from.w * scale, h: from.from.h * scale };
+    this.carried = { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
                      reach: this.#reachLow(null), at: s.x, middle: from.middle, facing: s.huong, giver };
-    this.#offerArms(t, giver, 0);
+    this.#offerArms(t, source, 0);
     t.to(s, { than: this.NGHI.than - dir * 3, nhinX: dir * 2, cuoi: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.set(s, { om: 1, omRise: 0 }, HANDOVER_AT);
     t.to(s, { omRise: 1, huong: 0, than: this.NGHI.than, nhinX: 0, nhinY: 1.8, dauY: 3, duration: 0.55, ease: 'power2.inOut' }, HANDOVER_AT + 0.02);
@@ -2811,7 +2828,8 @@ class RigSVG {
     const inv = this.svg.getScreenCTM().inverse(), r = pet.svg.getBoundingClientRect();
     const a = new DOMPoint(r.left, r.top).matrixTransform(inv), b = new DOMPoint(r.right, r.bottom).matrixTransform(inv);
     const reach = this.#reachLow(pet, null, 'body');
-    const head = pet.el.dau ? pet.el.dau.getBoundingClientRect() : r, middle = r.width ? clamp((head.left + head.width / 2 - r.left) / r.width, 0.1, 0.9) : 0.5;
+    const vb = pet.svg.viewBox && pet.svg.viewBox.baseVal, walked = vb && vb.width ? (pet.s.x || 0) / vb.width : 0;
+    const head = pet.el.dau ? pet.el.dau.getBoundingClientRect() : r, middle = r.width ? clamp((head.left + head.width / 2 - r.left) / r.width - walked, 0.1, 0.9) : 0.5;
     this.carried = { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((name) => [name, pet.svg.getAttribute(name)]),
                      from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong };
     const other = reach.k === 'L' ? 'R' : 'L';
@@ -2829,11 +2847,12 @@ class RigSVG {
     const { reach } = c, other = reach.k === 'L' ? 'R' : 'L';
     t.to(s, { ['bat' + reach.k]: reach.upper, ['cang' + reach.k]: reach.fore, ['bat' + other]: reach.upper * 0.6, ['cang' + other]: -40, duration: 0.02 }, 0);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0.02);
+    t.to(s, { omHome: 1, duration: 0.02 }, 0);                                             // hạ về chỗ nhà (xem `#placeCarried`)
     if (reach.crouch) t.to(s, { seat: reach.crouch, duration: 0.5, ease: 'power2.inOut' }, 0);
     t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'power2.inOut' }, 0);
     t.to(s, { huong: c.facing, duration: 0.5, ease: 'sine.inOut' }, 0);                    // quay lại hướng lúc bế lên
     t.set(s, { om: 0 }, 0.6);                                                              // con vật về chỗ của nó
-    this.#khep(t, 0.45, 0.65, { om: 0, omRise: 0, huong: c.facing });
+    this.#khep(t, 0.45, 0.65, { om: 0, omRise: 0, omHome: 0, huong: c.facing });
     return t;
   }
   sitDown() {
@@ -5838,7 +5857,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const prop = element.querySelector && element.querySelector('svg[data-prop]');
       return stand(element, null, { x, z, y, height, turn: false, shadow, ground: ground != null ? ground : prop ? PROP_FRAME.floor / PROP_FRAME.h : 1 });
     },
-    target(from, to, part = 'head') {
+    target(from, to, part = 'head', { at = null } = {}) {
       const of = (rig) => actors.find((actor) => actor.rig === rig);
       if (!of(from) || !of(to)) throw new Error('[character] set.target(from, to): both must be rigs placed with set.place()');
       const frameOf = (rig) => (rig.constructor && rig.constructor.KHUNG) || { w: 400, h: 470 };
@@ -5846,7 +5865,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         if (actor.ground === null) actor.ground = groundOf(actor.rig);
         const size = frameOf(actor.rig), unit = actor.height / size.h, ground = (actor.ground || 1) * size.h;
-        return { size, unit, ground, x: actor.spot.x + (actor.rig.s.x || 0) * unit };
+        return { size, unit, ground, x: actor.spot.x + (actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) * unit };
       };
       const head = () => {
         const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
@@ -6024,6 +6043,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (key) { from = [key.x, key.y, key.z]; amount = clamp(0.26 + key.k * 0.5, 0, 0.6); glow = clamp(key.k * 0.35, 0, 0.34) * (key.front ?? 1); rgb = key.rgb; }
             else { const key = mood.sun && mood.name === 'evening' ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood.name === 'night' ? 0.12 : mood.name === 'evening' ? 0.4 : 0.24; glow = mood.name === 'evening' ? 0.18 : 0; rgb = mood.name === 'evening' ? mood.sunColor : rgb; }
             const a = set.project(...from), b = set.project(...centre);
+            if (mood.name === 'day' && isPerson(actor)) { amount = Math.max(amount, 0.34); glow = Math.max(glow, 0.32); if (!key) rgb = mood.sunColor || '255,244,214'; }
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             if (dim > 0) glow *= 1 - dim;
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
@@ -6031,6 +6051,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
             actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
+            actor.lightInfo = { mood: mood.name, key: !!key, back: +dim.toFixed(3), amount: +amount.toFixed(3), glow: +glow.toFixed(3) };
             if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
@@ -6168,7 +6189,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (hidden) host.style.display = '';
         const mark = actor.rig.markEl, shown = mark && mark.style.display;
         if (mark) mark.style.display = 'none';
-        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = part.getBoundingClientRect();
+        const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect(), r = drawnRect(part);
         if (mark) mark.style.display = shown || '';
         if (hidden) host.style.display = 'none';
         if (!r.width || !at.scale) return null;
@@ -6343,14 +6364,18 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const rect = (r) => ({ x0: (r.left - box.left) * sx, y0: (r.top - box.top) * sy, x1: (r.right - box.left) * sx, y1: (r.bottom - box.top) * sy });
       const point = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); if (!ctm) return null; const p = new DOMPoint(x, y).matrixTransform(ctm); return { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; };
       const frameBox = (rig, b) => { const a = point(rig.svg, b.x, b.y), c = point(rig.svg, b.x + b.width, b.y + b.height); return a && c ? { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) } : null; };
-      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && actor.host.contains(actor.rig.svg)).map((actor) => {
-        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z);
+      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && (actor.host.contains(actor.rig.svg) || (actor.rig.svg.isConnected && view.contains(actor.rig.svg)))).map((actor) => {
+        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z), carried = !actor.host.contains(rig.svg);
         const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0).map(rect);
         const hands = person ? ['L', 'R'].map((side) => e['coTay' + side] && { side, ...point(e['coTay' + side], 0, 10) }).filter((h) => h && Number.isFinite(h.x)) : [];
+        const sitting = person && rig.s && rig.s.seat > 0.5;
+        const under = sitting ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
+        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.seatY()) : null;
+        const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
-        return { name: actor.host.dataset.name || actor.host.id || '', person, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length ? Math.max(...feet.map((r) => r.y1)) : null,
-          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x };
+        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null };
       });
     },
     framing() {
@@ -6360,7 +6385,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const rig = actor.rig, parts = rig.el ? [rig.el.dau, rig.el.than].filter(Boolean) : [];
         if (!parts.length || !rig.svg || !actor.host.contains(rig.svg)) continue;          // đang được bế: nằm trong tay người khác
         const origin = view.getBoundingClientRect(), scale = origin.width / (W || 1) || 1;
-        const rects = parts.map((part) => part.getBoundingClientRect()).filter((r) => r.width > 0);
+        const rects = parts.map(drawnRect).filter((r) => r.width > 0);
         if (!rects.length) continue;
         const x0 = (Math.min(...rects.map((r) => r.left)) - origin.left) / scale, x1 = (Math.max(...rects.map((r) => r.right)) - origin.left) / scale;
         const y0 = (Math.min(...rects.map((r) => r.top)) - origin.top) / scale, y1 = (Math.max(...rects.map((r) => r.bottom)) - origin.top) / scale;
@@ -6374,6 +6399,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return cut;
     },
   };
+  function drawnRect(element) {
+    const covers = [...element.querySelectorAll('svg svg [data-shade], svg svg [data-bounce]')].map((el) => [el, el.style.display]);
+    covers.forEach(([el]) => { el.style.display = 'none'; });
+    const r = element.getBoundingClientRect();
+    covers.forEach(([el, display]) => { el.style.display = display; });
+    return r;
+  }
   function stand(host, rig, { x, z, y, height, turn, ground, shadow: withShadow }) {
     if (host.parentNode !== view) view.appendChild(host);
     host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
@@ -6660,7 +6692,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.68.0';
+const VERSION = '0.69.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -7162,7 +7194,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...written] = turn, mine = part(rig);
-      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake', 'handOverPet', 'takePet'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;

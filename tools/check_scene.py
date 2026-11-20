@@ -587,6 +587,35 @@ with tempfile.TemporaryDirectory() as work:
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'acting')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('acting: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
 
+    # Đợt 29: đưa / nhận / bế, người ngồi, sáng một bên. Bé đưa cốc cho ông ngồi ghế đá (ông tự nhận, cốc ở tay phía bé); con
+    # chó đi tới ông (set.target biết chỗ nó đứng ở lượt ấy), ông vuốt, bế nó lên lòng rồi trao cho bé. Đo bằng
+    # tools/acting_check.py (tay tới tay, con vật trong vòng tay, mông trên mặt ghế) và tools/light_side.py (ban ngày: nửa phía
+    # nắng sáng hơn nửa kia).
+    handover = {'id': 'handover', 'camera': 'auto', 'set': {'preset': 'park'}, 'characters': [
+        {'name': 'ong', 'id': 'grandpa', 'z': -880, 'x': 380, 'on': 'bench', 'seated': True, 'holds': 'cup', 'holdsHidden': True},
+        {'name': 'be', 'id': 'boy', 'z': -880, 'x': -200, 'holds': 'cup'}, {'name': 'cho', 'species': 'corgi', 'z': -880, 'x': 820}],
+        'script': [{'who': 'be', 'do': [['handOver', '@ong']]}, {'who': 'ong', 'do': [['stroke', '@cho']]}, {'who': 'ong', 'do': [['carry', '@cho']]},
+                   {'who': 'ong', 'do': [['handOverPet', '@be']]}, {'who': 'be', 'do': ['putDown']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_handover.json')
+    try:
+        json.dump(handover, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'handover'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('handover: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'handover', 'index.html'), encoding='utf-8').read()
+        for needle in ('items: {"L": "cup"}, itemsHidden: true', '[ong, ["take", be]]', '[be, ["takePet", ong]]', '// cho comes over to ong (seated) for "stroke"', "set.target(ong, cho, 'head', { at: "):
+            if needle not in html: problems.append(f'handover: {needle} is not in the composition')
+        checks = [m['check'] for m in json.load(open(os.path.join(work, 'handover', 'moments.json'), encoding='utf-8')) if m.get('check')]
+        if sorted((c['who'], c['kind'], c['to']) for c in checks) != [('be', 'handOver', 'hands'), ('ong', 'carry', 'body'), ('ong', 'handOverPet', 'hands'), ('ong', 'stroke', 'body')]:
+            problems.append(f'handover: moments.json checks are {checks}')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'handover')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('handover: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'in the arms' not in done.stdout or 'seated on the seat' not in done.stdout: problems.append('handover: acting_check did not measure the carried pet and the seated person:\n' + done.stdout[-400:])
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'light_side.py'), os.path.join(work, 'handover')], capture_output=True, text=True)
+        if done.returncode != 0 or ' pass' not in done.stdout or '0/0' in done.stdout: problems.append('handover light: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+
     # Đợt 26: mẫu phim ánh sáng trong examples/lighting/ — kịch bản chữ phải đọc được (không dựng: CI đã đủ dài).
     import glob, shutil
     for sample in sorted(glob.glob(os.path.join(os.path.dirname(HERE), 'examples', 'lighting', '*.txt'))):
