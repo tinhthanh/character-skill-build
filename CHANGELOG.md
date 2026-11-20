@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.67.0
+
+Changed — no network needed to render, and lighter films
+- **GSAP is pinned and shipped with the composition**: `vendor/gsap-3.15.1.min.js` is copied next to every
+  composition `tools/scene.py` and `tools/reel.py` write (as `gsap.min.js`), and the examples and test pages load
+  it from `vendor/`. They used to load `gsap@3` from a CDN: CI failed when the CDN did not answer (0.65.0), and a
+  new GSAP release could change how a scene renders. 3.15.1 is what `gsap@3` served until now — the 7 trial scenes
+  render identically, pixel for pixel. The docs show the pinned CDN URL for your own projects.
+- **Film grain is added when a film is joined** (`tools/film.py`, `"grain": "post"`, the default): the scenes are
+  built with `--no-grain` and FFmpeg adds the grain (`noise=alls=3`) while it prepares each part. Measured on a
+  14.2 s vertical scene: the page's grain layer costs about a quarter of the render time (22.9 s against 16.8 s,
+  median of 3) and makes the file about 10 times larger (43 MB against 4.2 MB), and after compression it is
+  barely visible (standard deviation over the sky 19.31 against 19.18 without). FFmpeg's grain at strength 3
+  gives the same amount (19.26) in a 9 MB file. `"grain": "page"` keeps the old layer, `"none"` leaves grain out.
+  Without the page's grain (blended `overlay`) the picture is a touch darker, as night scenes were meant to be.
+  `tools/scene.py --no-grain` drops the layer from any 3D scene.
+  A 5-scene vertical film (park → night, a walk past street lamps, watching TV, a power cut, the clinic; 77 s)
+  built and rendered in 183 s and came out at 56 MB (0.73 MB per second, against 1.38 for the 0.63.0 trial film
+  with the page's grain).
+
+Added
+- `tools/light_audit.py --report -o audit/` writes `audit/report.html`: each sheet with every reviewer's answers
+  (every `answers*.json` in the folder), failures in red, and the score history — quicker to read than JSON.
+
+Fixed
+- In the shading on a character the light comes from the strongest source in front of or beside them; a lamp
+  behind them (the exam lamp behind the table) only gives a rim — its direction left the body shaded evenly.
+- A piece of furniture cut by only 3 % at the frame edge counts as cut (it used to need 12 %); a full shot that
+  still cuts some after placing each one moves back to take them all in, within the same limit. A piece wider than
+  half the frame (the sofa in a vertical frame) is no longer skipped.
+
+Known
+- In the vertical living room the sofa and the TV do not both fit a full shot within the 1.6 × pull-back limit: the
+  power-cut opening still cuts the sofa at the left edge.
+
 ## 0.66.0
 
 Changed — the lighting in its own module

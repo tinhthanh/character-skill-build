@@ -89,7 +89,7 @@ export default {
 ## In a HyperFrames composition
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.1/dist/gsap.min.js"></script>
 <script src="character.slim.js"></script>
 <script>
   VGCharacter.seed(7);

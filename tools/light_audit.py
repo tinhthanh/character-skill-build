@@ -12,6 +12,11 @@ khắc ánh sáng (mở cảnh, mất điện, trời chuyển, bật đèn, r�
 nheo; hỏi đúng một điều trên đúng một ảnh thì câu trả lời kiểm được.
 
 answers.json: [{ "q": 1, "a": "yes" }, …] — đúng như prompt.txt yêu cầu người chấm trả về.
+
+    python3 tools/light_audit.py --report -o audit/   → audit/report.html: mỗi bảng ảnh kèm câu hỏi và câu trả lời của từng
+                                                       người chấm (mọi tệp answers*.json trong audit/), câu hỏng tô đỏ, lịch sử
+                                                       điểm qua các lần chấm (history.json). Mở bằng trình duyệt, không cần mạng
+                                                       (giữ report.html cạnh các tệp scene-*.png).
 """
 import argparse, datetime, json, os, re, subprocess, sys
 
@@ -70,13 +75,54 @@ def score(answers_path, out, label):
     json.dump(history, open(history_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 
+def report(out):
+    """Trang HTML đặt cạnh các bảng ảnh (tham chiếu tương đối — nhúng ảnh thì tệp nặng 20 MB): đọc nhanh bằng mắt hơn JSON."""
+    import glob, html
+    questions = json.load(open(os.path.join(out, 'questions.json'), encoding='utf-8'))
+    reviewers = []
+    for path in sorted(glob.glob(os.path.join(out, 'answers*.json'))):
+        text = open(path, encoding='utf-8').read(); found = re.search(r'\[.*\]', text, re.S)
+        if not found: continue
+        name = os.path.splitext(os.path.basename(path))[0].replace('answers-', '').replace('answers', 'answers')
+        reviewers.append((name, {int(item['q']): str(item.get('a', '')).strip().lower() for item in json.loads(found.group(0))}))
+    history_path = os.path.join(out, 'history.json')
+    history = json.load(open(history_path, encoding='utf-8')) if os.path.isfile(history_path) else []
+    css = '''body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f6f7f9;color:#1d2330}main{max-width:1100px;margin:auto;padding:24px 16px}
+h1{font-size:22px}h2{font-size:18px;margin-top:32px}.scene{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+img{width:100%;border-radius:8px;border:1px solid #d8dce3}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #e3e6eb;padding:5px 6px;text-align:left;vertical-align:top}
+.yes{color:#1b7a3a;font-weight:600}.no{color:#c0262d;font-weight:700}.na{color:#7a808c}tr.bad{background:#fdeeee}.hist td{white-space:nowrap}
+@media (max-width:760px){.scene{grid-template-columns:1fr}}@media (prefers-color-scheme:dark){body{background:#15181e;color:#e4e7ec}td,th{border-color:#2a2f38}tr.bad{background:#3a1d20}img{border-color:#2a2f38}}'''
+    parts = [f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lighting check</title><style>{css}</style></head><body><main>',
+             f'<h1>Lighting check — {len(questions)} questions, {len(reviewers)} reviewer(s)</h1>']
+    if history:
+        parts.append('<h2>History</h2><table class="hist"><tr><th>Date</th><th>Run</th><th>Yes</th><th>Per scene</th></tr>')
+        for row in history: parts.append(f'<tr><td>{html.escape(row.get("date",""))}</td><td>{html.escape(row.get("label",""))}</td><td>{row.get("yes")}/{row.get("total")}</td><td>{html.escape(" · ".join(f"{k}: {v}" for k, v in row.get("scenes", {}).items()))}</td></tr>')
+        parts.append('</table>')
+    for scene in sorted({q['scene'] for q in questions}):
+        sheet = os.path.join(out, f'scene-{scene}.png')
+        image = f'<img alt="scene {scene}" src="scene-{scene}.png">' if os.path.isfile(sheet) else ''      # cạnh report.html
+        rows = ['<tr><th>Q</th><th>Time</th><th>Question</th>' + ''.join(f'<th>{html.escape(name)}</th>' for name, _ in reviewers) + '</tr>']
+        for q in (q for q in questions if q['scene'] == scene):
+            marks = [answers.get(q['q'], '') for _, answers in reviewers]
+            cells = ''.join(f'<td class="{"yes" if a == "yes" else "na" if a in ("n/a", "na", "") else "no"}">{html.escape(a or "—")}</td>' for a in marks)
+            bad = ' class="bad"' if any(a not in ('yes', 'n/a', 'na', '') for a in marks) else ''
+            rows.append(f'<tr{bad}><td>{q["q"]}</td><td>{q["t"]:g} s</td><td>{html.escape(q["ask"])}</td>{cells}</tr>')
+        parts.append(f'<h2>Scene {scene}</h2><div class="scene"><div>{image}</div><table>{"".join(rows)}</table></div>')
+    parts.append('</main></body></html>')
+    path = os.path.join(out, 'report.html')
+    open(path, 'w', encoding='utf-8').write('\n'.join(parts))
+    print(f'light_audit: {path}')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Lighting check from still frames and yes / no questions.')
     parser.add_argument('scenes', nargs='*', help='scene folders built by tools/scene.py')
     parser.add_argument('-o', '--out', required=True, help='folder for the sheets, prompt.txt, questions.json, history.json')
     parser.add_argument('--score', help='answers.json from the reviewer: score it against questions.json')
+    parser.add_argument('--report', action='store_true', help='write report.html: the sheets with every reviewer\'s answers and the history')
     parser.add_argument('--label', default='', help='a name for this run in history.json (e.g. "0.62.0")')
     args = parser.parse_args()
-    if args.score: score(args.score, args.out, args.label)
+    if args.report: report(args.out)
+    elif args.score: score(args.score, args.out, args.label)
     elif args.scenes: make(args.scenes, args.out)
     else: parser.error('give scene folders, or --score answers.json')

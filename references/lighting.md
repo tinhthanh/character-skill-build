@@ -66,8 +66,10 @@ grass.*
   dark and sharp at the feet, paler and blurred towards the tail; a long shadow that reaches a wall climbs it.
 - The floor reflects its colour onto legs and bellies (strongest in a patch of sunlight).
 - The **lens layer** grades the colour by time of day, darkens the corners and adds film grain.
-  `"lens": false` in `"set"` turns all of it off; `"grain": false` drops only the grain — about 20 % faster to
-  render, for drafts.
+  `"lens": false` in `"set"` turns all of it off; `"grain": false` drops only the grain.
+- **A film** (`tools/film.py`) adds the grain itself when it joins the parts (`"grain": "post"`, the default): the
+  scenes render without their grain layer — about 25 % faster — and the film is several times smaller, with the
+  same amount of grain. `"grain": "page"` keeps each scene's own layer, `"none"` leaves grain out.
 - `"shading": false` in `"set"` turns off the light and shade on the characters' bodies.
 
 ## Tips
@@ -84,4 +86,5 @@ grass.*
 questions whose right answer is "yes". `python3 tools/light_audit.py <scene dirs…> -o audit/` captures them as
 sheets and writes `audit/prompt.txt`; answer the questions (or hand the sheets and the prompt to a reviewer), then
 `python3 tools/light_audit.py --score answers.json -o audit/`. A question about something not in the frame may be
-answered `n/a`.
+answered `n/a`. `python3 tools/light_audit.py --report -o audit/` writes `audit/report.html`: each sheet with every
+reviewer's answers (all `answers*.json`), failures in red, and the score history.

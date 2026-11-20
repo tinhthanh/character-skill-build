@@ -172,6 +172,7 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
+GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
 MARKS = ('!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music')         # runtime/marks.js
 PET_MOOD_MARKS = {'scared': '!', 'curious': '?', 'sleepy': 'zzz', 'happy': 'heart', 'excited': 'heart', 'angry': 'anger', 'guilty': 'sweat', 'pain': 'sweat'}
@@ -341,7 +342,8 @@ def place_sounds(html, timings, sounds, base, out, copied):
         start, length = float(action['start']) + float(spec.get('at', 0)), audio_length(os.path.join(out, name))
         clips.append(f'  <audio id="sound-{len(clips) + 1}" class="clip" src="{name}" data-start="{start:.2f}" data-duration="{length:.2f}" data-track-index="{track + len(clips)}" data-volume="{float(spec.get("volume", 1)):g}"></audio>')
     if not clips: return html, 0
-    marker = '\n\n  <script src="https://cdn.jsdelivr.net/npm/gsap'
+    marker = '\n\n  <script src="gsap.min.js'
+    if marker not in html: marker = '\n\n  <script src="https://cdn.jsdelivr.net/npm/gsap'      # composition dựng trước đợt 27
     if marker not in html: fail('could not place the "sounds" clips (the composition has no gsap <script> after its clips)')
     return html.replace(marker, '\n  <!-- "sounds": one clip each time the action plays -->\n' + '\n'.join(clips) + marker, 1), len(clips)
 
@@ -622,6 +624,7 @@ def main():
     parser.add_argument('--force', action='store_true', help='overwrite index.html even if it was edited by hand since the tool wrote it')
     parser.add_argument('--no-intro', action='store_true', help='leave out the scene\'s "intro" card (tools/film.py: only the first scene of a film opens with one)')
     parser.add_argument('--no-outro', action='store_true', help='leave out the scene\'s "outro" card (tools/film.py: only the last scene of a film closes with one)')
+    parser.add_argument('--no-grain', action='store_true', help='leave the film grain out of a 3D set (tools/film.py adds grain when it joins the parts: cheaper to render, much smaller files)')
     parser.add_argument('--cues', default='auto', choices=['auto', 'rhubarb', 'spectral', 'amplitude'], help='lip-sync method for voice files')
     args = parser.parse_args()
     if args.retime: return retime(args.retime)
@@ -634,6 +637,7 @@ def main():
     if not isinstance(scene, dict): fail('the scene file must be a JSON object')
     if args.no_intro: scene.pop('intro', None)
     if args.no_outro: scene.pop('outro', None)
+    if args.no_grain and isinstance(scene.get('set'), dict): scene['set']['grain'] = False
     known('scene', scene, TOP_KEYS)
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
@@ -1318,6 +1322,9 @@ def main():
     bundle = os.path.join(ROOT, 'dist', 'character.slim.js')
     if not os.path.isfile(bundle): fail('dist/character.slim.js is missing — run python3 tools/build.py first')
     shutil.copy(bundle, os.path.join(out, 'character.slim.js'))
+    # GSAP GHIM PHIÊN BẢN, chép cạnh composition (vendor/): nạp từ CDN `gsap@3` thì CI đỏ khi mạng chập chờn (đợt 26) và
+    # GSAP lên bản mới là cùng một cảnh render ra khác. Render được cả khi không có mạng.
+    shutil.copy(os.path.join(ROOT, 'vendor', GSAP_FILE), os.path.join(out, 'gsap.min.js'))
     for voice in voices:
         if os.path.abspath(voice['source']) != os.path.abspath(os.path.join(out, voice['file'])): shutil.copy(voice['source'], os.path.join(out, voice['file']))
         done = subprocess.run([sys.executable, os.path.join(HERE, 'cues.py'), os.path.join(out, voice['file']), '--js', '--name', voice['key'], '--text', voice['text'],
@@ -1820,7 +1827,7 @@ def main():
 <div id="stage" data-composition-id="{scene_id}" data-start="0" data-duration="__TOTAL__" data-width="{width}" data-height="{height}">
 {chr(10).join(body)}
 
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <script src="gsap.min.js"></script>
   <script src="character.slim.js"></script>{cue_scripts}
   <script>
     VGCharacter.seed({int(scene.get('seed', 7))});

@@ -1,4 +1,4 @@
-/* VGCharacter v0.66.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.67.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -8953,7 +8953,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (actor.rig && typeof actor.rig.lightShade === 'function' && lighting.shading) {
             const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
             let from, amount, glow = 0, rgb = '255,255,255';
-            if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34) * (L.rim.front ?? 1); rgb = L.rim.rgb; }
+            // Đổ bóng theo nguồn mạnh nhất ở PHÍA TRƯỚC / bên cạnh: nguồn sau lưng (đèn khám treo sau bàn) chỉ cho viền sáng — lấy
+            // hướng của nó thì sáng tối trên thân gần như không có chiều ngang, người chấm thấy "sáng đều hai bên" (đợt 27).
+            const key = L.sources.find((src) => src.k > 0.12 && (src.front ?? 1) >= 0.5);
+            if (key) { from = [key.x, key.y, key.z]; amount = clamp(0.26 + key.k * 0.5, 0, 0.6); glow = clamp(key.k * 0.35, 0, 0.34) * (key.front ?? 1); rgb = key.rgb; }
             else { const key = mood.sun && mood.name === 'evening' ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood.name === 'night' ? 0.12 : mood.name === 'evening' ? 0.4 : 0.24; glow = mood.name === 'evening' ? 0.18 : 0; rgb = mood.name === 'evening' ? mood.sunColor : rgb; }
             const a = set.project(...from), b = set.project(...centre);
             // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
@@ -9244,9 +9247,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const front = span.z > zMeanProps + 150;
           const half = (W / 2) * cam.distance / k, plane = (x) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - span.z));
           const a = plane(span.a), b = plane(span.b);
-          if (b - a > half) continue;
+          if (b - a > 2 * half) continue;                                   // rộng hơn cả khung: không lấy trọn được
           const shown = (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a);
-          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.12 || shown >= 0.88) continue;
+          // Lẹm dù chỉ 3 % (mép sofa, chân kệ TV ở mép khung dọc) cũng là cắt dở — cả hai mô hình chấm đều thấy (đợt 27).
+          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || shown >= 0.97) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
           const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
@@ -9256,6 +9260,21 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             // mép phải bị cắt đôi ở mọi cảnh phòng khách (đợt 23).
             const wider = { ...region, x0: Math.min(region.x0, a - margin), x1: Math.max(region.x1, b + margin) }, test = solve(wider);
             if (test.distance <= cam.distance * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }      // khung dọc hẹp: lùi xa hơn (đợt 25: TV cắt đôi lúc mất điện)
+          }
+        }
+        // XỬ LÝ TỪNG CÁI một thì sửa cái này hỏng cái kia (lấy trọn TV thì sofa ở mép trái bị lẹm — đợt 27). Góc toàn: còn đồ vật
+        // nào lẹm mép thì lùi máy lấy trọn TẤT CẢ chúng, cùng giới hạn lùi như trên (tính từ khoảng cách lúc vào bước này).
+        if (size === 'full') {
+          const start = cam.distance, still = () => {
+            const half = (W / 2) * cam.distance / k, plane = (x, z) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - z));
+            return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
+              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) < 0.97);
+          };
+          const cut = still();
+          if (cut.length) {
+            const margin = (W / 2) * cam.distance / k * 0.04;
+            const wider = { ...region, x0: Math.min(region.x0, ...cut.map((c) => c.a - margin)), x1: Math.max(region.x1, ...cut.map((c) => c.b + margin)) }, test = solve(wider);
+            if (test.distance <= start * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }
           }
         }
       }
@@ -9824,7 +9843,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.66.0';
+const VERSION = '0.67.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

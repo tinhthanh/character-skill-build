@@ -49,6 +49,7 @@ def main():
     bundle = os.path.join(ROOT, 'dist', 'character.slim.js')
     if not os.path.isfile(bundle): fail('dist/character.slim.js is missing — run python3 tools/build.py first')
     shutil.copy(bundle, os.path.join(out, 'character.slim.js'))
+    shutil.copy(os.path.join(ROOT, 'vendor', 'gsap-3.15.1.min.js'), os.path.join(out, 'gsap.min.js'))      # GSAP ghim phiên bản (đợt 27)
 
     # Danh mục người và thú cùng vào trang; trang tự chọn theo `id` (người hay loài thú) và lọc theo loài.
     entries = {'people': catalog['people'], 'pets': catalog['pets']}
@@ -76,7 +77,7 @@ def main():
 <body>
 <div id="stage" data-composition-id="{name}" data-start="0" data-duration="__TOTAL__" data-width="{WIDTH}" data-height="{HEIGHT}">
 
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <script src="gsap.min.js"></script>
   <script src="character.slim.js"></script>
   <script>
     VGCharacter.seed(7);

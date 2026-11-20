@@ -16,7 +16,10 @@ film.json (paths are relative to it):
     "music": "music.mp3",          optional: background music under the whole film — looped to length, faded in and
     "musicVolume": 0.25,              out, and lowered automatically while someone speaks (ducking)
     "subtitles": true,             write film.srt next to the film from every spoken line (default true)
-    "poster": 1.0                  write film.jpg — the frame at this second (false: none; default 1.0)
+    "poster": 1.0,                 write film.jpg — the frame at this second (false: none; default 1.0)
+    "grain": "post"                "post" (default): film grain added by FFmpeg when the parts are joined — the scenes
+                                      render without their own grain layer (about 25 % faster) and the film is several
+                                      times smaller; "page": keep each scene's own grain layer; "none": no grain
   }
 
 Every scene must have the same frame size ("width" / "height"). A scene without sound gets a silent
@@ -55,7 +58,7 @@ def main():
     path = os.path.abspath(args.film)
     try: film = json.load(open(path, encoding='utf-8'))
     except (OSError, ValueError) as error: fail(f'cannot read {args.film}: {error}')
-    allowed = {'scenes', 'transition', 'duration', 'fps', 'output', 'music', 'musicVolume', 'subtitles', 'poster'}
+    allowed = {'scenes', 'transition', 'duration', 'fps', 'output', 'music', 'musicVolume', 'subtitles', 'poster', 'grain'}
     unknown = set(film) - allowed
     if unknown: fail(f'unknown key(s) {", ".join(sorted(unknown))} (allowed: {", ".join(sorted(allowed))})')
     base = os.path.dirname(path)
@@ -65,6 +68,11 @@ def main():
     if kind not in TRANSITIONS: fail(f'"transition" must be one of {", ".join(TRANSITIONS)} — got {kind!r}')
     blend = float(film.get('duration', 0.6)) if kind != 'cut' else 0.0
     fps = int(film.get('fps', 30))
+    # HẠT PHIM (đợt 27): lớp hạt trong trang tốn ~25 % thời gian render, làm video nặng gấp ~10 lần (43 MB so với 4,2 MB, cảnh
+    # 14 s dọc) mà sau khi nén gần như không thấy. Nhiễu FFmpeg mức 3 lúc chuẩn hoá từng phần cho độ hạt tương đương (đo độ lệch
+    # chuẩn trên vùng trời: 19,26 so với 19,31) với tệp 9 MB.
+    grain = film.get('grain', 'post')
+    if grain not in ('post', 'page', 'none'): fail(f'"grain" must be "post", "page" or "none" — got {grain!r}')
     output = os.path.join(base, film.get('output', os.path.splitext(os.path.basename(path))[0] + '.mp4'))
     parts_dir = os.path.splitext(output)[0] + '.parts'
     # Soát film.json TRƯỚC khi đòi FFmpeg: lỗi trong tệp thì báo đúng lỗi ấy, cả trên máy chưa cài FFmpeg (CI).
@@ -91,7 +99,7 @@ def main():
         source = os.path.join(base, scene)
         if not os.path.isfile(source): fail(f'scene file not found: {scene}')
         cards = (['--no-intro'] if number > 1 else []) + (['--no-outro'] if number < len(scenes) else [])
-        built = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), source, '--force', '-o', os.path.join(parts_dir, f'scene{number}'), *cards], capture_output=True, text=True)
+        built = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), source, '--force', '-o', os.path.join(parts_dir, f'scene{number}'), *cards, *(['--no-grain'] if grain != 'page' else [])], capture_output=True, text=True)
         if built.returncode != 0: fail(f'{scene} does not build:\n{built.stderr.strip()}')
         for line in built.stdout.splitlines():
             if line.startswith('  !'): print(f'  {scene}:{line[1:]}', file=sys.stderr)          # lời nhắc của scene.py (góc máy cắt người…)
@@ -112,7 +120,7 @@ def main():
             # Đồng nhất mã hoá (cùng fps, cùng định dạng điểm ảnh, tiếng AAC 48 kHz stereo) cho xfade / acrossfade.
             command = ['ffmpeg', '-y', '-loglevel', 'error', '-i', raw]
             if not has_audio: command += ['-f', 'lavfi', '-t', f'{length:.3f}', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000']
-            command += ['-map', '0:v', '-map', '0:a' if has_audio else '1:a', '-r', str(fps), '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-crf', '18',
+            command += ['-map', '0:v', '-map', '0:a' if has_audio else '1:a', *(['-vf', 'noise=alls=3:allf=t'] if grain == 'post' else []), '-r', str(fps), '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-crf', '18',
                         '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', part]
             if subprocess.run(command).returncode != 0: fail(f'could not prepare {scene}')
         elif not os.path.isfile(part): fail(f'--no-render: {part} is missing — render once without it')

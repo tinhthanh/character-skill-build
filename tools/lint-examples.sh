@@ -25,8 +25,9 @@ for example in examples/*/index.html; do
   mkdir -p "$WORK/$name"
   cp -R "$(dirname "$example")/." "$WORK/$name/"            # audio, cue scripts and anything else the example loads
   # Cùng một phép thay mà người dùng làm khi chép ví dụ vào project thật.
-  sed 's#\.\./\.\./dist/character\.iife\.js#character.iife.js#' "$example" > "$WORK/$name/index.html"
+  sed -e 's#\.\./\.\./dist/character\.iife\.js#character.iife.js#' -e 's#\.\./\.\./vendor/gsap-#gsap-#' "$example" > "$WORK/$name/index.html"
   cp dist/character.iife.js "$WORK/$name/"
+  cp vendor/gsap-*.min.js "$WORK/$name/"                     # GSAP ghim phiên bản (đợt 27), không nạp từ CDN
   if (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" lint > "$WORK/$name.log" 2>&1) && grep -q "0 errors" "$WORK/$name.log"; then
     echo "  ✓ $name  $(grep -E '[0-9]+ errors?' "$WORK/$name.log" | tail -1 | sed 's/^[^0-9]*//')"
   else
