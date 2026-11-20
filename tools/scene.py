@@ -1201,6 +1201,10 @@ def main():
                 # (đo bằng tools/acting_check.py, đợt 28).
                 wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
+                # Người NGỒI quay 3/4 về phía con vật (xem `state.facing` của người ngồi): đầu gối chìa ra phía ấy — con vật dừng xa
+                # hơn một chút, không thì nó đứng khuất sau hai đầu gối (đợt 29: con mèo tới cạnh bà trên sofa).
+                if who.get('seated') and target['_pet'] and stage_set is not None and not who.get('faces') and (gap > 0) == (float(who['_x0']) < 0):
+                    wanted = max(wanted, 0.3 * who['_host_height'])
                 if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
                     # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
                     # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
@@ -1744,6 +1748,11 @@ def main():
         if who.get('faces') and not who.get('enter') and not who['_late']:
             toward = -1 if names[who['faces']]['_x0'] < who['_x0'] else 1          # chỗ đứng LÚC ĐẦU, không phải sau các lượt bước lại gần
             setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
+        elif who.get('seated') and not who['_pet'] and stage_set is not None and not who['_late']:
+            # Người NGỒI trên ghế, không nói nhìn ai: quay 3/4 vào giữa phòng — dáng 3/4 mới vẽ được đùi nằm ngang trên mặt ghế,
+            # nhìn thẳng thì trông như đứng trước ghế (đợt 29).
+            toward = 1 if who['_x0'] < 0 else -1
+            setup.append(f"    {who['name']}.state.facing = {toward * 0.55};            // seated: a three-quarter turn into the room, thighs on the seat")
         if who['_late']:
             setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")
     # ── THẺ THÔNG BÁO (`"toast"` trên một lượt): một thẻ kiểu thông báo ứng dụng ở góc trên khung — biểu tượng chuông,

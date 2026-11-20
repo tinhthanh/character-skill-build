@@ -1078,21 +1078,23 @@ class RigSVG {
       e['tai' + ben].setAttribute('transform', `translate(${dau * x} 4) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
-    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah);
-    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah) * (1 - clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1)));
+    const sideSit = clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1));
+    const sitFold = -Math.sign(h) * 75 * sideSit;                                      // xoay dương = về bên trái màn hình
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
+    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
     if (e.skirt) {
       const K = this.nv.skirt, thigh = DAI.dui * daiDui, halfLeg = 13 * dayChan, flare = K.flare ?? 4;
       const reach = (K.length ?? 1) * thigh;                     // gấu cách hông bao xa, đo dọc theo chân
       const along = (side, offset) => {
         const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3) + legShift;
-        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay) + sitFold) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
-        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay) * RAD;
+        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay - sitFold) * RAD;
         return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
       };
       const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
@@ -2836,8 +2838,9 @@ class RigSVG {
     this.#leanTo(t, reach, 'xoe');
     t.to(s, { ['bat' + other]: reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
     t.set(s, { om: 1 }, 0.5);                                                              // hai tay đã chạm: con vật vào tay
-    t.to(s, { omRise: 1, huong: 0, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
-    this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: 0 });
+    const turnKeep = s.seat >= 0.5 && Math.abs(s.huong) > 0.02 ? Math.sign(s.huong) * 0.22 : 0;
+    t.to(s, { omRise: 1, huong: turnKeep, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
+    this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: turnKeep });
     return t;
   }
   putDown() {
@@ -6048,11 +6051,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (dim > 0) glow *= 1 - dim;
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
             amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
-            const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
+            const carried = !!(actor.rig.svg && !host.contains(actor.rig.svg));
+            if (!isPerson(actor)) { amount = Math.min(carried ? 0.2 : 0.45, amount); if (carried) glow = Math.min(glow, 0.1); }
+            const darkSide = !isPerson(actor) ? (mood.name === 'night' ? mood.shade : '46,36,30') : mood.name === 'day' ? '52,82,140' : mood.shade;
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
             actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
             actor.lightInfo = { mood: mood.name, key: !!key, back: +dim.toFixed(3), amount: +amount.toFixed(3), glow: +glow.toFixed(3) };
-            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
+            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, carried ? 0 : up.amount); }      // trong vòng tay: không còn ánh sàn hắt lên
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
           if (actor.rig && lighting.mood.dark > 0.3) {

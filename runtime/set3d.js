@@ -640,12 +640,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
             amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
             // Ban ngày / phòng sáng: phía khuất NGẢ LẠNH hẳn (xanh xám), không chỉ tối đi — đọc ra hướng sáng (phòng khám "phẳng").
-            const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
+            // CON VẬT: phía khuất tối trung tính ấm, không ngả xanh, và không quá 0,45 — xanh lam ở độ đậm 0,6–0,7 (×1,45 rồi
+            // ×1,5 vì nhỏ trên màn hình) phủ gần hết con mèo xám, con corgi cam thành xanh xám (đợt 29). Đang ĐƯỢC BẾ: nằm
+            // trước ngực người, chỉ tối nhẹ (≤ 0,2) — giữ màu lông thật.
+            const carried = !!(actor.rig.svg && !host.contains(actor.rig.svg));
+            if (!isPerson(actor)) { amount = Math.min(carried ? 0.2 : 0.45, amount); if (carried) glow = Math.min(glow, 0.1); }
+            const darkSide = !isPerson(actor) ? (mood.name === 'night' ? mood.shade : '46,36,30') : mood.name === 'day' ? '52,82,140' : mood.shade;
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
             actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
             // Cho tools/light_side.py: giờ trong ngày, có nguồn sáng chính gần (đèn, cửa sổ) hay chỉ hướng sáng chung, ngược sáng bao nhiêu.
             actor.lightInfo = { mood: mood.name, key: !!key, back: +dim.toFixed(3), amount: +amount.toFixed(3), glow: +glow.toFixed(3) };
-            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
+            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, carried ? 0 : up.amount); }      // trong vòng tay: không còn ánh sàn hắt lên
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
           // Đứng GẦN ĐÈN lúc tối: một quầng nhạt màu đèn ôm quanh người — đèn tách người khỏi nền tối.

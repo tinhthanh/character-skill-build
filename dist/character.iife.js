@@ -1679,14 +1679,23 @@ class RigSVG {
     // dậm chân, chỗ đó cả chân nhấc về phía trước.)
     // Ngồi thì hai đùi XOÈ ra, ống chân vẫn thẳng đứng: có một chỗ GẬP ở đầu gối để mắt đọc ra dáng ngồi. Chỉ rút
     // ngắn đùi theo chiều dọc thì chân vẫn là một đường thẳng — nhìn như nhân vật lùn đi chứ không phải ngồi xuống.
-    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah);
+    // (Ngồi quay 3/4 — đùi gập nằm ngang, xem `sideSit` dưới đây — thì thôi xoè: xoè cộng gập làm một đùi dốc hơn, bàn chân lún.)
+    const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah) * (1 - clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1)));
     // Đùi xoè thì dài thêm 1/cos để đầu gối vẫn ở đúng độ cao cũ — bàn chân không rời mặt đất.
     // Quỳ: ống chân cũng rút (chĩa về phía người xem) — co thêm sau phép co ngược của đùi.
-    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    // NGỒI MÀ QUAY 3/4 (đợt 29): đùi NẰM NGANG trên mặt ghế, chĩa về phía mặt nhìn, gần đủ dài; ống chân thõng thẳng xuống.
+    // Nhìn thẳng thì đùi chỉ còn một khúc rút ngắn nối thẳng với ống chân — người ngồi sofa / ghế đá trông như đứng trước
+    // ghế. Đùi 75° dài đủ thì phần thẳng đứng của nó là cos 75° ≈ 0,26 chiều dài — gần đúng 0,28 của dáng nhìn thẳng, nên
+    // hông vẫn hạ đúng chừng ấy (`seatY`, mặt ghế) và bàn chân vẫn chạm đất.
+    const sideSit = clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1));
+    const sitFold = -Math.sign(h) * 75 * sideSit;                                      // xoay dương = về bên trái màn hình
+    // Phần thẳng đứng của đùi luôn bằng của dáng nhìn thẳng (1 − 0,72 × seat): đùi xoay φ thì dài thêm 1/cos φ — quay dở
+    // (đang vuốt con chó, huong −0,3) mà để đùi dài theo `sideSit` thì đầu gối thấp quá, bàn chân lún 4,5 % chiều cao.
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
+    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
 
     // ── VÁY / TẠP DỀ: một tứ giác từ eo xuống gấu, hai góc gấu BÁM theo hai đùi.
     if (e.skirt) {
@@ -1696,10 +1705,10 @@ class RigSVG {
       // hệ toạ độ nhóm chân. Quá gối thì đi tiếp theo hướng ống chân.
       const along = (side, offset) => {
         const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3) + legShift;
-        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay)) * RAD;
+        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay) + sitFold) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
-        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay) * RAD;
+        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay - sitFold) * RAD;
         return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
       };
       const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
@@ -4375,8 +4384,11 @@ class RigSVG {
     // Nhấc lên và QUAY VỀ PHÍA NGƯỜI XEM: dáng ôm là dáng nhìn thẳng (ở dáng 3/4 tay phía xa buông chéo qua mặt con
     // vật), và "khoe" con vật ra máy quay cũng là điều ta muốn thấy. Thế bế giữ hướng nhìn thẳng; `putDown` trả lại hướng cũ.
     // Đang NGỒI (`sitDown`, ghế phòng chờ) thì vẫn ngồi — con vật nằm trên đùi; đứng thì đứng thẳng lại sau cú khuỵu gối.
-    t.to(s, { omRise: 1, huong: 0, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
-    this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: 0 });
+    // Đang NGỒI quay 3/4 (đùi nằm trên mặt ghế): giữ một chút quay (0,22) — nhìn thẳng hẳn thì đùi dựng lại, người bế con vật
+    // trông như đứng trước ghế (đợt 29). Hai cánh tay vẫn gần như nhìn thẳng.
+    const turnKeep = s.seat >= 0.5 && Math.abs(s.huong) > 0.02 ? Math.sign(s.huong) * 0.22 : 0;
+    t.to(s, { omRise: 1, huong: turnKeep, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
+    this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: turnKeep });
     return t;
   }
 
@@ -9026,12 +9038,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
             amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
             // Ban ngày / phòng sáng: phía khuất NGẢ LẠNH hẳn (xanh xám), không chỉ tối đi — đọc ra hướng sáng (phòng khám "phẳng").
-            const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
+            // CON VẬT: phía khuất tối trung tính ấm, không ngả xanh, và không quá 0,45 — xanh lam ở độ đậm 0,6–0,7 (×1,45 rồi
+            // ×1,5 vì nhỏ trên màn hình) phủ gần hết con mèo xám, con corgi cam thành xanh xám (đợt 29). Đang ĐƯỢC BẾ: nằm
+            // trước ngực người, chỉ tối nhẹ (≤ 0,2) — giữ màu lông thật.
+            const carried = !!(actor.rig.svg && !host.contains(actor.rig.svg));
+            if (!isPerson(actor)) { amount = Math.min(carried ? 0.2 : 0.45, amount); if (carried) glow = Math.min(glow, 0.1); }
+            const darkSide = !isPerson(actor) ? (mood.name === 'night' ? mood.shade : '46,36,30') : mood.name === 'day' ? '52,82,140' : mood.shade;
             actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
             actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
             // Cho tools/light_side.py: giờ trong ngày, có nguồn sáng chính gần (đèn, cửa sổ) hay chỉ hướng sáng chung, ngược sáng bao nhiêu.
             actor.lightInfo = { mood: mood.name, key: !!key, back: +dim.toFixed(3), amount: +amount.toFixed(3), glow: +glow.toFixed(3) };
-            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
+            if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, carried ? 0 : up.amount); }      // trong vòng tay: không còn ánh sàn hắt lên
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
           // Đứng GẦN ĐÈN lúc tối: một quầng nhạt màu đèn ôm quanh người — đèn tách người khỏi nền tối.

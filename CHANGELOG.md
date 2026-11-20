@@ -21,7 +21,8 @@ Added — handing over, seated people and the lit side, measured
 
 Fixed — measured on 4 trial scenes (clinic: hand over the dog, hand over pills; living room: cup, carry, hand over the
 cat; sofa: stroke and carry a cat that walks over; bench: the same with a dog): 1 of 4 hand measurements passed with
-the 0.68.0 code (the clinic scene did not build: `handOverPet` alone), 18 of 18 now (hands, pet in the arms, seat)
+the 0.68.0 code (the clinic scene did not build: `handOverPet` alone), 18 of 18 now (hands, pet in the arms, seat);
+with the two 0.68.0 acting scenes and the CI scene, 37 of 37
 - **Handing over** aims at the point between the two shoulders, as the handshake does (a fixed pose held the item at the
   belly): the hands come within 2.8–3.8 % of the height of each other, against 18.8–19.9 %. The givers stand 0.28 × the
   height apart (0.45 before) and 0.34 for a carried pet (0.42 before: 7.8 % → 2.1–2.9 %); the pet is handed to where the
@@ -37,6 +38,17 @@ the 0.68.0 code (the clinic scene did not build: `handOverPet` alone), 18 of 18 
 - A **seated** person reaches for where a pet that walked over stands at that turn, not where it stood when the scene
   began (grandpa on the bench held his hand out level, 6.7 % of the height above the dog's back → 0.0 %).
 - The park bench is 100 high, a seated person's seat height (85: grandpa floated 3.5 % of his height above it; 0.9 % now).
+- **A seated person looks seated**: on a sofa or bench, with no `"faces"`, they turn three-quarters into the room, and
+  seated three-quarters the thighs lie level on the seat, pointing the way they face, with the shins hanging straight
+  down (facing the camera the thigh was a short stub in line with the shin: they seemed to stand in front of the seat).
+  The upright part of the thigh stays what it was, so the seat line and the feet do not move (feet within 1.7 % of the
+  floor; turning half-way left the knee too low, feet 4.5 % into the floor, before the thigh length was matched to the
+  turn). Picking up a pet while seated keeps a slight turn (0.22) so the thighs stay on the seat; a pet that walks over
+  to the side the knees point to stops 0.3 × the height away, not behind the knees.
+- **Pets keep their colour**: the shade on a pet's far side was the cool blue of a person's daylight shade at 0.58–0.70
+  (×1.45 for pets, ×1.5 again when small on screen) — the grey cat on the sofa and the orange corgi turned blue-grey,
+  most of all in someone's arms. A pet's shade is now a warm neutral dark, at most 0.45; in someone's arms at most 0.2,
+  with no floor bounce.
 - **Light on one side**: the light and shade across a character's body followed where they stood when the scene began —
   someone who had walked a few steps stood wholly in the dark (or light) half of it. And in daylight the side facing
   the light got nothing, only the far side darkened: people in daylight are now warmed by the sun / window on that side
