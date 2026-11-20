@@ -108,8 +108,10 @@ without the pet, the pet drawn on top of everything) at least 70 % of it and 60 
 (the toucher on top, then with the hands painted) at least 70 % of the touching hand shows and at least 5 % of it lies
 on or against the pet (a hand in view that hovers beside it is not a touch). A seated person leans at most
 25° to reach a pet on the floor. Every medium shot the automatic camera chose (`set.shotLog`) must be narrower than
-85 % of the full shot of the same subjects — a cut to it would barely change the frame.
-It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene, a park scene and a living-room scene.
+85 % of the full shot of the same subjects — a cut to it would barely change the frame — and none may be kept as the full
+shot (the last line counts them). A stroke is followed every 0.1 s over the strokes (`track` in `moments.json`): the hand
+stays on or against the pet at every moment and no more than 25 % of it sinks past the pet's outline.
+It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene, a park scene, a living-room scene and a vertical power-cut scene.
 
 What the scene tool now does for the acting, so the measurements pass without extra script lines:
 
@@ -131,7 +133,11 @@ What the scene tool now does for the acting, so the measurements pass without ex
   whole), the camera lets furniture that nobody uses (a coffee table — not the TV, not the sofa someone sits on) touch the
   frame edge and stays at 80 % of the full shot; failing that it frames the person acting and the pet at the moment of
   the action; only when even that is too wide (or would cut the pet) does it keep the full shot instead of cutting to a
-  near copy. `tools/scene.py` says when a medium shot is still that wide.
+  near copy. `tools/scene.py` says when a medium shot is still that wide. In a vertical frame two subjects far apart
+  get a single shot of the person acting instead; medium shots of a person are framed on the upper body (a seated
+  person's knees do not widen them), and the vertical full shot leaves room around the person (66 % of the height).
+- A stroke glides: the hand slides along the top of the pet's head, its underside on one line, instead of rocking up
+  off it and down behind it.
   `acting_check` also measures that a carried pet is in the arms and that a seated person sits on the seat
   (within 3 % of their height of the top of the sofa / bench).
 

@@ -84,6 +84,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const camera = { ...base }, marks = [];
   const backdrop = [], props = [], actors = [], layers = [], focused = [], surfaces = [];
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
+  let trial = null;                                  // máy THỬ (đợt 32): `direct` đo đồ đạc ở mép một góc chưa đặt — đè lên máy của timeline
 
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
   const layer = (index) => {
@@ -401,6 +402,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return {
         get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
         get y() { const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
+        // BỀ NGANG ĐẦU con vật trong khung của `from` (đợt 32): quãng bàn tay trượt khi vuốt (`stroke`).
+        get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
       };
     },
 
@@ -510,6 +513,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const done = entry.duration ? clamp(local / entry.duration, 0, 1) : 1, k = entry.curve(done);
         for (const [key, value] of Object.entries(entry.values)) camera[key] += (value - camera[key]) * k;
       }
+      if (trial) Object.assign(camera, trial);
       // ÁNH SÁNG SỐNG theo thời gian của timeline (tua tới đâu cũng đúng): mây thỉnh thoảng che nắng — vệt nắng, luồng nắng,
       // bụi và ánh cửa sổ trên người dịu đi rồi sáng lại; màn hình TV / laptop nhấp nháy, đổi màu theo "cảnh" trên màn hình.
       if (lighting) {
@@ -877,7 +881,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // ĐẦU (người): góc cận né theo đầu — mặt người bên cạnh ra hẳn khỏi khung, cánh tay đang khám / cho thuốc thì được lấn vào.
         const headEl = actor.rig.el && actor.rig.el.dau, h = headEl ? headEl.getBoundingClientRect() : null;
         const head = h && h.width ? { x0: toX(h.left), x1: toX(h.right), top: toY(h.top), base: toY(h.bottom) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, rig: actor.rig };
+        // PHẦN TRÊN THÂN (đợt 32): đầu, mình, hai tay — không có chân. Góc trung / cận cắt ngang dưới hông nên chỉ cần bề ngang
+        // này: đo cả người thì đầu gối người ngồi chìa ngang (bà trên sofa: 912 px so với 610 px phần trên) — khung dọc hẹp
+        // lùi tới đúng khoảng cách góc toàn (góc trung = 100 % góc toàn, phải giữ góc toàn).
+        const upperEl = actor.rig.el && actor.rig.el.than, u = upperEl && upperEl !== part ? drawnRect(upperEl) : null;
+        const upper = u && u.width ? { x0: toX(u.left), x1: toX(u.right) } : null;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, rig: actor.rig };
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
@@ -887,10 +896,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
-        return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
+        const across = size !== 'full' && m.upper ? m.upper : m;                         // góc trung / cận: bề ngang phần trên thân (đợt 32)
+        return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
+      const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper) } : a || b);
       // Người KHÁC cũng đo qua các mốc: bác sĩ bước tới khám rồi lùi về ngay trong nhịp — đo ở đầu / cuối nhịp thì không thấy
       // lúc họ đứng sát con vật (đợt 18: góc cận con mèo vẫn lẹm nửa mặt bác sĩ).
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -907,7 +918,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       // Khung DỌC: người chiếm ít chiều cao hơn — trung cảnh ở 86 % là một cái đầu to đầy khung, mặt rơi đúng chỗ phụ đề.
-      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.8 };
+      // Góc TOÀN dọc (đợt 32): người chiếm 66 % chiều cao (trước: 80 %). Khung dọc hẹp: góc trung một người bị bề ngang chặn —
+      // đầu chibi rộng ~0,44 chiều cao người, phải lọt 90 % bề ngang khung — nên không thể chặt hơn ~0,93 góc toàn 80 %: cắt
+      // sang góc trung gần như không đổi khung (bác sĩ phòng khám, bé ở công viên). Góc toàn chừa sàn và tường quanh người.
+      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.66 };
       const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill) => {
@@ -1110,9 +1124,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (!m.person && m.base < bottom && shown > 0.05 && shown < 0.95) {
               const pad = (m.top - m.base) * 0.08;
               const wider = { x0: Math.min(region.x0, m.x0), x1: Math.max(region.x1, m.x1), y0: Math.min(region.y0, m.base - pad), y1: region.y1 }, test = solve(wider, Math.max(fill, 0.8));
-              if (test.distance <= cam.distance * 1.8 && test.distance <= limit) { region = wider; cam = test; continue; }
+              // `ruleLog` (đợt 32): luật này chạy ở đâu — CI (tools/check_scene.py) dựng một cảnh chạm tới nó.
+              const noted = (how) => set.ruleLog.push({ rule: 'petBottom', how, size, shown: +shown.toFixed(3) });
+              if (test.distance <= cam.distance * 1.8 && test.distance <= limit) { region = wider; cam = test; noted('widen'); continue; }
               const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-              if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+              if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; noted('shift'); continue; }
             }
           }
           // ĐỈNH khung cắt ngang một người đứng (góc cận con mèo dưới sàn, bà đứng ngay sau: thấy thân, mất đầu — cảnh thử
@@ -1171,6 +1187,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * Góc của từng lần đổi là `frameOn` ở đúng lúc ấy (tua `tl` tới đó để đo). Trả về các thời điểm CẮT (cho phụ đề).
      */
     shotLog: [],
+    ruleLog: [],                                                                           // luật khung hình đã chạy (đợt 32: con vật ở mép dưới)
 
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
       const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
@@ -1200,24 +1217,46 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (beat.size === 'medium') {
           const seek = (time) => { tl.seek(time, false); set.update(); };
           let full = null, how = 'medium';
+          const tries = {};                                                                  // các lần dựng lại (để soát: vì sao giữ góc toàn)
           const ratio = values.distance;
           try { full = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek }); } catch (error) { full = null; }
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
             try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
-            if (loose && loose.distance < MEDIUM_WIDE * full.distance && !set.lastFrame.stillCut && set.lastFrame.whole) { values = loose; how = 'loose'; }
+            // ĐỒ ĐẠC Ở MÉP của góc thử (đợt 32): đo bằng phép chiếu THẬT — đặt máy thử (`trial`) rồi `propFraming()`, như
+            // acting_check chấm. Ước lượng phẳng của `frameOn` (`stillCut`) bỏ qua góc ngẩng / độ sâu: góc trung bác sĩ phòng khám
+            // khung dọc ước 0,58 "lẹm" mà hình thật không lẹm gì — góc trung bị bỏ, giữ góc toàn.
+            const edgeCut = (v) => { trial = { ...v }; set.update(); const cut = set.propFraming().filter((p) => !p.minor && !p.front); trial = null; set.update(); return cut; };
+            const usable = (v) => {
+              if (!v) return false;
+              const frame = set.lastFrame, cut = edgeCut(v), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
+              return { ok, ratio: +(v.distance / full.distance).toFixed(3), cut: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), whole: frame.whole };
+            };
+            const judged = (name, v) => { const r = usable(v); if (r) tries[name] = { ratio: r.ratio, cut: r.cut, whole: r.whole }; return r && r.ok; };
+            if (judged('loose', loose)) { values = loose; how = 'loose'; }
             else {
               // (2) góc trung của người làm động tác + con vật, đo ĐÚNG LÚC động tác (giữa nhịp) — nhịp dài gộp mọi chỗ họ đứng
               // (bé bước tới, quỳ, đứng lên: khung rộng 89–92 % góc toàn). Người xem thấy động tác to hơn, không phải góc toàn.
               let moment = null;
               try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
-              if (moment && moment.distance < MEDIUM_WIDE * full.distance && !set.lastFrame.stillCut && set.lastFrame.whole) { values = moment; how = 'moment'; }
-              else { values = full; size = 'full'; how = 'full'; }      // (3) vẫn không được: giữ góc toàn
+              if (judged('moment', moment)) { values = moment; how = 'moment'; }
+              else {
+                // (3) GÓC ĐƠN của người làm (đợt 32): hai chủ thể đứng xa nhau — khung dọc hẹp, bà trên sofa rọi đèn pin sang con
+                // mèo giữa phòng: góc hai người nào cũng gần bằng góc toàn (98 %) hay lẹm TV. Quay người làm một mình ở cỡ trung
+                // (con vật có góc cận của nó ở nhịp sau). Chỉ khi chủ thể đầu là người.
+                let single = null;
+                const actor = beat.subjects[0], person = actor && typeof actor.seatY === 'function';
+                if (person && beat.subjects.length > 1) {
+                  try { single = set.frameOn([actor], 'full', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { single = null; }
+                }
+                if (judged('single', single)) { values = single; how = 'single'; }
+                else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
+              }
             }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,
-                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null });
+                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries });
           // Thành góc toàn của đúng những chủ thể của góc đang có: giữ nguyên, không cắt.
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }

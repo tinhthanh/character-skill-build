@@ -321,7 +321,9 @@ def shot_notes(shots):
     """Nhắc những góc TRUNG gần rộng bằng góc TOÀN của cùng các chủ thể (`set.shotLog`, ghi lúc `direct` đặt máy): cắt từ góc
     toàn sang đó người xem chỉ thấy khung giật nhẹ — hai chủ thể đứng xa nhau mà còn phải lấy trọn đồ đạc (đợt 30)."""
     return [f'{shot["t"]:.1f} s: the medium shot of {", ".join(shot["subjects"])} is {shot["ratio"] * 100:.0f} % as wide as their full shot — a cut to it barely changes the frame; '
-            f'stand them closer, or give that turn a "view" on one of them' for shot in shots if shot.get('ratio') and shot['ratio'] >= MEDIUM_WIDE and shot.get('how') != 'full']
+            f'stand them closer, or give that turn a "view" on one of them' for shot in shots if shot.get('ratio') and shot['ratio'] >= MEDIUM_WIDE and shot.get('how') != 'full'] \
+        + [f'{shot["t"]:.1f} s: no medium shot of {", ".join(shot["subjects"])} could be framed (it was {shot["first"] * 100:.0f} % as wide as their full shot) — the full shot is kept; '
+           f'stand them closer, or give that turn a "view"' for shot in shots if shot.get('how') == 'full']      # đợt 32: góc trung bị giữ thành góc toàn
 
 
 def quiet_notes(timings, shown_turns, longest=8.0):
@@ -440,7 +442,10 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
             if op['kind'] == 'carry': ask = [f'Is {op["who"]} holding the animal ({op["target"]}) in their arms, against the chest — not floating beside them?']
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]} {op["target"]}', 'ask': ask + ['Are the standing characters\' feet on the floor (not floating above it or sunk into it)?'],
-                            'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times}})
+                            'check': dict({'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times},
+                                          # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
+                                          # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
+                                          **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
         if op['kind'] == 'putDown':
             # ĐẶT XUỐNG (đợt 30): con vật nằm trên sàn sát chân người đặt, và đứng yên — từ lúc tay thả (60 % bước) tới 0,8 s sau

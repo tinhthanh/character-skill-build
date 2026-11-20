@@ -3310,12 +3310,15 @@ export class RigSVG {
   // ĐÍCH THẤP (con vật dưới đất / trên bàn): tay nào vươn tới, góc bắp / cẳng, độ ngả người và độ khuỵu gối. `hand`: ép
   // dùng tay ấy (tay đang cầm ống tiêm); bỏ trống = tay ở phía con vật, tay ấy đang cầm đồ thì tay kia.
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
+  // VUỐT (đợt 32): bàn tay trượt ± 20 % bề ngang đầu con vật (tối đa 10 đơn vị khung), mép dưới bàn tay cao hơn đích 4 đơn vị —
+  // đo trên b1 / b2 (tools/acting_check.py, dải mốc vuốt): rộng 30 % thì tay lún qua tai con mèo 22 %, không nâng thì 19 %.
+  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4;
 
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
-    let tx = 300, ty = 400;
+    let tx = 300, ty = 400, span = 0;                 // span: bề ngang đầu con vật (khung của người) — quãng tay trượt khi vuốt
     const live = target && target.live ? target.live : target;
-    if (live && typeof live.x === 'number' && typeof live.y === 'number' && !live.el) { tx = live.x - s.x; ty = live.y - s.y - DOI_Y; }
+    if (live && typeof live.x === 'number' && typeof live.y === 'number' && !live.el) { tx = live.x - s.x; ty = live.y - s.y - DOI_Y; span = typeof live.span === 'number' ? live.span : 0; }
     else if (live) {
       // Vuốt ve nhắm vào ĐẦU (đỉnh đầu); nghe tim phổi và tiêm nhắm vào THÂN (giữa ngực con vật).
       const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
@@ -3333,6 +3336,7 @@ export class RigSVG {
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
         const shift = anchored ? (target.centerX() - live.centerX()) / unit : 0;
         tx = (r.left + r.width / 2 - ox) / unit - s.x + shift; ty = (r.top + r.height * (body ? 0.35 : headAt) - oy) / unit - s.y - DOI_Y;
+        span = r.width / unit;
       }
     }
     // Tay ở PHÍA con vật; tay ấy đang cầm đồ thì dùng tay kia.
@@ -3362,18 +3366,29 @@ export class RigSVG {
       while (phi < RigSVG.SEATED_LEAN && Math.hypot(tx - at(phi).x, ty - at(phi).y) > far) phi = Math.min(phi + 2, RigSVG.SEATED_LEAN);
       shoulder = at(phi); lean = -dir * phi; tilt = -phi; bend = phi;
     }
-    const angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;
-    let upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - tilt, -10, 95), fore = across ? -58 : 0;
-    // Đích GẦN hơn chiều dài cánh tay (đầu con vật trên bàn khám, người đứng sát): duỗi thẳng thì bàn tay vượt quá đích,
-    // thõng xuống dưới nó — đèn soi rọi vào thành bàn. Gập khuỷu (hai đốt, như `#meetAngles`): khuỷu thấp, cẳng tay
-    // hất lên, bàn tay dừng đúng ở đích.
-    const d = Math.hypot(tx - shoulder.x, ty - (shoulder.y + drop));
-    if (!across && d < (armUpper + armFore) * 0.96) {
-      const alpha = Math.acos(clamp((armUpper * armUpper + d * d - armFore * armFore) / (2 * armUpper * d), -1, 1)) * 180 / Math.PI;
-      const beta = Math.acos(clamp((armUpper * armUpper + armFore * armFore - d * d) / (2 * armUpper * armFore), -1, 1)) * 180 / Math.PI;
-      upper = clamp(upper - alpha, -15, 95); fore = 180 - beta;
-    }
-    return { k, upper, fore, lean, crouch, tx, across, bend };
+    // Góc hai đốt tay để bàn tay tới (x, y) — cùng vai, cùng dáng cúi. `stroke` gọi lại ở hai điểm trên đường viền đầu con vật
+    // để bàn tay TRƯỢT theo nó (đợt 32).
+    const solve = (x, y) => {
+      const angle = Math.atan2(y - (shoulder.y + drop), x - shoulder.x) * 180 / Math.PI;
+      let upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - tilt, -10, 95), fore = across ? -58 : 0;
+      // Đích GẦN hơn chiều dài cánh tay (đầu con vật trên bàn khám, người đứng sát): duỗi thẳng thì bàn tay vượt quá đích,
+      // thõng xuống dưới nó — đèn soi rọi vào thành bàn. Gập khuỷu (hai đốt, như `#meetAngles`): khuỷu thấp, cẳng tay
+      // hất lên, bàn tay dừng đúng ở đích.
+      const d = Math.hypot(x - shoulder.x, y - (shoulder.y + drop));
+      // `dir`: hướng CẲNG TAY trong khung (độ, y xuống) — bàn tay nối dài theo nó. Duỗi thẳng: hướng vai → đích; gập khuỷu: lệch
+      // lên một góc bằng góc ở cổ tay của tam giác vai – khuỷu – cổ tay.
+      let dir = angle;
+      const bent = !across && d < (armUpper + armFore) * 0.96;
+      if (bent) {
+        const alpha = Math.acos(clamp((armUpper * armUpper + d * d - armFore * armFore) / (2 * armUpper * d), -1, 1)) * 180 / Math.PI;
+        const beta = Math.acos(clamp((armUpper * armUpper + armFore * armFore - d * d) / (2 * armUpper * armFore), -1, 1)) * 180 / Math.PI;
+        upper = clamp(upper - alpha, -15, 95); fore = 180 - beta;
+        dir = k === 'R' ? angle - (180 - alpha - beta) : angle + (180 - alpha - beta);
+      }
+      return { upper, fore, dir, bent };
+    };
+    const { upper, fore, dir } = solve(tx, ty);
+    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve };
   }
 
   // Cúi người và đưa tay tới đích thấp (dùng chung cho vuốt ve, nghe tim phổi, tiêm).
@@ -3399,9 +3414,42 @@ export class RigSVG {
   stroke(target = null) {
     const t = this.tl(), reach = this.#reachLow(target), { k, upper, fore } = reach, s = this.s;
     this.#leanTo(t, reach, 'xoe');          // bàn tay XOÈ úp lên lưng con vật; dáng thả lỏng nhìn cạnh ở đầu một cánh tay duỗi chéo chỉ là một cái gai
+    // TRƯỢT THEO ĐẦU (đợt 32): bàn tay đi tới đi lui giữa hai điểm trên cùng đường ngang của đích (đỉnh đầu con vật), mỗi điểm
+    // một lời giải hai đốt tay — trước đây lắc khớp ±(4°, 9°) nên bàn tay vẽ một cung: nhấc khỏi đầu rồi lún qua viền nó (bà vuốt
+    // mèo: 4 / 13 mốc tay rời đầu, có lúc 64 % bàn tay khuất sau đầu mèo). Quãng trượt: `STROKE_GLIDE` bề ngang đầu mỗi bên.
+    // Đích không đo được bề ngang (một điểm) thì giữ cách lắc cũ, nhỏ hơn.
+    const glide = reach.span && !reach.across ? Math.min(RigSVG.STROKE_MAX, reach.span * RigSVG.STROKE_GLIDE) : 0;
+    // MÉP DƯỚI BÀN TAY trên một đường (đợt 32): đặt cổ tay cùng một độ cao chưa đủ — đầu "lùi" cẳng tay dựng, bàn tay nằm
+    // ngang, hở khỏi đầu con mèo; đầu "tới" bàn tay chúc 26°, lún qua viền nó (mép dưới lệch 14 đơn vị khung). Bàn tay nối dài
+    // theo cẳng tay (`dir`): mép dưới của nó cách cổ tay bao nhiêu thì đặt cổ tay cao lên bấy nhiêu, so với dáng ở đích.
+    let box = { x: -20, y: -23, width: 31, height: 61 }, scale = 0.9;
+    try {
+      const el = this.el['coTay' + k], m = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM());
+      const b = el.getBBox();
+      if (b.height > 0) { box = b; scale = Math.hypot(m.a, m.b) || scale; }
+    } catch (error) { /* chưa vẽ: số đo của bàn tay mẫu */ }
+    const below = (deg) => {
+      const a = deg * Math.PI / 180, sin = Math.sin(a), cos = Math.abs(Math.cos(a)), half = box.width / 2;
+      return scale * (Math.max(box.y * sin, (box.y + box.height) * sin) + half * cos);
+    };
+    const line = reach.ty + below(reach.dir) - RigSVG.STROKE_LIFT;
+    const place = (x) => {
+      let y = reach.ty, pose = reach.solve(x, y);
+      for (let n = 0; n < 4; n++) { y = line - below(pose.dir); pose = reach.solve(x, y); }
+      return pose;
+    };
+    // Trong TẦM TAY: điểm xa quá thì cánh tay duỗi thẳng mà cổ tay vẫn không xuống tới đường (bà ngồi sofa đã cúi hết 25°) —
+    // bàn tay hở khỏi đầu con vật. Thu quãng trượt phía ấy lại cho tới khi khuỷu còn gập.
+    const reachable = (sign) => {
+      let g = glide, pose = place(reach.tx + sign * g);
+      while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
+      return pose;
+    };
+    const ahead = glide ? reachable(1) : { upper: upper + 3, fore: fore + 5 };
+    const back = glide ? reachable(-1) : { upper: upper - 2, fore: fore - 4 };
     for (let n = 0; n < 3; n++) {
-      t.to(s, { ['cang' + k]: fore - 9, ['bat' + k]: upper - 4, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
-       .to(s, { ['cang' + k]: fore + 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+      t.to(s, { ['cang' + k]: back.fore, ['bat' + k]: back.upper, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+       .to(s, { ['cang' + k]: ahead.fore, ['bat' + k]: ahead.upper, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 1.7);

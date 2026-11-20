@@ -28,7 +28,10 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
   • ĐỒ ĐẠC TRONG KHUNG (đợt 30): ở mọi khoảnh khắc của moments.json, không món đồ đạc nào (hộp: sofa, bàn, kệ; tấm: TV, bàn,
     quầy, ghế) bị mép trái / phải cắt dở hay chạm mép (`set.propFraming()`); vật ở tiền cảnh thì thôi. Đợt 31: đồ đạc PHỤ (không
     phải TV, không ai ngồi / đứng trên nó) được lẹm mép, trừ ở khoảnh khắc mở cảnh.
-  • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`).
+  • TAY VUỐT (đợt 32): ở mọi mốc mỗi 0,1 s suốt các lần vuốt, bàn tay sát con vật (≥ 5 % trong 3 px quanh hình nó) và không
+    lún qua viền nó quá 25 % — không chỉ ở lúc được hỏi.
+  • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`). Đợt 32: góc trung
+    bị giữ thành góc toàn cũng là hỏng; dòng cuối đếm số góc như thế.
 """
 import argparse, json, os, re, socket, subprocess, sys, time
 
@@ -198,13 +201,26 @@ def pet_pixels(folder, jobs, keep=None):
                 # TIẾP XÚC (đợt 31): phần bàn tay nằm sát (≤ 3 px) hình con vật — đè lên nó hay chạm mép. Tay thấy trọn mà không sát
                 # hình con vật là tay lơ lửng trên đầu nó.
                 pet_px = lambda x, y: 0 <= x < W and 0 <= y < H and differ(pc[x, y], pb[x, y])
-                mine = shown = near = 0
+                mine = shown = near = sunk = 0
+                hand_px = []
                 for y in range(max(0, int(hb['y0'])), min(H, int(hb['y1']) + 1)):
                     for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
                         if not differ(pd[x, y], pe[x, y]): continue
-                        mine += 1; shown += not differ(pa[x, y], pd[x, y])
+                        mine += 1; seen_px = not differ(pa[x, y], pd[x, y]); shown += seen_px
                         near += any(pet_px(x + dx, y + dy) for dx in (-3, 0, 3) for dy in (-3, 0, 3))
-                if mine >= 30: result[(t, name)]['hand'] = shown / mine; result[(t, name)]['contact'] = near / mine
+                        # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
+                        # lưng (con vật vẽ trước người), không phải đặt lên đó.
+                        sunk += (not seen_px) and pet_px(x, y)
+                        hand_px.append((x, y))
+                if mine >= 30:
+                    result[(t, name)]['hand'] = shown / mine; result[(t, name)]['contact'] = near / mine; result[(t, name)]['sunk'] = sunk / mine
+                    # KHE HỞ (đợt 32): tay không sát con vật thì cách nó bao nhiêu px (tìm tới 80 px quanh khung bàn tay).
+                    gap_px = 0.0
+                    if not near:
+                        pets = [(x, y) for y in range(max(0, int(hb['y0']) - 80), min(H, int(hb['y1']) + 81), 2)
+                                for x in range(max(0, int(hb['x0']) - 80), min(W, int(hb['x1']) + 81), 2) if pet_px(x, y)]
+                        gap_px = min((min((hx - x) ** 2 + (hy - y) ** 2 for x, y in pets) ** 0.5 for hx, hy in hand_px[::3]), default=81.0) if pets else 81.0
+                    result[(t, name)]['gap'] = gap_px / who['tall']
         return result
     finally:
         server.terminate()
@@ -233,6 +249,39 @@ def check_seen(folder, checks, keep=None):
                             'note': f'{part["hand"] * 100:.0f} % of the hand shows (least {HAND_SHOWN * 100:g} %)'})
             results.append({'scene': folder, 'what': f'{toucher}\'s hand rests on {name} at {t:g} s', 'ok': part['contact'] >= CONTACT, 'contact': round(part['contact'], 3),
                             'note': f'{part["contact"] * 100:.0f} % of the hand is on or against {name} (least {CONTACT * 100:g} %; less is a hand hovering over it)'})
+    return results
+
+
+TRACK_SUNK = 0.25      # lúc vuốt: tối đa 25 % bàn tay lún qua viền con vật (khuất sau nó) ở bất kỳ mốc nào (đợt 32) — chặt hơn
+                       # HAND_SHOWN ở lúc được hỏi (≤ 30 % khuất); 0.71.0: 64 % (bà, mèo), 40 % (ông, chó)
+
+
+def check_track(folder, checks, keep=None):
+    """TAY VUỐT SUỐT ĐỘNG TÁC (đợt 32): ở mọi mốc của dải `track` (mỗi 0,1 s suốt các lần vuốt), bàn tay vẫn SÁT con vật
+    (≥ 5 % bàn tay trong 3 px quanh hình nó — tay nhấc khỏi đầu là hỏng) và không lún qua viền nó quá 25 % (con vật vẽ trước
+    người: phần lún vào là phần khuất sau đầu / lưng nó). Đợt 31 chỉ đo ở lúc được hỏi: bà vuốt mèo — tay nhấc khỏi đầu giữa
+    hai lần vuốt."""
+    tracks = [c for c in checks if c.get('track')]
+    jobs = [(t, c['target'], c['who']) for c in tracks for t in c['track']]
+    if not jobs: return []
+    found = pet_pixels(folder, jobs, keep)
+    if found is None: return []
+    results = []
+    for c in tracks:
+        rows = [(t, found.get((t, c['target'])) or {}) for t in c['track']]
+        rows = [(t, r) for t, r in rows if 'contact' in r]
+        if not rows: results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand on it throughout', 'ok': None, 'note': 'hand not measured'}); continue
+        off = [(t, r) for t, r in rows if r['contact'] < CONTACT]
+        worst_gap = max(rows, key=lambda tr: tr[1].get('gap', 0))
+        least = min(rows, key=lambda tr: tr[1]['contact'])
+        results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand on it throughout ({len(rows)} moments)', 'ok': not off,
+                        'contact': [round(r['contact'], 3) for _, r in rows], 'gap': [round(r.get('gap', 0), 4) for _, r in rows],
+                        'note': f'{len(off)} of {len(rows)} moments with the hand off it' + (f' (at {", ".join(f"{t:g}" for t, _ in off)} s)' if off else '')
+                                + f'; least contact {least[1]["contact"] * 100:.0f} % at {least[0]:g} s; widest gap {worst_gap[1].get("gap", 0) * 100:.1f} % of height at {worst_gap[0]:g} s'})
+        deep = max(rows, key=lambda tr: tr[1].get('sunk', 0))
+        results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand not sunk past its outline', 'ok': deep[1].get('sunk', 0) <= TRACK_SUNK,
+                        'sunk': [round(r.get('sunk', 0), 3) for _, r in rows],
+                        'note': f'at most {deep[1].get("sunk", 0) * 100:.0f} % of the hand behind {c["target"]}\'s outline, at {deep[0]:g} s (limit {TRACK_SUNK * 100:g} %)'})
     return results
 
 
@@ -291,12 +340,19 @@ def check_shots(folder, log):
     for shot in log or []:
         if not shot.get('ratio'): continue
         who = ', '.join(shot['subjects'])
+        # Đợt 32: góc trung bị GIỮ thành góc toàn là hỏng — máy phải dựng được một góc trung thật (dựng lại, đúng lúc động tác,
+        # góc đơn của người làm). Đợt 31 chỉ ghi lại: 5 góc như thế trong cảnh thử (khung dọc — góc toàn dọc quá chặt; đồ đạc
+        # "lẹm" theo ước lượng phẳng mà hình thật không lẹm).
         if shot.get('how') == 'full':
-            results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s', 'ok': None, 'note': f'kept the full shot — the medium one was {shot["first"] * 100:.0f} % as wide'})
+            tried = '; '.join(f'{name} {t["ratio"] * 100:.0f} %' + (f' cutting {", ".join(t["cut"])}' if t.get('cut') else '') + ('' if t.get('whole', True) else ', a pet cut')
+                              for name, t in (shot.get('tries') or {}).items() if isinstance(t, dict) and 'ratio' in t)
+            results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s not kept as the full shot', 'ok': False, 'kept': True,
+                            'note': f'kept the full shot — the medium one was {shot["first"] * 100:.0f} % as wide' + (f' (tried: {tried})' if tried else '')})
             continue
         results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s narrower than the full shot', 'ok': shot['ratio'] < MEDIUM_WIDE, 'ratio': shot['ratio'],
                         'note': f'{shot["ratio"] * 100:.0f} % as wide as the full shot (limit {MEDIUM_WIDE * 100:g} %)' + (f'; {shot["first"] * 100:.0f} % before furniture at the edges was let go' if shot.get('how') == 'loose' else '')
-                                + (f'; {shot["first"] * 100:.0f} % framed over the whole beat, now at the moment of the action' if shot.get('how') == 'moment' else '')})
+                                + (f'; {shot["first"] * 100:.0f} % framed over the whole beat, now at the moment of the action' if shot.get('how') == 'moment' else '')
+                                + (f'; {shot["first"] * 100:.0f} % for both, now {who.split(", ")[0]} alone' if shot.get('how') == 'single' else '')})
     return results
 
 
@@ -305,7 +361,7 @@ def check_scene(folder):
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
-    results = check_props(folder, moments, cuts) + check_shots(folder, log) + check_seen(folder, checks, KEEP)
+    results = check_props(folder, moments, cuts) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] == 'walk':
@@ -404,6 +460,8 @@ if __name__ == '__main__':
     results = [r for folder in args.scenes for r in check_scene(folder)]
     for r in results: print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))}: {r["what"]} — {r["note"]}')
     bad = [r for r in results if r['ok'] is False]
-    print(f'acting_check: {sum(1 for r in results if r["ok"])}/{sum(1 for r in results if r["ok"] is not None)} pass' + (f', {len(bad)} fail' if bad else ''))
+    kept = sum(1 for r in results if r.get('kept'))
+    print(f'acting_check: {sum(1 for r in results if r["ok"])}/{sum(1 for r in results if r["ok"] is not None)} pass' + (f', {len(bad)} fail' if bad else '')
+          + f'; {kept} medium shot{"" if kept == 1 else "s"} kept as the full shot')
     if args.json: json.dump(results, open(args.json, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     sys.exit(1 if bad else 0)

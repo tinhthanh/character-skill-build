@@ -12,6 +12,29 @@ def build(scene_path, out):
     return subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), scene_path, '-o', out], capture_output=True, text=True)
 
 
+def page_eval(folder, script):
+    """Mở cảnh đã dựng trong Chrome (tools/chrome_run.py) và trả về giá trị JSON của `script` — None nếu không chạy được."""
+    import socket, time
+    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
+    if not chrome: return None
+    with socket.socket() as probe_socket:
+        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
+    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={folder}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        url = f'http://127.0.0.1:{port}/__project/index.html'
+        for _ in range(50):
+            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
+            time.sleep(0.1)
+        html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
+        size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
+                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--eval', script], capture_output=True, text=True)
+        try: return json.loads(done.stdout)
+        except ValueError: return None
+    finally:
+        server.terminate()
+
+
 with tempfile.TemporaryDirectory() as work:
     example = os.path.join(ROOT, 'examples', 'scene', 'scene.json')
     out = os.path.join(work, 'built')
@@ -649,6 +672,58 @@ with tempfile.TemporaryDirectory() as work:
         elif 'meo in view at' not in done.stdout or "ba's hand on meo in view" not in done.stdout or "ba's hand rests on meo" not in done.stdout or 'ba stroke meo — leans no more than' not in done.stdout or 'medium shot of' not in done.stdout:
             problems.append('sofa: acting_check did not measure the cat in view, the hand in view, the lean or the medium shot:\n' + done.stdout[-400:])
         if "set.target(ba, meo, 'crown'" not in html: problems.append("sofa: granny does not aim at the top of the cat's head (set.target(ba, meo, 'crown'))")
+        # Đợt 32: tay bà áp và trượt trên đầu con mèo SUỐT lúc vuốt — đo mỗi 0,1 s (0.71.0: 4 / 13 mốc tay nhấc khỏi đầu, có lúc
+        # 64 % bàn tay lún sau viền đầu mèo).
+        if 'ba strokes meo — hand on it throughout' not in done.stdout or 'ba strokes meo — hand not sunk past its outline' not in done.stdout:
+            problems.append('sofa: acting_check did not follow the hand through the strokes:\n' + done.stdout[-400:])
+
+    # Đợt 32: KHUNG DỌC, phòng khách tối, bà ngồi sofa — mất điện, nói một câu (góc trung một người ngồi: đầu gối chìa ngang
+    # làm góc trung = 100 % góc toàn), rọi đèn pin sang con mèo đứng giữa phòng (hai chủ thể xa nhau: góc hai người lẹm TV —
+    # góc đơn của bà, luồng đèn vẫn chĩa về phía con mèo ngoài khung). 0.71.0: hai góc trung bị giữ thành góc toàn.
+    portrait = {'id': 'portrait', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'living-room', 'light': 'night'}, 'characters': [
+        {'name': 'ba', 'id': 'granny', 'z': -950, 'on': 'sofa', 'seated': True, 'x': -300}, {'name': 'meo', 'species': 'calico', 'z': -560, 'x': 150}],
+        'script': [{'who': 'ba', 'power': 'off'}, {'who': 'ba', 'say': 'Mèo ơi, con đâu rồi?'}, {'who': 'ba', 'do': [['shine', '@meo']]},
+                   {'who': 'meo', 'mood': 'scared'}, {'who': 'ba', 'say': 'Đừng sợ, bà đây mà.'}]}
+    path = os.path.join(os.path.dirname(stage), '_check_portrait.json')
+    try:
+        json.dump(portrait, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'portrait'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('portrait: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        if 'no medium shot of' in done.stdout: problems.append('portrait: scene.py says a medium shot was kept as the full shot:\n' + done.stdout[-400:])
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'portrait')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('portrait: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif '0 medium shots kept as the full shot' not in done.stdout or 'medium shot of ba at' not in done.stdout:
+            problems.append('portrait: acting_check did not count the medium shots kept as full shots:\n' + done.stdout[-400:])
+        # Luồng đèn pin chĩa SANG PHẢI (phía con mèo), không lên trần: đầu đèn ở bên phải tay cầm, không cao hơn nó nhiều.
+        aim = page_eval(os.path.join(work, 'portrait'), """(() => { const tl = Object.values(window.__timelines)[0], log = window.__set.shotLog.find((s) => s.how === 'single');
+            if (!log) return { single: false }; tl.seek((log.t + log.end) / 2, false); window.__set.update();
+            const ba = document.querySelector('[data-set3d][data-name="ba"]'), lens = ba && ba.querySelector('[data-lens]'), tip = ba && ba.querySelector('[data-tip]');
+            if (!lens || !tip) return { single: true, torch: false };
+            const at = (el) => new DOMPoint(+el.getAttribute('cx'), +el.getAttribute('cy')).matrixTransform(el.getScreenCTM());
+            const a = at(lens), b = at(tip); return { single: true, torch: true, angle: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI }; })()""")
+        if not aim or not aim.get('single'): problems.append(f'portrait: the shine is not framed as a single shot of granny ({aim})')
+        elif aim.get('torch') and not -60 <= aim['angle'] <= 60: problems.append(f'portrait: the torch beam points {aim["angle"]:.0f}° (screen), not towards the cat on the right')
+
+    # Đợt 32: CON VẬT Ở MÉP DƯỚI — bác sĩ nói giọng ngạc nhiên (góc cận) cạnh con husky trên một cái bệ cao: góc cận cắt ngang
+    # chân, thân con chó. Luật (0.71.0) nới khung lấy trọn nó; không có luật thì khung thân nó lòi 16 % dưới mép (1134 > 1080 px).
+    stand = {'id': 'stand', 'camera': 'auto', 'set': {'preset': 'exam', 'boxes': [{'name': 'stand', 'x': 160, 'z': -480, 'width': 200, 'depth': 140, 'height': 200}]},
+             'characters': [{'name': 'bac_si', 'id': 'vet', 'z': -560, 'x': 40}, {'name': 'cho', 'species': 'husky', 'z': -560, 'on': 'stand', 'x': 260}],
+             'script': [{'who': 'bac_si', 'mood': 'surprised', 'say': 'Ồ, bé hôm nay ngoan quá!'}, {'who': 'bac_si', 'mood': 'worried', 'say': 'Để cô xem tai bé nào.'}]}
+    path = os.path.join(os.path.dirname(stage), '_check_stand.json')
+    try:
+        json.dump(stand, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'stand'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('stand: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        got = page_eval(os.path.join(work, 'stand'), """(() => { const tl = Object.values(window.__timelines)[0]; tl.seek(3, false); window.__set.update();
+            const dog = window.__set.actingProbe().find((a) => a.name === 'cho'); return { rules: window.__set.ruleLog, bottom: dog && dog.body ? dog.body.y1 : null, height: window.innerHeight }; })()""")
+        if not got or not any(r.get('rule') == 'petBottom' for r in got.get('rules') or []): problems.append(f'stand: the bottom-edge rule for pets was not reached ({got})')
+        elif got.get('bottom') is None or got['bottom'] > 1080 + 2: problems.append(f'stand: the husky is cut by the bottom edge of the close shot (its box ends at {got.get("bottom")} px of 1080)')
 
     # Đợt 26: mẫu phim ánh sáng trong examples/lighting/ — kịch bản chữ phải đọc được (không dựng: CI đã đủ dài).
     import glob, shutil

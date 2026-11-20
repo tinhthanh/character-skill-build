@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.72.0
+
+Added — the machine follows the stroking hand, counts medium shots kept as full shots, and reaches the bottom-edge rule
+- **The stroke is measured all the way through**: `tools/scene.py` gives each stroke of a pet a `track` of moments every
+  0.1 s over the three strokes, and `tools/acting_check.py` measures each from the pixels (the captures of 0.71.0): the
+  hand must stay on or against the pet (at least 5 % of it within 3 px of the pet's shape) and no more than 25 % of it may
+  sink past the pet's outline (behind its head or back). On the 0.71.0 code: granny strokes the cat (b1) — the hand off
+  the head at 4 of 13 moments, up to 64 % of it behind the cat's head; grandpa and the dog (b2) — off at 3 of 13, 40 %
+  sunk; the living-room CI scene — 67 % sunk.
+- **A medium shot kept as the full shot fails** `acting_check` (it was only noted), with what was tried (`set.shotLog`
+  now carries each retry: its width and the furniture it cut, measured as the reviewer sees it), and the last line counts
+  them; `tools/scene.py` says so too. On the 0.71.0 code: 5 in the 14 trial scenes and examples (the vertical clinic
+  opening 97 %, the vertical power cut 98 %, the vertical park 93 %, `dem-mat-dien` 100 %, `toi-xem-tv` 106 %).
+- `set.ruleLog`: which framing rules ran (the bottom-edge rule for pets: `petBottom`, `widen` / `shift`).
+- `tools/check_scene.py`: a vertical power-cut scene (granny on the sofa speaks, shines the torch at the cat across the
+  room — no medium shot may be kept as a full shot, the torch must point at the cat), a close shot of the vet next to a
+  husky on a high stand (the bottom-edge rule must run and the dog stay whole: without it its box ends 16 % below the
+  frame), and the living-room scene must follow the hand through the strokes. The 0.71.0 code fails the first and the
+  last.
+
+Fixed — measured on the 10 trial scenes of 0.69.0–0.71.0 and the 4 3D examples: 169 of 169 pass, 0 medium shots kept as
+the full shot (the 0.71.0 code: 5 kept, and the stroke track fails in b1 and b2)
+- **Why the medium shots were kept**: none of the five were people walking in — all were in vertical frames, where the
+  width decides. (1) A medium shot was framed on the whole drawn width of the person, knees included: granny seated is
+  912 px wide, her head and body 610 px — the vertical medium shot backed off exactly as far as the full shot (100 %). Now
+  medium and close shots of a person take the width of the upper body (head, body, arms — `rig.el.than`). (2) A chibi
+  head is about 0.44 × the person's height wide and must fit 90 % of a 1080 px frame: no single-person shot can be
+  tighter than ~93 % of a full shot that fills 80 % of the height. The vertical full shot now fills 66 % (floor and wall
+  around the person). (3) The retries (a medium shot no further back than 80 %, at the moment of the action) were thrown
+  away because the flat estimate of `frameOn` said the TV or a table was cut — in the real picture nothing was (`direct`
+  now places a trial camera and asks `propFraming()`, as `acting_check` does). (4) Two subjects far apart in a vertical
+  frame (granny on the sofa shining the torch at the cat in the middle of the room: every two-shot cut the TV) — the
+  camera takes a single shot of the person acting (`how: 'single'`); the pet has its own close shot next. Vertical clinic
+  97 % → 71 %, park 93 % → 77 %, `dem-mat-dien` 100 % → 81 %, power cut 98 % → 54 % (granny alone), `toi-xem-tv`
+  106 % → 81 % (at the moment, now that the real picture shows the TV whole).
+- **A torch aimed at a pet off the frame**: the aim is corrected on the screen every frame, but a pet outside the frame
+  is hidden and was not measured — the arm kept the angle set at build time and the beam went up to the ceiling across
+  granny's face (the single shot above). Now the pet's head is projected from where it stands.
+- **The stroking hand glides along the head**: the strokes rocked the shoulder and elbow (±4°, ±9°), so the hand drew
+  an arc — up off the head, then down past its outline. Now the hand moves between two points 20 % of the head's width
+  either side of the target (at most 10 frame units), each with its own two-joint solution, with the underside of the
+  hand on one line: the wrist is raised or lowered by how far the hand hangs below it along the forearm (the hand lay flat
+  at one end and dipped 26° at the other), 4 units above the target, and a point beyond the arm's reach (granny already
+  leans her 25°) is brought in until the elbow bends. `set.target` gives the pet's head width (`span`). b1: off at 4 of 13
+  → 0 of 13 (least contact 7 %), sunk 64 % → 16 %; b2: 3 of 13 → 0, 40 % → 6 %; living-room CI scene: 67 % → 21 %; the boy
+  kneeling to the dog (acting-2, he is drawn in front) stays at 93 % contact, 0 % sunk.
+
+Known
+- The stroking hand still sinks 16–21 % behind a cat's ears at the ends of the glide (the cat's head bobs while it is
+  stroked; the line is fixed at build time), and the living-room CI scene's least contact is 5 %, at the limit.
+- The single shot of the person acting (vertical, two subjects far apart) leaves the pet out of that shot; it is used
+  only when no two-shot works, but a reviewer may want the pet's reaction in the same frame.
+- The vertical full shot is wider (person 66 % of the height): openings of a single standing person show more floor
+  and wall than before.
+
 ## 0.71.0
 
 Added — the machine sees a pet hidden behind a person, a hidden hand, and a medium shot that is really a full shot

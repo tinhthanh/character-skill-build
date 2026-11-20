@@ -417,7 +417,14 @@ export function createLighting(S) {
     // khi SVG không lấp kín đúng tỉ lệ host (đo ở cảnh thử đợt 25).
     const screenOf = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); return ctm ? new DOMPoint(x, y).matrixTransform(ctm) : null; };
     const l = lensEl && screenOf(lensEl, +lensEl.getAttribute('cx'), +lensEl.getAttribute('cy')), t = tipEl && screenOf(tipEl, +tipEl.getAttribute('cx'), +tipEl.getAttribute('cy'));
-    const box = to.shotBox('face'), f = screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2);
+    const box = to.shotBox('face');
+    let f = pet.host.style.display !== 'none' ? screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2) : null;
+    if (!f && S.set) {
+      // Con vật NGOÀI KHUNG (đợt 32): host bị ẩn, đo trên màn hình không được — trước đây bỏ qua, tay giữ góc đặt lúc dựng (góc
+      // đơn của bà rọi đèn: đèn chĩa thẳng lên trần, cánh tay đè ngang mặt). Chiếu chỗ mặt nó đứng trong bối cảnh lên màn hình.
+      const [hx, hy] = toSet(pet, box.x + box.width / 2, box.y + box.height / 2), p = S.set.project(hx, hy, pet.spot.z), r = view.getBoundingClientRect();
+      if (p.scale > 0) f = { x: r.left + p.x * r.width / (view.clientWidth || 1), y: r.top + p.y * r.height / (view.clientHeight || 1) };
+    }
     if (!l || !t || !f) return;
     const now = Math.atan2(t.y - l.y, t.x - l.x), want = Math.atan2(f.y - l.y, f.x - l.x);
     let delta = (want - now) * 180 / Math.PI;
