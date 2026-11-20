@@ -3725,12 +3725,23 @@ export class RigSVG {
   // đốt, khuỷu chúc xuống; xa quá tầm thì duỗi thẳng về phía ấy. (Đập tay đã thử và bỏ: đầu chibi chắn đúng chỗ hai bàn
   // tay phải gặp nhau khi đứng gần, đứng xa thì tay không tới.) Đích không phải rig
   // ('left' | 'right') thì trả về `null` — dùng dáng mặc định.
-  #meetAngles(target, k, drop) {
+  #meetAngles(anchor, k, drop) {
+    // Đích là MỎ NEO của conversation (`{ centerX, live }`): rig thật nằm ở `live`, còn chỗ đứng của nó LÚC LƯỢT NÀY là
+    // `centerX()`. Lúc dựng timeline hình SVG của mỗi rig còn vẽ ở một tư thế cũ bất kỳ (lần vẽ cuối của bản nháp), nên
+    // KHÔNG đọc vai từ DOM: tính từ trạng thái `s` + số đo khung — vai = tâm + (vai trong khung − nửa khung) × tỉ lệ
+    // (đợt 28: bác sĩ chìa tay phía xa ra chỗ đứa bé đứng lúc đầu cảnh, rồi vươn quá đầu nó).
+    const target = anchor && anchor.live ? anchor.live : anchor;
     if (!(target && target.el && target.svg && this.svg.getScreenCTM && target.svg.getScreenCTM)) return null;
-    const other = this.#towards(target, k) > 0 ? 'L' : 'R';
-    const mine = new DOMPoint(0, 0).matrixTransform(this.el['bat' + k].getScreenCTM()), theirs = new DOMPoint(0, 0).matrixTransform(target.el['bat' + other].getScreenCTM());
+    const other = this.#towards(anchor, k) > 0 ? 'L' : 'R';
     const sv = this.svg.getBoundingClientRect(), unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;
     const ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2, s = this.s;
+    let mine = new DOMPoint(0, 0).matrixTransform(this.el['bat' + k].getScreenCTM()), theirs = new DOMPoint(0, 0).matrixTransform(target.el['bat' + other].getScreenCTM());
+    if (target !== anchor && #shoulderX in target) {
+      const ts = target.svg.getBoundingClientRect(), tu = Math.min(ts.width / KHUNG.w, ts.height / KHUNG.h) || unit;
+      const toy = ts.top + (ts.height - KHUNG.h * tu) / 2;
+      mine = { x: this.centerX() + (this.#shoulderX(k) - KHUNG.w / 2) * unit, y: oy + (this.#shoulderY() + (s.y || 0) + DOI_Y) * unit };
+      theirs = { x: anchor.centerX() + (target.#shoulderX(other) - KHUNG.w / 2) * tu, y: toy + (target.#shoulderY() + (target.s.y || 0) + DOI_Y) * tu };
+    }
     // Cổ tay (không phải đầu ngón) tới điểm gặp: hai bàn tay chồng lên nhau ở đó, như đang nắm / chạm.
     const upper = DAI.canhTay * this.nv.daiCanhTay, fore = DAI.cangTay * this.nv.daiCangTay, reach = upper + fore;
     // CÙNG MỘT điểm cho cả hai người (tính trên màn hình): độ hạ / nâng theo chiều dài tay TRUNG BÌNH của hai người, tính
@@ -3870,8 +3881,12 @@ export class RigSVG {
    */
   inject(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
-    const k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-syringe]'));
+    // Ống tiêm đang CẤT (itemsHidden — tools/script.py giao sẵn cho người "tiêm"): lấy ra lúc tiêm, cất lại khi xong — cầm suốt
+    // cảnh thì tay ấy bận, các động tác khác (khám, cho ăn) với không tới con vật (đợt 28, đo bằng tools/acting_check.py).
+    const k = ['R', 'L'].find((side) => this.holds[side] && this.el['item' + side].querySelector('[data-syringe]'));
     if (!k) throw new Error('[character] inject: the character is not holding a syringe — give it one: createCharacter(host, { id, items: { R: "syringe" } })');
+    const stowed = s['item' + k] < 0.5;
+    if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
     const reach = this.#reachLow(target, k, 'body'), { upper, fore } = reach;
     // Con vật ở phía tay KIA: tay cầm ống tiêm phải vắt ngang qua bụng mà vẫn không tới — báo rõ thay vì diễn sai.
     if (reach.across) throw new Error(`[character] inject: the pet is on the ${k === 'R' ? 'left' : 'right'} but the syringe is in the ${k === 'R' ? 'right' : 'left'} hand — stand the pet on the ${k === 'R' ? 'right' : 'left'} of the character, or give the syringe to the other hand (items: { ${k === 'R' ? 'L' : 'R'}: "syringe" })`);
@@ -3885,7 +3900,7 @@ export class RigSVG {
     t.to(s, { ['plunger' + k]: 1, duration: 0.7, ease: 'sine.inOut' }, 0.8);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.2, ease: 'power2.in' }, 1.55);
     t.to(s, { cuoi: 0.95, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.25 }, 1.6);                 // xong rồi
-    this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0 });
+    this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0, ...(stowed ? { ['item' + k]: 0 } : {}) });
     return t;
   }
 

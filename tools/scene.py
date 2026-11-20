@@ -172,6 +172,11 @@ CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'fa
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
+# Động tác mà bàn tay phải TỚI được đích: tới đầu / thân con vật, hay tới tay người kia (đợt 28: soát diễn xuất).
+# Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
+REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
+                 'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands'}
+CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
 MARKS = ('!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music')         # runtime/marks.js
@@ -244,6 +249,9 @@ SET_PRESETS = {
         'panels': [{'wall': 'back', 'at': 120, 'y': 560, 'width': 380, 'height': 260, 'color': '#bfe0f0', 'border': '14px solid #ffffff', 'window': True}],
         'cutouts': [{'kind': 'plant', 'x': 700, 'z': -300, 'height': 640}, {'kind': 'floorlamp', 'name': 'lamp', 'x': -180, 'z': -840, 'height': 470},
                     {'kind': 'tv', 'x': 540, 'z': -900}],
+        # KHUNG DỌC: TV xích lại gần sofa — để x 540 thì góc toàn dọc không lấy trọn được cả sofa lẫn TV (đợt 27: sofa lẹm mép);
+        # sofa ngắn lại và dịch vào giữa — chỉ dời TV thì góc toàn vẫn lẹm đầu trái sofa (Gemini, đợt 28).
+        'vertical': {'cutouts': {'tv': {'x': 330}}, 'boxes': {'sofa': {'x': -470, 'width': 440}}},
         'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
@@ -402,13 +410,28 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
     for op in gear_ops:
         pet = pet_of(op['target'])
+        if op['kind'] in REACH_ACTIONS:
+            # Lượt có động tác chạm: đo ở 30 / 50 / 70 % lượt — tay tới đích ở ÍT NHẤT một lúc là đạt.
+            if op['turn'] >= len(turns): continue
+            t0, t1 = float(turns[op['turn']][0]), float(turns[op['turn']][1])
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            pet = pet_of(op['target'])
+            ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
+                   if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
+            moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]} {op["target"]}', 'ask': ask + ['Are the standing characters\' feet on the floor (not floating above it or sunk into it)?'],
+                            'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times}})
+            if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
         if op['kind'] == 'walk':
             # ĐI NGANG QUA ĐÈN (tối, có đèn): hai khung đầu / cuối quãng đi — bóng phải xoay / dài ngắn theo vị trí đèn, người sáng
             # lên khi tới gần đèn (đợt 24).
-            if stage_set.get('light', 'day') == 'day' or not (any(item.get('kind') in ('lamp', 'floorlamp') for item in stage_set.get('cutouts', [])) or stage_set.get('lamps')): continue
             t0, t1 = at(op['turn'], min(1.4, op['dur'] * 0.3)), at(op['turn'], max(0.8, op['dur'] - 0.3))
             if t0 is None or t1 is None or t1 - t0 < 1: continue
-            moments.append({'t': t0, 'what': f'{op["who"]} walking — start', 'ask': ['Does the walking character cast a shadow on the ground?']})
+            check = {'kind': 'walk', 'who': op['who'], 'times': [t0, round((t0 + t1) / 2, 2), t1]}
+            if stage_set.get('light', 'day') == 'day' or not (any(item.get('kind') in ('lamp', 'floorlamp') for item in stage_set.get('cutouts', [])) or stage_set.get('lamps')):
+                # Ban ngày / không đèn: chỉ soát dáng đi — chân chạm sàn, không trượt (đợt 28).
+                moments.append({'t': check['times'][1], 'what': f'{op["who"]} walking', 'ask': ["Are the walking character's feet on the floor (not floating above it or sunk into it)?"], 'check': check})
+                continue
+            moments.append({'t': t0, 'what': f'{op["who"]} walking — start', 'ask': ['Does the walking character cast a shadow on the ground?'], 'check': check})
             moments.append({'t': t1, 'what': f'{op["who"]} walking — end', 'ask': [
                 f'Compared with the frame at {t0:g} s, has the walking character\'s shadow changed direction or length?',
                 f'Is the walking character brighter in whichever of the two frames ({t0:g} s or this one) they stand nearer a lit lamp?']})
@@ -654,6 +677,11 @@ def main():
             for key in ('boxes', 'panels', 'cutouts', 'lamps'): merged[key] = [dict(item) for item in preset.get(key, [])] + list(stage_set.get(key, []))
             if not merged['lamps']: del merged['lamps']
             if 'room' in preset: merged['room'] = dict(preset['room'], **stage_set.get('room', {}))
+            # Cách bày riêng cho KHUNG DỌC (đồ của preset, không đụng đồ người viết khai thêm).
+            if int(scene.get('height', 1080)) > int(scene.get('width', 1920)) * 1.2:
+                # Đồ cắt (cutouts) nhận theo `kind`, khối (boxes) theo `name`.
+                for key, by in (('cutouts', 'kind'), ('boxes', 'name')):
+                    for item in merged[key][:len(preset.get(key, []))]: item.update(preset.get('vertical', {}).get(key, {}).get(item.get(by), {}))
             stage_set = scene['set'] = merged
             preset_note = f'set.preset: where people stand — {preset["spots"]}'
         for key, allowed in (('room', ROOM_KEYS), ('camera', CAMERA_KEYS)):
@@ -1087,7 +1115,9 @@ def main():
             # → người + con vật ở cỡ trung, đo lúc GIỮA nhịp (đang khám, hai bên đứng sát nhau) — cận riêng con vật thì lẹm nửa
             # mặt người đứng sát nó (Gemini, đợt 18).
             if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='medium', mid=True)
-            return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='medium' if targets else 'full')
+            # Bắt tay / đưa đồ giữa hai người: hai bàn tay gặp nhau ngang hông — cỡ trung cắt ngang đúng chỗ ấy (đợt 28).
+            low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet') for step in turn.get('do', []))
+            return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='full' if low_hands or not targets else 'medium')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
         subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
         return dict(span, subjects=subjects, size='medium' if not moods else 'full')
@@ -1122,6 +1152,14 @@ def main():
             if not isinstance(turn, dict) or turn.get('who') not in names: continue
             who = names[turn['who']]
             if who['_pet']: continue
+            # QUỲ XUỐNG với con vật dưới SÀN (vuốt ve, cho ăn, khám, chải lông): người đứng thẳng thì tay chỉ tới lưng gần đuôi
+            # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
+            # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
+            steps = turn.get('do') if isinstance(turn.get('do'), list) else []
+            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush')
+                   and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
+            if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
+                turn['do'] = ['kneel'] + steps + ['standUp']
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
                 # Người đang NGỒI (ghế đá, ghế phòng chờ) không đứng dậy đi tới: con vật ĐI TỚI người (bế, vuốt ve…). Đích là
@@ -1135,9 +1173,34 @@ def main():
                 # Đưa đồ: hai cánh tay cùng vươn (0,45); bắt tay: bàn tay gặp nhau ở giữa, đứng gần hơn (0,38); chạm tới con vật: gần như vuốt ve.
                 # Soi đèn / đưa bánh thưởng tới ĐẦU con vật (cao hơn thân, xa vai hơn): đứng sát hơn nữa (0,16), không thì tay
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
-                wanted = {'handOver': 0.45, 'handOverPet': 0.42, 'handshake': 0.38, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
+                # (đo bằng tools/acting_check.py, đợt 28).
+                wanted = {'handOver': 0.45, 'handOverPet': 0.42, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                target = names[step[1][1:]]
+                if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
+                    # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
+                    # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
+                    away = (wanted - abs(gap)) * (-1 if gap > 0 else 1)
+                    turns.append((f'  // {who["name"]} steps back from {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(away / who['_unit'])}]]"))
+                    emitted[0] += 1
+                    who['x'] = float(who['x']) + away
+                    continue
                 if abs(gap) <= wanted + 0.05 * who['_host_height']: continue
                 move = (abs(gap) - wanted) * (1 if gap > 0 else -1)
+                if target['_pet'] and not who.get('seated'):
+                    # NHƯỜNG CHỖ: một người khác (đứng, cùng độ sâu) đang ở đúng chỗ sắp tới bên con vật — người ấy lùi ra trước,
+                    # không thì hai người đứng đè lên nhau, tay người mới chỉ chạm mép bàn (cảnh thử đợt 28: bé vuốt mèo trên bàn
+                    # khám đứng lẫn vào bác sĩ).
+                    spot = float(who['x']) + move
+                    for other in names.values():
+                        if other is who or other['_pet'] or other.get('seated') or abs(float(other.get('z', -300)) - float(who.get('z', -300))) > 60: continue
+                        if abs(float(other['x']) - spot) >= 0.3 * who['_host_height']: continue
+                        # Lùi về phía xa con vật hơn — sang hẳn bên kia chỗ đứng mới, chừa khoảng cho hai thân người.
+                        side = -1 if float(target['x']) > spot else 1
+                        aside = spot + side * 0.4 * max(who['_host_height'], other['_host_height']) - float(other['x'])
+                        turns.append((f'  // {other["name"]} makes room for {who["name"]} by {step[1][1:]}', f"[{other['name']}, ['walk', 4, {round(aside / other['_unit'])}]]"))
+                        emitted[0] += 1
+                        other['x'] = float(other['x']) + aside
                 if who.get('seated'):
                     # Con vật đi tới người ngồi (cảnh thử đợt 11: bà cụ trên ghế đá bế con mèo đứng sau ghế — con mèo
                     # "nhảy" vào lòng trong 0,6 s vì nó ở ngoài tầm tay).
@@ -1196,7 +1259,14 @@ def main():
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or not isinstance(turn.get('do'), list): continue
             for step in turn['do']:
+                # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
+                if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
+                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:]})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
+                    # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người
+                    # đứng cách con vật cả khung hình (đợt 28: tay cách con chó 29 % chiều cao người).
+                    mover = names.get(turn.get('who'))
+                    if mover and isinstance(step[2], (int, float)): mover['x'] = float(mover['x']) + float(step[2]) * mover['_unit']
                     gear_ops.append({'turn': emitted[0], 'kind': 'walk', 'who': turn.get('who'), 'target': None, 'dur': float(step[1])})
                 if isinstance(step, list) and step and step[0] in ('shine', 'examine'):
                     target = step[1][1:] if len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None
@@ -1225,7 +1295,15 @@ def main():
             pets = [name for name in stroked if name in names and names[name]['_pet']]
             if pets and 'say' not in entry and code.startswith('['):
                 pet = names[pets[0]]
-                code = '{ together: [' + code + f", [{pet['name']}, {js('purr' if 'cat' in pet['species'] else 'wagTail')}]] }}"
+                # Mèo: mọi giống mèo (calico không có chữ "cat" — đợt 28: mèo tam thể vẫy đuôi như chó).
+                code = '{ together: [' + code + f", [{pet['name']}, {js('purr' if 'cat' in pet['species'] or pet['species'] in CAT_BREEDS else 'wagTail')}]] }}"
+                emitted[0] += 1
+            # `["handshake", "@người kia"]` một mình: người kia BẮT TAY LẠI cùng lúc — rig chỉ tính điểm gặp khi cả hai cùng
+            # đưa tay; một bên đưa thì tay chỉ tới bụng, tay người kia buông thõng (đợt 28: hai bàn tay cách 26 % chiều cao).
+            shaken = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'handshake' and isinstance(step[1], str) and step[1].startswith('@')]
+            shaken = [name for name in shaken if name in names and not names[name]['_pet'] and name != entry.get('who')]
+            if shaken and not pets and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
+                code = '{ together: [' + code + f", [{names[shaken[0]]['name']}, [\"handshake\", {names[entry['who']]['name']}]]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
             # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).
@@ -1361,6 +1439,7 @@ def main():
         origin = f", origin: {js(stage_set['origin'])}" if stage_set.get('origin') else (f", origin: [{width // 2}, {round(height * 0.62)}]" if portrait else '')
         setup.append(f"    // The 3D set: a room of flat planes; the characters stay 2D and always face the lens (references/hyperframes.md, \"3D sets\").")
         setup.append(f"    const set = VGCharacter.createSet($('view'), {{ camera: {js(start)}{origin} }});")
+        setup.append("    window.__set = set;                                   // tools/acting_check.py đo diễn xuất qua set.actingProbe()")
         # Sàn kéo dài thêm 1500 đơn vị về phía máy quay (ra ngoài mép trước của phòng): ở cảnh toàn, nhất là khung dọc, máy
         # quay lùi xa và nhìn thấy cả khoảng trước phòng — không có sàn ở đó là một dải trống dưới đáy khung.
         setup.append(f"    set.floor({{ x: [{-half:g}, {half:g}], z: [{back:g}, {front + 1500:g}], style: {js('background:' + floor)} }});")

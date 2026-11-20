@@ -248,6 +248,16 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
     characters = [c for c in characters if c['name'] in used] or characters
+    # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
+    # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
+    needs = {'inject': 'syringe', 'leash': 'leash'}
+    for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
+        for step in turn.get('do', []) if isinstance(turn, dict) else []:
+            item = needs.get(step[0]) if isinstance(step, list) and step else None
+            who = next((c for c in characters if c['name'] == turn.get('who')), None)
+            if item and who and not who.get('holds') and not who.get('species'):
+                who['holds'] = item
+                if item == 'syringe': who['holdsHidden'] = True                     # cất sẵn: chỉ lấy ra lúc tiêm
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
     if head.get('ánh sáng'):
         # "chiều → tối": cảnh bắt đầu lúc chiều, trời tối dần từ giữa cảnh (6 giây).

@@ -88,3 +88,18 @@ sheets and writes `audit/prompt.txt`; answer the questions (or hand the sheets a
 `python3 tools/light_audit.py --score answers.json -o audit/`. A question about something not in the frame may be
 answered `n/a`. `python3 tools/light_audit.py --report -o audit/` writes `audit/report.html`: each sheet with every
 reviewer's answers (all `answers*.json`), failures in red, and the score history.
+
+The same `moments.json` also holds the **acting** moments: every turn where a hand must reach something (stroke,
+examine, give a treat, brush, listen, inject: the pet; hand over, handshake: the other person's hand) and every
+walk, with questions for the reviewer and a `check` for the machine. `python3 tools/acting_check.py <scene dirs…>`
+opens each scene, seeks to 30 / 50 / 70 % of those turns and measures: the hand must come within 6 % of the
+person's height of the pet's head or body (or of the other hand), and feet must stay within 3 % of the floor.
+It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene.
+
+What the scene tool now does for the acting, so the measurements pass without extra script lines:
+
+- A person **kneels** to stroke, feed, examine or brush a pet on the floor (standing, the hand only reaches its back).
+- Someone already standing where a newcomer needs to be next to a pet **steps aside** first.
+- `bác sĩ → bé: bắt tay` makes the other person **shake hands back**; they stand close enough for the short arms to
+  meet, and the shot is a full one, so the hands are in it.
+- In a vertical frame the living room is laid out tighter (shorter sofa, TV nearer), so a full shot holds both.

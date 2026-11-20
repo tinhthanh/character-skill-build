@@ -562,6 +562,31 @@ with tempfile.TemporaryDirectory() as work:
             if any(not m['ask'] or not isinstance(m['t'], (int, float)) for m in moments) or [m['t'] for m in moments] != sorted(m['t'] for m in moments):
                 problems.append('light: moments.json moments need a time, questions, and to be in time order')
 
+    # Đợt 28: diễn xuất — tay tới đích, chân chạm sàn. Bé quỳ xuống vuốt con chó dưới sàn; bác sĩ nhường chỗ cho bé vuốt con
+    # mèo trên bàn khám; bắt tay một chiều thì bé bắt tay lại. Đo bằng tools/acting_check.py (Chrome).
+    acting = {'id': 'acting', 'camera': 'auto', 'set': {'preset': 'exam'}, 'characters': [
+        {'name': 'bac_si', 'id': 'vet', 'z': -560, 'x': -30}, {'name': 'be', 'id': 'boy', 'z': -560, 'x': -430},
+        {'name': 'meo', 'species': 'calico', 'z': -560, 'on': 'table', 'x': 200}, {'name': 'cho', 'species': 'corgi', 'z': -560, 'x': -700}],
+        'script': [{'who': 'be', 'do': [['stroke', '@cho']]}, {'who': 'bac_si', 'do': [['listen', '@meo']]}, {'who': 'be', 'do': [['stroke', '@meo']]},
+                   {'who': 'bac_si', 'do': [['handshake', '@be']]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_acting.json')
+    try:
+        json.dump(acting, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'acting'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('acting: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'acting', 'index.html'), encoding='utf-8').read()
+        for needle in ('[be, "kneel"', '// bac_si makes room for be by meo', '[be, ["handshake", bac_si]]', '[meo, "purr"]', 'window.__set = set'):
+            if needle not in html: problems.append(f'acting: {needle} is not in the composition')
+        checks = [m['check'] for m in json.load(open(os.path.join(work, 'acting', 'moments.json'), encoding='utf-8')) if m.get('check')]
+        if sorted((c['who'], c['kind'], c['target'], c['to']) for c in checks) != [('bac_si', 'handshake', 'be', 'hands'), ('bac_si', 'listen', 'meo', 'body'), ('be', 'stroke', 'cho', 'body'), ('be', 'stroke', 'meo', 'body')] \
+                or any(len(c['times']) != 3 for c in checks):
+            problems.append(f'acting: moments.json checks are {checks}')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'acting')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('acting: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+
     # Đợt 26: mẫu phim ánh sáng trong examples/lighting/ — kịch bản chữ phải đọc được (không dựng: CI đã đủ dài).
     import glob, shutil
     for sample in sorted(glob.glob(os.path.join(os.path.dirname(HERE), 'examples', 'lighting', '*.txt'))):

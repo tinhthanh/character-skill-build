@@ -182,6 +182,9 @@ clips for every voice file.
    Lighting of a 3D scene: `python3 tools/light_audit.py <id> -o audit/` captures the moments that matter for
    the light (`moments.json`: power cut, sky turning, flashlight…) and writes yes / no questions in
    `audit/prompt.txt` — answer them from the frames (or hand both to a reviewer), then `--score answers.json`.
+   The same moments carry the acting (hands reaching the pet or the other person, feet on the floor), and
+   `python3 tools/acting_check.py <id>` measures it without anyone looking: palm-to-target distance and
+   feet-to-floor offset as a share of the character's height, exit code 1 when a hand misses or a foot floats.
 4. **Change what the scene file cannot say** by editing `index.html` — it is plain,
    commented HTML. Finish with the scene file first: after a hand edit the tool will not
    overwrite `index.html` (`--force` would discard your edit); if your edit moved the timing,

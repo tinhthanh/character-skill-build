@@ -1075,6 +1075,28 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return cuts;
     },
 
+    /**
+     * SỐ ĐO DIỄN XUẤT ở khung vừa vẽ (tools/acting_check.py): với mỗi nhân vật / con vật đang thấy — đường sàn dưới chân
+     * (`ground`, y trên màn hình của điểm đứng), đáy bàn chân (`feet`), lòng hai bàn tay (`hands`), khung mặt (`face`) và khung
+     * thân (`body`), cao bao nhiêu trên màn hình (`tall`), có đang ngồi không. Toạ độ px trong `view`. Gọi sau khi tua tới lúc cần đo.
+     */
+    actingProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      const rect = (r) => ({ x0: (r.left - box.left) * sx, y0: (r.top - box.top) * sy, x1: (r.right - box.left) * sx, y1: (r.bottom - box.top) * sy });
+      const point = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); if (!ctm) return null; const p = new DOMPoint(x, y).matrixTransform(ctm); return { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; };
+      const frameBox = (rig, b) => { const a = point(rig.svg, b.x, b.y), c = point(rig.svg, b.x + b.width, b.y + b.height); return a && c ? { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) } : null; };
+      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && actor.host.contains(actor.rig.svg)).map((actor) => {
+        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z);
+        const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0).map(rect);
+        const hands = person ? ['L', 'R'].map((side) => e['coTay' + side] && { side, ...point(e['coTay' + side], 0, 10) }).filter((h) => h && Number.isFinite(h.x)) : [];
+        const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
+        const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
+        return { name: actor.host.dataset.name || actor.host.id || '', person, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length ? Math.max(...feet.map((r) => r.y1)) : null,
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x };
+      });
+    },
+
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
       for (const actor of actors) {

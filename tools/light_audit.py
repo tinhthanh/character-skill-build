@@ -42,7 +42,7 @@ def make(scenes, out):
             for ask in m['ask']:
                 questions.append({'q': len(questions) + 1, 'scene': n, 't': m['t'], 'what': m['what'], 'ask': ask})
                 lines.append(f'    Q{len(questions)}. {ask}')
-    head = ('You are checking the lighting of a 2.5D animated film from still frames. For each question look ONLY at the named frame '
+    head = ('You are checking the lighting and the acting (hands reaching, feet on the floor) of a 2.5D animated film from still frames. For each question look ONLY at the named frame '
             'and answer strictly "yes" or "no" from what is visible in the picture (do not guess what the film intends). '
             'Answer "n/a" only when the thing the question is about (a lamp, a TV, furniture, a flashlight…) is not in that frame at all. '
             'Reply with a JSON array only, one item per question: [{"q": 1, "a": "yes", "why": "a few words"}, …].\n')

@@ -1,4 +1,4 @@
-/* VGCharacter v0.67.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.68.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -2524,12 +2524,19 @@ class RigSVG {
     this.#khep(t, 0.45, 1.35);
     return t;
   }
-  #meetAngles(target, k, drop) {
+  #meetAngles(anchor, k, drop) {
+    const target = anchor && anchor.live ? anchor.live : anchor;
     if (!(target && target.el && target.svg && this.svg.getScreenCTM && target.svg.getScreenCTM)) return null;
-    const other = this.#towards(target, k) > 0 ? 'L' : 'R';
-    const mine = new DOMPoint(0, 0).matrixTransform(this.el['bat' + k].getScreenCTM()), theirs = new DOMPoint(0, 0).matrixTransform(target.el['bat' + other].getScreenCTM());
+    const other = this.#towards(anchor, k) > 0 ? 'L' : 'R';
     const sv = this.svg.getBoundingClientRect(), unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;
     const ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2, s = this.s;
+    let mine = new DOMPoint(0, 0).matrixTransform(this.el['bat' + k].getScreenCTM()), theirs = new DOMPoint(0, 0).matrixTransform(target.el['bat' + other].getScreenCTM());
+    if (target !== anchor && #shoulderX in target) {
+      const ts = target.svg.getBoundingClientRect(), tu = Math.min(ts.width / KHUNG.w, ts.height / KHUNG.h) || unit;
+      const toy = ts.top + (ts.height - KHUNG.h * tu) / 2;
+      mine = { x: this.centerX() + (this.#shoulderX(k) - KHUNG.w / 2) * unit, y: oy + (this.#shoulderY() + (s.y || 0) + DOI_Y) * unit };
+      theirs = { x: anchor.centerX() + (target.#shoulderX(other) - KHUNG.w / 2) * tu, y: toy + (target.#shoulderY() + (target.s.y || 0) + DOI_Y) * tu };
+    }
     const upper = DAI.canhTay * this.nv.daiCanhTay, fore = DAI.cangTay * this.nv.daiCangTay, reach = upper + fore;
     const ts = target.svg.getBoundingClientRect(), theirUnit = Math.min(ts.width / KHUNG.w, ts.height / KHUNG.h) || unit;
     const theirReach = target.nv ? DAI.canhTay * (target.nv.daiCanhTay || 1) + DAI.cangTay * (target.nv.daiCangTay || 1) : reach;
@@ -2622,8 +2629,10 @@ class RigSVG {
   }
   inject(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
-    const k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-syringe]'));
+    const k = ['R', 'L'].find((side) => this.holds[side] && this.el['item' + side].querySelector('[data-syringe]'));
     if (!k) throw new Error('[character] inject: the character is not holding a syringe — give it one: createCharacter(host, { id, items: { R: "syringe" } })');
+    const stowed = s['item' + k] < 0.5;
+    if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
     const reach = this.#reachLow(target, k, 'body'), { upper, fore } = reach;
     if (reach.across) throw new Error(`[character] inject: the pet is on the ${k === 'R' ? 'left' : 'right'} but the syringe is in the ${k === 'R' ? 'right' : 'left'} hand — stand the pet on the ${k === 'R' ? 'right' : 'left'} of the character, or give the syringe to the other hand (items: { ${k === 'R' ? 'L' : 'R'}: "syringe" })`);
     t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
@@ -2634,7 +2643,7 @@ class RigSVG {
     t.to(s, { ['plunger' + k]: 1, duration: 0.7, ease: 'sine.inOut' }, 0.8);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.2, ease: 'power2.in' }, 1.55);
     t.to(s, { cuoi: 0.95, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.25 }, 1.6);                 // xong rồi
-    this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0 });
+    this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0, ...(stowed ? { ['item' + k]: 0 } : {}) });
     return t;
   }
   #placeCarried() {
@@ -6328,6 +6337,22 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       tl.seek(0, false); set.update();
       return cuts;
     },
+    actingProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      const rect = (r) => ({ x0: (r.left - box.left) * sx, y0: (r.top - box.top) * sy, x1: (r.right - box.left) * sx, y1: (r.bottom - box.top) * sy });
+      const point = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); if (!ctm) return null; const p = new DOMPoint(x, y).matrixTransform(ctm); return { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; };
+      const frameBox = (rig, b) => { const a = point(rig.svg, b.x, b.y), c = point(rig.svg, b.x + b.width, b.y + b.height); return a && c ? { x0: Math.min(a.x, c.x), y0: Math.min(a.y, c.y), x1: Math.max(a.x, c.x), y1: Math.max(a.y, c.y) } : null; };
+      return actors.filter((actor) => actor.rig && actor.rig.svg && actor.host.style.display !== 'none' && actor.host.contains(actor.rig.svg)).map((actor) => {
+        const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z);
+        const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0).map(rect);
+        const hands = person ? ['L', 'R'].map((side) => e['coTay' + side] && { side, ...point(e['coTay' + side], 0, 10) }).filter((h) => h && Number.isFinite(h.x)) : [];
+        const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
+        const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
+        return { name: actor.host.dataset.name || actor.host.id || '', person, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length ? Math.max(...feet.map((r) => r.y1)) : null,
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x };
+      });
+    },
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
       for (const actor of actors) {
@@ -6635,7 +6660,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.67.0';
+const VERSION = '0.68.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -7137,7 +7162,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       if (turn && !Array.isArray(turn) && Array.isArray(turn.turn)) { if ('shot' in turn) own = turn.shot; turn = turn.turn; }
       if (!Array.isArray(turn) || !turn[0] || typeof turn[0].shotBox !== 'function' || turn.length < 2) throw new Error(`[character] conversation: turn ${index + 1} must be [rig, ...steps], { turn: [rig, ...steps], shot }, or { together: [ …such turns ] }`);
       const [rig, ...written] = turn, mine = part(rig);
-      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
@@ -7181,7 +7206,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
       const walksFirst = crossing && (!spoken.length || crossing.start <= from);
       if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
-      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write'].includes(step.name));
+      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write', 'handshake'].includes(step.name));
       if (reaching && !spoken.length && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {

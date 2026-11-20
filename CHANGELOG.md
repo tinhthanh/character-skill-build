@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.68.0
+
+Added — the acting is measured
+- **`tools/acting_check.py <scene dirs…>`**: opens each 3D scene, seeks to 30 / 50 / 70 % of every turn where a hand
+  must reach something, and measures from the drawing itself (`set.actingProbe()`): the closest palm must come
+  within 6 % of the person's height of the pet's head or body, or of the other person's hand; every standing
+  person's feet within 3 % of the floor; a walking person's feet on the floor all the way. Exit code 1 on a miss.
+  `tools/check_scene.py` runs it on a small clinic scene (kneel, make room, handshake).
+- `moments.json` holds these moments too, with questions for a reviewer: `tools/light_audit.py` now asks about the
+  acting as well as the light.
+- A turn that needs something in the hand gets it: `tiêm` (inject) gives the vet a syringe, kept out of sight until
+  the injection; `dắt` (leash) a leash.
+
+Fixed — measured on two trial scenes (clinic: examine, listen, inject, treat, brush, stroke, handshake; park: walk,
+stroke, treat): 2 of 11 measurements passed before, 10 of 10 now
+- A person **kneels** to stroke, feed, examine or brush a pet on the floor; standing, the hand stopped at the dog's
+  back, 12 % of the height from its head.
+- A person who walks to a pet where someone already stands no longer stands **inside** them: the one already
+  there steps aside first (the boy stroking the cat on the exam table overlapped the vet and touched the table).
+- Stroking aims at the pet's back, as people do, and is measured there.
+- **Handshake**: `A → B: bắt tay` makes B shake hands back (alone, B's arm hung down); A uses the hand on B's side
+  and aims at where B stands at that moment, not at the start of the scene (the vet held out the far hand towards
+  where the boy had been); they stand 0.22 × height apart, close enough for the short arms to meet (0.38 left the
+  hands 24 % of the height apart); and the shot is a full one, so the hands are in it.
+- A calico cat purrs when stroked (it wagged its tail like a dog: only breeds with "cat" in the name counted).
+- An explicit `walk` step moves the person for the turns after it (a later "step closer" was computed from the old
+  spot and stopped a whole frame short).
+- Vertical living room: the sofa is shorter and nearer the middle as well as the TV, so the full shot holds both
+  (the 0.67.0 known issue).
+
+Audit of the same frames (4 lighting scenes from 0.66.0 + the 2 acting scenes, 75 questions):
+
+| Reviewer | Score | Acting questions | Fails |
+|---|---|---|---|
+| Gemini 4 Hydrogen | 59 / 67 (8 n/a) | 16 / 16 (5 n/a: feet below the frame) | the side facing the light not brighter (5), shadow / pool / walk brightness (3) |
+| Gemini 3.8 Flash | 70 / 74 | 21 / 21 | long evening shadows (1), park daylight (3) |
+
+Hydrogen's answers about the lighting change between two runs on identical sheets (Q10, Q23, Q31 yes → no; Q6 no →
+yes): single fails there are noise. Steady across both runs: "is the side facing the light brighter" fails in
+daylight scenes.
+
 ## 0.67.0
 
 Changed — no network needed to render, and lighter films
