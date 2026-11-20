@@ -82,6 +82,16 @@ Known
   the floor if the receiver stands elsewhere.
 - In the preset hints a pet on the floor stands at z -500, nearer the camera than the sofa: a seated owner cannot
   reach it (the tool says so). The hints now say to give it the sofa's / bench's z.
+- Granny on the sofa stroking a cat that walked over rests her hand on her own knee, just short of the cat (both
+  reviewers; `acting_check` passes it — the cat's box reaches behind the knee). In the landscape living room the TV
+  is cut by the right edge in the opening shot, and in the vertical one the TV stand still touches the edge in the
+  medium shot of the flashlight.
+
+Audit of the same frames (4 lighting scenes from 0.66.0, the 2 acting scenes from 0.68.0, the 2 seated scenes; 93
+questions): Gemini 4 Hydrogen 81 / 85 (8 n/a), against 73 / 85 before the last fixes in this release — the seated
+carry, stroke and the light-facing side now pass. Gemini 3.8 Flash answered "no shadows, flat shading" for every
+frame in the final run (65 / 85), while the frames show them; its run before the last fixes gave 70 / 86 and agreed
+with Hydrogen on the seated carry.
 
 ## 0.68.0
 
