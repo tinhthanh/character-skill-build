@@ -10,11 +10,12 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
 `window.__set.actingProbe()` (runtime/set3d.js) và xét:
 
   • TAY TỚI ĐÍCH: khoảng cách gần nhất từ lòng bàn tay của người làm tới khung mặt / thân con vật (hay tới bàn tay người
-    kia), ở lúc gần nhất trong các lúc đo, không quá 6 % chiều cao người ấy trên màn hình;
+    kia), ở LÚC GIỮA trong ba lúc đo — lúc moments.json hỏi người chấm (đợt 29) —, không quá 6 % chiều cao người ấy;
   • CHÂN CHẠM SÀN: đáy bàn chân của mọi người đang đứng lệch khỏi đường sàn dưới chân họ không quá 3 % chiều cao người —
     cao hơn là lơ lửng, thấp hơn là lún;
   • ĐI: chân người đang đi chạm sàn ở cả ba lúc đo.
-  • BẾ (đợt 29): ở lúc đo cuối con vật nằm trong vòng tay — hình nó trong hình người bế, giữa thân nó trong khung thân người;
+  • BẾ (đợt 29): ở lúc giữa (lúc được hỏi) và lúc cuối con vật nằm trong vòng tay — hình nó trong hình người bế, giữa thân
+    nó ở 60 % trên của khung thân người (trước ngực) — người ngồi: trên đường mặt ghế (trên lòng);
   • NGỒI (đợt 29): người ngồi trên một hộp (sofa, ghế đá) — đường mặt ghế của rig lệch mặt trên hộp không quá 3 % chiều cao
     (cao hơn là lơ lửng, thấp hơn là lún); chân họ vẫn phải chạm sàn.
 """
@@ -77,7 +78,7 @@ def check_scene(folder):
             results.append({'scene': folder, 'what': f'{c["who"]} walking — feet on the floor', 'ok': abs(worst[1]) <= FEET,
                             'note': f'feet {worst[1] * 100:+.1f} % of height off the floor at {worst[0]:g} s (limit ±{FEET * 100:g} %)'})
             continue
-        best = None
+        best, asked = None, None
         for t, frame in zip(c['times'], frames):
             who, target = frame.get(c['who']), frame.get(c['target'])
             if not who or not target or not who['hands'] or not who['tall']: continue
@@ -89,22 +90,30 @@ def check_scene(folder):
                 if not box: continue
                 d = min(gap(h, box) for h in who['hands'])
             if best is None or d / who['tall'] < best[1]: best = (t, d / who['tall'])
+            if t == c['times'][len(c['times']) // 2]: asked = (t, d / who['tall'])
         if best is None: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]}', 'ok': None, 'note': 'not both in the frame'}); continue
-        results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand reaches', 'ok': best[1] <= REACH,
-                        'note': f'closest {best[1] * 100:.1f} % of height at {best[0]:g} s (limit {REACH * 100:g} %)'})
+        # Chấm ở LÚC GIỮA — lúc moments.json hỏi người chấm (đợt 29: lấy lúc gần nhất trong ba lúc thì "đạt" dù lúc được hỏi hai
+        # tay ông còn buông bên hông). Không đo được lúc ấy thì lấy lúc gần nhất.
+        judged = asked or best
+        results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand reaches', 'ok': judged[1] <= REACH,
+                        'note': f'{judged[1] * 100:.1f} % of height at {judged[0]:g} s, the moment asked about (closest {best[1] * 100:.1f} % at {best[0]:g} s; limit {REACH * 100:g} %)'})
         if c['kind'] == 'carry':
             # BẾ: ở lúc đo cuối, con vật nằm TRONG VÒNG TAY — hình nó trong hình người bế, giữa thân nằm trong khung thân người
             # ấy. Chỉ đo tay thì con mèo bay ra mép khung (đợt 29, người ngồi sofa bế mèo) vẫn "đạt": tay chạm khung con mèo lúc
             # nhấc nó lên.
-            t, frame = c['times'][-1], frames[-1]
-            who, pet = frame.get(c['who']), frame.get(c['target'])
-            box = pet and pet.get('body')
-            held = bool(who and who.get('body') and pet and pet.get('carried') and box)
-            if held:
-                cx, cy = (box['x0'] + box['x1']) / 2, (box['y0'] + box['y1']) / 2
-                held = who['body']['x0'] <= cx <= who['body']['x1'] and who['body']['y0'] <= cy <= who['body']['y1']
-            results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — in the arms', 'ok': held,
-                            'note': f'at {t:g} s ' + ('the pet is held against the body' if held else 'the pet is not in the arms' if not (pet and pet.get('carried')) else 'the pet is held away from the body')})
+            # Ở LÚC GIỮA (lúc được hỏi) và lúc cuối — đợt 29: lúc 50 % lượt con mèo còn ngồi dưới sàn cạnh ống chân bà. Giữa thân con
+            # vật phải ở NỬA TRÊN thân người bế (trước ngực), không chỉ trong khung thân.
+            for t, frame in list(zip(c['times'], frames))[len(c['times']) // 2:]:
+                who, pet = frame.get(c['who']), frame.get(c['target'])
+                box = pet and pet.get('body')
+                held = bool(who and who.get('body') and pet and pet.get('carried') and box)
+                if held:
+                    cx, cy, body = (box['x0'] + box['x1']) / 2, (box['y0'] + box['y1']) / 2, who['body']
+                    # Người NGỒI: khung thân kéo tới bàn chân — vạch là đường mặt ghế (con vật trên lòng, trước ngực).
+                    low = who['seat']['y'] if who.get('seated') and who.get('seat') else body['y0'] + (body['y1'] - body['y0']) * 0.6
+                    held = body['x0'] <= cx <= body['x1'] and body['y0'] <= cy <= low
+                results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — in the arms at {t:g} s', 'ok': held,
+                                'note': 'the pet is held against the chest' if held else 'the pet is not in the arms' if not (pet and pet.get('carried')) else 'the pet is held low or away from the body'})
         # Chân của mọi người ở lúc tay gần đích nhất; người NGỒI trên hộp: mông trên mặt ghế (đợt 29).
         frame = frames[c['times'].index(best[0])]
         for name, a in frame.items():

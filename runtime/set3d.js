@@ -932,7 +932,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (b - a > 2 * half) continue;                                   // rộng hơn cả khung: không lấy trọn được
           const shown = (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a);
           // Lẹm dù chỉ 3 % (mép sofa, chân kệ TV ở mép khung dọc) cũng là cắt dở — cả hai mô hình chấm đều thấy (đợt 27).
-          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || shown >= 0.97) continue;
+          // Trọn trong khung là cách mép ít nhất 3 % nửa khung: lộ 97 % — hay lộ hết mà chạm mép — vẫn là "chạm mép" (kệ TV khung
+          // dọc lúc mất điện, Gemini đợt 29).
+          const clear = a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97;
+          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || clear) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
           const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
@@ -950,7 +953,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const start = cam.distance, still = () => {
             const half = (W / 2) * cam.distance / k, plane = (x, z) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - z));
             return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
-              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) < 0.97);
+              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && !(a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97));
           };
           const cut = still();
           if (cut.length) {

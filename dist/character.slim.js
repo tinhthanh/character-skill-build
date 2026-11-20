@@ -2678,16 +2678,17 @@ class RigSVG {
     const down = (s.omHome || 0) > 0.5, rise = clamp(s.omRise, 0, 1), grow = c.giver && !down ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = c.from.w * grow, h = c.from.h * grow;
     let fromX = c.from.x, fromY = c.from.y;
     const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? (pet.s.x || 0) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
+    fromX += offX; fromY += offY;
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
     if (c.giver && !down) {
       const q = toMine(RigSVG.#meetPoint(c.giver, this));
-      if (q) { fromX = q.x - w * c.middle - offX; fromY = q.y - h * 0.66 - offY; }
+      if (q) { fromX = q.x - w * c.middle; fromY = q.y - h * 0.66; }
     }
-    let x = pha(fromX, belly.x - w * c.middle - offX, rise), y = pha(fromY, belly.y - h * 0.66 - offY, rise);
+    let x = pha(fromX, belly.x - w * c.middle, rise), y = pha(fromY, belly.y - h * 0.66, rise);
     const give = clamp(s.omGive || 0, 0, 1);
     if (give && c.receiver) {
       const q = toMine(RigSVG.#meetPoint(this, c.receiver));
-      if (q) { x = pha(x, q.x - w * c.middle - offX, give); y = pha(y, q.y - h * 0.66 - offY, give); }
+      if (q) { x = pha(x, q.x - w * c.middle, give); y = pha(y, q.y - h * 0.66, give); }
     }
     for (const [name, value] of [['x', x], ['y', y], ['width', w], ['height', h]]) pet.svg.setAttribute(name, value.toFixed(2));
     pet.svg.style.overflow = 'visible';
@@ -3546,7 +3547,8 @@ class RigThu {
     const held = s !== this.s;
     const fx = (v) => v.toFixed(2);
     const flip = (s.huong < 0 ? -1 : 1) * (RigThu.FLIP_MIN + (1 - RigThu.FLIP_MIN) * Math.min(1, Math.abs(s.huong)));
-    e.goc.setAttribute('transform', `translate(${fx(s.x)} ${fx(s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    const away = this.isCarried();
+    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x)} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -3792,8 +3794,10 @@ class RigThu {
     const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
     return frame.left + frame.width / 2 + this.s.x * scale;
   }
+  isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
   shotBox(kind = 'full') {
-    const { S } = this.#khung(), d = this.nv.dau, s = this.s, k = s.huong < 0 ? -1 : 1;
+    const { S } = this.#khung(), d = this.nv.dau, k = this.s.huong < 0 ? -1 : 1;
+    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : this.s;                // đang được bế: không có phần dời (xem apDung)
     const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
     if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
     if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
@@ -6252,7 +6256,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const a = plane(span.a), b = plane(span.b);
           if (b - a > 2 * half) continue;                                   // rộng hơn cả khung: không lấy trọn được
           const shown = (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a);
-          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || shown >= 0.97) continue;
+          const clear = a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97;
+          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || clear) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
           const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
@@ -6266,7 +6271,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const start = cam.distance, still = () => {
             const half = (W / 2) * cam.distance / k, plane = (x, z) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - z));
             return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
-              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) < 0.97);
+              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && !(a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97));
           };
           const cut = still();
           if (cut.length) {

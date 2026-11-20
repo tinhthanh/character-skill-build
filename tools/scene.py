@@ -418,7 +418,13 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             # Lượt có động tác chạm: đo ở 30 / 50 / 70 % lượt — tay tới đích ở ÍT NHẤT một lúc là đạt.
             if op['turn'] >= len(turns): continue
             t0, t1 = float(turns[op['turn']][0]), float(turns[op['turn']][1])
-            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            # Lúc đo lấy theo chính BƯỚC ấy (`reaches`), không theo cả lượt: lượt vuốt ve của ông ngồi ghế đá có quãng chờ máy quay
+            # trước khi tay đưa ra — lúc 50 % lượt hai tay còn buông bên hông; bế: lúc 50 % con mèo còn dưới sàn, nó chỉ nằm trước
+            # ngực từ ~75 % bước (Gemini, đợt 29). Bế: lúc giữa (lúc được hỏi) và lúc cuối đã ôm; các động tác khác: tay đã tới.
+            reach = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                          for step in timings['reaches'][n] if step['name'] == op['kind']), None)
+            if reach: t0, t1 = float(reach['start']), float(reach['start']) + float(reach['duration'])
+            times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.35, 0.82, 0.95) if op['kind'] == 'carry' else (0.4, 0.55, 0.7))]
             pet = pet_of(op['target'])
             ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
@@ -1969,7 +1975,10 @@ def main():
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
     window.__sceneTimings = {{ duration: tl.duration(), outro: T1, turns: talk.turns.map((turn) => [T0 + turn.start, T0 + turn.end]), speech: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.name === 'speakCues').map((step) => ({{ start: T0 + step.start, sound: step.sound, length: step.speech }}))),
       lines: talk.turns.flatMap((turn) => turn.steps.filter((step) => step.text).map((step) => ({{ start: T0 + step.start, end: T0 + step.start + (step.speech || step.duration), text: step.text }}))),
-      actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))) }};
+      actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
+      // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
+      // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(REACH_ACTIONS))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

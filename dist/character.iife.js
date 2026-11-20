@@ -4140,24 +4140,25 @@ class RigSVG {
     // Nhận con vật TỪ TAY NGƯỜI KHÁC (`takePet`): nó trượt từ trước bụng người trao (đo trên màn hình, ở khung này) về
     // trước bụng người nhận, giữ nguyên cỡ đang bế — không từ chỗ nó đứng dưới đất.
     let fromX = c.from.x, fromY = c.from.y;
-    // Con vật ĐÃ ĐI trong khung của nó (`walk`: hình vẽ dời s.x đơn vị khung — con mèo đi tới người ngồi sofa): khung SVG đặt
-    // vào tay mà quên phần dời ấy thì hình con mèo nằm cách người bế đúng quãng nó đã đi — bay ra ngoài mép khung hình (cảnh
-    // thử đợt 29). Các đích (trước bụng, điểm giao) trừ đi phần dời; chỗ xuất phát (`from`, khung ở nhà) đã có sẵn nó.
+    // Con vật ĐÃ ĐI trong khung của nó (`walk`: hình vẽ dời s.x đơn vị khung — con mèo đi tới người ngồi sofa). Đang được bế
+    // thì hình nó KHÔNG dời nữa (RigThu.apDung), nên chỗ XUẤT PHÁT (`from`, khung ở nhà) phải cộng phần dời ấy — con vật bắt
+    // đầu được nhấc lên từ đúng chỗ nó đứng; các đích (trước bụng, điểm giao) thì không (đợt 29).
     const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? (pet.s.x || 0) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
+    fromX += offX; fromY += offY;
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
     // Nhận: con vật bắt đầu từ ĐIỂM GIỮA hai người — nơi người trao đã đưa nó ra (xem `omGive` bên dưới).
     if (c.giver && !down) {
       const q = toMine(RigSVG.#meetPoint(c.giver, this));
-      if (q) { fromX = q.x - w * c.middle - offX; fromY = q.y - h * 0.66 - offY; }
+      if (q) { fromX = q.x - w * c.middle; fromY = q.y - h * 0.66; }
     }
     // Thân con vật nằm TRÊN hai cẳng tay: đáy khung của nó (chân) ngay dưới đường cẳng tay.
     // ĐẦU con vật vào giữa ngực người bế (thân và đuôi sang một bên); đầu ở ngang ngực, không che cằm.
-    let x = pha(fromX, belly.x - w * c.middle - offX, rise), y = pha(fromY, belly.y - h * 0.66 - offY, rise);
+    let x = pha(fromX, belly.x - w * c.middle, rise), y = pha(fromY, belly.y - h * 0.66, rise);
     // Trao: từ trước bụng trượt ra điểm giữa hai người theo `omGive`.
     const give = clamp(s.omGive || 0, 0, 1);
     if (give && c.receiver) {
       const q = toMine(RigSVG.#meetPoint(this, c.receiver));
-      if (q) { x = pha(x, q.x - w * c.middle - offX, give); y = pha(y, q.y - h * 0.66 - offY, give); }
+      if (q) { x = pha(x, q.x - w * c.middle, give); y = pha(y, q.y - h * 0.66, give); }
     }
     for (const [name, value] of [['x', x], ['y', y], ['width', w], ['height', h]]) pet.svg.setAttribute(name, value.toFixed(2));
     pet.svg.style.overflow = 'visible';
@@ -5530,7 +5531,11 @@ class RigThu {
     // Giữa chừng cú lật KHÔNG ép con vật dẹt về 0: bề ngang chỉ co tới 30% rồi đổi bên. Co về 0 thì có một khung hình
     // con vật là một vạch dọc mảnh như sợi chỉ.
     const flip = (s.huong < 0 ? -1 : 1) * (RigThu.FLIP_MIN + (1 - RigThu.FLIP_MIN) * Math.min(1, Math.abs(s.huong)));
-    e.goc.setAttribute('transform', `translate(${fx(s.x)} ${fx(s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    // ĐANG ĐƯỢC BẾ (hình nằm trong tay người khác, không trong host của nó): bỏ phần dời của chính nó — người bế đặt cả khung
+    // SVG vào tay. Để phần dời lại thì vị trí trong tay phụ thuộc thứ tự cập nhật: tua nhảy tới giữa cảnh, người bế đặt con mèo
+    // theo `s.x` cũ của nó, rồi con mèo mới dời hình đi — nó lệch hẳn khỏi tay (đợt 29, b1 lúc 11,4 s).
+    const away = this.isCarried();
+    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x)} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -5865,8 +5870,12 @@ class RigThu {
    * KHUNG NGẮM cho máy quay (`shot` trong index.js), đơn vị khung 400 × 330, ở trạng thái hiện tại.
    *   'face'  cận mặt        'chest' / 'full'  cả con vật
    */
+  /** Đang được bế: hình nằm trong tay một người khác (không trong host của nó). */
+  isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
+
   shotBox(kind = 'full') {
-    const { S } = this.#khung(), d = this.nv.dau, s = this.s, k = s.huong < 0 ? -1 : 1;
+    const { S } = this.#khung(), d = this.nv.dau, k = this.s.huong < 0 ? -1 : 1;
+    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : this.s;                // đang được bế: không có phần dời (xem apDung)
     const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
     if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
     if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
@@ -9330,7 +9339,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (b - a > 2 * half) continue;                                   // rộng hơn cả khung: không lấy trọn được
           const shown = (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a);
           // Lẹm dù chỉ 3 % (mép sofa, chân kệ TV ở mép khung dọc) cũng là cắt dở — cả hai mô hình chấm đều thấy (đợt 27).
-          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || shown >= 0.97) continue;
+          // Trọn trong khung là cách mép ít nhất 3 % nửa khung: lộ 97 % — hay lộ hết mà chạm mép — vẫn là "chạm mép" (kệ TV khung
+          // dọc lúc mất điện, Gemini đợt 29).
+          const clear = a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97;
+          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || clear) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
           const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
@@ -9348,7 +9360,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const start = cam.distance, still = () => {
             const half = (W / 2) * cam.distance / k, plane = (x, z) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - z));
             return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
-              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) < 0.97);
+              .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && !(a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97));
           };
           const cut = still();
           if (cut.length) {

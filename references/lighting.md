@@ -92,8 +92,11 @@ reviewer's answers (all `answers*.json`), failures in red, and the score history
 The same `moments.json` also holds the **acting** moments: every turn where a hand must reach something (stroke,
 examine, give a treat, brush, listen, inject: the pet; hand over, handshake: the other person's hand) and every
 walk, with questions for the reviewer and a `check` for the machine. `python3 tools/acting_check.py <scene dirs…>`
-opens each scene, seeks to 30 / 50 / 70 % of those turns and measures: the hand must come within 6 % of the
-person's height of the pet's head or body (or of the other hand), and feet must stay within 3 % of the floor.
+opens each scene, seeks to three moments of each of those actions (40 / 55 / 70 % of the action itself, not of the
+turn — a turn can wait for the camera before the hand moves; a pick-up: 35 / 82 / 95 %, once the pet is up) and
+measures at the middle one, the moment the reviewer is asked about: the hand must come within 6 % of the person's
+height of the pet's head or body (or of the other hand), a picked-up pet must be against the chest (also at the
+last moment), and feet must stay within 3 % of the floor.
 It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene.
 
 What the scene tool now does for the acting, so the measurements pass without extra script lines:

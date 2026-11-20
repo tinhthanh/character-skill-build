@@ -61,6 +61,22 @@ with the two 0.68.0 acting scenes and the CI scene, 37 of 37
   window or lamp behind ≥ 20 % as backlit and says so instead of judging it (0.3 before): 18 of 18 judged pass. Not
   judged: 5 backlit (living room, 21–50 %) and 2 night scenes with no lamp near (shading +4 %, as before).
 
+- **The acting is measured at the moment the reviewer sees** (Gemini on 0.69.0: grandpa on the bench "strokes" the dog
+  with both hands at his sides; granny "picks up" the cat while it still sits on the floor; grandpa only touches the
+  dog by his knee). The moments came from 30 / 50 / 70 % of the whole turn, and `acting_check` passed on the closest
+  of the three: the stroke turn waits for the camera before the hand moves (at 50 %: 6.7 % of the height away, at
+  70 %: 5.5 % — "pass"), and a pet is only in the arms from about 75 % of `carry`. Now the moments come from the action
+  itself (`window.__sceneTimings.reaches`): 40 / 55 / 70 % of it, a pick-up 35 / 82 / 95 %; the hand is judged at the
+  middle one, the moment asked about, and a picked-up pet must be against the chest (above 60 % of the body; seated:
+  above the seat line) at the middle and the last. On the 0.69.0 builds the new check fails exactly where the reviewers
+  did (4 misses); rebuilt: 42 of 42 on the 7 trial scenes (grandpa's hand 2.5 % from the dog at the moment asked).
+- A pet that walked and is then picked up sits in the arms in every frame, also when the player jumps straight to a
+  time (rendering, measuring): the carrier placed it using the pet's old position before the pet redrew itself — the
+  cat on the sofa was a third of the frame to the left of granny's arms. A carried pet now ignores its own walk offset.
+- A piece of furniture counts as inside the frame only with 3 % of the half-frame to spare: 97 % shown — or all of it,
+  touching the edge — was taken as inside. The vertical power-cut opening, with granny now seated three-quarters,
+  left the TV stand touching the right edge (Gemini); now it stands clear.
+
 Known
 - A pet handed over and put down by the receiver goes back to the spot it was first picked up from, sliding across
   the floor if the receiver stands elsewhere.

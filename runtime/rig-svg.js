@@ -3949,24 +3949,25 @@ export class RigSVG {
     // Nhận con vật TỪ TAY NGƯỜI KHÁC (`takePet`): nó trượt từ trước bụng người trao (đo trên màn hình, ở khung này) về
     // trước bụng người nhận, giữ nguyên cỡ đang bế — không từ chỗ nó đứng dưới đất.
     let fromX = c.from.x, fromY = c.from.y;
-    // Con vật ĐÃ ĐI trong khung của nó (`walk`: hình vẽ dời s.x đơn vị khung — con mèo đi tới người ngồi sofa): khung SVG đặt
-    // vào tay mà quên phần dời ấy thì hình con mèo nằm cách người bế đúng quãng nó đã đi — bay ra ngoài mép khung hình (cảnh
-    // thử đợt 29). Các đích (trước bụng, điểm giao) trừ đi phần dời; chỗ xuất phát (`from`, khung ở nhà) đã có sẵn nó.
+    // Con vật ĐÃ ĐI trong khung của nó (`walk`: hình vẽ dời s.x đơn vị khung — con mèo đi tới người ngồi sofa). Đang được bế
+    // thì hình nó KHÔNG dời nữa (RigThu.apDung), nên chỗ XUẤT PHÁT (`from`, khung ở nhà) phải cộng phần dời ấy — con vật bắt
+    // đầu được nhấc lên từ đúng chỗ nó đứng; các đích (trước bụng, điểm giao) thì không (đợt 29).
     const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? (pet.s.x || 0) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
+    fromX += offX; fromY += offY;
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
     // Nhận: con vật bắt đầu từ ĐIỂM GIỮA hai người — nơi người trao đã đưa nó ra (xem `omGive` bên dưới).
     if (c.giver && !down) {
       const q = toMine(RigSVG.#meetPoint(c.giver, this));
-      if (q) { fromX = q.x - w * c.middle - offX; fromY = q.y - h * 0.66 - offY; }
+      if (q) { fromX = q.x - w * c.middle; fromY = q.y - h * 0.66; }
     }
     // Thân con vật nằm TRÊN hai cẳng tay: đáy khung của nó (chân) ngay dưới đường cẳng tay.
     // ĐẦU con vật vào giữa ngực người bế (thân và đuôi sang một bên); đầu ở ngang ngực, không che cằm.
-    let x = pha(fromX, belly.x - w * c.middle - offX, rise), y = pha(fromY, belly.y - h * 0.66 - offY, rise);
+    let x = pha(fromX, belly.x - w * c.middle, rise), y = pha(fromY, belly.y - h * 0.66, rise);
     // Trao: từ trước bụng trượt ra điểm giữa hai người theo `omGive`.
     const give = clamp(s.omGive || 0, 0, 1);
     if (give && c.receiver) {
       const q = toMine(RigSVG.#meetPoint(this, c.receiver));
-      if (q) { x = pha(x, q.x - w * c.middle - offX, give); y = pha(y, q.y - h * 0.66 - offY, give); }
+      if (q) { x = pha(x, q.x - w * c.middle, give); y = pha(y, q.y - h * 0.66, give); }
     }
     for (const [name, value] of [['x', x], ['y', y], ['width', w], ['height', h]]) pet.svg.setAttribute(name, value.toFixed(2));
     pet.svg.style.overflow = 'visible';
