@@ -27,6 +27,8 @@ import { createLighting } from './lighting.js';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
+// Tấm đồ vật tính là ĐỒ ĐẠC khi soát mép khung (`propFraming`, đợt 30) — cây, đèn, bát, ô cửa thì không.
+const FURNITURE = ['tv', 'table', 'counter', 'chair', 'stool', 'monitor', 'carrier', 'scale'];
 
 /** Giới hạn của máy quay: góc chúc (độ, âm là ngước lên) và góc vòng sang hai bên (độ). */
 export const CAMERA_LIMITS = Object.freeze({ pitch: [-8, 15], yaw: 60 });
@@ -305,7 +307,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * trong, cao `height`. Hộp là ĐỒ VẬT: nó che nhân vật đứng sau nó và bị nhân vật đứng trước nó che.
      * `colors`: một màu, hoặc { top, front, side }.
      */
-    box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf' } = {}) {
+    box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf', name = null } = {}) {
       for (const [name, value] of Object.entries({ x, z, width, depth, height })) if (typeof value !== 'number') throw new Error(`[character] set.box: ${name} must be a number`);
       const tone = typeof colors === 'string' ? { top: colors, front: colors, side: colors } : colors;
       const group = document.createElement('div');
@@ -328,7 +330,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         { origin: [x, y + height, z], u: [1, 0, 0], v: [0, -1, 0], n: [0, 0, 1], kind: 'box' });
       // Bốn mặt vừa dựng là mặt của một VẬT: đánh dấu để `update` không làm mờ chúng khi chúng tràn ra ngoài khung hình.
       for (const item of focused.slice(-4)) item.solid = true;
-      const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width], spec: { x, z, width, depth, height, y } };
+      const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width], spec: { x, z, width, depth, height, y }, name };
       props.push(prop);
       return prop;
     },
@@ -377,14 +379,14 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         if (actor.ground === null) actor.ground = groundOf(actor.rig);
         const size = frameOf(actor.rig), unit = actor.height / size.h, ground = (actor.ground || 1) * size.h;
-        return { size, unit, ground, x: actor.spot.x + (actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) * unit };
+        return { size, unit, ground, x: actor.spot.x + ((actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) + (typeof actor.rig.dropX === 'function' ? actor.rig.dropX() : 0)) * unit };
       };
       const head = () => {
         // `part`: 'head' (mặt — chỉ tay, vuốt ve) hay 'body' (giữa thân — nghe tim phổi, tiêm): khung toàn thân, dưới
         // tâm một chút (con vật nằm ngang: phần dưới khung là thân, phần trên là đầu).
         const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
         const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * (part === 'body' ? 0.5 : 0.5) : f.ground * (part === 'body' ? 0.4 : 0.6);
-        return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
+        return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       return {
         get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
@@ -552,7 +554,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // quãng đi bằng 0 — khung ấy ra khác hẳn tuỳ nó có phải khung đầu hay không (bộ dựng tua không theo thứ tự).
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         const size = actor.rig && actor.rig.constructor && actor.rig.constructor.KHUNG;
-        actor.step = size && actor.height && actor.rig.s && typeof actor.rig.s.x === 'number' ? actor.rig.s.x : 0;
+        // `dropX()`: chỗ người nhận đặt con vật xuống (rig thú, đợt 30) — cộng vào quãng đi.
+        actor.step = size && actor.height && actor.rig.s && typeof actor.rig.s.x === 'number' ? actor.rig.s.x + (typeof actor.rig.dropX === 'function' ? actor.rig.dropX() : 0) : 0;
         actor.unit = size && actor.height ? actor.height / size.h : 0;
         actor.where = actor.spot.x + actor.step * actor.unit;
       }
@@ -920,9 +923,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // nếu chủ thể vẫn trọn trong khung. Vật ở tiền cảnh (gần máy hơn chủ thể) thì để: lấp ló ở mép là cách dựng tiền cảnh.
       {
         const zMeanProps = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
-        const spans = props.filter((prop) => prop.spec).map((prop) => ({ a: prop.spec.x, b: prop.spec.x + prop.spec.width, z: prop.spec.z - prop.spec.depth / 2 }))
+        // `near` / `far`: mặt trước và mặt sau của hộp — mép hộp trên màn hình là mép của mặt GẦN máy hơn (đợt 30: tính theo giữa
+        // hộp thì bàn nước "trọn trong khung" mà hình vẽ chạm mép).
+        const spans = props.filter((prop) => prop.spec).map((prop) => ({ a: prop.spec.x, b: prop.spec.x + prop.spec.width, z: prop.spec.z - prop.spec.depth / 2, near: prop.spec.z, far: prop.spec.z - prop.spec.depth }))
           .concat(actors.filter((actor) => !actor.rig && !actor.lamp && actor.content && actor.width).map((actor) => {
-            const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z };
+            const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z, near: actor.spot.z, far: actor.spot.z };
           }));
         for (const span of spans) {
           // Tiền cảnh: chỉ đẩy ra hẳn một MẨU lấp ló ở mép (nhánh cây chọc vào khung — Gemini đợt 22), không kéo nó vào.
@@ -955,11 +960,55 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
               .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && !(a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97));
           };
-          const cut = still();
-          if (cut.length) {
+          // LẶP tới khi không còn gì lẹm (đợt 30): lấy trọn cái bàn nước thì máy đặt lại tâm khung, cái TV vừa được đẩy ra hẳn
+          // ở trên lại lẹm mép phải (49 % — góc mở đầu phòng khách khung ngang, Gemini): lượt sau lấy trọn cả nó. Lùi quá giới
+          // hạn thì giữ góc của lượt trước.
+          for (let pass = 0; pass < 4; pass++) {
+            const cut = still();
+            if (!cut.length) break;
             const margin = (W / 2) * cam.distance / k * 0.04;
             const wider = { ...region, x0: Math.min(region.x0, ...cut.map((c) => c.a - margin)), x1: Math.max(region.x1, ...cut.map((c) => c.b + margin)) }, test = solve(wider);
-            if (test.distance <= start * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }
+            if (test.distance > start * (H > W * 1.2 ? 1.6 : 1.35)) break;
+            region = wider; cam = test;
+          }
+        }
+        // CÒN ĐỒ VẬT LẸM MÉP (đợt 30): sửa từng cái một thì cái này đẩy cái kia vào mép — góc mở đầu phòng khách khung ngang để
+        // TV lộ 49 % ở mép phải; góc trung lúc rọi đèn (khung dọc) cắt đôi TV và bàn nước. Thử một lượt các chỗ đặt máy (dời
+        // ngang, góc toàn / trung lùi thêm chút) mà chủ thể vẫn trọn, lấy chỗ ít lẹm nhất: lẹm dở nặng hơn chạm mép.
+        if (size !== 'close') {
+          const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
+          const backed = spans.filter((span) => span.z <= zMeanProps + 150);
+          const badness = (c) => {
+            const half = (W / 2) * c.distance / k;
+            let bad = 0;
+            for (const span of backed) {
+              const xs = [span.near, span.far].flatMap((z) => { const f = c.distance / Math.max(50, c.distance + (zMeanProps - z)); return [c.x + (span.a - c.x) * f, c.x + (span.b - c.x) * f]; });
+              const a = Math.min(...xs), b = Math.max(...xs);
+              if (b - a > 2 * half) continue;
+              // Ước lượng phẳng lệch vài phần trăm so với hình vẽ thật: ra hẳn ngoài là cách mép thêm 3 %, trọn trong là cách mép 5 %.
+              const shown = (Math.min(b, c.x + half * 1.03) - Math.max(a, c.x - half * 1.03)) / (b - a);
+              if (shown <= 0 || (a >= c.x - half * 0.95 && b <= c.x + half * 0.95)) continue;
+              bad += shown >= 0.97 ? 0.1 : 0.3 + Math.min(shown, 1 - shown);
+            }
+            return bad;
+          };
+          let best = { cam: base, bad: badness(base), cost: 0 };
+          if (best.bad > 0) {
+            // Góc trung: lùi tới 1,45 / 1,6 (dọc) — góc trung hai người cách xa nhau (bà trên sofa, con mèo) thì xấp xỉ góc toàn; lùi
+            // 1,2 thì TV vẫn chạm mép phải.
+            const top = size === 'full' ? (portrait ? 1.6 : 1.35) : (portrait ? 1.6 : 1.45);
+            for (let factor = 1; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
+              const distance = Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;
+              const shift = size === 'full' ? Infinity : half * (portrait ? 0.7 : 0.35);
+              const lo = Math.max(region.x1 - half, base.x - shift), hi = Math.min(region.x0 + half, base.x + shift);
+              if (lo > hi) continue;
+              for (let n = 0; n <= 24; n++) {
+                const c = { ...base, x: lo + (hi - lo) * n / 24, y: base.y - c0 * (distance - base.distance), distance };
+                const bad = badness(c), cost = (factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
+                if (bad < best.bad - 1e-6 || (Math.abs(bad - best.bad) < 1e-6 && cost < best.cost)) best = { cam: c, bad, cost };
+              }
+            }
+            cam = best.cam;
           }
         }
       }
@@ -1119,9 +1168,61 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
+        // CHÂN NGƯỜI dạng "viên thuốc" (đợt 30): đùi hông → gối, ống chân gối → cổ chân, kèm bán kính — trên màn hình. Để biết
+        // bàn tay có đang đặt trên đùi / gối của chính người ấy không (bà ngồi sofa "vuốt" mèo mà tay nằm trên gối mình), và
+        // phần nào của con vật bị chân người đứng trước che mất.
+        const legs = person ? ['L', 'R'].flatMap((side) => {
+          const leg = e['chan' + side], shin = e['ong' + side];
+          if (!leg || !shin) return [];
+          const hip = point(leg, 0, 0), knee = point(shin, 0, 0), edge = point(shin, 12, 0);
+          let length = 0;
+          try { const b = rig.svg.querySelector('#' + rig.id + '-ongHinh' + side).getBBox(); length = b.y + b.height - 10; } catch (error) { length = 0; }
+          const ankle = point(shin, 0, length);
+          if (!hip || !knee || !ankle || !edge) return [];
+          const r = Math.hypot(edge.x - knee.x, edge.y - knee.y);
+          return [{ side, part: 'thigh', a: hip, b: knee, r }, { side, part: 'shin', a: knee, b: ankle, r }];
+        }) : [];
+        // PHẦN THẤY ĐƯỢC của con vật (đợt 30): khung hình vẽ của đầu và thân — không phải khung chụp `shotBox('full')`, lan ra
+        // sau đầu gối người ngồi cạnh nó. `acting_check` đo tay tới những điểm trong hai khung ấy mà không bị người khác che.
+        const parts = !person && e.dau ? Object.fromEntries([['head', e.dau], ['back', e.than]].filter(([, el]) => el).map(([key, el]) => [key, rect(drawnRect(el))])
+          .filter(([, r]) => r.x1 > r.x0 && r.y1 > r.y0)) : null;
         return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
-          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null };
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
+          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
       });
+    },
+
+    /**
+     * ĐỒ VẬT BỊ MÉP KHUNG CẮT ở khung vừa vẽ (đợt 30): `[{ name, kind, shown, edge, front }]` — hộp (sofa, bàn, kệ) và tấm
+     * đồ vật (TV, bàn, quầy, ghế) mà mép trái / phải khung cắt dở, hay chạm: trọn trong khung là cách mép ít nhất 3 % nửa
+     * khung, như `frameOn`. `shown`: phần bề ngang còn trong khung. Vật rộng hơn cả khung, vật ra hẳn ngoài khung, cây, đèn,
+     * ô cửa thì không tính. `front`: vật ở tiền cảnh (gần máy hơn mọi nhân vật ≥ 150) — lấp ló ở mép là cách dựng tiền cảnh.
+     */
+    propFraming() {
+      set.update();
+      const W = view.clientWidth, margin = W / 2 * 0.03, out = [];
+      const near = Math.max(-Infinity, ...actors.filter((actor) => actor.rig && actor.host.style.display !== 'none').map((actor) => actor.spot.z)) + 150;
+      const judge = (item) => {
+        const { x0, x1 } = item;
+        if (!(x1 > x0) || x1 - x0 > W) return;
+        const shown = (Math.min(x1, W) - Math.max(x0, 0)) / (x1 - x0);
+        if (shown <= 0.02 || (x0 >= margin && x1 <= W - margin)) return;
+        out.push({ ...item, shown: +shown.toFixed(3), edge: (x0 + x1) / 2 < W / 2 ? 'left' : 'right', front: item.z > near, x0: Math.round(x0), x1: Math.round(x1) });
+      };
+      for (const prop of props) {
+        if (!prop.spec) continue;
+        const { x, z, width, depth, height, y } = prop.spec, xs = [];
+        for (const px of [x, x + width]) for (const pz of [z, z - depth]) for (const py of [y, y + height]) { const at = set.project(px, py, pz); if (at.depth < camera.lens - 60) xs.push(at.x); }
+        if (xs.length === 8) judge({ name: prop.name || 'box', kind: 'box', z, x0: Math.min(...xs), x1: Math.max(...xs) });
+      }
+      for (const actor of actors) {
+        if (actor.rig || actor.lamp || !actor.frame || actor.host.style.display === 'none') continue;
+        const kind = (actor.host.querySelector && actor.host.querySelector('svg[data-prop]') || { dataset: {} }).dataset.prop;
+        if (!FURNITURE.includes(kind)) continue;
+        const [cx0, , cx1] = actor.content || [0, 0, 1, 1], f = actor.frame;
+        judge({ name: kind, kind, z: actor.spot.z, x0: f.left + cx0 * f.w, x1: f.left + cx1 * f.w });
+      }
+      return out;
     },
 
     framing() {

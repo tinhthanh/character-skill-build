@@ -497,7 +497,7 @@ export class RigThu {
     // SVG vào tay. Để phần dời lại thì vị trí trong tay phụ thuộc thứ tự cập nhật: tua nhảy tới giữa cảnh, người bế đặt con mèo
     // theo `s.x` cũ của nó, rồi con mèo mới dời hình đi — nó lệch hẳn khỏi tay (đợt 29, b1 lúc 11,4 s).
     const away = this.isCarried();
-    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x)} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x + this.dropX())} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -825,19 +825,31 @@ export class RigThu {
   centerX() {
     const frame = this.svg.getBoundingClientRect();
     const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
-    return frame.left + frame.width / 2 + this.s.x * scale;
+    return frame.left + frame.width / 2 + (this.s.x + this.dropX()) * scale;
   }
 
   /**
    * KHUNG NGẮM cho máy quay (`shot` trong index.js), đơn vị khung 400 × 330, ở trạng thái hiện tại.
    *   'face'  cận mặt        'chest' / 'full'  cả con vật
    */
+  /**
+   * CHỖ NGƯỜI NHẬN ĐẶT NÓ XUỐNG (đợt 30): phần dời thêm theo x (đơn vị khung) — người nhận con vật từ tay người khác
+   * (`takePet`) đặt nó cạnh chân mình, không phải về chỗ nó được bế lần đầu. Lượng dời ghi ở `drops` (người nhận → số đơn vị),
+   * bật bằng kênh `petDrop` của CHÍNH người nhận (0 → 1 lúc nhận): trạng thái người được dựng / trả về khung 0 cùng
+   * timeline của họ — một kênh trên con vật thì tween của người nhận ghi nhầm giá trị đầu (con chó nhảy tới đó từ khung 0).
+   */
+  dropX() {
+    let x = 0;
+    if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
+    return x;
+  }
+
   /** Đang được bế: hình nằm trong tay một người khác (không trong host của nó). */
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
 
   shotBox(kind = 'full') {
     const { S } = this.#khung(), d = this.nv.dau, k = this.s.huong < 0 ? -1 : 1;
-    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : this.s;                // đang được bế: không có phần dời (xem apDung)
+    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : { ...this.s, x: this.s.x + this.dropX() };      // đang được bế: không có phần dời (xem apDung)
     const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
     if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
     if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);

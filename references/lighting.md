@@ -97,7 +97,13 @@ turn — a turn can wait for the camera before the hand moves; a pick-up: 35 / 8
 measures at the middle one, the moment the reviewer is asked about: the hand must come within 6 % of the person's
 height of the pet's head or body (or of the other hand), a picked-up pet must be against the chest (also at the
 last moment), and feet must stay within 3 % of the floor.
-It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene.
+The hand is measured to the parts of the pet you can see — a grid over its drawn head and body, less what a person's legs
+in front of it hide — not to its framing box (that box reached behind a seated person's knee, so a hand resting on her
+own knee "touched" the cat); a seated person's hand must not rest on their own thigh or knee. After `putDown` the pet
+must be on the floor next to the person who put it down (within 12 % of their height) and stay there. At every moment
+of `moments.json` no piece of furniture (sofa, table, TV stand, TV, counter) may be cut, or touched, by the left or
+right edge of the frame (`set.propFraming()`; foreground props excepted).
+It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene, a park scene and a living-room scene.
 
 What the scene tool now does for the acting, so the measurements pass without extra script lines:
 
@@ -109,7 +115,10 @@ What the scene tool now does for the acting, so the measurements pass without ex
 - `bé → ông: đưa` (`handOver`) makes the other person **take** it at the same time (when they have the item put
   away), and `trao` (`handOverPet`) adds the other's `takePet`; both reach for the point between their shoulders, like a
   handshake, and the item sits in the hand on the receiver's side.
-- A pet walks over to a **seated** person who strokes or picks it up; the hand aims at where the pet stands then.
+- A pet walks over to a **seated** person who strokes or picks it up; the hand aims at where the pet stands then, and
+  the person leans over their knees towards it (up to 40°) until its head is within reach.
+- A pet handed over (`trao`) and put down by the receiver lands next to the receiver's feet, on the side away from
+  the giver — not back where it was first picked up.
   `acting_check` also measures that a carried pet is in the arms and that a seated person sits on the seat
   (within 3 % of their height of the top of the sofa / bench).
 

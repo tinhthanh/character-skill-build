@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.70.0
+
+Added — the machine sees what the reviewers saw in 0.69.0
+- `tools/acting_check.py` measures a hand to the parts of a pet **you can see**: a grid over the drawn head and body,
+  less what the legs of a person in front of it hide (`set.actingProbe()` now gives each pet its drawn head / body
+  boxes and each person's thighs and shins as capsules). The framing box of the cat by granny on the sofa reached
+  behind her knee, so her hand resting on her own knee measured 0.0 % — "pass" — while both reviewers saw it miss; now
+  15.7 % of her height, fail. A seated person's hand must also not rest on their own thigh / knee.
+- **Put down** is measured: `moments.json` has a `putDown` moment (the pet, who put it down — `carry` and
+  `handOverPet` are followed), and `acting_check` checks that from the release to 0.8 s after the step the pet is on
+  the floor next to that person (within 12 % of their height, across) and does not slide (1.5 %).
+- **Furniture at the frame edges** is measured at every moment of `moments.json` (`set.propFraming()`: boxes — sofa,
+  tables, stands — and TV / table / counter / chair cutouts; whole inside means 3 % of the half-frame clear of the
+  edge, as `frameOn` uses). On the 0.69.0 camera code it fails 7 moments in the 8 trial scenes, among them the
+  landscape living-room opening (TV 49 % shown — the reviewers' miss) and the vertical flashlight shot (TV 48 %,
+  coffee table 82 %). Boxes take a `name` (`set.box({ …, name })`; `tools/scene.py` passes the preset names).
+- `tools/check_scene.py` builds a living-room scene (granny on the sofa strokes and picks up a cat that walks over) and
+  asks for the put-down in the park scene; with the 0.69.0 runtime both fail (stroke 16.0 %, hand on the lap, coffee
+  table cut 90 %; dog put down 19.9 % of the boy's height away, by the bench).
+
+Fixed — measured on the 4 dot29 trial scenes (clinic hand-over, living-room hand-over, sofa, bench), the 4 lighting
+trial scenes, the two 0.68.0 acting scenes and the park CI scene: with the new checks the 0.69.0 code fails 6 acting
+measurements (in 4 scenes) and 7 furniture moments (in the 8 trial scenes); now 99 of 99 pass, and 27 of 27 on the
+two CI scenes
+- **A seated person reaches the pet past their knees**: they lean over their knees towards it — up to 40°, just enough
+  for its head to come within reach — and the arm is aimed from the real, seated shoulder (it was aimed from the
+  standing one, 56 units higher, so the hand came down on the person's own knee); the other arm hangs instead of
+  swinging up behind. Granny strokes the cat: 15.7 % → 0.6 % of her height; grandpa on the bench, whose hand rested on
+  his thigh beside the dog's head: 1.0 %, off the lap.
+- **A pet handed over and put down by the receiver lands by the receiver's feet**, on the side away from the giver,
+  instead of sliding back to where it was first picked up: clinic (vet puts the dog down) 33.9 % → 0.0 % of the
+  height from her, park CI scene 19.9 % → 0.0 %. The offset belongs to the receiver (`petDrop`, read by the pet's
+  `dropX()`), so seeking anywhere in the timeline gives the same place; `tools/scene.py` tells `takePet` where a pet
+  that walked earlier stood (`{ petAt }`) — at build time its state is back at frame 0.
+- **Furniture no longer cut by the frame edge**: `frameOn` fixed one piece at a time, and the last pass of the full
+  shot re-centred the camera to take in the coffee table, which put the TV it had just pushed out back on the right
+  edge (49 %). Now, when something is still cut, it tries a range of camera positions (and, for a full or medium
+  shot, up to 1.35 / 1.45 × further back; vertical 1.6) with the subjects still whole and takes the one with the least
+  cut; boxes are measured by their nearer face, not their middle. All 7 furniture misses above pass.
+
+Known
+- A pet put down by the receiver is placed by the runtime; `tools/scene.py` still thinks it stands where it was picked
+  up, so a later turn that reaches for it (stroke, pick up) may step to the wrong place.
+- Stroking from a sofa, granny leans far over her knees (up to 40°) and the cat stands partly behind her shins.
+- To keep the furniture whole a medium shot of two subjects far apart can be almost as wide as the full shot.
+
 ## 0.69.0
 
 Added — handing over, seated people and the lit side, measured

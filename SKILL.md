@@ -185,7 +185,8 @@ clips for every voice file.
    The same moments carry the acting (hands reaching the pet or the other person, feet on the floor), and
    `python3 tools/acting_check.py <id>` measures it without anyone looking: palm-to-target distance and
    feet-to-floor offset as a share of the character's height, a carried pet held against the body, a seated person's
-   seat on the sofa / bench, exit code 1 when a hand misses or a foot floats. `python3 tools/light_side.py <id>` measures
+   seat on the sofa / bench, a pet put down next to the feet of whoever put it down, no furniture cut by the frame edge
+   at any moment, exit code 1 when a hand misses or a foot floats. `python3 tools/light_side.py <id>` measures
    from the pixels whether the half of each character facing the main light is brighter than the other half.
 4. **Change what the scene file cannot say** by editing `index.html` — it is plain,
    commented HTML. Finish with the scene file first: after a hand edit the tool will not

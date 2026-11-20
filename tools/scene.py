@@ -432,6 +432,17 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]} {op["target"]}', 'ask': ask + ['Are the standing characters\' feet on the floor (not floating above it or sunk into it)?'],
                             'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] == 'putDown':
+            # ĐẶT XUỐNG (đợt 30): con vật nằm trên sàn sát chân người đặt, và đứng yên — từ lúc tay thả (60 % bước) tới 0,8 s sau
+            # khi bước xong. Trước đây người NHẬN đặt xuống thì nó trượt dọc sàn về chỗ được bế lần đầu.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == 'putDown'), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            times = [round(t0 + (t1 - t0) * 0.62, 2), round(t1, 2), round(min(t1 + 0.8, float(timings.get('duration') or t1 + 0.8)), 2)]
+            moments.append({'t': times[1], 'what': f'{op["who"]} puts {op["target"]} down', 'ask': [f'Is the animal ({op["target"]}) on the floor right next to {op["who"]}\'s feet (not across the room, not sliding away)?'],
+                            'check': {'kind': 'putDown', 'who': op['who'], 'target': op['target'], 'to': 'floor', 'times': times}})
+            continue
         if op['kind'] == 'walk':
             # ĐI NGANG QUA ĐÈN (tối, có đèn): hai khung đầu / cuối quãng đi — bóng phải xoay / dài ngắn theo vị trí đèn, người sáng
             # lên khi tới gần đèn (đợt 24).
@@ -1030,6 +1041,8 @@ def main():
     lamp_ops = []                                           # { turn, name, on, dur } — bật / tắt đèn của bối cảnh 3D
     power_ops, sky_ops = [], []                             # mất điện / có điện · trời chuyển giờ
     gear_ops = []                                           # đèn trong tay (rọi đèn pin, soi đèn khám) — cho moments.json
+    holding = {}                                            # ai đang bế con vật nào (bế, trao) — để đo lúc `putDown` (đợt 30)
+    arms = {}                                               # ai đang bế con vật nào — để `takePet` biết con vật ĐANG ở đâu (đợt 30)
     popups = []                                             # { turn, cutout: số thứ tự, title, text, hold } — thông báo trên màn hình đạo cụ 3D
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
@@ -1296,6 +1309,10 @@ def main():
                 # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
                 if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
                     gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:]})
+                # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
+                if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
+                if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
+                if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
                     # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người
                     # đứng cách con vật cả khung hình (đợt 28: tay cách con chó 29 % chiều cao người).
@@ -1344,9 +1361,21 @@ def main():
             # một mình làm hỏng cả cảnh (`putDown` sau đó báo "không bế con vật nào") (đợt 29).
             given = [(step[0], step[1][1:]) for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in ('handOver', 'handOverPet') and isinstance(step[1], str) and step[1].startswith('@')]
             given = [(kind, name) for kind, name in given if name in names and not names[name]['_pet'] and name != entry.get('who') and (kind == 'handOverPet' or (names[name].get('holds') and names[name].get('holdsHidden')))]
+            for step in entry.get('do', []):
+                if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str) and step[1][1:] in names: arms[entry['who']] = step[1][1:]
             if given and not pets and not shaken and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
                 kind, name = given[0]
-                code = '{ together: [' + code + f", [{names[name]['name']}, [{js('take' if kind == 'handOver' else 'takePet')}, {names[entry['who']]['name']}]]] }}"
+                # NHẬN CON VẬT: báo chỗ nó đứng lúc được bế (đơn vị khung của nó, như `set.target(…, { at })`) — lúc dựng, trạng thái
+                # con vật đã về khung 0, mà người nhận đặt nó xuống cạnh chân mình tính từ chỗ ấy (đợt 30: con chó đã đi tới ông ngồi
+                # ghế đá thì bị đặt ra ngoài khung).
+                held = arms.pop(entry['who'], None) if kind == 'handOverPet' else None
+                extra = ''
+                if held:
+                    arms[name] = held
+                    pet = names[held]
+                    walked = (float(pet['x']) - float(pet['_x0'])) / pet['_unit'] if pet.get('_unit') and pet.get('_x0') is not None else 0
+                    extra = f", {{ petAt: {round(walked, 1):g} }}"
+                code = '{ together: [' + code + f", [{names[name]['name']}, [{js('take' if kind == 'handOver' else 'takePet')}, {names[entry['who']]['name']}{extra}]]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
             # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).
@@ -1508,7 +1537,7 @@ def main():
             colour = item.get('color', '#8fb3bf')
             tone = {'top': item.get('top', '#f1f4f5'), 'front': colour, 'side': item.get('side', colour)}
             numbers = ', '.join(f"{key}: {item[key]:g}" for key in ('x', 'z', 'width', 'depth', 'height', 'y') if key in item)
-            setup.append(f"    const box{n + 1} = set.box({{ {numbers}, colors: {js(tone)} }});" + (f"          // {item['name']}" if item.get('name') else ''))
+            setup.append(f"    const box{n + 1} = set.box({{ {numbers}, colors: {js(tone)}" + (f", name: {js(item['name'])}" if item.get('name') else '') + " });")
         for n, item in enumerate(stage_set.get('cutouts', [])):
             # Tấm hình phẳng đứng trong phòng (đạo cụ vẽ sẵn hay ảnh) — đặt sát máy quay là có tiền cảnh.
             # Máy tính vẽ trong CÙNG khung với người (400 × 470): mặc định cao bằng người, để nó cùng tỉ lệ với nhân vật.
@@ -1978,7 +2007,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(REACH_ACTIONS))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

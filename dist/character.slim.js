@@ -1,4 +1,4 @@
-/* VGCharacter v0.69.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.70.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -165,6 +165,7 @@ const NGHI = Object.freeze({
   handZoomL: 1, handZoomR: 1,   // phóng to bàn tay (đếm ngón cho dễ đọc)
   khoc: 0, khocY: 0,            // nước mắt (0…1 hiện) và độ chảy của giọt nước mắt (0…1, xuống má)
   moHoi: 0, doMa: 0,            // giọt mồ hôi ở thái dương (ngượng, bối rối) · má đỏ thêm (0…1)         // 1 = đồng hồ đeo ở cổ tay ấy (`checkWatch`)
+  petDrop: 0,                   // 0 / 1 đã nhận con vật từ tay người khác (`takePet`): nó được đặt xuống cạnh chân người này (RigThu.dropX, đợt 30)
   omGive: 0,                    // 0…1 đang TRAO con vật đang bế (`handOverPet`): nó và hai cánh tay đi ra điểm giữa hai người
   omHome: 0,                    // 1 trong lúc ĐẶT con vật xuống (`putDown`): nó hạ về CHỖ NHÀ của nó — kể cả khi nhận nó từ tay người khác
   om: 0, omRise: 0,             // đang BẾ một con vật (SVG của nó nằm trong ngăn `om`) / độ nhấc nó lên trước ngực 0…1           // 1 = mặt ống nghe hiện trong tay ấy (`listen`)
@@ -1551,6 +1552,7 @@ class RigSVG {
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
+    so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
     for (const side of ['L', 'R']) {
@@ -2206,6 +2208,7 @@ class RigSVG {
     this.#khep(t, 0.45, 0.45 + dur);
     return t;
   }
+  static SEATED_LEAN = 40;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
     let tx = 300, ty = 400;
@@ -2227,18 +2230,27 @@ class RigSVG {
     let k = hand || (tx < HONG.x ? 'L' : 'R');
     if (!hand && this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
     const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
-    const shoulder = VAI[k], angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;
-    const lean = clamp((tx - HONG.x) * 0.06, -9, 9);
-    const across = (k === 'L') !== (tx < HONG.x);
-    let upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - Math.abs(lean), -10, 95), fore = across ? -58 : 0;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
+    const across = (k === 'L') !== (tx < HONG.x);
+    let shoulder = VAI[k];
+    let lean = clamp((tx - HONG.x) * 0.06, -9, 9), tilt = Math.abs(lean), bend = 0;
+    if (s.seat > 0.5 && !across) {
+      const px = HONG.x, py = HONG.y + this.hangChan() + this.#lowered(), bx = this.#shoulderX(k), by = this.#shoulderY();
+      const dir = tx >= px ? 1 : -1, far = (armUpper + armFore) * 0.92;
+      const at = (deg) => { const a = dir * deg * Math.PI / 180; return { x: px + (bx - px) * Math.cos(a) - (by - py) * Math.sin(a), y: py + (bx - px) * Math.sin(a) + (by - py) * Math.cos(a) }; };
+      let phi = 0;
+      while (phi < RigSVG.SEATED_LEAN && Math.hypot(tx - at(phi).x, ty - at(phi).y) > far) phi += 2;
+      shoulder = at(phi); lean = -dir * phi; tilt = -phi; bend = phi;
+    }
+    const angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;
+    let upper = across ? 8 : clamp(chuanHoaGoc(k === 'L' ? angle - 90 : 90 - angle) - tilt, -10, 95), fore = across ? -58 : 0;
     const d = Math.hypot(tx - shoulder.x, ty - (shoulder.y + drop));
     if (!across && d < (armUpper + armFore) * 0.96) {
       const alpha = Math.acos(clamp((armUpper * armUpper + d * d - armFore * armFore) / (2 * armUpper * d), -1, 1)) * 180 / Math.PI;
       const beta = Math.acos(clamp((armUpper * armUpper + armFore * armFore - d * d) / (2 * armUpper * armFore), -1, 1)) * 180 / Math.PI;
       upper = clamp(upper - alpha, -15, 95); fore = 180 - beta;
     }
-    return { k, upper, fore, lean, crouch, tx, across };
+    return { k, upper, fore, lean, crouch, tx, across, bend };
   }
   #leanTo(t, reach, hand) {
     const s = this.s, N = this.NGHI, { k, upper, fore, lean, crouch, tx } = reach;
@@ -2246,6 +2258,7 @@ class RigSVG {
     t.to(s, { ['aim' + k]: 1, duration: 0.3, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + k]: hand }, 0.02);
     if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
+    if (reach.bend) { const other = k === 'L' ? 'R' : 'L'; t.to(s, { ['bat' + other]: -reach.bend, ['cang' + other]: -20, ['aim' + other]: 0, duration: 0.45, ease: 'power2.out' }, 0); }
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
   }
@@ -2677,7 +2690,7 @@ class RigSVG {
     const belly = new DOMPoint(0, -62).matrixTransform(fromThan);
     const down = (s.omHome || 0) > 0.5, rise = clamp(s.omRise, 0, 1), grow = c.giver && !down ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = c.from.w * grow, h = c.from.h * grow;
     let fromX = c.from.x, fromY = c.from.y;
-    const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? (pet.s.x || 0) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
+    const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
     fromX += offX; fromY += offY;
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
     if (c.giver && !down) {
@@ -2761,7 +2774,7 @@ class RigSVG {
     this.#khep(t, 0.45, HANDOVER_AT + 0.1, { om: 0, omRise: 0, omGive: 0 });
     return t;
   }
-  takePet(source) {
+  takePet(source, { petAt = null } = {}) {
     const giver = source && source.live ? source.live : source, from = giver && giver.carried;
     if (!(giver instanceof RigSVG) || !from) throw new Error('[character] takePet(giver): the giver is not carrying a pet — run giver.carry(pet) first, then takePet together with giver.handOverPet');
     const t = this.tl(), s = this.s, dir = this.#towards(source, 'R');
@@ -2770,13 +2783,22 @@ class RigSVG {
     const inv = this.svg.getScreenCTM().inverse(), home = from.pet.svg.getBoundingClientRect();
     const a = new DOMPoint(home.left, home.top).matrixTransform(inv), b = new DOMPoint(home.right, home.bottom).matrixTransform(inv);
     const spot = home.width ? { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y } : { x: 0, y: 0, w: from.from.w * scale, h: from.from.h * scale };
+    const pet = from.pet, petWide = (pet.constructor && pet.constructor.KHUNG && pet.constructor.KHUNG.w) || 400;
+    let drop = null;
+    if (home.width && spot.w > 0) {
+      const side = -dir, now = spot.x + spot.w / 2 + ((typeof petAt === 'number' ? petAt : pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * spot.w / petWide, want = KHUNG.w / 2 + (s.x || 0) + side * (60 + spot.w * 0.25);
+      if (!pet.drops) pet.drops = new Map();
+      pet.drops.set(this, (pet.drops.get(this) || 0) * (s.petDrop || 0) + (want - now) * petWide / spot.w);
+      t.set(s, { petDrop: 1 }, HANDOVER_AT);
+      drop = { x: want, y: spot.y + spot.h * 0.6 };
+    }
     this.carried = { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
-                     reach: this.#reachLow(null), at: s.x, middle: from.middle, facing: s.huong, giver };
+                     reach: this.#reachLow(drop), at: s.x, middle: from.middle, facing: s.huong, giver };
     this.#offerArms(t, source, 0);
     t.to(s, { than: this.NGHI.than - dir * 3, nhinX: dir * 2, cuoi: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.set(s, { om: 1, omRise: 0 }, HANDOVER_AT);
     t.to(s, { omRise: 1, huong: 0, than: this.NGHI.than, nhinX: 0, nhinY: 1.8, dauY: 3, duration: 0.55, ease: 'power2.inOut' }, HANDOVER_AT + 0.02);
-    this.#khep(t, 0.4, HANDOVER_AT + 0.6, { om: 1, omRise: 1, huong: 0 });
+    this.#khep(t, 0.4, HANDOVER_AT + 0.6, { om: 1, omRise: 1, huong: 0, ...(drop ? { petDrop: 1 } : {}) });
     return t;
   }
   notify(text = 'Thông báo mới', hold = 1.8, { side = 'auto' } = {}) {
@@ -2837,7 +2859,7 @@ class RigSVG {
                      from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong };
     const other = reach.k === 'L' ? 'R' : 'L';
     this.#leanTo(t, reach, 'xoe');
-    t.to(s, { ['bat' + other]: reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
+    t.to(s, { ['bat' + other]: reach.bend ? -reach.bend : reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
     t.set(s, { om: 1 }, 0.5);                                                              // hai tay đã chạm: con vật vào tay
     const turnKeep = s.seat >= 0.5 && Math.abs(s.huong) > 0.02 ? Math.sign(s.huong) * 0.22 : 0;
     t.to(s, { omRise: 1, huong: turnKeep, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
@@ -2849,7 +2871,7 @@ class RigSVG {
     if (!c || s.om < 0.5) throw new Error('[character] putDown: the character is not carrying a pet — carry(pet) first');
     if (Math.abs(s.x - c.at) > 20) throw new Error('[character] putDown: the character walked away from where it picked the pet up — walk back first (the pet goes back to its own spot)');
     const { reach } = c, other = reach.k === 'L' ? 'R' : 'L';
-    t.to(s, { ['bat' + reach.k]: reach.upper, ['cang' + reach.k]: reach.fore, ['bat' + other]: reach.upper * 0.6, ['cang' + other]: -40, duration: 0.02 }, 0);
+    t.to(s, { ['bat' + reach.k]: reach.upper, ['cang' + reach.k]: reach.fore, ['bat' + other]: reach.bend ? -reach.bend : reach.upper * 0.6, ['cang' + other]: -40, duration: 0.02 }, 0);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0.02);
     t.to(s, { omHome: 1, duration: 0.02 }, 0);                                             // hạ về chỗ nhà (xem `#placeCarried`)
     if (reach.crouch) t.to(s, { seat: reach.crouch, duration: 0.5, ease: 'power2.inOut' }, 0);
@@ -3548,7 +3570,7 @@ class RigThu {
     const fx = (v) => v.toFixed(2);
     const flip = (s.huong < 0 ? -1 : 1) * (RigThu.FLIP_MIN + (1 - RigThu.FLIP_MIN) * Math.min(1, Math.abs(s.huong)));
     const away = this.isCarried();
-    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x)} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x + this.dropX())} ${fx(away ? 0 : s.y)}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -3792,12 +3814,17 @@ class RigThu {
   centerX() {
     const frame = this.svg.getBoundingClientRect();
     const scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
-    return frame.left + frame.width / 2 + this.s.x * scale;
+    return frame.left + frame.width / 2 + (this.s.x + this.dropX()) * scale;
+  }
+  dropX() {
+    let x = 0;
+    if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
+    return x;
   }
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
   shotBox(kind = 'full') {
     const { S } = this.#khung(), d = this.nv.dau, k = this.s.huong < 0 ? -1 : 1;
-    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : this.s;                // đang được bế: không có phần dời (xem apDung)
+    const s = this.isCarried() ? { ...this.s, x: 0, y: 0 } : { ...this.s, x: this.s.x + this.dropX() };      // đang được bế: không có phần dời (xem apDung)
     const headX = 200 + (S.x + d.dx - 200) * k + s.x, headY = S.y + d.dy + s.y;
     if (kind === 'face') return { x: headX - 66, y: headY - 64, width: 132, height: 132 };
     if (kind !== 'chest' && kind !== 'full') throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
@@ -5654,6 +5681,7 @@ const { PROP_FRAME } = __m['runtime/props.js'];
 const { createLighting } = __m['runtime/lighting.js'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
+const FURNITURE = ['tv', 'table', 'counter', 'chair', 'stool', 'monitor', 'carrier', 'scale'];
 const CAMERA_LIMITS = Object.freeze({ pitch: [-8, 15], yaw: 60 });
 const OVERVIEW = Object.freeze({ pitch: 14, lens: 5000, distance: 5000 });
 function checkCamera(values, where) {
@@ -5832,7 +5860,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         { origin: [at[0], at[1], at[2]], u: [Math.cos(across), 0, -Math.sin(across)], v: [0, -1, 0], n: [Math.sin(across), 0, Math.cos(across)], kind: 'panel' }));
       return set;
     },
-    box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf' } = {}) {
+    box({ x, z, width, depth, height, y = 0, colors = '#8fb3bf', name = null } = {}) {
       for (const [name, value] of Object.entries({ x, z, width, depth, height })) if (typeof value !== 'number') throw new Error(`[character] set.box: ${name} must be a number`);
       const tone = typeof colors === 'string' ? { top: colors, front: colors, side: colors } : colors;
       const group = document.createElement('div');
@@ -5850,7 +5878,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       face(group, width, height, `translate3d(${x}px, ${top}px, ${z}px)`, paint(tone.front, '#8fb3bf'), middle,
         { origin: [x, y + height, z], u: [1, 0, 0], v: [0, -1, 0], n: [0, 0, 1], kind: 'box' });
       for (const item of focused.slice(-4)) item.solid = true;
-      const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width], spec: { x, z, width, depth, height, y } };
+      const prop = { group, centre: middle, top: y + height, front: z, span: [x, x + width], spec: { x, z, width, depth, height, y }, name };
       props.push(prop);
       return prop;
     },
@@ -5872,12 +5900,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         if (actor.ground === null) actor.ground = groundOf(actor.rig);
         const size = frameOf(actor.rig), unit = actor.height / size.h, ground = (actor.ground || 1) * size.h;
-        return { size, unit, ground, x: actor.spot.x + (actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) * unit };
+        return { size, unit, ground, x: actor.spot.x + ((actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) + (typeof actor.rig.dropX === 'function' ? actor.rig.dropX() : 0)) * unit };
       };
       const head = () => {
         const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
         const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * (part === 'body' ? 0.5 : 0.5) : f.ground * (part === 'body' ? 0.4 : 0.6);
-        return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
+        return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       return {
         get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
@@ -5995,7 +6023,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       for (const actor of actors) {
         if (!actor.width) { actor.width = actor.host.offsetWidth; actor.height = actor.host.offsetHeight; }
         const size = actor.rig && actor.rig.constructor && actor.rig.constructor.KHUNG;
-        actor.step = size && actor.height && actor.rig.s && typeof actor.rig.s.x === 'number' ? actor.rig.s.x : 0;
+        actor.step = size && actor.height && actor.rig.s && typeof actor.rig.s.x === 'number' ? actor.rig.s.x + (typeof actor.rig.dropX === 'function' ? actor.rig.dropX() : 0) : 0;
         actor.unit = size && actor.height ? actor.height / size.h : 0;
         actor.where = actor.spot.x + actor.step * actor.unit;
       }
@@ -6246,9 +6274,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       {
         const zMeanProps = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
-        const spans = props.filter((prop) => prop.spec).map((prop) => ({ a: prop.spec.x, b: prop.spec.x + prop.spec.width, z: prop.spec.z - prop.spec.depth / 2 }))
+        const spans = props.filter((prop) => prop.spec).map((prop) => ({ a: prop.spec.x, b: prop.spec.x + prop.spec.width, z: prop.spec.z - prop.spec.depth / 2, near: prop.spec.z, far: prop.spec.z - prop.spec.depth }))
           .concat(actors.filter((actor) => !actor.rig && !actor.lamp && actor.content && actor.width).map((actor) => {
-            const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z };
+            const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z, near: actor.spot.z, far: actor.spot.z };
           }));
         for (const span of spans) {
           const front = span.z > zMeanProps + 150;
@@ -6273,11 +6301,46 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             return spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ a: plane(span.a, span.z), b: plane(span.b, span.z) }))
               .filter(({ a, b }) => b - a <= 2 * half && (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a) > 0.02 && !(a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97));
           };
-          const cut = still();
-          if (cut.length) {
+          for (let pass = 0; pass < 4; pass++) {
+            const cut = still();
+            if (!cut.length) break;
             const margin = (W / 2) * cam.distance / k * 0.04;
             const wider = { ...region, x0: Math.min(region.x0, ...cut.map((c) => c.a - margin)), x1: Math.max(region.x1, ...cut.map((c) => c.b + margin)) }, test = solve(wider);
-            if (test.distance <= start * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }
+            if (test.distance > start * (H > W * 1.2 ? 1.6 : 1.35)) break;
+            region = wider; cam = test;
+          }
+        }
+        if (size !== 'close') {
+          const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
+          const backed = spans.filter((span) => span.z <= zMeanProps + 150);
+          const badness = (c) => {
+            const half = (W / 2) * c.distance / k;
+            let bad = 0;
+            for (const span of backed) {
+              const xs = [span.near, span.far].flatMap((z) => { const f = c.distance / Math.max(50, c.distance + (zMeanProps - z)); return [c.x + (span.a - c.x) * f, c.x + (span.b - c.x) * f]; });
+              const a = Math.min(...xs), b = Math.max(...xs);
+              if (b - a > 2 * half) continue;
+              const shown = (Math.min(b, c.x + half * 1.03) - Math.max(a, c.x - half * 1.03)) / (b - a);
+              if (shown <= 0 || (a >= c.x - half * 0.95 && b <= c.x + half * 0.95)) continue;
+              bad += shown >= 0.97 ? 0.1 : 0.3 + Math.min(shown, 1 - shown);
+            }
+            return bad;
+          };
+          let best = { cam: base, bad: badness(base), cost: 0 };
+          if (best.bad > 0) {
+            const top = size === 'full' ? (portrait ? 1.6 : 1.35) : (portrait ? 1.6 : 1.45);
+            for (let factor = 1; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
+              const distance = Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;
+              const shift = size === 'full' ? Infinity : half * (portrait ? 0.7 : 0.35);
+              const lo = Math.max(region.x1 - half, base.x - shift), hi = Math.min(region.x0 + half, base.x + shift);
+              if (lo > hi) continue;
+              for (let n = 0; n <= 24; n++) {
+                const c = { ...base, x: lo + (hi - lo) * n / 24, y: base.y - c0 * (distance - base.distance), distance };
+                const bad = badness(c), cost = (factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
+                if (bad < best.bad - 1e-6 || (Math.abs(bad - best.bad) < 1e-6 && cost < best.cost)) best = { cam: c, bad, cost };
+              }
+            }
+            cam = best.cam;
           }
         }
       }
@@ -6384,9 +6447,49 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
+        const legs = person ? ['L', 'R'].flatMap((side) => {
+          const leg = e['chan' + side], shin = e['ong' + side];
+          if (!leg || !shin) return [];
+          const hip = point(leg, 0, 0), knee = point(shin, 0, 0), edge = point(shin, 12, 0);
+          let length = 0;
+          try { const b = rig.svg.querySelector('#' + rig.id + '-ongHinh' + side).getBBox(); length = b.y + b.height - 10; } catch (error) { length = 0; }
+          const ankle = point(shin, 0, length);
+          if (!hip || !knee || !ankle || !edge) return [];
+          const r = Math.hypot(edge.x - knee.x, edge.y - knee.y);
+          return [{ side, part: 'thigh', a: hip, b: knee, r }, { side, part: 'shin', a: knee, b: ankle, r }];
+        }) : [];
+        const parts = !person && e.dau ? Object.fromEntries([['head', e.dau], ['back', e.than]].filter(([, el]) => el).map(([key, el]) => [key, rect(drawnRect(el))])
+          .filter(([, r]) => r.x1 > r.x0 && r.y1 > r.y0)) : null;
         return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
-          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null };
+          tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
+          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
       });
+    },
+    propFraming() {
+      set.update();
+      const W = view.clientWidth, margin = W / 2 * 0.03, out = [];
+      const near = Math.max(-Infinity, ...actors.filter((actor) => actor.rig && actor.host.style.display !== 'none').map((actor) => actor.spot.z)) + 150;
+      const judge = (item) => {
+        const { x0, x1 } = item;
+        if (!(x1 > x0) || x1 - x0 > W) return;
+        const shown = (Math.min(x1, W) - Math.max(x0, 0)) / (x1 - x0);
+        if (shown <= 0.02 || (x0 >= margin && x1 <= W - margin)) return;
+        out.push({ ...item, shown: +shown.toFixed(3), edge: (x0 + x1) / 2 < W / 2 ? 'left' : 'right', front: item.z > near, x0: Math.round(x0), x1: Math.round(x1) });
+      };
+      for (const prop of props) {
+        if (!prop.spec) continue;
+        const { x, z, width, depth, height, y } = prop.spec, xs = [];
+        for (const px of [x, x + width]) for (const pz of [z, z - depth]) for (const py of [y, y + height]) { const at = set.project(px, py, pz); if (at.depth < camera.lens - 60) xs.push(at.x); }
+        if (xs.length === 8) judge({ name: prop.name || 'box', kind: 'box', z, x0: Math.min(...xs), x1: Math.max(...xs) });
+      }
+      for (const actor of actors) {
+        if (actor.rig || actor.lamp || !actor.frame || actor.host.style.display === 'none') continue;
+        const kind = (actor.host.querySelector && actor.host.querySelector('svg[data-prop]') || { dataset: {} }).dataset.prop;
+        if (!FURNITURE.includes(kind)) continue;
+        const [cx0, , cx1] = actor.content || [0, 0, 1, 1], f = actor.frame;
+        judge({ name: kind, kind, z: actor.spot.z, x0: f.left + cx0 * f.w, x1: f.left + cx1 * f.w });
+      }
+      return out;
     },
     framing() {
       const W = view.clientWidth, H = view.clientHeight, cut = [];
@@ -6702,7 +6805,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.69.0';
+const VERSION = '0.70.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
