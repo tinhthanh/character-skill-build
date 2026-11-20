@@ -3309,7 +3309,7 @@ export class RigSVG {
 
   // ĐÍCH THẤP (con vật dưới đất / trên bàn): tay nào vươn tới, góc bắp / cẳng, độ ngả người và độ khuỵu gối. `hand`: ép
   // dùng tay ấy (tay đang cầm ống tiêm); bỏ trống = tay ở phía con vật, tay ấy đang cầm đồ thì tay kia.
-  static SEATED_LEAN = 40;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
+  static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
 
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
@@ -3357,7 +3357,7 @@ export class RigSVG {
       const dir = tx >= px ? 1 : -1, far = (armUpper + armFore) * 0.92;
       const at = (deg) => { const a = dir * deg * Math.PI / 180; return { x: px + (bx - px) * Math.cos(a) - (by - py) * Math.sin(a), y: py + (bx - px) * Math.sin(a) + (by - py) * Math.cos(a) }; };
       let phi = 0;
-      while (phi < RigSVG.SEATED_LEAN && Math.hypot(tx - at(phi).x, ty - at(phi).y) > far) phi += 2;
+      while (phi < RigSVG.SEATED_LEAN && Math.hypot(tx - at(phi).x, ty - at(phi).y) > far) phi = Math.min(phi + 2, RigSVG.SEATED_LEAN);
       shoulder = at(phi); lean = -dir * phi; tilt = -phi; bend = phi;
     }
     const angle = Math.atan2(ty - (shoulder.y + drop), tx - shoulder.x) * 180 / Math.PI;

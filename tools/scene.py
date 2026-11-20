@@ -314,6 +314,16 @@ def framing_notes(samples, step=0.25, least=2.0):
     return [note for _, note in sorted(notes)]
 
 
+MEDIUM_WIDE = 0.85      # góc trung rộng ≥ 85 % góc toàn của cùng chủ thể: cắt sang gần như cùng một khung (đợt 31)
+
+
+def shot_notes(shots):
+    """Nhắc những góc TRUNG gần rộng bằng góc TOÀN của cùng các chủ thể (`set.shotLog`, ghi lúc `direct` đặt máy): cắt từ góc
+    toàn sang đó người xem chỉ thấy khung giật nhẹ — hai chủ thể đứng xa nhau mà còn phải lấy trọn đồ đạc (đợt 30)."""
+    return [f'{shot["t"]:.1f} s: the medium shot of {", ".join(shot["subjects"])} is {shot["ratio"] * 100:.0f} % as wide as their full shot — a cut to it barely changes the frame; '
+            f'stand them closer, or give that turn a "view" on one of them' for shot in shots if shot.get('ratio') and shot['ratio'] >= MEDIUM_WIDE and shot.get('how') != 'full']
+
+
 def quiet_notes(timings, shown_turns, longest=8.0):
     """Nhắc những quãng DÀI không có lời nào (câu thoại, thẻ thông báo, thông báo trên màn hình) — hơn `longest` giây giữa
     lúc cảnh bắt đầu, các câu, và thẻ kết thúc. Người xem quảng cáo ngắn rời đi trong quãng ấy (cảnh thử đợt 11: 20 s đầu
@@ -487,7 +497,7 @@ def read_timings(folder, target):
         with tempfile.TemporaryDirectory() as work:
             log = os.path.join(work, 'log')
             probe = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '45', '--fail-on-error',
-                                    '--eval', 'Object.assign({}, window.__sceneTimings, { framing: window.__framing ? window.__framing() : [] })', '--log', log], capture_output=True, text=True)
+                                    '--eval', 'Object.assign({}, window.__sceneTimings, { framing: window.__framing ? window.__framing() : [], shots: window.__set && window.__set.shotLog || [] })', '--log', log], capture_output=True, text=True)
             errors = open(log, encoding='utf-8').read().strip() if os.path.exists(log) else ''
         if probe.returncode != 0 or not probe.stdout.strip() or probe.stdout.strip() == 'null':
             fail('the composition did not build:\n  ' + (errors or probe.stderr.strip() or 'no error message').replace('\n', '\n  ') + f'\n  (see {target})')
@@ -882,6 +892,7 @@ def main():
                 walked = (float(other['x']) - float(other['_x0'])) / other['_unit'] if other.get('_unit') and other.get('_x0') is not None else 0
                 at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
                 if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
+                elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_front') is not None and other['_front'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'crown'{at})")
                 elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
                 else: parts.append(item[1:])
@@ -1226,8 +1237,12 @@ def main():
                 target = names[step[1][1:]]
                 # Người NGỒI quay 3/4 về phía con vật (xem `state.facing` của người ngồi): đầu gối chìa ra phía ấy — con vật dừng xa
                 # hơn một chút, không thì nó đứng khuất sau hai đầu gối (đợt 29: con mèo tới cạnh bà trên sofa).
-                if who.get('seated') and target['_pet'] and stage_set is not None and not who.get('faces') and (gap > 0) == (float(who['_x0']) < 0):
-                    wanted = max(wanted, 0.3 * who['_host_height'])
+                # Con vật dưới sàn tới người NGỒI (đợt 31): đứng TRƯỚC ống chân người ấy (lớp vẽ trên, `over` — xem `_front`),
+                # sát đầu gối (0,22). Đợt 29–30 nó dừng xa hơn (0,3) mà vẫn sau hai ống chân, cùng lớp với người: bà trên sofa phải
+                # cúi 40° qua đầu gối, con mèo khuất 34 % sau ống chân và bàn tay; tay ông ghế đá khuất hẳn sau mặt con chó.
+                if who.get('seated') and target['_pet'] and stage_set is not None and not target.get('on'):
+                    wanted = 0.22 * who['_host_height']
+                    target['_front'] = who
                 if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
                     # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
                     # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
@@ -1776,7 +1791,11 @@ def main():
                 if abs(float(box['height']) - seat_height) > 30: notes.append(f'character "{who["name"]}" sits on "{who["on"]}", which is {float(box["height"]):g} high — the seat of a character this size is about {seat_height:.0f}; make the box about that high, or the character floats above it / sinks into it')
             # Chỗ đứng LÚC ĐẦU (`_x0`): `who['x']` đã bị các lượt "bước lại gần" trong kịch bản cập nhật thành chỗ đứng sau
             # cùng — đặt nhân vật ở đó rồi cho nó bước thêm là nó đi quá, đứng chồng lên người kia.
-            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g} }});")
+            # Con vật một người NGỒI vuốt / bế (đợt 31): vẽ TRÊN người ấy (`over`) — đứng trước hai ống chân, không khuất sau chúng;
+            # bàn tay nhắm ĐỈNH ĐẦU nó ('crown'). Giữ nguyên z: dời nó lại gần máy thì người khác (bé quỳ vuốt nó) với tay trong mặt
+            # phẳng của mình, lơ lửng trên đầu nó.
+            over = f", over: {who['_front']['name']}" if who.get('_front') is not None else ''
+            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
                    'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door')}
@@ -2047,6 +2066,7 @@ def main():
     for voice, line in zip(voices, timings['speech']):
         print(f'  {voice["file"]}: {voice["who"]} at {line["start"]:.2f} s ({voice["length"]:.2f} s)')
     notes += framing_notes(timings.get('framing', []))
+    notes += shot_notes(timings.get('shots', []))
     notes += quiet_notes(timings, [note['turn'] for note in toasts] + [pop['turn'] for pop in popups])
     for note in notes: print(f'  ! {note}')
     if preset_note: print(f'  · {preset_note}')

@@ -21,12 +21,19 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
   • CON VẬT THẤY ĐƯỢC (đợt 30): tay đo tới đầu / thân THẤY ĐƯỢC của con vật (lưới điểm trong khung hình vẽ đầu, thân — bỏ phần
     bị chân người đứng trước che), không tới khung chụp; người ngồi: tay gần nó nhất không được nằm trên đùi / gối mình.
   • ĐẶT XUỐNG (đợt 30): sau `putDown` con vật ở sát người đặt (≤ 12 % chiều cao, theo bề ngang) và đứng yên (≤ 1,5 %).
+  • CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác chạm con vật (vuốt, khám, cho ăn…), phần hình con vật
+    THẤY ĐƯỢC — không bị người / đồ đạc che — ≥ 70 % hình nó, và đầu nó thấy ≥ 60 %. Đo bằng pixel: chụp cảnh như thường, cảnh
+    ẩn con vật, cảnh đưa con vật lên lớp trên cùng (vẽ đè mọi thứ). Hình con vật = chỗ ảnh "trên cùng" khác ảnh "ẩn"; phần
+    thấy được = chỗ ảnh thường khác ảnh "ẩn". (Bà ngồi sofa cúi 40° qua đầu gối vuốt mèo, mèo đứng nửa sau ống chân bà.)
   • ĐỒ ĐẠC TRONG KHUNG (đợt 30): ở mọi khoảnh khắc của moments.json, không món đồ đạc nào (hộp: sofa, bàn, kệ; tấm: TV, bàn,
-    quầy, ghế) bị mép trái / phải cắt dở hay chạm mép (`set.propFraming()`); vật ở tiền cảnh thì thôi.
+    quầy, ghế) bị mép trái / phải cắt dở hay chạm mép (`set.propFraming()`); vật ở tiền cảnh thì thôi. Đợt 31: đồ đạc PHỤ (không
+    phải TV, không ai ngồi / đứng trên nó) được lẹm mép, trừ ở khoảnh khắc mở cảnh.
+  • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`).
 """
 import argparse, json, os, re, socket, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+KEEP = None            # --keep: giữ ảnh chụp của phép đo con vật thấy được
 REACH = 0.06            # tay cách đích ≤ 6 % chiều cao người
 FEET = 0.03             # chân lệch sàn ≤ 3 % chiều cao người
 
@@ -49,14 +56,15 @@ def probe(folder, times):
             time.sleep(0.1)
         # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } return out; })()"
+                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; return out; })()"
                   % (json.dumps(found.group(1)), json.dumps(sorted(set(times)))))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
                                '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--eval', script], capture_output=True, text=True)
         if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not probe {folder}:\n{done.stderr.strip()[-500:]}')
         found = json.loads(done.stdout)
-        return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}
+        shots = found.pop('shots', None)
+        return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
 
@@ -89,9 +97,136 @@ def visible_points(pet, frame, steps=8):
     return points
 
 
-def on_lap(hand, who):
-    """Bàn tay nằm trên ĐÙI / GỐI của chính người ấy (trong "viên thuốc" của đùi, nới thêm nửa bán kính)."""
+def on_lap(hand, who, pet=None, seen=None):
+    """Bàn tay nằm trên ĐÙI / GỐI của chính người ấy (trong "viên thuốc" của đùi, nới thêm nửa bán kính). Con vật đứng TRƯỚC
+    người ấy (lớp vẽ trên, đợt 31) mà bàn tay nằm trên phần thấy được của nó: tay đang trên con vật, che khuất cái gối sau nó."""
+    if pet is not None and seen and pet.get('layer', 0) > who.get('layer', 0):
+        step = max(max(b['x1'] - b['x0'], b['y1'] - b['y0']) for b in (pet.get('parts') or {}).values()) / 8 if pet.get('parts') else 0
+        if min(((hand['x'] - p['x']) ** 2 + (hand['y'] - p['y']) ** 2) ** 0.5 for p in seen) <= step: return False
     return any(segment_gap(hand, leg['a'], leg['b']) <= leg['r'] * 1.5 for leg in who.get('legs') or [] if leg['part'] == 'thigh')
+
+
+SEATED_LEAN = 25      # người ngồi cúi tới con vật dưới sàn ≤ 25° (đợt 31; RigSVG.SEATED_LEAN)
+HAND_SHOWN = 0.5       # bàn tay chạm con vật thấy ≥ 50 % (vòng quanh lòng bàn tay) — con vật vẽ trước người thì tay dễ khuất sau nó
+SEEN = 0.70            # con vật được chạm: thấy ≥ 70 % hình nó (đợt 31)
+SEEN_HEAD = 0.60       # … và ≥ 60 % cái đầu
+
+
+def pet_pixels(folder, jobs, keep=None):
+    """CON VẬT THẤY ĐƯỢC BAO NHIÊU (đợt 31), đo bằng pixel. `jobs`: [(lúc, tên con vật, tên người chạm)]. Ở mỗi lúc chụp năm
+    ảnh: a — như thường; b — ẩn host con vật; c — host con vật lên lớp trên cùng (z-index; nhân vật nằm trên các lớp phẳng
+    xếp theo z-index, set3d.js); d — host người chạm lên lớp trên cùng; e — như d, hai bàn tay tô hồng sẫm. Trả về {(lúc, tên): {'all',
+    'head', 'hand'}}: tỉ lệ điểm ảnh của hình con vật (c khác b) mà ảnh thường cũng thấy (a khác b) — trong khung hình vẽ đầu
+    + thân (`parts` của actingProbe) để bóng dưới sàn không lẫn vào; `hand`: trong khung hình vẽ của bàn tay gần con vật nhất,
+    tỉ lệ điểm ảnh của bàn tay (d khác e) mà ảnh thường vẫn thấy như ở d (a giống d: không bị gì che)."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    import tempfile
+    html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
+    comp = re.search(r'data-composition-id="([^"]+)"', html).group(1)
+    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
+    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
+    with socket.socket() as probe_socket:
+        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
+    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={os.path.abspath(folder)}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    out = keep or tempfile.mkdtemp(prefix='pet-seen-')
+    os.makedirs(out, exist_ok=True)
+    try:
+        url = f'http://127.0.0.1:{port}/__project/index.html'
+        for _ in range(50):
+            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
+            time.sleep(0.1)
+        tl = f'window.__timelines[{json.dumps(comp)}]'
+        steps, bases = [], []
+        for n, (t, name, toucher) in enumerate(jobs):
+            host = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(name)} + '\"]')"
+            person = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(toucher)} + '\"]')"
+            base = os.path.join(out, f'{os.path.basename(os.path.normpath(folder))}-pet{n}')
+            steps += [{'eval': f'(() => {{ {tl}.seek({t}, false); window.__set.update(); return window.__set.actingProbe(); }})()'},
+                      {'screenshot': base + '-a.png'},
+                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()"},
+                      {'screenshot': base + '-b.png'},
+                      {'eval': f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()"},
+                      {'screenshot': base + '-c.png'},
+                      # d: người chạm ở lớp trên cùng; e: như d, hai bàn tay (nhóm `-coTayL/R`) tô một màu hồng sẫm — chỗ d khác e là
+                      # đúng hình bàn tay. (Ẩn cả người chỉ để hiện bàn tay thì không được: cánh tay trước thân bị mask theo hình thân.)
+                      {'eval': f"(() => {{ const h = {host}, p = {person}; if (h) h.style.zIndex = h.dataset.z; if (p) {{ p.dataset.z = p.style.zIndex; p.style.zIndex = 99999; }} return 0; }})()"},
+                      {'screenshot': base + '-d.png'},
+                      {'eval': f"(() => {{ const p = {person}; if (p) for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) {{ g.dataset.fill = g.style.fill; g.style.fill = '#ff00ff'; }} return 0; }})()"},
+                      {'screenshot': base + '-e.png'},
+                      {'eval': f"(() => {{ const p = {person}; if (p) {{ p.style.zIndex = p.dataset.z; for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) g.style.fill = g.dataset.fill || ''; }} return 0; }})()"}]
+            bases.append(base)
+        plan = os.path.join(out, 'pet-steps.json')
+        json.dump(steps, open(plan, 'w', encoding='utf-8'))
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
+                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan], capture_output=True, text=True)
+        if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not capture {folder}:\n{done.stderr.strip()[-500:]}')
+        probes = json.loads(done.stdout.strip().splitlines()[-1])[0::6]
+        result = {}
+        for (t, name, toucher), base, probe in zip(jobs, bases, probes):
+            pet = next((a for a in probe if a['name'] == name), None)
+            if not pet or not pet.get('parts'): continue
+            a, b, c = (Image.open(base + k).convert('RGB') for k in ('-a.png', '-b.png', '-c.png'))
+            W, H = a.size
+            pa, pb, pc = a.load(), b.load(), c.load()
+            differ = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > 12
+            counts = {}
+            boxes = pet['parts']
+            x0, y0 = max(0, int(min(r['x0'] for r in boxes.values()))), max(0, int(min(r['y0'] for r in boxes.values())))
+            x1, y1 = min(W, int(max(r['x1'] for r in boxes.values())) + 1), min(H, int(max(r['y1'] for r in boxes.values())) + 1)
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    inside = [k for k, r in boxes.items() if r['x0'] <= x <= r['x1'] and r['y0'] <= y <= r['y1']]
+                    if not inside or not differ(pc[x, y], pb[x, y]): continue
+                    seen = differ(pa[x, y], pb[x, y])
+                    for k in ['all'] + inside:
+                        total, shown = counts.get(k, (0, 0)); counts[k] = (total + 1, shown + seen)
+            result[(t, name)] = {k: shown / total for k, (total, shown) in counts.items() if total >= 30}
+            who = next((a for a in probe if a['name'] == toucher), None)
+            if who and who.get('hands') and who.get('tall') and 'all' in result[(t, name)]:
+                d, e = (Image.open(base + k).convert('RGB') for k in ('-d.png', '-e.png'))
+                pd, pe = d.load(), e.load()
+                centre = lambda bx: ((bx['x0'] + bx['x1']) / 2, (bx['y0'] + bx['y1']) / 2)
+                spots = [centre(bx) for bx in boxes.values()]
+                hand = min(who['hands'], key=lambda h: min((h['x'] - x) ** 2 + (h['y'] - y) ** 2 for x, y in spots))
+                # Trong khung hình vẽ của bàn tay (cổ tay trở ra), không phải một vòng quanh lòng bàn tay: vòng ấy lấy cả đầu gối
+                # người ngồi ngay sau con vật.
+                hb = hand.get('box') or {'x0': hand['x'] - who['tall'] * 0.03, 'x1': hand['x'] + who['tall'] * 0.03, 'y0': hand['y'] - who['tall'] * 0.03, 'y1': hand['y'] + who['tall'] * 0.03}
+                mine = shown = 0
+                for y in range(max(0, int(hb['y0'])), min(H, int(hb['y1']) + 1)):
+                    for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
+                        if not differ(pd[x, y], pe[x, y]): continue
+                        mine += 1; shown += not differ(pa[x, y], pd[x, y])
+                if mine >= 30: result[(t, name)]['hand'] = shown / mine
+        return result
+    finally:
+        server.terminate()
+        if not keep:
+            for item in os.listdir(out): os.remove(os.path.join(out, item))
+            os.rmdir(out)
+
+
+def check_seen(folder, checks, keep=None):
+    """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
+    tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry') and c.get('to') != 'hands']
+    if not jobs: return []
+    found = pet_pixels(folder, jobs, keep)
+    if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
+    results = []
+    for t, name, toucher in jobs:
+        part = found.get((t, name))
+        if not part or 'all' not in part: continue      # con vật không trong khung (hay đang là một tấm nhỏ xíu): không đo
+        head = part.get('head')
+        ok = part['all'] >= SEEN and (head is None or head >= SEEN_HEAD)
+        results.append({'scene': folder, 'what': f'{name} in view at {t:g} s', 'ok': ok, 'seen': round(part['all'], 3), 'head': None if head is None else round(head, 3),
+                        'note': f'{part["all"] * 100:.0f} % of {name} shows' + (f', head {head * 100:.0f} %' if head is not None else '') + f' (least {SEEN * 100:g} %, head {SEEN_HEAD * 100:g} %)'})
+        if part.get('hand') is not None:
+            results.append({'scene': folder, 'what': f'{toucher}\'s hand on {name} in view at {t:g} s', 'ok': part['hand'] >= HAND_SHOWN, 'hand': round(part['hand'], 3),
+                            'note': f'{part["hand"] * 100:.0f} % of the hand shows (least {HAND_SHOWN * 100:g} %)'})
+    return results
 
 
 PUT_NEAR = 0.12         # con vật đặt xuống cách thân người đặt ≤ 12 % chiều cao người (theo bề ngang)
@@ -129,9 +264,31 @@ def check_props(folder, moments, cuts):
     for m in moments:
         found = cuts.get(float(m['t'])) if isinstance(m.get('t'), (int, float)) else None
         if found is None: continue
-        bad = [c for c in found if not c.get('front')]
+        # Đồ đạc PHỤ (`minor`: không phải TV, không ai ngồi / đứng trên nó — đợt 31) được lẹm mép ở góc trung, không ở khoảnh khắc
+        # mở cảnh (góc toàn; người chấm được hỏi về đồ đạc ở đó).
+        bad = [c for c in found if not c.get('front') and not (c.get('minor') and m.get('what') != 'opening')]
+        minor = [c for c in found if not c.get('front') and c not in bad]
         results.append({'scene': folder, 'what': f'furniture inside the frame at {m["t"]:g} s ({m.get("what", "")})', 'ok': not bad,
-                        'note': '; '.join(f'{c["name"]} cut by the {c["edge"]} edge ({c["shown"] * 100:.0f} % shown)' for c in bad) or 'none cut by the left / right edge'})
+                        'note': ('; '.join(f'{c["name"]} cut by the {c["edge"]} edge ({c["shown"] * 100:.0f} % shown)' for c in bad) or 'none cut by the left / right edge')
+                                + (' (allowed: ' + '; '.join(f'{c["name"]} {c["shown"] * 100:.0f} % at the {c["edge"]} edge' for c in minor) + ' — not in use)' if minor else '')})
+    return results
+
+
+MEDIUM_WIDE = 0.85     # góc trung ≥ 85 % bề rộng góc toàn của cùng chủ thể: cắt sang gần như cùng khung (đợt 31)
+
+
+def check_shots(folder, log):
+    """GÓC TRUNG KHÁC GÓC TOÀN (đợt 31): mỗi góc trung máy tự đặt (`set.shotLog`, ghi lúc `direct` dựng cảnh) hẹp hơn 85 % bề
+    rộng góc toàn của cùng chủ thể. Góc trung đã đổi thành góc toàn (hai chủ thể đứng quá xa) thì ghi lại, không chấm."""
+    results = []
+    for shot in log or []:
+        if not shot.get('ratio'): continue
+        who = ', '.join(shot['subjects'])
+        if shot.get('how') == 'full':
+            results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s', 'ok': None, 'note': f'kept the full shot — the medium one was {shot["first"] * 100:.0f} % as wide'})
+            continue
+        results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s narrower than the full shot', 'ok': shot['ratio'] < MEDIUM_WIDE, 'ratio': shot['ratio'],
+                        'note': f'{shot["ratio"] * 100:.0f} % as wide as the full shot (limit {MEDIUM_WIDE * 100:g} %)' + (f'; {shot["first"] * 100:.0f} % before furniture at the edges was let go' if shot.get('how') == 'loose' else '')})
     return results
 
 
@@ -139,8 +296,8 @@ def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
-    shots, cuts = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
-    results = check_props(folder, moments, cuts)
+    shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    results = check_props(folder, moments, cuts) + check_shots(folder, log) + check_seen(folder, checks, KEEP)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] == 'walk':
@@ -157,7 +314,7 @@ def check_scene(folder):
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
             continue
-        best, asked, lap = None, None, None
+        best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):
             who, target = frame.get(c['who']), frame.get(c['target'])
             if not who or not target or not who['hands'] or not who['tall']: continue
@@ -181,13 +338,20 @@ def check_scene(folder):
                 # Tay gần đích nhất mà lại nằm trên đùi / gối của chính mình (người ngồi vuốt con vật): chưa chạm tới nó.
                 if who.get('seated') and c['kind'] != 'carry' and not target['person']:
                     near = min(who['hands'], key=lambda h: min(((h['x'] - p['x']) ** 2 + (h['y'] - p['y']) ** 2) ** 0.5 for p in seen) if seen else gap(h, box))
-                    if on_lap(near, who): lap = t
+                    if on_lap(near, who, target, seen): lap = t
+                # CÚI (đợt 31): người ngồi cúi qua đầu gối tới con vật dưới sàn không quá SEATED_LEAN độ — 40° (đợt 30) là gập
+                # người gần nửa vuông góc, mèo vẫn đứng sau ống chân.
+                if who.get('seated') and not target['person'] and who.get('lean') is not None:
+                    bent = (t, who['lean'])
         if best is None: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]}', 'ok': None, 'note': 'not both in the frame'}); continue
         # Chấm ở LÚC GIỮA — lúc moments.json hỏi người chấm (đợt 29: lấy lúc gần nhất trong ba lúc thì "đạt" dù lúc được hỏi hai
         # tay ông còn buông bên hông). Không đo được lúc ấy thì lấy lúc gần nhất.
         judged = asked or best
         results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand reaches', 'ok': judged[1] <= REACH,
                         'note': f'{judged[1] * 100:.1f} % of height at {judged[0]:g} s, the moment asked about (closest {best[1] * 100:.1f} % at {best[0]:g} s; limit {REACH * 100:g} %)'})
+        if bent is not None:
+            results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — leans no more than {SEATED_LEAN:g}°', 'ok': bent[1] <= SEATED_LEAN + 0.5,
+                            'note': f'the body leans {bent[1]:.0f}° at {bent[0]:g} s, the moment asked about (limit {SEATED_LEAN:g}°)'})
         if lap is not None:
             results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand off the own lap', 'ok': False,
                             'note': f'the hand rests on {c["who"]}\'s own thigh / knee at {lap:g} s, the moment asked about'})
@@ -223,10 +387,12 @@ def check_scene(folder):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Measure the acting of 3D scenes: hands reaching, feet on the floor, pets put down, furniture at the frame edges.')
+    parser = argparse.ArgumentParser(description='Measure the acting of 3D scenes: hands reaching, feet on the floor, pets put down and in view, furniture at the frame edges, medium shots narrower than full ones.')
     parser.add_argument('scenes', nargs='+', help='scene folders built by tools/scene.py')
     parser.add_argument('--json', help='also write the measurements here')
+    parser.add_argument('--keep', help='keep the frames captured to see how much of each pet shows')
     args = parser.parse_args()
+    KEEP = args.keep
     results = [r for folder in args.scenes for r in check_scene(folder)]
     for r in results: print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))}: {r["what"]} — {r["note"]}')
     bad = [r for r in results if r['ok'] is False]
