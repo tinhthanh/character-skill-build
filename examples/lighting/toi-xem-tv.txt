@@ -1,0 +1,9 @@
+# Tối xem TV — ánh TV hắt lên tường, đèn cây ấm, bóng dài trên sàn.
+# Dựng: python3 tools/script.py examples/lighting/toi-xem-tv.txt
+bà (granny, ngồi) · mèo (calico)
+
+bối cảnh: phòng khách · ánh sáng: tối
+bà (vui): Tối nay có phim hay.
+mèo: [tò mò]
+bà: Mèo ơi, lại đây xem với bà.
+mèo: [vui, vẫy đuôi]

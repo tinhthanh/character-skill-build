@@ -1,4 +1,4 @@
-/* VGCharacter v0.65.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.66.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -5196,8 +5196,427 @@ function configToPublic(config, pet = false) {
 }
 return { DEFINITION_KEYS, FACE_SHAPE_KEYS, BROW_KEYS, COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, REQUIRED_IDS, colorsToInternal, colorsToPublic, stateToInternal, stateToPublic, DRAWING_SLOTS, definitionToInternal, definitionToPublic, configToInternal, configToPublic };
 })();
+__m['runtime/lighting.js'] = (function () {
+const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+function createLighting(S) {
+  const { actors, backdrop, props, layers, surfaces, view, layer } = S;
+  const MOODS = {
+    day:     { name: 'day', dark: 0.06, keyShade: 0.16, key: [0.35, -0.8, -0.5],  shade: '20,28,40', tint: null,                       sun: [0.2, -0.6, 0.78],   sunColor: '255,244,214', sunAlpha: 0.62, lampsOn: false, warm: 0 },
+    evening: { name: 'evening', dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     fog: 'rgba(255,176,128,0.1)', sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
+    night:   { name: 'night', dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     fog: 'rgba(46,62,120,0.12)', sun: null,                                         lampsOn: true,  warm: 0 },
+  };
+  const LENS = { day: { grade: [255, 248, 235, 0.06], vignette: 0.2, grain: 0.035 }, evening: { grade: [255, 146, 70, 0.2], vignette: 0.3, grain: 0.045 }, night: { grade: [46, 74, 170, 0.26], vignette: 0.42, grain: 0.06 } };
+  for (const name of Object.keys(MOODS)) Object.assign(MOODS[name], LENS[name]);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rgbaOf = (text, other) => { if (text) return text.match(/[\d.]+/g).map(Number); const o = rgbaOf(other || 'rgba(0,0,0,0)'); return [o[0], o[1], o[2], 0]; };
+  const mixMood = (a, b, t) => {
+    if (t <= 0) return a; if (t >= 1) return b;
+    const rgb = (x, y) => x.split(',').map((v, i) => Math.round(lerp(+v, +y.split(',')[i], t))).join(',');
+    const rgba = (x, y) => { const p = rgbaOf(x, y), q = rgbaOf(y, x); return `rgba(${p.slice(0, 3).map((v, i) => Math.round(lerp(v, q[i], t))).join(',')},${lerp(p[3], q[3], t).toFixed(3)})`; };
+    const sun = a.sun || b.sun;
+    return { name: t < 0.5 ? a.name : b.name, dark: lerp(a.dark, b.dark, t), keyShade: lerp(a.keyShade, b.keyShade, t), key: a.key.map((v, i) => lerp(v, b.key[i], t)),
+      shade: rgb(a.shade, b.shade), tint: rgba(a.tint, b.tint), fog: rgba(a.fog, b.fog), sun, sunColor: rgb(a.sunColor || b.sunColor, b.sunColor || a.sunColor),
+      sunAlpha: lerp(a.sun ? a.sunAlpha : 0, b.sun ? b.sunAlpha : 0, t), lampsOn: b.lampsOn, warm: lerp(a.warm, b.warm, t),
+      grade: a.grade.map((v, i) => lerp(v, b.grade[i], t)), vignette: lerp(a.vignette, b.vignette, t), grain: lerp(a.grain, b.grain, t) };
+  };
+  const sunFade = () => (S.lighting && S.lighting.mood.sun ? clamp(S.lighting.mood.sunAlpha / 0.62, 0, 1) : 0);
+  const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const rgbOf = (hex) => { const h = hex.replace('#', ''), full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h; return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(','); };
+  const lightSurface = (f) => {
+    const mood = S.lighting.mood;
+    if (!f.shadeEl) {
+      f.shadeEl = document.createElement('div'); f.glowEl = document.createElement('div');
+      const edge = f.edge = parseFloat(getComputedStyle(f.element).borderTopWidth) || 0;
+      for (const el of [f.shadeEl, f.glowEl]) { el.style.cssText = `position:absolute;inset:${-edge}px;pointer-events:none`; f.element.appendChild(el); }
+      if (f.kind === 'wall') f.glowEl.dataset.ao = 'linear-gradient(to top, rgba(0,0,0,.2), rgba(0,0,0,0) 24%), linear-gradient(to right, rgba(0,0,0,.1), rgba(0,0,0,0) 7%, rgba(0,0,0,0) 93%, rgba(0,0,0,.1))';
+      if (f.kind === 'floor' && f.back) f.glowEl.dataset.ao = 'linear-gradient(to bottom, rgba(0,0,0,.16), rgba(0,0,0,0) 80px)';
+    }
+    const facing = Math.max(0, dot(f.n, S.lighting.key.map((c) => -c)));
+    const darkness = 1 - (1 - mood.dark) * (1 - mood.keyShade * (1 - facing));
+    const glow = [], mask = [];
+    for (const lamp of S.lighting.lamps) {
+      if (lamp.level <= 0.001) continue;
+      const p = [lamp.x - f.origin[0], lamp.y - f.origin[1], lamp.z - f.origin[2]], d = dot(p, f.n);
+      if (d < -20 || Math.abs(d) >= lamp.range) continue;                                        // đèn ở sau mặt này, hay quá xa
+      const strength = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - Math.abs(d) / lamp.range, 0.8), R = Math.sqrt(lamp.range * lamp.range - d * d);
+      const u = dot(p, f.u).toFixed(1), v = dot(p, f.v).toFixed(1), c = lamp.rgb;
+      glow.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(${c},${Math.min(0.66, 0.7 * strength).toFixed(3)}) 0, rgba(${c},${Math.min(0.34, 0.3 * strength).toFixed(3)}) ${(R * 0.4).toFixed(1)}px, rgba(${c},0) ${R.toFixed(1)}px)`);
+      mask.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(0,0,0,${Math.max(0, 1 - 1.9 * strength).toFixed(3)}) 0, rgba(0,0,0,${Math.max(0, 1 - 0.7 * strength).toFixed(3)}) ${(R * 0.45).toFixed(1)}px, rgba(0,0,0,1) ${R.toFixed(1)}px)`);
+    }
+    const night = f.window && mood.name === 'night';
+    f.shadeEl.style.background = night ? 'linear-gradient(rgba(6,12,38,.9), rgba(18,30,70,.82))' : darkness > 0.004 ? `rgba(${mood.shade},${darkness.toFixed(3)})` : 'none';
+    f.shadeEl.style.boxShadow = night && f.edge ? `inset 0 0 0 ${f.edge}px rgba(${mood.shade},${Math.min(0.85, darkness + 0.15).toFixed(3)})` : 'none';
+    const masks = mask.length && !night ? mask.join(', ') : 'none';
+    if (f.window) { const fade = sunFade(); f.element.style.boxShadow = fade > 0.05 ? `0 0 70px 14px rgba(${mood.name === 'evening' ? mood.sunColor : '255,252,240'},${(0.5 * fade).toFixed(3)})` : 'none'; }                       // kính đêm: đèn trong phòng không làm trời sáng ra
+    f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
+    f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
+    if (f.kind === 'floor' && S.lighting.gloss) {
+      for (const lamp of S.lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.kind === 'screen') continue;
+        const u = lamp.x - f.origin[0], v = lamp.z + 160 - f.origin[2];
+        glow.push(`radial-gradient(ellipse 46px 240px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(${lamp.rgb},${(0.26 * lamp.level).toFixed(3)}), rgba(${lamp.rgb},0))`);
+      }
+      for (const win of S.lighting.windows) {
+        if (!mood.sun) continue;
+        const u = win.x + win.width / 2 - f.origin[0], v = win.z + 220 - f.origin[2];
+        glow.push(`radial-gradient(ellipse ${(win.width * 0.42).toFixed(1)}px 260px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(255,255,255,0.22), rgba(255,255,255,0))`);
+      }
+    }
+    const fog = f.kind === 'wall' && mood.fog ? [`linear-gradient(${mood.fog}, ${mood.fog})`] : [];
+    if (f.kind === 'wall' && S.lighting.skyline && mood.dark > 0.1) {
+      const a = clamp((mood.dark - 0.06) * 1.65, 0, 0.92), line = (S.lighting.skyline * 100).toFixed(1);
+      fog.push(`linear-gradient(to bottom, rgba(${mood.shade},${a.toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) ${line}%, rgba(${mood.shade},0) ${line}%)`);
+    }
+    if (f.kind === 'wall' && mood.name !== 'night') fog.push(`linear-gradient(to bottom, rgba(${mood.shade},.16), rgba(${mood.shade},.05) 40%, rgba(${mood.shade},0) 70%)`);
+    const layers = [...glow, ...fog, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
+    f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
+  };
+  const inside = (poly, x, z) => { let hit = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) hit = !hit; } return hit; };
+  const sunAt = (x, z) => {
+    if (!S.lighting || !S.lighting.patches.length) return 0;
+    const hits = [-45, 0, 45].filter((dx) => S.lighting.patches.some((poly) => inside(poly, x + dx, z))).length;
+    return hits / 3 * S.lighting.cloud * sunFade();
+  };
+  const lightAt = (x, y, z, self = null) => {
+    const mood = S.lighting.mood;
+    let level = 1 - (mood.dark > 0.1 ? mood.dark * 0.85 : 0), warm = mood.warm;
+    const sources = [];
+    for (const lamp of S.lighting.lamps) {
+      if (lamp.level <= 0.001) continue;
+      const d = Math.hypot(lamp.x - x, lamp.y - y, lamp.z - z);
+      if (d >= lamp.range * 1.15) continue;
+      const k = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
+      const front = clamp(0.55 + 0.45 * (lamp.z - z) / Math.max(1, Math.hypot(lamp.x - x, lamp.z - z)), 0.15, 1);
+      const night = mood.dark > 0.3 && lamp.kind !== 'screen' ? 1.7 : 1;
+      level += k * 0.6 * night * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
+      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front, screen: lamp.kind === 'screen' });
+    }
+    for (const torch of S.lighting.torches) {
+      if (torch.owner === self) continue;
+      const d = beamGap(torch, x, y, z);
+      if (d >= torch.range) continue;
+      const k = torch.power * Math.pow(1 - d / torch.range, 1.2);
+      level += k * 0.35 * (mood.dark > 0.3 ? 1.6 : 1); warm += k * 0.03;
+      sources.push({ k, x: torch.x, y: torch.y, z: torch.z + 30, rgb: torch.rgb, front: 0.9, torch: true });
+    }
+    if (mood.sun) for (const win of S.lighting.windows) {
+      const wx = win.x + win.width / 2, wy = win.y - win.height / 2, d = Math.hypot(wx - x, wy - y, win.z - z);
+      if (d >= 1500) continue;
+      sources.push({ k: 0.42 * S.lighting.cloud * sunFade() * (1 - d / 1500), x: wx, y: wy, z: win.z + 40, rgb: mood.name === 'evening' ? mood.sunColor : '206,226,255', window: true });
+    }
+    const sunlit = sunAt(x, z);
+    if (sunlit > 0) {
+      const sun = norm(mood.sun);
+      level += 0.16 * sunlit; warm += (mood.name === 'evening' ? 0.16 : 0.06) * sunlit;
+      sources.push({ k: 0.75 * sunlit, x: x - sun[0] * 1000, y: y - sun[1] * 1000, z: z - sun[2] * 1000, rgb: mood.sunColor, front: 0.6, sun: true });
+    }
+    if (mood.dark > 0.5) { const lit = S.lighting.lamps.reduce((sum, lamp) => sum + (lamp.kind === 'screen' ? 0.4 : 1) * lamp.level, 0); level -= 0.2 * clamp(1 - lit, 0, 1); }
+    sources.sort((a, b) => b.k - a.k);
+    let rim = sources[0] || null;
+    if (mood.name === 'evening' && sunFade() > 0.2 && (!rim || rim.k < 0.35)) { rim = { k: 0.55 * sunFade(), x: x - mood.sun[0] * 1000, y: y - mood.sun[1] * 1000, z: z - mood.sun[2] * 1000, rgb: mood.sunColor }; sources.unshift(rim); }
+    return { level: clamp(level, 0.22, 1.06), warm: clamp(warm, 0, 0.42), rim, sources };
+  };
+  let floorTone = null;
+  const floorRgb = () => {
+    if (floorTone) return floorTone;
+    const strip = backdrop.find((el) => el.dataset.floor !== undefined);
+    if (!strip) return (floorTone = '200,200,200');
+    const style = getComputedStyle(strip), solid = style.backgroundColor.match(/[\d.]+/g);
+    if (solid && (solid.length < 4 || +solid[3] > 0.1)) return (floorTone = solid.slice(0, 3).join(','));
+    const hex = style.backgroundImage.match(/#([0-9a-f]{3,6})\b/i), rgb = style.backgroundImage.match(/rgba?\(([^)]+)\)/);
+    return (floorTone = rgb ? rgb[1].split(',').slice(0, 3).map((v) => Math.round(+v)).join(',') : hex ? rgbOf(hex[0]) : '200,200,200');
+  };
+  const bounceAt = (actor, L) => {
+    const mood = S.lighting.mood, sunlit = sunAt(actor.where, actor.spot.z);
+    let amount = mood.name === 'day' ? 0.1 : mood.name === 'evening' ? 0.08 : 0.03;
+    amount += 0.32 * sunlit;
+    for (const src of L.sources) if (!src.window && !src.sun) amount += 0.1 * src.k;
+    if (actor.spot.y > 0) amount *= 0.6;                                              // trên mặt bàn: mặt bàn nhỏ, hắt ít hơn sàn
+    const floor = floorRgb().split(',').map(Number), sun = (mood.sunColor || '255,255,255').split(',').map(Number), mix = clamp(sunlit * 0.6, 0, 0.6);
+    return { rgb: floor.map((v, i) => Math.round(lerp(v, sun[i], mix))).join(','), amount: clamp(amount, 0, 0.42) };
+  };
+  const wallHit = (x, z, angle, length) => {
+    const dx = Math.cos(angle), dz = Math.sin(angle);
+    let best = null;
+    for (const f of surfaces) {
+      if (f.kind !== 'wall' || dx * f.n[0] + dz * f.n[2] >= -0.05) continue;
+      const ux = f.u[0], uz = f.u[2], ox = f.origin[0], oz = f.origin[2], det = dx * -uz - dz * -ux;
+      if (Math.abs(det) < 1e-6) continue;
+      const rx = ox - x, rz = oz - z, t = (rx * -uz - rz * -ux) / det, along = (dx * rz - dz * rx) / det;
+      if (t <= 4 || t >= length - 4 || along < 0 || along > f.width) continue;
+      if (!best || t < best.t) best = { t, wall: f, at: [x + dx * t, z + dz * t] };
+    }
+    return best;
+  };
+  const ramp = (stops, length, offset = 0) => stops.map(([alpha, at]) => `rgba(${alpha}) ${(at * length - offset).toFixed(1)}px`).join(', ');
+  const climbOn = (el, hit, across, rise, background, opacity) => {
+    const f = hit.wall, turn = -Math.atan2(f.u[2], f.u[0]) * 180 / Math.PI;
+    Object.assign(el.style, { width: across.toFixed(1) + 'px', height: rise.toFixed(1) + 'px', opacity, background, borderRadius: '50% 50% 12% 12% / 34% 34% 6% 6%',
+      transform: `translate3d(${hit.at[0].toFixed(1)}px, ${(-rise).toFixed(1)}px, ${hit.at[1].toFixed(1)}px) rotateY(${turn.toFixed(2)}deg) translate3d(${(-across / 2).toFixed(1)}px, 0px, 1.6px)` });
+  };
+  const climbEl = (blur) => {
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;filter:blur(${blur}px);opacity:0`;
+    layer(0).appendChild(el);
+    return el;
+  };
+  const castShadows = (actor, rank, seen) => {
+    const casts = [];
+    if (S.lighting && seen > 0.05 && !actor.lamp) {
+      const tall = actor.height * 0.85, x = actor.where, z = actor.spot.z, y = actor.spot.y;
+      for (const lamp of S.lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= tall + y + 20) continue;
+        const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
+        if (d >= lamp.range * 1.3 || flat < 1) continue;
+        const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
+        const nightLamp = S.lighting.mood.dark > 0.3;
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * (nightLamp ? 0.9 : 0.25), tall * 2.2), alpha: (S.lighting.mood.name === 'evening' ? 0.3 : 1.8) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
+      }
+      for (const torch of S.lighting.torches) {
+        if (torch.kind !== 5 || torch.owner === actor) continue;
+        const gap = beamGap(torch, x, y + tall * 0.5, z), near = clamp(1 - gap / torch.range, 0, 1);
+        if (near <= 0.05) continue;
+        const dx = x - torch.hx, dz = (z - torch.z) || 1, flat = Math.hypot(dx, dz), lift = Math.max(30, torch.hy - y - tall * 0.6);
+        const dark = clamp((S.lighting.mood.dark - 0.1) / 0.5, 0.25, 1);
+        const along = Math.sign(torch.x - torch.hx) || Math.sign(dx) || 1;
+        casts.push({ angle: Math.atan2(0.18, along), length: clamp(flat * tall / lift, tall * 0.8, tall * 2.2), alpha: 0.95 * near * dark * seen });
+      }
+      if (S.lighting.mood.sun) for (const win of S.lighting.windows) {
+        const wx = win.x + win.width / 2, dx = x - wx, dz = z - win.z, flat = Math.hypot(dx, dz);
+        if (flat > 1400 || flat < 1) continue;
+        casts.push({ angle: Math.atan2(dz, dx), length: tall * 0.9, alpha: 0.3 * (1 - flat / 1400) * S.lighting.cloud * sunFade() * seen, soft: true });
+      }
+      const sun = S.lighting.mood.sun, sunlit = sunAt(x, z);
+      if (sun && (S.lighting.mood.name === 'evening' || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: tall * (S.lighting.mood.name === 'evening' ? 1.7 : 1.3), alpha: Math.max(S.lighting.mood.name === 'evening' ? 0.34 * sunFade() : 0, 0.55 * sunlit) * seen });
+    }
+    actor.casts = actor.casts || [];
+    while (actor.casts.length < casts.length) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;pointer-events:none;filter:blur(3px)';
+      actor.casts.push(el);
+    }
+    actor.climbs = actor.climbs || [];
+    while (actor.climbs.length < actor.casts.length) actor.climbs.push(null);
+    actor.casts.forEach((el, n) => {
+      const cast = casts[n], up = actor.climbs[n];
+      if (!cast) { el.style.opacity = '0'; if (up) up.style.opacity = '0'; return; }
+      if (el.parentNode !== layers[rank]) layers[rank].appendChild(el);
+      const across = actor.width * 0.26, opacity = Math.min(1, cast.alpha).toFixed(3);
+      const stops = [['0,0,0,.7', 0], ['0,0,0,.42', 0.18], ['0,0,0,.2', 0.45], ['0,0,0,.05', 0.82], ['0,0,0,0', 1]];
+      el.style.filter = `blur(${(2 + cast.length * 0.011).toFixed(1)}px)`;
+      const hit = !cast.soft && actor.spot.y <= 0 ? wallHit(actor.where, actor.spot.z, cast.angle, cast.length) : null;
+      if (hit) {
+        const rise = Math.min((cast.length - hit.t) * 0.85, actor.height * 0.95), upEl = up || (actor.climbs[n] = climbEl(7));
+        climbOn(upEl, hit, across * 1.1, rise, `linear-gradient(to top, ${ramp(stops, cast.length, hit.t)})`, opacity);
+      } else if (up && up.style.opacity !== '0') up.style.opacity = '0';
+      Object.assign(el.style, { width: (hit ? hit.t + across * 0.1 : cast.length).toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity,
+        borderRadius: hit ? '50% 0 0 50%' : '50%',
+        background: cast.soft ? 'radial-gradient(ellipse at 0% 50%, rgba(0,0,0,.4), rgba(0,0,0,0) 70%)' : `linear-gradient(to right, ${ramp(stops, cast.length)})`,
+        transform: `translate3d(${actor.where.toFixed(1)}px, ${(-actor.spot.y - 0.7).toFixed(1)}px, ${actor.spot.z.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
+    });
+  };
+  const boxShadows = () => {
+    for (const prop of props) {
+      const b = prop.spec;
+      if (!b || b.y > 0) continue;
+      const cx = b.x + b.width / 2, cz = b.z - b.depth / 2, casts = [], across = Math.max(b.width, b.depth) * 0.9;
+      for (const lamp of S.lighting.lamps) {
+        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= b.height + 20) continue;
+        const dx = cx - lamp.x, dz = cz - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y);
+        if (d >= lamp.range * 1.3 || flat < 1) continue;
+        const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * b.height / (lamp.y - b.height), b.height * 0.6, b.height * 2.5) + across / 2, alpha: (S.lighting.mood.name === 'evening' ? 0.6 : 1.8) * strength });
+      }
+      const sun = S.lighting.mood.sun, sunlit = sunAt(cx, cz);
+      if (sun && (S.lighting.mood.name === 'evening' || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: b.height * (S.lighting.mood.name === 'evening' ? 1.8 : 1.3) + across / 2, alpha: Math.max(S.lighting.mood.name === 'evening' ? 0.6 * sunFade() : 0, 0.75 * sunlit) });
+      prop.casts = prop.casts || [];
+      while (prop.casts.length < casts.length) {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;filter:blur(5px)';
+        layer(0).appendChild(el); prop.casts.push(el);
+      }
+      prop.climbs = prop.climbs || [];
+      prop.casts.forEach((el, n) => {
+        const cast = casts[n], up = prop.climbs[n];
+        if (!cast || cast.alpha < 0.01) { if (el.style.opacity !== '0') el.style.opacity = '0'; if (up && up.style.opacity !== '0') up.style.opacity = '0'; return; }
+        const shade = S.lighting.mood.shade, edge = Math.min(0.75, (Math.max(b.width, b.depth) / 2) / cast.length);
+        const stops = [[`${shade},.75`, 0], [`${shade},.7`, edge], [`${shade},.32`, edge + (1 - edge) * 0.5], [`${shade},0`, 1]], opacity = Math.min(1, cast.alpha).toFixed(3);
+        const hit = wallHit(cx, cz, cast.angle, cast.length);
+        if (hit) {
+          const upEl = up || (prop.climbs[n] = climbEl(8));
+          climbOn(upEl, hit, across, Math.min(b.height * 1.6, (cast.length - hit.t) * 0.85), `linear-gradient(to top, ${ramp(stops, cast.length, hit.t)})`, opacity);
+        } else if (up && up.style.opacity !== '0') up.style.opacity = '0';
+        el.style.filter = `blur(${(3 + cast.length * 0.012).toFixed(1)}px)`;
+        Object.assign(el.style, { width: (hit ? hit.t : cast.length).toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity,
+          background: `linear-gradient(to right, ${ramp(stops, cast.length)})`,
+          transform: `translate3d(${cx.toFixed(1)}px, -2.2px, ${cz.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
+      });
+    }
+  };
+  const wallShadow = (actor, seen) => {
+    const wall = surfaces.find((f) => f.kind === 'wall' && f.n[2] > 0.9);
+    const gap = wall ? actor.spot.z - wall.origin[2] : Infinity, reach = 420;
+    const strength = S.lighting && wall && actor.width && !actor.lamp ? clamp(1 - gap / reach, 0, 1) * seen : 0;
+    if (!actor.wallShade) {
+      if (strength <= 0) return;
+      actor.wallShade = document.createElement('div');
+      actor.wallShade.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:50%;filter:blur(14px)';
+      layer(0).appendChild(actor.wallShade);
+    }
+    const el = actor.wallShade;
+    if (strength <= 0) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
+    const L = lightAt(actor.where, actor.spot.y + actor.height * 0.45, actor.spot.z, actor), src = L.rim;
+    const shift = src ? clamp((actor.where - src.x) * gap / Math.max(200, Math.abs(src.z - wall.origin[2])), -160, 160) : 0;
+    const w = actor.width * (0.55 + gap / 900), h = actor.height * 0.8;
+    Object.assign(el.style, { width: w.toFixed(1) + 'px', height: h.toFixed(1) + 'px', opacity: (strength * (S.lighting.mood.dark > 0.2 ? 0.5 : 0.34)).toFixed(3),
+      background: `radial-gradient(closest-side, rgba(${S.lighting.mood.shade},.55), rgba(${S.lighting.mood.shade},0))`,
+      transform: `translate3d(${(actor.where + shift - w / 2).toFixed(1)}px, ${(-actor.spot.y - h * 0.95).toFixed(1)}px, ${(wall.origin[2] + 1.5).toFixed(1)}px)` });
+  };
+  const toSet = (actor, ux, uy) => {
+    const size = (actor.rig.constructor && actor.rig.constructor.KHUNG) || { w: 400, h: 470 }, unit = actor.height / size.h;
+    return [actor.spot.x + (ux - size.w / 2) * unit, actor.spot.y + ((actor.ground || 1) * size.h - uy) * unit];
+  };
+  const svgPoint = (rig, element) => {
+    const ctm = element && element.getScreenCTM && element.getScreenCTM(), root = rig.svg.getScreenCTM();
+    if (!ctm || !root) return null;
+    const p = new DOMPoint(+(element.getAttribute('cx') || 0), +(element.getAttribute('cy') || 0)).matrixTransform(ctm).matrixTransform(root.inverse());
+    return [p.x, p.y];
+  };
+  const beamGap = (torch, x, y, z) => {
+    const ext = torch.kind === 5 ? 1.4 : 0.5, ax = torch.hx, ay = torch.hy, bx = torch.x + (torch.x - torch.hx) * ext, by = torch.y + (torch.y - torch.hy) * ext;
+    const vx = bx - ax, vy = by - ay, t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1);
+    return Math.hypot(ax + vx * t - x, ay + vy * t - y, (torch.z - z) * 0.15);
+  };
+  const gadgetOf = (box, kind) => [...box.children].find((child) => +child.getAttribute('data-gadget') === kind);
+  const findTorches = () => {
+    const torches = [];
+    for (const actor of actors) {
+      const rig = actor.rig;
+      if (!rig || !rig.el || !rig.s || !actor.height || actor.host.style.display === 'none' || !actor.host.contains(rig.svg)) continue;
+      for (const side of ['L', 'R']) {
+        const kind = Math.round(rig.s['gadget' + side] || 0), box = rig.el['gadget' + side];
+        if ((kind !== 1 && kind !== 5) || !box) continue;
+        const tip = svgPoint(rig, gadgetOf(box, kind).querySelector('[data-tip]')), hand = svgPoint(rig, rig.el['coTay' + side]);
+        if (!tip || !hand) continue;
+        const [x, y] = toSet(actor, ...tip), [hx, hy] = toSet(actor, ...hand);
+        torches.push({ owner: actor, kind, side, x, y, z: actor.spot.z, hx, hy, power: kind === 5 ? 1 : 0.75, range: kind === 5 ? 320 : 200, rgb: '255,250,230' });
+      }
+    }
+    S.lighting.torches = torches;
+  };
+  const aimTorch = (torch) => {
+    const rig = torch.owner.rig, aim = rig.shineAim, to = aim && aim.target && aim.target.aimTo;
+    if (torch.kind !== 5 || !to || !rig.el || aim.side !== torch.side) return;
+    const pet = actors.find((actor) => actor.rig === to);
+    if (!pet || !pet.width || typeof to.shotBox !== 'function') return;
+    const group = gadgetOf(rig.el['gadget' + torch.side], 5), lensEl = group && group.querySelector('[data-lens]'), tipEl = group && group.querySelector('[data-tip]');
+    const screenOf = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); return ctm ? new DOMPoint(x, y).matrixTransform(ctm) : null; };
+    const l = lensEl && screenOf(lensEl, +lensEl.getAttribute('cx'), +lensEl.getAttribute('cy')), t = tipEl && screenOf(tipEl, +tipEl.getAttribute('cx'), +tipEl.getAttribute('cy'));
+    const box = to.shotBox('face'), f = screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2);
+    if (!l || !t || !f) return;
+    const now = Math.atan2(t.y - l.y, t.x - l.x), want = Math.atan2(f.y - l.y, f.x - l.x);
+    let delta = (want - now) * 180 / Math.PI;
+    delta = ((delta + 540) % 360) - 180;
+    const key = 'bat' + torch.side;
+    const next = clamp(rig.s[key] + clamp(torch.side === 'R' ? -delta : delta, -60, 60), -15, 172);
+    if (Math.abs(rig.s[key] - next) > 0.05) { rig.s[key] = next; rig.render(); }
+  };
+  const squint = (actor) => {
+    const rig = actor.rig;
+    if (!rig || typeof rig.seatY === 'function' || !rig.s || typeof rig.s.matY !== 'number' || typeof rig.shotBox !== 'function') return;
+    let glare = 0;
+    if (S.lighting.torches.length && actor.height) {
+      const box = rig.shotBox('face'), [fx, fy] = toSet(actor, box.x + box.width / 2, box.y + box.height / 2), reach = Math.max(90, 1.4 * box.width * actor.height / 470);
+      const face = S.set.project(fx, fy, actor.spot.z), r = Math.max(12, reach * face.scale);
+      for (const torch of S.lighting.torches) {
+        if (torch.owner === actor) continue;
+        const a = S.set.project(torch.hx, torch.hy, torch.z), tip = S.set.project(torch.x, torch.y, torch.z), ext = torch.kind === 5 ? 1.4 : 0.5;
+        const bx = tip.x + (tip.x - a.x) * ext, by = tip.y + (tip.y - a.y) * ext, vx = bx - a.x, vy = by - a.y;
+        const t = clamp(((face.x - a.x) * vx + (face.y - a.y) * vy) / (vx * vx + vy * vy || 1), 0, 1), gap = Math.hypot(a.x + vx * t - face.x, a.y + vy * t - face.y);
+        glare = Math.max(glare, clamp(1.4 - gap / r, 0, 1) * (torch.kind === 5 ? 1 : 0.85));
+      }
+    }
+    const eye = actor.eye || (actor.eye = { wrote: null, base: null });
+    const own = eye.wrote && rig.s.matY === eye.wrote[0] && rig.s.dongTu === eye.wrote[1] ? eye.base : [rig.s.matY, rig.s.dongTu];
+    eye.base = own;
+    const next = glare > 0.02 ? [Math.max(own[0], Math.min(0.8, 0.85 * glare)), Math.min(own[1], 1 - 0.5 * glare)] : own;
+    eye.wrote = next;
+    if (rig.s.matY !== next[0] || rig.s.dongTu !== next[1]) { rig.s.matY = next[0]; rig.s.dongTu = next[1]; rig.render(); }
+  };
+  const torchPools = () => {
+    const dark = clamp((S.lighting.mood.dark - 0.15) / 0.4, 0, 1), wall = surfaces.find((f) => f.kind === 'wall' && f.n[2] > 0.9);
+    const beams = S.lighting.torches.filter((torch) => torch.kind === 5);
+    while (S.lighting.pools.length < beams.length) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:50%;filter:blur(8px)';
+      layer(0).appendChild(el); S.lighting.pools.push(el);
+    }
+    S.lighting.pools.forEach((el, n) => {
+      const torch = beams[n];
+      if (!torch || dark < 0.02) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
+      const dx = torch.x - torch.hx, dy = torch.y - torch.hy, len = Math.hypot(dx, dy) || 1;
+      const glow = `radial-gradient(closest-side, rgba(${torch.rgb},.85), rgba(${torch.rgb},.4) 55%, rgba(${torch.rgb},0))`;
+      if (dy / len < -0.25 && torch.hy > 0) {
+        const fx = torch.hx + dx * (torch.hy / -dy), w = 300, d = 150;
+        Object.assign(el.style, { width: w + 'px', height: d + 'px', background: glow, opacity: (0.75 * dark).toFixed(3),
+          transform: `translate3d(${(fx - w / 2).toFixed(1)}px, -1.2px, ${(torch.z - d / 2).toFixed(1)}px) rotateX(90deg)` });
+      } else if (wall) {
+        const wx = torch.x + dx / len * 260, wy = clamp(torch.y + dy / len * 260, 60, 900), r = 120 + (torch.z - wall.origin[2]) * 0.18;
+        Object.assign(el.style, { width: (2 * r).toFixed(1) + 'px', height: (2 * r).toFixed(1) + 'px', background: glow, opacity: (0.6 * dark).toFixed(3),
+          transform: `translate3d(${(wx - r).toFixed(1)}px, ${(-wy - r).toFixed(1)}px, ${(wall.origin[2] + 2).toFixed(1)}px)` });
+      }
+    });
+  };
+  const beamOverlays = () => {
+    S.lighting.beams = S.lighting.beams || [];
+    const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+    const live = [];
+    for (const torch of S.lighting.torches) {
+      const rig = torch.owner.rig, group = gadgetOf(rig.el['gadget' + torch.side], torch.kind);
+      for (const el of group.querySelectorAll('[data-beam]')) if (el.style.display !== 'none') el.style.display = 'none';
+      const centreOf = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.width / 2 - box.left) * sx, (r.top + r.height / 2 - box.top) * sy]; };
+      const tip = centreOf(group.querySelector('[data-tip]')), from = centreOf(group.querySelector('[data-lens]'));
+      const dx = tip[0] - from[0], dy = tip[1] - from[1], len = Math.hypot(dx, dy);
+      if (len < 4) continue;
+      const reach = len * (torch.kind === 5 ? 1.9 : 1.5), wide = reach * (torch.kind === 5 ? 0.5 : 0.8);
+      const night = clamp((S.lighting.mood.dark - 0.1) / 0.5, 0, 1), strength = (torch.kind === 5 ? 0.55 : 1) + 0.4 * night;
+      live.push({ from, angle: Math.atan2(dy, dx), reach, wide, strength, night, kind: torch.kind, hidden: torch.owner.host.style.display === 'none', z: +(torch.owner.host.style.zIndex || 1) });
+    }
+    while (S.lighting.beams.length < live.length) {
+      const el = document.createElement('div'), spot = document.createElement('div');
+      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 50%;pointer-events:none;mix-blend-mode:screen';
+      spot.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;mix-blend-mode:screen;border-radius:50%;filter:blur(4px)';
+      const flare = spot.cloneNode();
+      view.appendChild(el); view.appendChild(spot); view.appendChild(flare); S.lighting.beams.push({ el, spot, flare });
+    }
+    S.lighting.beams.forEach(({ el, spot, flare }, n) => {
+      const b = live[n];
+      if (!b || b.hidden) { el.style.display = 'none'; spot.style.display = 'none'; flare.style.display = 'none'; return; }
+      const day = 1 - b.night, f = Math.max(10, b.wide * 0.32) * (1 + 0.4 * day);
+      flare.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen'; spot.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen';
+      Object.assign(flare.style, { display: '', zIndex: 8992, width: (2 * f).toFixed(1) + 'px', height: (2 * f).toFixed(1) + 'px',
+        background: `radial-gradient(closest-side, rgba(255,255,252,${(0.95 * b.strength).toFixed(3)}), rgba(255,250,225,${(0.55 * b.strength).toFixed(3)}) 30%, rgba(255,246,210,${(0.2 * b.strength).toFixed(3)}) 55%, rgba(110,110,100,${(0.14 * day).toFixed(3)}) 72%, rgba(110,110,100,0))`,
+        transform: `translate(${(b.from[0] - f).toFixed(1)}px, ${(b.from[1] - f).toFixed(1)}px)` });
+      const a = b.strength;
+      Object.assign(el.style, { display: '', zIndex: 8990, width: b.reach.toFixed(1) + 'px', height: b.wide.toFixed(1) + 'px', filter: `blur(${Math.max(2, b.wide * 0.07).toFixed(1)}px)`,
+        boxShadow: 'none',
+        clipPath: 'polygon(0 45%, 100% 0, 100% 100%, 0 55%)',
+        background: `linear-gradient(to right, rgba(255,251,228,${(0.8 * a).toFixed(3)}), rgba(255,246,206,${(0.34 * a).toFixed(3)}) 45%, rgba(255,242,180,0))`,
+        transform: `translate(${b.from[0].toFixed(1)}px, ${(b.from[1] - b.wide / 2).toFixed(1)}px) rotate(${(b.angle * 180 / Math.PI).toFixed(2)}deg)` });
+      const r = b.wide * 0.42, at = b.kind === 5 ? 0.62 : 0.87, cx = b.from[0] + Math.cos(b.angle) * b.reach * at, cy = b.from[1] + Math.sin(b.angle) * b.reach * at;
+      Object.assign(spot.style, { display: '', zIndex: 8991, width: (2 * r).toFixed(1) + 'px', height: (2 * r).toFixed(1) + 'px',
+        background: `radial-gradient(closest-side, rgba(255,255,245,${((b.night > 0.5 ? 0.75 : 0.55) * a).toFixed(3)}), rgba(255,248,214,${(0.3 * a).toFixed(3)}) 55%, rgba(255,244,190,0))`,
+        transform: `translate(${(cx - r).toFixed(1)}px, ${(cy - r).toFixed(1)}px)` });
+    });
+  };
+  return { MOODS, LENS, lerp, rgbaOf, mixMood, sunFade, norm, dot, rgbOf, lightSurface, inside, sunAt, lightAt, floorRgb, bounceAt, wallHit, ramp, climbOn, climbEl, castShadows, boxShadows, wallShadow, toSet, svgPoint, beamGap, gadgetOf, findTorches, aimTorch, squint, torchPools, beamOverlays };
+}
+return { createLighting };
+})();
 __m['runtime/set3d.js'] = (function () {
 const { PROP_FRAME } = __m['runtime/props.js'];
+const { createLighting } = __m['runtime/lighting.js'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
 const CAMERA_LIMITS = Object.freeze({ pitch: [-8, 15], yaw: 60 });
@@ -5244,417 +5663,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     return element;
   };
   const paint = (style, fallback) => (typeof style === 'string' && style.trim() ? (/[:;]/.test(style) ? style : `background:${style}`) : `background:${fallback}`);
-  const MOODS = {
-    day:     { name: 'day', dark: 0.06, keyShade: 0.16, key: [0.35, -0.8, -0.5],  shade: '20,28,40', tint: null,                       sun: [0.2, -0.6, 0.78],   sunColor: '255,244,214', sunAlpha: 0.62, lampsOn: false, warm: 0 },
-    evening: { name: 'evening', dark: 0.3,  keyShade: 0.22, key: [0.8, -0.35, -0.45], shade: '45,26,48', tint: 'rgba(255,140,60,0.2)',     fog: 'rgba(255,176,128,0.1)', sun: [0.55, -0.36, 0.76], sunColor: '255,184,112', sunAlpha: 0.62, lampsOn: true,  warm: 0.26 },
-    night:   { name: 'night', dark: 0.62, keyShade: 0.12, key: [0.2, -0.9, -0.3],   shade: '8,14,36',  tint: 'rgba(60,80,170,0.10)',     fog: 'rgba(46,62,120,0.12)', sun: null,                                         lampsOn: true,  warm: 0 },
-  };
-  const LENS = { day: { grade: [255, 248, 235, 0.06], vignette: 0.2, grain: 0.035 }, evening: { grade: [255, 146, 70, 0.2], vignette: 0.3, grain: 0.045 }, night: { grade: [46, 74, 170, 0.26], vignette: 0.42, grain: 0.06 } };
-  for (const name of Object.keys(MOODS)) Object.assign(MOODS[name], LENS[name]);
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const rgbaOf = (text, other) => { if (text) return text.match(/[\d.]+/g).map(Number); const o = rgbaOf(other || 'rgba(0,0,0,0)'); return [o[0], o[1], o[2], 0]; };
-  const mixMood = (a, b, t) => {
-    if (t <= 0) return a; if (t >= 1) return b;
-    const rgb = (x, y) => x.split(',').map((v, i) => Math.round(lerp(+v, +y.split(',')[i], t))).join(',');
-    const rgba = (x, y) => { const p = rgbaOf(x, y), q = rgbaOf(y, x); return `rgba(${p.slice(0, 3).map((v, i) => Math.round(lerp(v, q[i], t))).join(',')},${lerp(p[3], q[3], t).toFixed(3)})`; };
-    const sun = a.sun || b.sun;
-    return { name: t < 0.5 ? a.name : b.name, dark: lerp(a.dark, b.dark, t), keyShade: lerp(a.keyShade, b.keyShade, t), key: a.key.map((v, i) => lerp(v, b.key[i], t)),
-      shade: rgb(a.shade, b.shade), tint: rgba(a.tint, b.tint), fog: rgba(a.fog, b.fog), sun, sunColor: rgb(a.sunColor || b.sunColor, b.sunColor || a.sunColor),
-      sunAlpha: lerp(a.sun ? a.sunAlpha : 0, b.sun ? b.sunAlpha : 0, t), lampsOn: b.lampsOn, warm: lerp(a.warm, b.warm, t),
-      grade: a.grade.map((v, i) => lerp(v, b.grade[i], t)), vignette: lerp(a.vignette, b.vignette, t), grain: lerp(a.grain, b.grain, t) };
-  };
-  const sunFade = () => (lighting && lighting.mood.sun ? clamp(lighting.mood.sunAlpha / 0.62, 0, 1) : 0);
-  const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const rgbOf = (hex) => { const h = hex.replace('#', ''), full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h; return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)).join(','); };
   let lighting = null, litKey = '', driven = null;
-  const lightSurface = (f) => {
-    const mood = lighting.mood;
-    if (!f.shadeEl) {
-      f.shadeEl = document.createElement('div'); f.glowEl = document.createElement('div');
-      const edge = f.edge = parseFloat(getComputedStyle(f.element).borderTopWidth) || 0;
-      for (const el of [f.shadeEl, f.glowEl]) { el.style.cssText = `position:absolute;inset:${-edge}px;pointer-events:none`; f.element.appendChild(el); }
-      if (f.kind === 'wall') f.glowEl.dataset.ao = 'linear-gradient(to top, rgba(0,0,0,.2), rgba(0,0,0,0) 24%), linear-gradient(to right, rgba(0,0,0,.1), rgba(0,0,0,0) 7%, rgba(0,0,0,0) 93%, rgba(0,0,0,.1))';
-      if (f.kind === 'floor' && f.back) f.glowEl.dataset.ao = 'linear-gradient(to bottom, rgba(0,0,0,.16), rgba(0,0,0,0) 80px)';
-    }
-    const facing = Math.max(0, dot(f.n, lighting.key.map((c) => -c)));
-    const darkness = 1 - (1 - mood.dark) * (1 - mood.keyShade * (1 - facing));
-    const glow = [], mask = [];
-    for (const lamp of lighting.lamps) {
-      if (lamp.level <= 0.001) continue;
-      const p = [lamp.x - f.origin[0], lamp.y - f.origin[1], lamp.z - f.origin[2]], d = dot(p, f.n);
-      if (d < -20 || Math.abs(d) >= lamp.range) continue;                                        // đèn ở sau mặt này, hay quá xa
-      const strength = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - Math.abs(d) / lamp.range, 0.8), R = Math.sqrt(lamp.range * lamp.range - d * d);
-      const u = dot(p, f.u).toFixed(1), v = dot(p, f.v).toFixed(1), c = lamp.rgb;
-      glow.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(${c},${Math.min(0.66, 0.7 * strength).toFixed(3)}) 0, rgba(${c},${Math.min(0.34, 0.3 * strength).toFixed(3)}) ${(R * 0.4).toFixed(1)}px, rgba(${c},0) ${R.toFixed(1)}px)`);
-      mask.push(`radial-gradient(circle ${R.toFixed(1)}px at ${u}px ${v}px, rgba(0,0,0,${Math.max(0, 1 - 1.9 * strength).toFixed(3)}) 0, rgba(0,0,0,${Math.max(0, 1 - 0.7 * strength).toFixed(3)}) ${(R * 0.45).toFixed(1)}px, rgba(0,0,0,1) ${R.toFixed(1)}px)`);
-    }
-    const night = f.window && mood.name === 'night';
-    f.shadeEl.style.background = night ? 'linear-gradient(rgba(6,12,38,.9), rgba(18,30,70,.82))' : darkness > 0.004 ? `rgba(${mood.shade},${darkness.toFixed(3)})` : 'none';
-    f.shadeEl.style.boxShadow = night && f.edge ? `inset 0 0 0 ${f.edge}px rgba(${mood.shade},${Math.min(0.85, darkness + 0.15).toFixed(3)})` : 'none';
-    const masks = mask.length && !night ? mask.join(', ') : 'none';
-    if (f.window) { const fade = sunFade(); f.element.style.boxShadow = fade > 0.05 ? `0 0 70px 14px rgba(${mood.name === 'evening' ? mood.sunColor : '255,252,240'},${(0.5 * fade).toFixed(3)})` : 'none'; }                       // kính đêm: đèn trong phòng không làm trời sáng ra
-    f.shadeEl.style.maskImage = masks; f.shadeEl.style.webkitMaskImage = masks;
-    f.shadeEl.style.maskComposite = 'intersect'; f.shadeEl.style.webkitMaskComposite = 'source-in';
-    if (f.kind === 'floor' && lighting.gloss) {
-      for (const lamp of lighting.lamps) {
-        if (lamp.level <= 0.001 || lamp.kind === 'screen') continue;
-        const u = lamp.x - f.origin[0], v = lamp.z + 160 - f.origin[2];
-        glow.push(`radial-gradient(ellipse 46px 240px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(${lamp.rgb},${(0.26 * lamp.level).toFixed(3)}), rgba(${lamp.rgb},0))`);
-      }
-      for (const win of lighting.windows) {
-        if (!mood.sun) continue;
-        const u = win.x + win.width / 2 - f.origin[0], v = win.z + 220 - f.origin[2];
-        glow.push(`radial-gradient(ellipse ${(win.width * 0.42).toFixed(1)}px 260px at ${u.toFixed(1)}px ${v.toFixed(1)}px, rgba(255,255,255,0.22), rgba(255,255,255,0))`);
-      }
-    }
-    const fog = f.kind === 'wall' && mood.fog ? [`linear-gradient(${mood.fog}, ${mood.fog})`] : [];
-    if (f.kind === 'wall' && lighting.skyline && mood.dark > 0.1) {
-      const a = clamp((mood.dark - 0.06) * 1.65, 0, 0.92), line = (lighting.skyline * 100).toFixed(1);
-      fog.push(`linear-gradient(to bottom, rgba(${mood.shade},${a.toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) ${line}%, rgba(${mood.shade},0) ${line}%)`);
-    }
-    if (f.kind === 'wall' && mood.name !== 'night') fog.push(`linear-gradient(to bottom, rgba(${mood.shade},.16), rgba(${mood.shade},.05) 40%, rgba(${mood.shade},0) 70%)`);
-    const layers = [...glow, ...fog, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
-    f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
-  };
-  const inside = (poly, x, z) => { let hit = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) hit = !hit; } return hit; };
-  const sunAt = (x, z) => {
-    if (!lighting || !lighting.patches.length) return 0;
-    const hits = [-45, 0, 45].filter((dx) => lighting.patches.some((poly) => inside(poly, x + dx, z))).length;
-    return hits / 3 * lighting.cloud * sunFade();
-  };
-  const lightAt = (x, y, z, self = null) => {
-    const mood = lighting.mood;
-    let level = 1 - (mood.dark > 0.1 ? mood.dark * 0.85 : 0), warm = mood.warm;
-    const sources = [];
-    for (const lamp of lighting.lamps) {
-      if (lamp.level <= 0.001) continue;
-      const d = Math.hypot(lamp.x - x, lamp.y - y, lamp.z - z);
-      if (d >= lamp.range * 1.15) continue;
-      const k = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
-      const front = clamp(0.55 + 0.45 * (lamp.z - z) / Math.max(1, Math.hypot(lamp.x - x, lamp.z - z)), 0.15, 1);
-      const night = mood.dark > 0.3 && lamp.kind !== 'screen' ? 1.7 : 1;
-      level += k * 0.6 * night * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
-      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front, screen: lamp.kind === 'screen' });
-    }
-    for (const torch of lighting.torches) {
-      if (torch.owner === self) continue;
-      const d = beamGap(torch, x, y, z);
-      if (d >= torch.range) continue;
-      const k = torch.power * Math.pow(1 - d / torch.range, 1.2);
-      level += k * 0.35 * (mood.dark > 0.3 ? 1.6 : 1); warm += k * 0.03;
-      sources.push({ k, x: torch.x, y: torch.y, z: torch.z + 30, rgb: torch.rgb, front: 0.9, torch: true });
-    }
-    if (mood.sun) for (const win of lighting.windows) {
-      const wx = win.x + win.width / 2, wy = win.y - win.height / 2, d = Math.hypot(wx - x, wy - y, win.z - z);
-      if (d >= 1500) continue;
-      sources.push({ k: 0.42 * lighting.cloud * sunFade() * (1 - d / 1500), x: wx, y: wy, z: win.z + 40, rgb: mood.name === 'evening' ? mood.sunColor : '206,226,255', window: true });
-    }
-    const sunlit = sunAt(x, z);
-    if (sunlit > 0) {
-      const sun = norm(mood.sun);
-      level += 0.16 * sunlit; warm += (mood.name === 'evening' ? 0.16 : 0.06) * sunlit;
-      sources.push({ k: 0.75 * sunlit, x: x - sun[0] * 1000, y: y - sun[1] * 1000, z: z - sun[2] * 1000, rgb: mood.sunColor, front: 0.6, sun: true });
-    }
-    if (mood.dark > 0.5) { const lit = lighting.lamps.reduce((sum, lamp) => sum + (lamp.kind === 'screen' ? 0.4 : 1) * lamp.level, 0); level -= 0.2 * clamp(1 - lit, 0, 1); }
-    sources.sort((a, b) => b.k - a.k);
-    let rim = sources[0] || null;
-    if (mood.name === 'evening' && sunFade() > 0.2 && (!rim || rim.k < 0.35)) { rim = { k: 0.55 * sunFade(), x: x - mood.sun[0] * 1000, y: y - mood.sun[1] * 1000, z: z - mood.sun[2] * 1000, rgb: mood.sunColor }; sources.unshift(rim); }
-    return { level: clamp(level, 0.22, 1.06), warm: clamp(warm, 0, 0.42), rim, sources };
-  };
-  let floorTone = null;
-  const floorRgb = () => {
-    if (floorTone) return floorTone;
-    const strip = backdrop.find((el) => el.dataset.floor !== undefined);
-    if (!strip) return (floorTone = '200,200,200');
-    const style = getComputedStyle(strip), solid = style.backgroundColor.match(/[\d.]+/g);
-    if (solid && (solid.length < 4 || +solid[3] > 0.1)) return (floorTone = solid.slice(0, 3).join(','));
-    const hex = style.backgroundImage.match(/#([0-9a-f]{3,6})\b/i), rgb = style.backgroundImage.match(/rgba?\(([^)]+)\)/);
-    return (floorTone = rgb ? rgb[1].split(',').slice(0, 3).map((v) => Math.round(+v)).join(',') : hex ? rgbOf(hex[0]) : '200,200,200');
-  };
-  const bounceAt = (actor, L) => {
-    const mood = lighting.mood, sunlit = sunAt(actor.where, actor.spot.z);
-    let amount = mood.name === 'day' ? 0.1 : mood.name === 'evening' ? 0.08 : 0.03;
-    amount += 0.32 * sunlit;
-    for (const src of L.sources) if (!src.window && !src.sun) amount += 0.1 * src.k;
-    if (actor.spot.y > 0) amount *= 0.6;                                              // trên mặt bàn: mặt bàn nhỏ, hắt ít hơn sàn
-    const floor = floorRgb().split(',').map(Number), sun = (mood.sunColor || '255,255,255').split(',').map(Number), mix = clamp(sunlit * 0.6, 0, 0.6);
-    return { rgb: floor.map((v, i) => Math.round(lerp(v, sun[i], mix))).join(','), amount: clamp(amount, 0, 0.42) };
-  };
-  const wallHit = (x, z, angle, length) => {
-    const dx = Math.cos(angle), dz = Math.sin(angle);
-    let best = null;
-    for (const f of surfaces) {
-      if (f.kind !== 'wall' || dx * f.n[0] + dz * f.n[2] >= -0.05) continue;
-      const ux = f.u[0], uz = f.u[2], ox = f.origin[0], oz = f.origin[2], det = dx * -uz - dz * -ux;
-      if (Math.abs(det) < 1e-6) continue;
-      const rx = ox - x, rz = oz - z, t = (rx * -uz - rz * -ux) / det, along = (dx * rz - dz * rx) / det;
-      if (t <= 4 || t >= length - 4 || along < 0 || along > f.width) continue;
-      if (!best || t < best.t) best = { t, wall: f, at: [x + dx * t, z + dz * t] };
-    }
-    return best;
-  };
-  const ramp = (stops, length, offset = 0) => stops.map(([alpha, at]) => `rgba(${alpha}) ${(at * length - offset).toFixed(1)}px`).join(', ');
-  const climbOn = (el, hit, across, rise, background, opacity) => {
-    const f = hit.wall, turn = -Math.atan2(f.u[2], f.u[0]) * 180 / Math.PI;
-    Object.assign(el.style, { width: across.toFixed(1) + 'px', height: rise.toFixed(1) + 'px', opacity, background, borderRadius: '50% 50% 12% 12% / 34% 34% 6% 6%',
-      transform: `translate3d(${hit.at[0].toFixed(1)}px, ${(-rise).toFixed(1)}px, ${hit.at[1].toFixed(1)}px) rotateY(${turn.toFixed(2)}deg) translate3d(${(-across / 2).toFixed(1)}px, 0px, 1.6px)` });
-  };
-  const climbEl = (blur) => {
-    const el = document.createElement('div');
-    el.style.cssText = `position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;filter:blur(${blur}px);opacity:0`;
-    layer(0).appendChild(el);
-    return el;
-  };
-  const castShadows = (actor, rank, seen) => {
-    const casts = [];
-    if (lighting && seen > 0.05 && !actor.lamp) {
-      const tall = actor.height * 0.85, x = actor.where, z = actor.spot.z, y = actor.spot.y;
-      for (const lamp of lighting.lamps) {
-        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= tall + y + 20) continue;
-        const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
-        if (d >= lamp.range * 1.3 || flat < 1) continue;
-        const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
-        const nightLamp = lighting.mood.dark > 0.3;
-        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * (nightLamp ? 0.9 : 0.25), tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 1.8) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
-      }
-      for (const torch of lighting.torches) {
-        if (torch.kind !== 5 || torch.owner === actor) continue;
-        const gap = beamGap(torch, x, y + tall * 0.5, z), near = clamp(1 - gap / torch.range, 0, 1);
-        if (near <= 0.05) continue;
-        const dx = x - torch.hx, dz = (z - torch.z) || 1, flat = Math.hypot(dx, dz), lift = Math.max(30, torch.hy - y - tall * 0.6);
-        const dark = clamp((lighting.mood.dark - 0.1) / 0.5, 0.25, 1);
-        const along = Math.sign(torch.x - torch.hx) || Math.sign(dx) || 1;
-        casts.push({ angle: Math.atan2(0.18, along), length: clamp(flat * tall / lift, tall * 0.8, tall * 2.2), alpha: 0.95 * near * dark * seen });
-      }
-      if (lighting.mood.sun) for (const win of lighting.windows) {
-        const wx = win.x + win.width / 2, dx = x - wx, dz = z - win.z, flat = Math.hypot(dx, dz);
-        if (flat > 1400 || flat < 1) continue;
-        casts.push({ angle: Math.atan2(dz, dx), length: tall * 0.9, alpha: 0.3 * (1 - flat / 1400) * lighting.cloud * sunFade() * seen, soft: true });
-      }
-      const sun = lighting.mood.sun, sunlit = sunAt(x, z);
-      if (sun && (lighting.mood.name === 'evening' || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: tall * (lighting.mood.name === 'evening' ? 1.7 : 1.3), alpha: Math.max(lighting.mood.name === 'evening' ? 0.34 * sunFade() : 0, 0.55 * sunlit) * seen });
-    }
-    actor.casts = actor.casts || [];
-    while (actor.casts.length < casts.length) {
-      const el = document.createElement('div');
-      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;border-radius:50%;pointer-events:none;filter:blur(3px)';
-      actor.casts.push(el);
-    }
-    actor.climbs = actor.climbs || [];
-    while (actor.climbs.length < actor.casts.length) actor.climbs.push(null);
-    actor.casts.forEach((el, n) => {
-      const cast = casts[n], up = actor.climbs[n];
-      if (!cast) { el.style.opacity = '0'; if (up) up.style.opacity = '0'; return; }
-      if (el.parentNode !== layers[rank]) layers[rank].appendChild(el);
-      const across = actor.width * 0.26, opacity = Math.min(1, cast.alpha).toFixed(3);
-      const stops = [['0,0,0,.7', 0], ['0,0,0,.42', 0.18], ['0,0,0,.2', 0.45], ['0,0,0,.05', 0.82], ['0,0,0,0', 1]];
-      el.style.filter = `blur(${(2 + cast.length * 0.011).toFixed(1)}px)`;
-      const hit = !cast.soft && actor.spot.y <= 0 ? wallHit(actor.where, actor.spot.z, cast.angle, cast.length) : null;
-      if (hit) {
-        const rise = Math.min((cast.length - hit.t) * 0.85, actor.height * 0.95), upEl = up || (actor.climbs[n] = climbEl(7));
-        climbOn(upEl, hit, across * 1.1, rise, `linear-gradient(to top, ${ramp(stops, cast.length, hit.t)})`, opacity);
-      } else if (up && up.style.opacity !== '0') up.style.opacity = '0';
-      Object.assign(el.style, { width: (hit ? hit.t + across * 0.1 : cast.length).toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity,
-        borderRadius: hit ? '50% 0 0 50%' : '50%',
-        background: cast.soft ? 'radial-gradient(ellipse at 0% 50%, rgba(0,0,0,.4), rgba(0,0,0,0) 70%)' : `linear-gradient(to right, ${ramp(stops, cast.length)})`,
-        transform: `translate3d(${actor.where.toFixed(1)}px, ${(-actor.spot.y - 0.7).toFixed(1)}px, ${actor.spot.z.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
-    });
-  };
-  const boxShadows = () => {
-    for (const prop of props) {
-      const b = prop.spec;
-      if (!b || b.y > 0) continue;
-      const cx = b.x + b.width / 2, cz = b.z - b.depth / 2, casts = [], across = Math.max(b.width, b.depth) * 0.9;
-      for (const lamp of lighting.lamps) {
-        if (lamp.level <= 0.001 || lamp.kind === 'screen' || lamp.y <= b.height + 20) continue;
-        const dx = cx - lamp.x, dz = cz - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y);
-        if (d >= lamp.range * 1.3 || flat < 1) continue;
-        const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
-        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * b.height / (lamp.y - b.height), b.height * 0.6, b.height * 2.5) + across / 2, alpha: (lighting.mood.name === 'evening' ? 0.6 : 1.8) * strength });
-      }
-      const sun = lighting.mood.sun, sunlit = sunAt(cx, cz);
-      if (sun && (lighting.mood.name === 'evening' || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: b.height * (lighting.mood.name === 'evening' ? 1.8 : 1.3) + across / 2, alpha: Math.max(lighting.mood.name === 'evening' ? 0.6 * sunFade() : 0, 0.75 * sunlit) });
-      prop.casts = prop.casts || [];
-      while (prop.casts.length < casts.length) {
-        const el = document.createElement('div');
-        el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;filter:blur(5px)';
-        layer(0).appendChild(el); prop.casts.push(el);
-      }
-      prop.climbs = prop.climbs || [];
-      prop.casts.forEach((el, n) => {
-        const cast = casts[n], up = prop.climbs[n];
-        if (!cast || cast.alpha < 0.01) { if (el.style.opacity !== '0') el.style.opacity = '0'; if (up && up.style.opacity !== '0') up.style.opacity = '0'; return; }
-        const shade = lighting.mood.shade, edge = Math.min(0.75, (Math.max(b.width, b.depth) / 2) / cast.length);
-        const stops = [[`${shade},.75`, 0], [`${shade},.7`, edge], [`${shade},.32`, edge + (1 - edge) * 0.5], [`${shade},0`, 1]], opacity = Math.min(1, cast.alpha).toFixed(3);
-        const hit = wallHit(cx, cz, cast.angle, cast.length);
-        if (hit) {
-          const upEl = up || (prop.climbs[n] = climbEl(8));
-          climbOn(upEl, hit, across, Math.min(b.height * 1.6, (cast.length - hit.t) * 0.85), `linear-gradient(to top, ${ramp(stops, cast.length, hit.t)})`, opacity);
-        } else if (up && up.style.opacity !== '0') up.style.opacity = '0';
-        el.style.filter = `blur(${(3 + cast.length * 0.012).toFixed(1)}px)`;
-        Object.assign(el.style, { width: (hit ? hit.t : cast.length).toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity,
-          background: `linear-gradient(to right, ${ramp(stops, cast.length)})`,
-          transform: `translate3d(${cx.toFixed(1)}px, -2.2px, ${cz.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
-      });
-    }
-  };
-  const wallShadow = (actor, seen) => {
-    const wall = surfaces.find((f) => f.kind === 'wall' && f.n[2] > 0.9);
-    const gap = wall ? actor.spot.z - wall.origin[2] : Infinity, reach = 420;
-    const strength = lighting && wall && actor.width && !actor.lamp ? clamp(1 - gap / reach, 0, 1) * seen : 0;
-    if (!actor.wallShade) {
-      if (strength <= 0) return;
-      actor.wallShade = document.createElement('div');
-      actor.wallShade.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:50%;filter:blur(14px)';
-      layer(0).appendChild(actor.wallShade);
-    }
-    const el = actor.wallShade;
-    if (strength <= 0) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
-    const L = lightAt(actor.where, actor.spot.y + actor.height * 0.45, actor.spot.z, actor), src = L.rim;
-    const shift = src ? clamp((actor.where - src.x) * gap / Math.max(200, Math.abs(src.z - wall.origin[2])), -160, 160) : 0;
-    const w = actor.width * (0.55 + gap / 900), h = actor.height * 0.8;
-    Object.assign(el.style, { width: w.toFixed(1) + 'px', height: h.toFixed(1) + 'px', opacity: (strength * (lighting.mood.dark > 0.2 ? 0.5 : 0.34)).toFixed(3),
-      background: `radial-gradient(closest-side, rgba(${lighting.mood.shade},.55), rgba(${lighting.mood.shade},0))`,
-      transform: `translate3d(${(actor.where + shift - w / 2).toFixed(1)}px, ${(-actor.spot.y - h * 0.95).toFixed(1)}px, ${(wall.origin[2] + 1.5).toFixed(1)}px)` });
-  };
-  const toSet = (actor, ux, uy) => {
-    const size = (actor.rig.constructor && actor.rig.constructor.KHUNG) || { w: 400, h: 470 }, unit = actor.height / size.h;
-    return [actor.spot.x + (ux - size.w / 2) * unit, actor.spot.y + ((actor.ground || 1) * size.h - uy) * unit];
-  };
-  const svgPoint = (rig, element) => {
-    const ctm = element && element.getScreenCTM && element.getScreenCTM(), root = rig.svg.getScreenCTM();
-    if (!ctm || !root) return null;
-    const p = new DOMPoint(+(element.getAttribute('cx') || 0), +(element.getAttribute('cy') || 0)).matrixTransform(ctm).matrixTransform(root.inverse());
-    return [p.x, p.y];
-  };
-  const beamGap = (torch, x, y, z) => {
-    const ext = torch.kind === 5 ? 1.4 : 0.5, ax = torch.hx, ay = torch.hy, bx = torch.x + (torch.x - torch.hx) * ext, by = torch.y + (torch.y - torch.hy) * ext;
-    const vx = bx - ax, vy = by - ay, t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1);
-    return Math.hypot(ax + vx * t - x, ay + vy * t - y, (torch.z - z) * 0.15);
-  };
-  const gadgetOf = (box, kind) => [...box.children].find((child) => +child.getAttribute('data-gadget') === kind);
-  const findTorches = () => {
-    const torches = [];
-    for (const actor of actors) {
-      const rig = actor.rig;
-      if (!rig || !rig.el || !rig.s || !actor.height || actor.host.style.display === 'none' || !actor.host.contains(rig.svg)) continue;
-      for (const side of ['L', 'R']) {
-        const kind = Math.round(rig.s['gadget' + side] || 0), box = rig.el['gadget' + side];
-        if ((kind !== 1 && kind !== 5) || !box) continue;
-        const tip = svgPoint(rig, gadgetOf(box, kind).querySelector('[data-tip]')), hand = svgPoint(rig, rig.el['coTay' + side]);
-        if (!tip || !hand) continue;
-        const [x, y] = toSet(actor, ...tip), [hx, hy] = toSet(actor, ...hand);
-        torches.push({ owner: actor, kind, side, x, y, z: actor.spot.z, hx, hy, power: kind === 5 ? 1 : 0.75, range: kind === 5 ? 320 : 200, rgb: '255,250,230' });
-      }
-    }
-    lighting.torches = torches;
-  };
-  const aimTorch = (torch) => {
-    const rig = torch.owner.rig, aim = rig.shineAim, to = aim && aim.target && aim.target.aimTo;
-    if (torch.kind !== 5 || !to || !rig.el || aim.side !== torch.side) return;
-    const pet = actors.find((actor) => actor.rig === to);
-    if (!pet || !pet.width || typeof to.shotBox !== 'function') return;
-    const group = gadgetOf(rig.el['gadget' + torch.side], 5), lensEl = group && group.querySelector('[data-lens]'), tipEl = group && group.querySelector('[data-tip]');
-    const screenOf = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); return ctm ? new DOMPoint(x, y).matrixTransform(ctm) : null; };
-    const l = lensEl && screenOf(lensEl, +lensEl.getAttribute('cx'), +lensEl.getAttribute('cy')), t = tipEl && screenOf(tipEl, +tipEl.getAttribute('cx'), +tipEl.getAttribute('cy'));
-    const box = to.shotBox('face'), f = screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2);
-    if (!l || !t || !f) return;
-    const now = Math.atan2(t.y - l.y, t.x - l.x), want = Math.atan2(f.y - l.y, f.x - l.x);
-    let delta = (want - now) * 180 / Math.PI;
-    delta = ((delta + 540) % 360) - 180;
-    const key = 'bat' + torch.side;
-    const next = clamp(rig.s[key] + clamp(torch.side === 'R' ? -delta : delta, -60, 60), -15, 172);
-    if (Math.abs(rig.s[key] - next) > 0.05) { rig.s[key] = next; rig.render(); }
-  };
-  const squint = (actor) => {
-    const rig = actor.rig;
-    if (!rig || typeof rig.seatY === 'function' || !rig.s || typeof rig.s.matY !== 'number' || typeof rig.shotBox !== 'function') return;
-    let glare = 0;
-    if (lighting.torches.length && actor.height) {
-      const box = rig.shotBox('face'), [fx, fy] = toSet(actor, box.x + box.width / 2, box.y + box.height / 2), reach = Math.max(90, 1.4 * box.width * actor.height / 470);
-      const face = set.project(fx, fy, actor.spot.z), r = Math.max(12, reach * face.scale);
-      for (const torch of lighting.torches) {
-        if (torch.owner === actor) continue;
-        const a = set.project(torch.hx, torch.hy, torch.z), tip = set.project(torch.x, torch.y, torch.z), ext = torch.kind === 5 ? 1.4 : 0.5;
-        const bx = tip.x + (tip.x - a.x) * ext, by = tip.y + (tip.y - a.y) * ext, vx = bx - a.x, vy = by - a.y;
-        const t = clamp(((face.x - a.x) * vx + (face.y - a.y) * vy) / (vx * vx + vy * vy || 1), 0, 1), gap = Math.hypot(a.x + vx * t - face.x, a.y + vy * t - face.y);
-        glare = Math.max(glare, clamp(1.4 - gap / r, 0, 1) * (torch.kind === 5 ? 1 : 0.85));
-      }
-    }
-    const eye = actor.eye || (actor.eye = { wrote: null, base: null });
-    const own = eye.wrote && rig.s.matY === eye.wrote[0] && rig.s.dongTu === eye.wrote[1] ? eye.base : [rig.s.matY, rig.s.dongTu];
-    eye.base = own;
-    const next = glare > 0.02 ? [Math.max(own[0], Math.min(0.8, 0.85 * glare)), Math.min(own[1], 1 - 0.5 * glare)] : own;
-    eye.wrote = next;
-    if (rig.s.matY !== next[0] || rig.s.dongTu !== next[1]) { rig.s.matY = next[0]; rig.s.dongTu = next[1]; rig.render(); }
-  };
-  const torchPools = () => {
-    const dark = clamp((lighting.mood.dark - 0.15) / 0.4, 0, 1), wall = surfaces.find((f) => f.kind === 'wall' && f.n[2] > 0.9);
-    const beams = lighting.torches.filter((torch) => torch.kind === 5);
-    while (lighting.pools.length < beams.length) {
-      const el = document.createElement('div');
-      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:50%;filter:blur(8px)';
-      layer(0).appendChild(el); lighting.pools.push(el);
-    }
-    lighting.pools.forEach((el, n) => {
-      const torch = beams[n];
-      if (!torch || dark < 0.02) { if (el.style.opacity !== '0') el.style.opacity = '0'; return; }
-      const dx = torch.x - torch.hx, dy = torch.y - torch.hy, len = Math.hypot(dx, dy) || 1;
-      const glow = `radial-gradient(closest-side, rgba(${torch.rgb},.85), rgba(${torch.rgb},.4) 55%, rgba(${torch.rgb},0))`;
-      if (dy / len < -0.25 && torch.hy > 0) {
-        const fx = torch.hx + dx * (torch.hy / -dy), w = 300, d = 150;
-        Object.assign(el.style, { width: w + 'px', height: d + 'px', background: glow, opacity: (0.75 * dark).toFixed(3),
-          transform: `translate3d(${(fx - w / 2).toFixed(1)}px, -1.2px, ${(torch.z - d / 2).toFixed(1)}px) rotateX(90deg)` });
-      } else if (wall) {
-        const wx = torch.x + dx / len * 260, wy = clamp(torch.y + dy / len * 260, 60, 900), r = 120 + (torch.z - wall.origin[2]) * 0.18;
-        Object.assign(el.style, { width: (2 * r).toFixed(1) + 'px', height: (2 * r).toFixed(1) + 'px', background: glow, opacity: (0.6 * dark).toFixed(3),
-          transform: `translate3d(${(wx - r).toFixed(1)}px, ${(-wy - r).toFixed(1)}px, ${(wall.origin[2] + 2).toFixed(1)}px)` });
-      }
-    });
-  };
-  const beamOverlays = () => {
-    lighting.beams = lighting.beams || [];
-    const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
-    const live = [];
-    for (const torch of lighting.torches) {
-      const rig = torch.owner.rig, group = gadgetOf(rig.el['gadget' + torch.side], torch.kind);
-      for (const el of group.querySelectorAll('[data-beam]')) if (el.style.display !== 'none') el.style.display = 'none';
-      const centreOf = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.width / 2 - box.left) * sx, (r.top + r.height / 2 - box.top) * sy]; };
-      const tip = centreOf(group.querySelector('[data-tip]')), from = centreOf(group.querySelector('[data-lens]'));
-      const dx = tip[0] - from[0], dy = tip[1] - from[1], len = Math.hypot(dx, dy);
-      if (len < 4) continue;
-      const reach = len * (torch.kind === 5 ? 1.9 : 1.5), wide = reach * (torch.kind === 5 ? 0.5 : 0.8);
-      const night = clamp((lighting.mood.dark - 0.1) / 0.5, 0, 1), strength = (torch.kind === 5 ? 0.55 : 1) + 0.4 * night;
-      live.push({ from, angle: Math.atan2(dy, dx), reach, wide, strength, night, kind: torch.kind, hidden: torch.owner.host.style.display === 'none', z: +(torch.owner.host.style.zIndex || 1) });
-    }
-    while (lighting.beams.length < live.length) {
-      const el = document.createElement('div'), spot = document.createElement('div');
-      el.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 50%;pointer-events:none;mix-blend-mode:screen';
-      spot.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;mix-blend-mode:screen;border-radius:50%;filter:blur(4px)';
-      const flare = spot.cloneNode();
-      view.appendChild(el); view.appendChild(spot); view.appendChild(flare); lighting.beams.push({ el, spot, flare });
-    }
-    lighting.beams.forEach(({ el, spot, flare }, n) => {
-      const b = live[n];
-      if (!b || b.hidden) { el.style.display = 'none'; spot.style.display = 'none'; flare.style.display = 'none'; return; }
-      const day = 1 - b.night, f = Math.max(10, b.wide * 0.32) * (1 + 0.4 * day);
-      flare.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen'; spot.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen';
-      Object.assign(flare.style, { display: '', zIndex: 8992, width: (2 * f).toFixed(1) + 'px', height: (2 * f).toFixed(1) + 'px',
-        background: `radial-gradient(closest-side, rgba(255,255,252,${(0.95 * b.strength).toFixed(3)}), rgba(255,250,225,${(0.55 * b.strength).toFixed(3)}) 30%, rgba(255,246,210,${(0.2 * b.strength).toFixed(3)}) 55%, rgba(110,110,100,${(0.14 * day).toFixed(3)}) 72%, rgba(110,110,100,0))`,
-        transform: `translate(${(b.from[0] - f).toFixed(1)}px, ${(b.from[1] - f).toFixed(1)}px)` });
-      const a = b.strength;
-      Object.assign(el.style, { display: '', zIndex: 8990, width: b.reach.toFixed(1) + 'px', height: b.wide.toFixed(1) + 'px', filter: `blur(${Math.max(2, b.wide * 0.07).toFixed(1)}px)`,
-        boxShadow: 'none',
-        clipPath: 'polygon(0 45%, 100% 0, 100% 100%, 0 55%)',
-        background: `linear-gradient(to right, rgba(255,251,228,${(0.8 * a).toFixed(3)}), rgba(255,246,206,${(0.34 * a).toFixed(3)}) 45%, rgba(255,242,180,0))`,
-        transform: `translate(${b.from[0].toFixed(1)}px, ${(b.from[1] - b.wide / 2).toFixed(1)}px) rotate(${(b.angle * 180 / Math.PI).toFixed(2)}deg)` });
-      const r = b.wide * 0.42, at = b.kind === 5 ? 0.62 : 0.87, cx = b.from[0] + Math.cos(b.angle) * b.reach * at, cy = b.from[1] + Math.sin(b.angle) * b.reach * at;
-      Object.assign(spot.style, { display: '', zIndex: 8991, width: (2 * r).toFixed(1) + 'px', height: (2 * r).toFixed(1) + 'px',
-        background: `radial-gradient(closest-side, rgba(255,255,245,${((b.night > 0.5 ? 0.75 : 0.55) * a).toFixed(3)}), rgba(255,248,214,${(0.3 * a).toFixed(3)}) 55%, rgba(255,244,190,0))`,
-        transform: `translate(${(cx - r).toFixed(1)}px, ${(cy - r).toFixed(1)}px)` });
-    });
-  };
+  const { MOODS, LENS, lerp, rgbaOf, mixMood, sunFade, norm, dot, rgbOf, lightSurface, inside, sunAt, lightAt, floorRgb, bounceAt, wallHit, ramp, climbOn, climbEl, castShadows, boxShadows, wallShadow, toSet, svgPoint, beamGap, gadgetOf, findTorches, aimTorch, squint, torchPools, beamOverlays } = createLighting({ actors, backdrop, props, layers, surfaces, view, layer, get set() { return set; }, get lighting() { return lighting; } });
   const set = {
     camera,
     view,
@@ -6219,13 +6229,18 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       const others = seen.filter(Boolean)
         .map((m) => (size === 'close' && m.person && m.head ? { ...m, ...m.head } : m));
+      const zSubject = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+      const depthF = (m) => cam.distance / Math.max(50, cam.distance + (zSubject - m.z));
+      const inPlane = (m) => { const f = depthF(m); return { ...m, raw: m, x0: cam.x + (m.x0 - cam.x) * f, x1: cam.x + (m.x1 - cam.x) * f, top: cam.y + (m.top - cam.y) * f, base: cam.y + (m.base - cam.y) * f }; };
+      const inHeight = (m) => { const span = H * cam.distance / k; return m.top > cam.y - 0.43 * span && m.base < cam.y + 0.57 * span; };
+      const outside = (m, half, margin, leftOf) => { const raw = m.raw || m, f = depthF(raw); return leftOf ? raw.x1 + (half + margin) / f : raw.x0 - (half + margin) / f; };
       for (let pass = 0; pass < 3; pass++) {
         const half = (W / 2) * cam.distance / k;
         const edge = half * 0.06;
-        const cut = others.find((m) => { const seen = Math.max(0, Math.min(m.x1, cam.x + half + edge) - Math.max(m.x0, cam.x - half - edge)); return seen > 0 && seen < (m.x1 - m.x0) * 0.98; });
+        const cut = others.map(inPlane).filter(inHeight).find((m) => { const seen = Math.max(0, Math.min(m.x1, cam.x + half + edge) - Math.max(m.x0, cam.x - half - edge)); return seen > 0 && seen < (m.x1 - m.x0) * 0.98; });
         if (!cut) break;
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
-        const x = (cut.x0 + cut.x1) / 2 < cam.x ? cut.x1 + half + margin : cut.x0 - half - margin;
+        const x = outside(cut, half, margin, (cut.x0 + cut.x1) / 2 < cam.x);
         if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
         else if (size === 'close' && cut.person) { region = { x0: Math.min(region.x0, cut.x0), x1: Math.max(region.x1, cut.x1), y0: region.y0, y1: Math.max(region.y1, cut.top) }; cam = solve(region); }
         else if (tight && cut.person) {
@@ -6238,13 +6253,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       {
         const half = (W / 2) * cam.distance / k, above = 0.57 * H * cam.distance / k, below = 0.43 * H * cam.distance / k;
-        for (const m of others) {
+        for (const m of others.map(inPlane)) {
           if (Math.min(m.x1, cam.x + half) <= Math.max(m.x0, cam.x - half)) continue;                 // ngoài khung theo chiều ngang
           const bottom = cam.y - below, slack = (above + below) * 0.05;
           if (m.top > bottom - slack && m.top < region.y0 && m.base < bottom) {
             const lift = m.top - bottom + slack;
             if (region.y1 <= cam.y + above + lift - (above + below) * 0.02) { cam = { ...cam, y: cam.y + lift }; continue; }
-            const margin = half * 0.06, x = (m.x0 + m.x1) / 2 < cam.x ? m.x1 + half + margin : m.x0 - half - margin;
+            const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
             if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
             const pad = (region.y1 - region.y0) * 0.04, frame = region.y1 + pad - (m.top + slack);
             if (frame >= (region.y1 - region.y0) * 1.05) {
@@ -6254,10 +6269,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           }
           const ceiling = cam.y + above;
           if (m.person && m.top > ceiling && m.base < ceiling - (above + below) * 0.02 && m.base > region.y0 - (above + below) * 0.5) {
-            const margin = half * 0.06, x = (m.x0 + m.x1) / 2 < cam.x ? m.x1 + half + margin : m.x0 - half - margin;
+            const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
             if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
             else {
-              const wider = { ...region, y1: Math.max(region.y1, m.top + (m.top - m.base) * 0.04) }, test = solve(wider, Math.max(fill, 0.8));
+              const wider = { ...region, y1: Math.max(region.y1, m.top + (m.top - m.base) * 0.12) }, test = solve(wider, Math.max(fill, 0.8));      // chừa 12 %: đổi độ sâu chỉ gần đúng
               if (test.distance <= cam.distance * 2.5) { region = wider; cam = { ...test, x: cam.x }; }
             }
           }
@@ -6606,7 +6621,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.65.0';
+const VERSION = '0.66.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

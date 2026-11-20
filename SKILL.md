@@ -160,7 +160,8 @@ clips for every voice file.
    characters, cast shadows; windows light the characters too (backlight, sunlight patch, passing clouds); a
    `"tv"` cutout flickers in the evening / at night; furniture casts long shadows; a lens layer grades the
    frame (`"grain": false` in `"set"` drops the film grain — about 20 % faster to render, for drafts). `"sky": "night"` on a turn darkens the scene gradually; `"power": "off"` / `"on"` is a power cut;
-   `["shine", "@cat"]` shines a flashlight that lights the room in a power cut. Long shadows climb the walls
+   `["shine", "@cat"]` shines a flashlight that lights the room in a power cut (all of the light, with pictures and
+   ready-to-run scripts: `references/lighting.md`, `examples/lighting/`). Long shadows climb the walls
    they reach; a lit floor reflects its colour onto legs and bellies.
    Easiest: `"camera": "auto"` at the top — the camera chooses every shot (speaker with listener, close on
    a pet's expression, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],

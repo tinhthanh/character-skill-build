@@ -1,0 +1,11 @@
+# Chiều về ở công viên — nắng chiều bóng dài, trời tối dần, đèn đường tự bật.
+# Dựng: python3 tools/script.py examples/lighting/chieu-cong-vien.txt
+khung: dọc
+bé (boy) · chó (corgi)
+
+bối cảnh: công viên · ánh sáng: chiều → tối
+bé (vui): Chiều nay mát quá!
+chó: [vui, vẫy đuôi]
+bé: Trời sắp tối rồi đó.
+chó: [đánh hơi]
+bé (vui): Đèn đường sáng rồi, về nhà thôi!

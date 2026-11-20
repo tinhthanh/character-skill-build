@@ -1,0 +1,15 @@
+# Đêm mất điện, bà rọi đèn pin tìm mèo — mất điện, đèn pin, có điện lại.
+# Dựng: python3 tools/script.py examples/lighting/dem-mat-dien.txt
+khung: dọc
+bà (granny, ngồi) · mèo (calico)
+
+bối cảnh: phòng khách · ánh sáng: tối
+bà (vui): Tối nay xem phim gì đây ta?
+mèo: [buồn ngủ, nằm]
+bà: [mất điện]
+bà (ngạc nhiên): Ơ, mất điện rồi!
+bà → mèo: rọi đèn
+mèo: [sợ]
+bà: Mèo ơi, đừng sợ, bà đây.
+bà: [có điện]
+bà (vui): May quá, có điện lại rồi.

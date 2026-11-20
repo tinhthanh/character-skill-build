@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.66.0
+
+Changed — the lighting in its own module
+- **`runtime/lighting.js`**: everything about light (time of day, lamps, windows, sun, shadows, light in the hand,
+  bounce light, beams) moved out of `set3d.js` (1,669 → 1,145 lines) into `createLighting(S)`, which reads the
+  set's shared arrays and the current lighting state through `S`. No change in behaviour: 7 trial scenes
+  captured before and after are identical pixel for pixel (the captures were first checked to be repeatable).
+
+Added
+- **`references/lighting.md`**: a guide to the light for people writing scenes — times of day, lamps, screens,
+  windows, the sky changing, power cuts, the flashlight and the examining light, shadows, the lens and grain
+  switches — each with the script line, the scene-file key and a picture (`references/img/`).
+- **`examples/lighting/`**: three scripts ready to run — `dem-mat-dien.txt` (a power cut, granny shines a
+  flashlight at the cat), `chieu-cong-vien.txt` (evening to night in the park), `toi-xem-tv.txt` (watching TV at
+  night). `tools/check_scene.py` checks they parse.
+
+Fixed — framing people at different depths
+- A person farther from the camera than the subject (granny on the sofa behind the cat) is now measured where she
+  appears on screen, not where she stands: a close shot of the cat either leaves her out completely or takes her
+  whole head in — a strip of her hair used to show at the frame edge, or half of her.
+- Moving the camera sideways to push someone out of the frame is worked out from where they stand, so they do
+  not slide back in after the move.
+- Someone entirely above or below the frame no longer counts as cut by the side edge (a close shot of granny was
+  pushed off-centre by the cat on the floor below the frame).
+- Widening a close shot to take in a person's head leaves 12 % above it (4 % touched the top edge).
+
+Measured — the final lighting check (park → night, a walk past street lamps, a power cut with a flashlight, the
+clinic; vertical; same 42 questions as 0.65.0)
+- Gemini 4 Hydrogen: 37 / 39 (3 n/a) — was 31 / 39. Gemini 3.8 Flash: 31 / 39 — was 28 / 39.
+- Both still say no to: a piece of furniture cut by the edge in the power-cut opening, and which side of the vet
+  faces the light in the clinic.
+- Render time (3 runs each, vertical 1080 × 1920 unless noted, under load 10–28 from the renders themselves):
+
+  | Scene | Video | Render (min / median / max) |
+  |---|---|---|
+  | park, evening → night | 12.6 s | 24.0 / 24.6 / 24.7 s |
+  | street at night, walking | 14.2 s | 20.5 / 22.9 / 24.5 s |
+  | the same with `"grain": false` | 14.2 s | 15.0 / 16.8 / 17.6 s |
+  | power cut, flashlight | 11.9 s | 18.2 / 21.9 / 21.9 s |
+  | clinic, day | 15.9 s | 18.7 / 22.3 / 22.9 s |
+  | living room, TV (landscape) | 9.3 s | 19.9 / 22.1 / 22.7 s |
+
+  About 1.2–2.4 s of rendering per second of video; dropping the film grain saves about a quarter.
+
 ## 0.65.0
 
 Fixed — light that reads at small sizes

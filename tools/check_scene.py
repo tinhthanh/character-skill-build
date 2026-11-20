@@ -548,6 +548,13 @@ with tempfile.TemporaryDirectory() as work:
             if any(not m['ask'] or not isinstance(m['t'], (int, float)) for m in moments) or [m['t'] for m in moments] != sorted(m['t'] for m in moments):
                 problems.append('light: moments.json moments need a time, questions, and to be in time order')
 
+    # Đợt 26: mẫu phim ánh sáng trong examples/lighting/ — kịch bản chữ phải đọc được (không dựng: CI đã đủ dài).
+    import glob, shutil
+    for sample in sorted(glob.glob(os.path.join(os.path.dirname(HERE), 'examples', 'lighting', '*.txt'))):
+        copy = os.path.join(work, os.path.basename(sample)); shutil.copy(sample, copy)
+        done = subprocess.run([sys.executable, script_tool, copy, '--no-build'], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'examples/lighting/{os.path.basename(sample)} does not parse: {done.stderr.strip()[:200]}')
+
     # Đợt 18: kịch bản nhiều cảnh → film.json; mở đầu "hook"; thông báo trong kịch bản chữ.
     multi = os.path.join(work, 'phim.txt')
     open(multi, 'w', encoding='utf-8').write('khung: dọc · nhạc: nen.mp3\nmở đầu: hook | Mèo bỏ ăn? | Gọi VetGo\nkết thúc: VetGo | Tải app\n'
