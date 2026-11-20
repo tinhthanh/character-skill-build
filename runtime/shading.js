@@ -17,12 +17,24 @@ export function attachShade(svg, root) {
     <mask id="${id}-mask" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><use href="#${root.id}" filter="url(#${id}-white)"/></mask>
     <linearGradient id="${id}-grad" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.4" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/><stop offset="0.86" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="${id}-bounce" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </linearGradient>`;
   const cover = document.createElementNS(NS, 'rect');
   for (const [key, value] of Object.entries({ x: -2000, y: -2000, width: 4400, height: 4400, fill: `url(#${id}-grad)`, mask: `url(#${id}-mask)`, 'pointer-events': 'none', 'data-shade': '' })) cover.setAttribute(key, value);
-  svg.appendChild(defs); svg.appendChild(cover);
+  // ÁNH SÁNG PHẢN XẠ (bounce): một lớp thứ hai, chuyển sắc từ CHÂN lên — sàn được chiếu sáng hắt màu của nó lên phần dưới
+  // người (vệt nắng vàng trên sàn gỗ: chân, váy ấm lên). Cũng cắt theo bóng nhân vật.
+  const up = cover.cloneNode();
+  up.setAttribute('fill', `url(#${id}-bounce)`); up.removeAttribute('data-shade'); up.setAttribute('data-bounce', ''); up.style.display = 'none';
+  svg.appendChild(defs); svg.appendChild(up); svg.appendChild(cover);
   const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
-  let box = null, last = '';
+  const rise = defs.querySelectorAll('linearGradient')[1], riseStops = rise.querySelectorAll('stop');
+  let box = null, last = '', lastBounce = '';
+  const frame = () => {
+    if (!box || !box.width) { try { box = root.getBBox(); } catch (error) { box = null; } }
+    return box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+  };
   return {
     cover,
     /**
@@ -37,8 +49,7 @@ export function attachShade(svg, root) {
       last = key;
       if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
       cover.style.display = '';
-      if (!box || !box.width) { try { box = root.getBBox(); } catch (error) { box = null; } }
-      const b = box && box.width ? box : { x: 100, y: 0, width: 200, height: 470 };
+      const b = frame();
       // Chủ yếu theo CHIỀU NGANG: ánh sáng từ một bên đọc rõ nhất trên hình chibi đứng thẳng; chuyển sắc trải theo bề NGANG
       // của hình (trải theo đường chéo cả khung thì giữa thân gần như không đổi — đo ở cảnh thử đợt 17).
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2, sx = (dx < 0 ? -1 : 1) * Math.max(Math.abs(dx), Math.abs(dy) * 0.6), sy = dy * 0.35, length = Math.hypot(sx, sy) || 1, ux = sx / length, uy = sy / length;
@@ -54,6 +65,19 @@ export function attachShade(svg, root) {
       const lift = fill && fillAmount > 0.003;
       stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
       stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
+    },
+    /** ÁNH SÁNG PHẢN XẠ từ sàn: màu `rgb` ("214,168,110"), độ mạnh `amount` 0…1 (0 tắt) — dày ở chân, tan hết ở ngang ngực. */
+    bounce(rgb = '255,255,255', amount = 0) {
+      const key = `${rgb},${amount.toFixed(3)}`;
+      if (key === lastBounce) return;
+      lastBounce = key;
+      if (amount <= 0.004) { up.style.display = 'none'; return; }
+      up.style.display = '';
+      const b = frame();
+      rise.setAttribute('y1', (b.y + b.height).toFixed(1)); rise.setAttribute('y2', (b.y + b.height * 0.35).toFixed(1));
+      for (const stop of riseStops) stop.setAttribute('stop-color', `rgb(${rgb})`);
+      riseStops[0].setAttribute('stop-opacity', Math.min(0.5, amount).toFixed(3));
+      riseStops[1].setAttribute('stop-opacity', Math.min(0.5, amount * 0.35).toFixed(3));
     },
   };
 }

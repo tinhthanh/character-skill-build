@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.61.0
+
+Added — light you can hold, light that bounces
+- **A real light beam for the examining light**: bright at the lamp, fading out, soft-edged, with a white
+  hotspot where it lands (it used to be a flat yellow wedge). In a 3D set the beam is a light source that moves
+  with the hand: the pet it reaches is lit from that side and **squints** (eyes half-closed, pupils narrow).
+- **Flashlight**: `shine(target, hold = 2)` on a person (`["shine", "@cat"]` in a scene file, `bà → mèo: rọi đèn`
+  or `[rọi đèn pin]` in a script). In a dark room (a power cut) the beam lights the pet, throws a pool of light on
+  the floor or on the back wall, and shows bright against the dark.
+- The beam is drawn as its own layer over the characters (blended with `screen`), not inside the drawing of
+  the person holding it — there it was greyed by that person's own darkness and shading.
+- **Shadows climb walls**: a long shadow (of a character or a piece of furniture) that reaches a wall goes on
+  up the wall instead of running through it.
+- **Bounce light**: a lit floor reflects its colour onto legs, skirts and bellies — strongest in a patch of
+  sunlight (floor colour mixed with sunlight), weaker under a lamp, faint at night.
+- **The camera sees the room change**: a turn with `"sky"` or `"power"` is always a wide shot of everyone and
+  the lamps, even when someone speaks on it; while the sky turns the camera slowly pulls back (`drift`).
+
+Fixed — framing
+- A close shot of a pet with a person standing right behind it no longer shows a body without a head: when the
+  camera cannot move sideways it widens to a two-shot that takes the head in (up to 2.5 × further back). It
+  also catches a head of which only the chin shows at the top edge.
+- A pet nearer the camera than the others in a two-shot is no longer cut at the bottom edge: the frame leaves
+  room for how much lower it falls on screen.
+- The bottom edge of a medium or full shot no longer cuts a person at the ankles: the frame drops to show the
+  feet, or rises to the knees when the head would not fit.
+- Lamps are off at the start of a scene whose sky turns to night, and switch on as it gets dark (they used to
+  burn in full afternoon sun). `set.shift` now switches on lamps that are off whenever the sky gets darker.
+- The white frame of a window stayed bright in a power cut: the darkness of the room now covers it too.
+- Contact shadows under characters are darker: in a bright clinic they read as standing on the floor.
+
+Measured
+- Gemini lighting review of the trial film (3 scenes): 5 / 3 / 2, then 4 / 3 / 2 after the fixes above —
+  the target of 6 was not reached. Several points of that review contradict the frames (it reports no squint and
+  no pool of light where both are visible), so the scores are noisy; the remaining real issues are the thin
+  examining beam on a white background and a flat-looking clinic.
+
 ## 0.60.0
 
 Added — the whole frame in the light

@@ -724,7 +724,7 @@ def main():
                 if item[1:] not in names: fail(f'{where}: "{item}" refers to a character that is not in the scene')
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
-                if stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]})")
+                if stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat', 'shine'): parts.append(f"set.target({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
                 else: parts.append(item[1:])
             else:
@@ -959,6 +959,15 @@ def main():
         group = entry['together'] if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]
         group = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in names]
         if not group: return dict(span, fixed=True)
+        if len(group) == 1 and ('power' in group[0] or 'sky' in group[0]) and not group[0].get('do'):
+            # MẤT ĐIỆN, TRỜI CHUYỂN: góc toàn có cả đèn — kể cả khi người ấy đang nói: cận người nói thì không thấy căn phòng tối
+            # đi (Gemini đợt 20). Trời chuyển: máy lùi chậm ra suốt lúc ấy (`drift`).
+            sky = group[0].get('sky')
+            drift = float(sky.get('dur', 6)) if isinstance(sky, dict) else 6.0 if sky else 0
+            if group[0].get('say'): spoken.append(names[group[0]['who']]['name'])
+            # Cả căn phòng đổi sáng: lấy MỌI nhân vật vào khung (con mèo trước bà bị cắt chân ở góc chỉ có bà — cảnh thử đợt 21).
+            everyone = [names[group[0]['who']]['name']] + [who['name'] for who in names.values() if who['name'] != names[group[0]['who']]['name']]
+            return dict(span, subjects=everyone, size='full', lamp=True, **({'drift': drift} if drift else {}), **({'speech': True} if group[0].get('say') else {}))
         talker = next((turn for turn in group if turn.get('say')), None)
         if talker:
             who = names[talker['who']]
@@ -977,7 +986,7 @@ def main():
             if company: return dict(span, subjects=[who['name']] + company, size='medium', speech=True)
             if talker.get('mood') in STRONG or not listener: return dict(span, subjects=[who['name']], size='close' if talker.get('mood') in STRONG else 'medium', speech=True)
             return dict(span, subjects=[who['name'], listener], size='medium', speech=True)
-        if len(group) == 1 and ('lamp' in group[0] or 'power' in group[0] or 'sky' in group[0]) and not group[0].get('do') and not group[0].get('say'):
+        if len(group) == 1 and 'lamp' in group[0] and not group[0].get('do') and not group[0].get('say'):
             # Bật / tắt đèn: cả người lẫn cây đèn trong khung (frameOn tự lấy bóng đèn đang sáng vào) — thấy căn phòng đổi sáng.
             return dict(span, subjects=[names[group[0]['who']]['name']], size='full', lamp=True)
         if len(group) == 1:
@@ -1314,6 +1323,11 @@ def main():
             name = lamp.get('name', f'lamp{n + 1}')
             first = next((op for op in lamp_ops if (op['name'] if op['name'] is not None else (lamps[0].get('name', 'lamp1'))) == name), None)
             if first and 'on' not in lamp: lamp['on'] = not first['on']
+        # TRỜI TỐI DẦN trong cảnh (`sky`): lúc đầu còn nắng thì đèn chưa bật — trời tối được hơn nửa, set.shift tự bật chúng
+        # (Gemini đợt 21: đèn cây sáng trưng giữa nắng chiều làm mất cảm giác chạng vạng).
+        if any(op['to'] == 'night' for op in sky_ops) and stage_set.get('light', 'day') != 'night':
+            for lamp in lamps:
+                if 'on' not in lamp and lamp.get('kind') != 'screen': lamp['on'] = False
         # MÀN HÌNH (laptop, máy tính) lúc chiều / tối: một nguồn sáng xanh nhạt ở mặt màn hình (không có quầng bóng đèn).
         if stage_set.get('light', 'day') != 'day':
             for n, item in enumerate(stage_set.get('cutouts', [])):
@@ -1667,7 +1681,7 @@ def main():
             items = []
             for beat in beats:
                 time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
-                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + ' }')
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '') + ' }')
             moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n"
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:

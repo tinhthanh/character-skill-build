@@ -40,7 +40,7 @@ const NGHI = Object.freeze({
   itemBackL: 0, itemBackR: 0,
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
-  gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`)
+  gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`), 5 = đèn pin (`shine`)
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
@@ -743,7 +743,7 @@ export class RigSVG {
                      'shake', 'shrug', 'march', 'stroll', 'stepInPlace', 'walkForward', 'walkAway',
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
-                     'examine', 'giveTreat', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
+                     'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
                      'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
@@ -985,9 +985,24 @@ export class RigSVG {
             <g id="${p}-watch${ben}" style="display:none"><rect x="-10" y="-8" width="20" height="10" rx="3" fill="#3b3f47"/><circle cx="0" cy="-3" r="8.4" fill="#f4f1e8" stroke="#3b3f47" stroke-width="1.8"/><path d="M 0 -3 V -8.6 M 0 -3 H 4.2" stroke="#3b3f47" stroke-width="1.5" stroke-linecap="round"/></g>
             <g id="${p}-tool${ben}" style="display:none"><path d="M 0 10 C ${ben === 'L' ? 14 : -14} 0 ${ben === 'L' ? 4 : -4} -18 ${ben === 'L' ? 12 : -12} -32" fill="none" stroke="#3b3f47" stroke-width="2.6" stroke-linecap="round"/>
               <circle cx="0" cy="12" r="7.5" fill="#c7ccd4" stroke="#3b3f47" stroke-width="1.4"/><circle cx="0" cy="12" r="3.8" fill="#8a929e"/></g>
+            <defs>
+              <linearGradient id="${p}-beam${ben}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe4" stop-opacity=".9"/><stop offset=".35" stop-color="#fff6c8" stop-opacity=".42"/><stop offset="1" stop-color="#fff2b0" stop-opacity="0"/></linearGradient>
+              <radialGradient id="${p}-spot${ben}"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".45" stop-color="#fff6cc" stop-opacity=".5"/><stop offset="1" stop-color="#fff2b0" stop-opacity="0"/></radialGradient>
+              <filter id="${p}-soft${ben}" x="-50%" y="-20%" width="200%" height="140%"><feGaussianBlur stdDeviation="1.8"/></filter>
+            </defs>
             <g id="${p}-gadget${ben}" style="display:none">
-              <g data-gadget="1"><path d="M -4 27 L -11 48 Q 0 52 11 48 L 4 27 Z" fill="#fff3a8" opacity=".55"/>
-                <rect x="-3" y="2" width="6" height="22" rx="2.5" fill="#3d7fd0" stroke="#24415f" stroke-width="1.1"/><rect x="-3.6" y="21" width="7.2" height="6" rx="1.5" fill="#d9dde3" stroke="#24415f" stroke-width="1"/></g>
+              <!-- LUỒNG SÁNG có thật: sáng ở đầu đèn, tan dần ra xa, mép nhoè; ĐIỂM RỌI sáng trắng ở cuối luồng (Gemini đợt 20: luồng
+                   vàng đặc như miếng dán). <circle data-tip> là chỗ điểm rọi — bối cảnh 3D đọc nó để chiếu sáng con vật, và vẽ lại luồng
+                   sáng (\`data-beam\`) thành một lớp riêng trên màn hình: trong hình nhân vật nó bị lớp tối của nhân vật phủ xám. -->
+              <g data-gadget="1"><path data-beam d="M -3.4 27 L -12 52 Q 0 57 12 52 L 3.4 27 Z" fill="url(#${p}-beam${ben})" filter="url(#${p}-soft${ben})"/>
+                <ellipse data-beam cx="0" cy="49" rx="11" ry="7" fill="url(#${p}-spot${ben})" filter="url(#${p}-soft${ben})"/><circle data-tip cx="0" cy="49" r="0.6" fill="none"/><circle data-lens cx="0" cy="27" r="0.6" fill="none"/>
+                <rect x="-3" y="2" width="6" height="22" rx="2.5" fill="#3d7fd0" stroke="#24415f" stroke-width="1.1"/><rect x="-3.6" y="21" width="7.2" height="6" rx="1.5" fill="#d9dde3" stroke="#24415f" stroke-width="1"/>
+                <ellipse cx="0" cy="27.4" rx="3.4" ry="1.6" fill="#fffbe0"/></g>
+              <!-- ĐÈN PIN (\`shine\`): thân đen, đầu loe, luồng sáng dài. -->
+              <g data-gadget="5"><path data-beam d="M -6 31 L -40 150 Q 0 166 40 150 L 6 31 Z" fill="url(#${p}-beam${ben})" filter="url(#${p}-soft${ben})"/>
+                <ellipse data-beam cx="0" cy="148" rx="30" ry="14" fill="url(#${p}-spot${ben})" filter="url(#${p}-soft${ben})" opacity=".7"/><circle data-tip cx="0" cy="148" r="0.6" fill="none"/><circle data-lens cx="0" cy="31" r="0.6" fill="none"/>
+                <rect x="-4.6" y="-2" width="9.2" height="25" rx="3" fill="#2f3440" stroke="#15181e" stroke-width="1.1"/><rect x="-1.6" y="6" width="3.2" height="5" rx="1" fill="#e8553f"/>
+                <path d="M -4.6 22 L -7.4 31 H 7.4 L 4.6 22 Z" fill="#555c69" stroke="#15181e" stroke-width="1.1"/><ellipse cx="0" cy="31" rx="7" ry="2.4" fill="#fffbe0"/></g>
               <g data-gadget="2" transform="translate(0 16)"><path d="M -8 -2.6 H 8 M -8 2.6 H 8" stroke="#a5784a" stroke-width="1"/><rect x="-8" y="-2.8" width="16" height="5.6" fill="#ecc893"/>
                 <circle cx="-9" cy="-2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/><circle cx="-9" cy="2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/>
                 <circle cx="9" cy="-2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/><circle cx="9" cy="2.6" r="3.2" fill="#ecc893" stroke="#a5784a" stroke-width="1"/>
@@ -1948,6 +1963,8 @@ export class RigSVG {
   static MARKS = MARKS;
   /** Ánh sáng trên thân (do bối cảnh 3D gọi mỗi khung): hướng sáng trên màn hình, độ tối phía khuất, màu và độ nhuốm phía sáng. */
   lightShade(dx, dy, amount, rgb, glow, dark, fill, fillAmount) { if (this.shadeEl) this.shadeEl.set(dx, dy, amount, rgb, glow, dark, fill, fillAmount); }
+  /** Ánh sáng PHẢN XẠ từ sàn lên phần dưới người / con vật (bối cảnh 3D gọi mỗi khung). */
+  lightBounce(rgb, amount) { if (this.shadeEl && this.shadeEl.bounce) this.shadeEl.bounce(rgb, amount); }
 
   // THẺ THÔNG BÁO (`notify`): bật ra phía trên bàn tay cầm điện thoại, đuôi chỉ xuống máy; lớn dần theo `note`.
   #drawNote() {
@@ -2643,10 +2660,12 @@ export class RigSVG {
     return HONG.y + this.hangChan() + seatDrop + CHOT_VAI.y * this.nv.coThan;
   }
 
-  point(muc = null) {
-    const t = this.tl(), s = this.s, screen = RigSVG.SCREEN_AIM;
-    if (!screen) this.#openUp(t);
+  // HƯỚNG TAY tới một đích (rig, phần tử, { x, y } trong khung, DOMRect, hay null = ngang vai sang phải): tay nào, góc bắp
+  // tay, đầu và mắt nhìn theo — dùng chung cho `point` và `shine`.
+  #aimOf(muc) {
+    const s = this.s, screen = RigSVG.SCREEN_AIM;
     let tx = 380, ty = 165;
+
     // Đích là một NHÂN VẬT / THÚ (rig): chỉ vào cái đầu của nó (thú: cả thân nếu không có đầu riêng). Bản trước chỉ nhận
     // phần tử trang hay toạ độ — truyền một rig vào thì `getBoundingClientRect` không có, mọi góc thành NaN và cả hình
     // nhân vật co rúm lại suốt động tác (tools/scene.py truyền đúng thế cho ["point", "@cat"]).
@@ -2672,6 +2691,32 @@ export class RigSVG {
     const bat = clamp(chuanHoaGoc(ben === 'L' ? goc - 90 : 90 - goc), -15, 172);
     const dau = clamp((tx - HONG.x) * 0.05, -10, 10);
     const nhinX = clamp((tx - HONG.x) * 0.02, -3, 3), nhinY = clamp((ty - 88) * 0.02, -2.5, 2.5);
+    return { ben, bat, dau, nhinX, nhinY };
+  }
+
+  /**
+   * RỌI ĐÈN PIN vào `target` (rig, phần tử, { x, y } trong khung, hay null = thẳng sang phải) trong `hold` giây: đèn pin hiện
+   * trong tay, giơ lên rọi, giữ, rồi hạ xuống. Trong bối cảnh 3D đèn pin là một NGUỒN SÁNG đi theo bàn tay: rọi sáng người /
+   * con vật ở cuối luồng (con vật nheo mắt), in một vũng sáng lên sàn và tường khi phòng tối (mất điện).
+   */
+  shine(muc = null, hold = 2) {
+    const t = this.tl(), s = this.s, screen = RigSVG.SCREEN_AIM;
+    if (!screen) this.#openUp(t);
+    const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(muc);
+    const batK = 'bat' + ben, cangK = 'cang' + ben;
+    t.set(s, { ['tay' + ben]: 'nam', ['gadget' + ben]: 5 }, 0.05);
+    if (screen) t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
+    t.to(s, { [batK]: bat, [cangK]: 0, than: ben === 'L' ? 1.5 : -1.5, dau, nhinX, nhinY, cuoi: 0.1, chum: 0.2, duration: 0.45, ease: 'sine.out' }, 0.05);
+    // Lia đèn nhè nhẹ quanh đích — tay người cầm đèn không đứng yên như giá đỡ.
+    t.to(s, { [batK]: bat + 4, duration: hold * 0.3, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
+    this.#khep(t, 0.45, 0.5 + hold);
+    return t;
+  }
+
+  point(muc = null) {
+    const t = this.tl(), s = this.s, screen = RigSVG.SCREEN_AIM;
+    if (!screen) this.#openUp(t);
+    const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(muc);
     const tay = 'tay' + ben, batK = 'bat' + ben, cangK = 'cang' + ben;
 
     t.set(s, { [tay]: 'nam' }, 0);
