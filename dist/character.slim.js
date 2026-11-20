@@ -6048,7 +6048,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const a = set.project(...from), b = set.project(...centre);
             if (mood.name === 'day' && isPerson(actor)) { amount = Math.max(amount, 0.34); glow = Math.max(glow, 0.32); if (!key) rgb = mood.sunColor || '255,244,214'; }
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
-            if (dim > 0) glow *= 1 - dim;
+            if (dim > 0) glow *= 1 - dim * (0.3 + 0.7 * clamp((dim - 0.15) / 0.25, 0, 1));
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
             amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
             const carried = !!(actor.rig.svg && !host.contains(actor.rig.svg));

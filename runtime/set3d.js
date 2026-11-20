@@ -634,7 +634,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             // Ngược sáng: phía trước tối đều, không còn một phía được chiếu rõ.
-            if (dim > 0) glow *= 1 - dim;
+            // Ô cửa chỉ lấp ló sau vai (ngược sáng MỘT PHẦN, dim ≲ 0,2): phía hướng về nguồn chính vẫn được chiếu gần đủ — làm tối
+            // theo cả `dim` thì ông đứng lệch trước cửa sổ phòng khách chỉ sáng hơn nửa kia 6 % (đợt 29). Ngược sáng thật (≥ 0,4):
+            // như cũ, phía trước tối đều.
+            if (dim > 0) glow *= 1 - dim * (0.3 + 0.7 * clamp((dim - 0.15) / 0.25, 0, 1));
             // NHỎ TRÊN MÀN HÌNH thì sáng tối phải đậm hơn mới đọc ra (đợt 25: "phía nào hướng về đèn?" hỏng 3 lần ở khung dọc, nhân
             // vật cao ~400 px): dưới 700 px tăng dần tới 1,5 lần.
             const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);

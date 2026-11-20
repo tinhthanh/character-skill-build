@@ -18,7 +18,7 @@ hướng về nguồn sáng chính có sáng hơn phía kia không?" — ban ng�
 `contrast` = (sáng nửa phía đèn − sáng nửa kia) / sáng trung bình — trên ảnh thường: cái người xem thấy, kể cả chỗ bất đối
 xứng của chính hình vẽ (tóc lệch, áo hai màu). `shading` = phần do lớp đổ bóng góp vào (ảnh thường trừ ảnh tắt đổ bóng).
 Đạt khi contrast hay shading ≥ 8 % — hình vẽ lệch (tóc dài một bên) có thể kéo contrast xuống dù đổ bóng đã làm đủ phần
-mình. Không chấm: người NGƯỢC SÁNG (ô cửa sáng sau lưng: mặt trước tối đều là đúng), ban ĐÊM không có đèn gần, người cao dưới
+mình. Không chấm: người NGƯỢC SÁNG (ô cửa sáng / bóng đèn sau lưng phủ ≥ 20 % đầu và thân trên: mặt trước tối đều là đúng), ban ĐÊM không có đèn gần, người cao dưới
 120 px trên màn hình.
 """
 import argparse, json, os, re, socket, subprocess, sys, tempfile, time
@@ -27,6 +27,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEAST = 0.08            # nửa phía đèn sáng hơn nửa kia ít nhất 8 % độ sáng trung bình
 SMALL = 120             # người thấp hơn 120 px trên màn hình: không đo
+BACKLIT = 0.2           # ô cửa sáng / bóng đèn sau lưng phủ ≥ 20 % vùng đầu + thân trên (set3d `dim`): ngược sáng, không chấm
 
 
 def shoot(folder, times, keep):
@@ -120,8 +121,10 @@ def check_scene(folder, keep=None, every=False):
             contrast = (part[lit] - part[dark]) / max(1, part['all'])
             flat = (part[lit + 'Flat'] - part[dark + 'Flat']) / max(1, part['allFlat'])
             light = person.get('light') or {}
-            # Không chấm: NGƯỢC SÁNG (ô cửa sáng sau lưng — mặt trước tối đều là đúng), hay ĐÊM không có đèn gần (ánh trời yếu).
-            judged = light.get('back', 0) < 0.3 and not (light.get('mood') == 'night' and not light.get('key'))
+            # Không chấm: NGƯỢC SÁNG (ô cửa sáng / bóng đèn sau lưng ≥ 20 % — mặt trước tối đều là đúng), hay ĐÊM không có đèn gần.
+            # (Ngưỡng 0,2 — đợt 29: ông đứng ngay trước ô cửa phòng khách, cửa sau lưng 21–24 %: phía trước tối đều là đúng, nửa
+            # phía đèn chỉ sáng hơn 6–7 %.)
+            judged = light.get('back', 0) < BACKLIT and not (light.get('mood') == 'night' and not light.get('key'))
             results.append({'scene': folder, 't': t, 'who': person['name'], 'tall': round(person['tall']), 'side': lit, 'contrast': round(contrast, 4),
                             'shading': round(contrast - flat, 4), 'light': light,
                             'ok': (contrast >= LEAST or contrast - flat >= LEAST) if judged else None})
@@ -141,7 +144,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     results = [r for folder in args.scenes for r in check_scene(folder, args.keep, args.all)]
     for r in results:
-        why = '' if r['ok'] is not None else ' — not judged: ' + ('backlit' if r['light'].get('back', 0) >= 0.3 else 'night, no lamp near')
+        why = '' if r['ok'] is not None else ' — not judged: ' + (f'backlit (a bright window or lamp behind {r["light"]["back"] * 100:.0f} % of the head and upper body)' if r['light'].get('back', 0) >= BACKLIT else 'night, no lamp near')
         print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))} {r["t"]:g} s: {r["who"]} ({r["tall"]} px) — light from the {r["side"]}: '
               f'that half {r["contrast"] * 100:+.1f} % brighter (shading {r["shading"] * 100:+.1f} %; least {LEAST * 100:g} %){why}')
     bad = [r for r in results if r['ok'] is False]

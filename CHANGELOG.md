@@ -7,8 +7,8 @@ Added — handing over, seated people and the lit side, measured
   light is brighter than the other half — the one lighting question the reviewer kept failing (0.68.0). It captures
   the opening frame three times (as is, without the characters — their pixels are what differs —, and without the body
   shading), and compares the brightness of the two halves of each person's head and upper body: the half facing the
-  light must be 8 % brighter (or the shading must add 8 %). Backlit people and people at night with no lamp near are
-  reported, not judged; `--all` also measures at the acting moments. `tools/chrome_run.py --steps` runs several
+  light must be 8 % brighter (or the shading must add 8 %). Backlit people (a bright window or lamp behind ≥ 20 % of the
+  head and upper body) and people at night with no lamp near are reported, not judged; `--all` also measures at the acting moments. `tools/chrome_run.py --steps` runs several
   evaluations and screenshots in one page load for it.
 - `tools/acting_check.py` measures more: **`carry`** (the hand reaches the pet, and at the end of the turn the pet is in
   the arms, against the body), and a **seated** person's seat line against the top of the sofa / bench under them
@@ -54,9 +54,12 @@ with the two 0.68.0 acting scenes and the CI scene, 37 of 37
   the light got nothing, only the far side darkened: people in daylight are now warmed by the sun / window on that side
   (0.32) and a little darker on the other (0.34, was 0.24). Night, evening and lamp-lit shading are unchanged.
   Measured with `light_side.py` on 21 people in 8 scenes (the 4 above and the 4 lighting trial scenes from 0.66.0):
-  6 passed before, 19 now; median shading in daylight +4.7 % → +12.2 % of the brightness, visible difference between the
-  halves +5.9 % → +11.7 %. The 2 still below 8 % are grandpa partly backlit by the living-room window (+6.1 / +6.5 %).
-  Not judged: 2 night scenes with no lamp near (shading +4 %, as before).
+  6 passed before; median shading in daylight +4.7 % → +12.2 % of the brightness, visible difference between the
+  halves +5.9 % → +11.7 %. A window only partly behind someone (up to ~20 % of the head and upper body) no longer
+  dims the lit side as much as a window right behind them (grandpa in the living room +6.1 / +6.5 % → +6.9 / +6.5 %).
+  He stands right in front of that window (21–24 % of his head and upper body), so `light_side.py` now counts a bright
+  window or lamp behind ≥ 20 % as backlit and says so instead of judging it (0.3 before): 18 of 18 judged pass. Not
+  judged: 5 backlit (living room, 21–50 %) and 2 night scenes with no lamp near (shading +4 %, as before).
 
 Known
 - A pet handed over and put down by the receiver goes back to the spot it was first picked up from, sliding across

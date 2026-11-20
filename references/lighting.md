@@ -117,5 +117,5 @@ brighter — warmed by it in daylight — and the other half darker and cooler. 
 measures it on the opening frame (where the reviewer is asked): it captures the frame, the frame without the
 characters (to find their pixels) and the frame without the body shading, and compares the brightness of the two
 halves of each person's head and upper body. The half facing the light must be at least 8 % brighter (or the shading
-must add 8 %). Backlit people (a bright window behind them) and people at night with no lamp near are reported but not
+must add 8 %). Backlit people (a bright window or lamp behind at least 20 % of their head and upper body) and people at night with no lamp near are reported but not
 judged. `--all` measures at the acting moments too.
