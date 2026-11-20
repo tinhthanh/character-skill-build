@@ -334,7 +334,7 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('a scene with vet-care steps does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'care3d', 'index.html'), encoding='utf-8').read().replace("'", '"')
-        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '"shine", set.target(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}', 'wear: ["cone", "bandage"]', '"brush", set.target(vet, cat, "body")', '"door": "left"', '["handOverPet", vet]', '["takePet", boy]', 'wear: ["mask", "gloves", "cap"]'):
+        for needle in ('"bowl", {"fill": "water"}', '"reading": "4.2 kg"', '"examine", set.target(vet, cat), "teeth"', '"giveTreat", set.target(vet, cat)', '"shine", set.aimAt(vet, cat)', '["leash", cat]', 'steps closer to cat for "examine"', 'items: {"R": "leash"}', 'wear: ["cone", "bandage"]', '"brush", set.target(vet, cat, "body")', '"door": "left"', '["handOverPet", vet]', '["takePet", boy]', 'wear: ["mask", "gloves", "cap"]'):
             if needle not in html: problems.append(f'vet care: {needle} is not in the composition')
 
     # Đợt 7: màn hình chia đôi khi gọi điện, thẻ thông báo trên khung.

@@ -39,6 +39,7 @@ def make(scenes, out):
                 lines.append(f'    Q{len(questions)}. {ask}')
     head = ('You are checking the lighting of a 2.5D animated film from still frames. For each question look ONLY at the named frame '
             'and answer strictly "yes" or "no" from what is visible in the picture (do not guess what the film intends). '
+            'Answer "n/a" only when the thing the question is about (a lamp, a TV, furniture, a flashlight…) is not in that frame at all. '
             'Reply with a JSON array only, one item per question: [{"q": 1, "a": "yes", "why": "a few words"}, …].\n')
     open(os.path.join(out, 'prompt.txt'), 'w', encoding='utf-8').write(head + '\n' + '\n'.join(lines) + '\n')
     json.dump(questions, open(os.path.join(out, 'questions.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -51,15 +52,20 @@ def score(answers_path, out, label):
     found = re.search(r'\[.*\]', text, re.S)                 # câu trả lời có thể bọc trong ```json … ```
     if not found: sys.exit('light_audit: no JSON array in the answers')
     answers = {int(item['q']): str(item.get('a', '')).strip().lower() for item in json.loads(found.group(0))}
-    failed = [q for q in questions if answers.get(q['q']) != 'yes']
-    passed = len(questions) - len(failed)
+    # "n/a": thứ được hỏi không có trong khung (đèn ngoài khung lúc ấy) — không tính vào điểm, nhưng liệt kê: câu hỏi chọn
+    # sai lúc, sửa moments.json chứ không sửa hình.
+    skipped = [q for q in questions if answers.get(q['q']) in ('n/a', 'na')]
+    failed = [q for q in questions if answers.get(q['q']) not in ('yes', 'n/a', 'na')]
+    counted = [q for q in questions if q not in skipped]
+    passed = len(counted) - len(failed)
     per_scene = {}
-    for q in questions: per_scene.setdefault(q['scene'], [0, 0]); per_scene[q['scene']][1] += 1; per_scene[q['scene']][0] += answers.get(q['q']) == 'yes'
-    print(f'light_audit: {passed}/{len(questions)} yes ({100 * passed / max(1, len(questions)):.0f} %) — ' + ' · '.join(f'scene {n}: {a}/{b}' for n, (a, b) in sorted(per_scene.items())))
+    for q in counted: per_scene.setdefault(q['scene'], [0, 0]); per_scene[q['scene']][1] += 1; per_scene[q['scene']][0] += answers.get(q['q']) == 'yes'
+    print(f'light_audit: {passed}/{len(counted)} yes ({100 * passed / max(1, len(counted)):.0f} %)' + (f', {len(skipped)} n/a' if skipped else '') + ' — ' + ' · '.join(f'scene {n}: {a}/{b}' for n, (a, b) in sorted(per_scene.items())))
+    for q in skipped: print(f'  · Q{q["q"]} scene {q["scene"]} at {q["t"]:g} s: not in the frame — {q["ask"]}')
     for q in failed: print(f'  ✗ Q{q["q"]} scene {q["scene"]} at {q["t"]:g} s ({q["what"]}): {q["ask"]} — answered {answers.get(q["q"], "nothing")!r}')
     history_path = os.path.join(out, 'history.json')
     history = json.load(open(history_path, encoding='utf-8')) if os.path.isfile(history_path) else []
-    history.append({'date': datetime.date.today().isoformat(), 'label': label, 'yes': passed, 'total': len(questions),
+    history.append({'date': datetime.date.today().isoformat(), 'label': label, 'yes': passed, 'total': len(counted), 'na': [q['q'] for q in skipped],
                     'scenes': {str(n): f'{a}/{b}' for n, (a, b) in sorted(per_scene.items())}, 'failed': [q['q'] for q in failed]})
     json.dump(history, open(history_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 

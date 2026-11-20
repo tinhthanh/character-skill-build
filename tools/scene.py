@@ -218,7 +218,8 @@ SET_PRESETS = {
     # NGOÀI TRỜI: tường sau là bầu trời + đồi xa (vẽ bằng dải màu), hai tường bên cùng màu trời để không thành vách phòng.
     'park': {
         'room': {'width': 2200, 'depth': 1500, 'floor': '#8cc46d', 'floor2': '#84bb66', 'tile': 260,
-                 'wall': 'linear-gradient(#a9d8f2 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)', 'sideWall': 'linear-gradient(#b9e0f4 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)'},
+                 'wall': 'linear-gradient(#a9d8f2 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)', 'sideWall': 'linear-gradient(#b9e0f4 0%, #dff1fa 58%, #a7d48a 58%, #8fc571 100%)',
+                 'skyline': 0.58},                   # trời vẽ trên tường tới 58 % bề cao: tối theo giờ như bầu trời, không như tường
         'boxes': [{'name': 'bench', 'x': 220, 'z': -880, 'width': 340, 'depth': 110, 'height': 85, 'color': '#a47551', 'top': '#c08f66', 'side': '#8c6243'}],
         'cutouts': [{'kind': 'tree', 'x': -720, 'z': -1100}, {'kind': 'tree', 'x': 780, 'z': -1000, 'color': '#5f9a68'}, {'kind': 'lamp', 'x': -260, 'z': -1150},
                     {'kind': 'plant', 'x': 900, 'z': 60, 'height': 560, 'color': '#a47551'}],
@@ -244,7 +245,7 @@ SET_PRESETS = {
         'spots': 'owner on the sofa: "on": "sofa", x -300, z -820, "seated": true · pet on the floor: x 0, z -500 · a standing lamp "lamp" by the sofa (lit in the evening / at night; "lamp": "on" / "off" on a turn)',
     },
 }
-ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall', 'gloss')
+ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall', 'gloss', 'skyline')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
 CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on')
@@ -350,11 +351,40 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
     turns, total = timings.get('turns', []), float(timings['duration'])
     at = lambda turn, delay: round(min(total - 0.1, float(turns[turn][0]) + delay), 2) if turn < len(turns) else None
     pet_of = lambda name: name and names.get(name, {}).get('_pet')
-    moments = [{'t': round(min(1.0, total / 2), 2), 'what': 'opening', 'ask': [
-        'Does every character cast a visible shadow on the floor (a darker patch under or beside the feet)?',
+    dark_start = any(not op['on'] and op['turn'] == 0 for op in power_ops)       # mở cảnh bằng mất điện: tối, không hỏi về bóng
+    moments = [{'t': round(min(1.0, total / 2), 2), 'what': 'opening', 'ask': ([] if dark_start else [
+        'Does every character cast a visible shadow on the floor (a darker patch under or beside the feet)?']) + [
         'Do the characters take on the colour of the room light (not flat and pasted on)?']
-        + (['Do the pieces of furniture (tables, sofa, counters) cast shadows on the floor?'] if stage_set.get('boxes') or stage_set.get('preset') else [])
-        + ['Is every piece of furniture and every object near the edges either fully inside the frame or fully outside it (none cut in half by the frame edge)?']}]
+        + (['Do the pieces of furniture (tables, sofa, counters) cast shadows on the floor?'] if (stage_set.get('boxes') or stage_set.get('preset')) and not dark_start else [])
+        + ['Is every piece of furniture (sofa, table, TV, counter, cabinet) either fully inside the frame or fully outside it, none cut in half by the left or right edge? (Ignore walls, trees, signs and pictures on walls.)']
+        + ([] if dark_start else ['Is the side of each character that faces the main light brighter (or warmer) than the side away from it?'])
+        + (['Are the shadows long, and do all of them point in roughly the same direction?'] if stage_set.get('light', 'day') == 'evening' else [])}]
+    # Câu hỏi KHÓ hơn theo bối cảnh (đợt 23 — bộ câu cũ đạt 26/27, không còn chỉ ra chỗ yếu): bóng chiều cùng hướng, vũng sáng
+    # dưới đèn đường, ánh TV, so sáng tối người gần / xa đèn.
+    mood = stage_set.get('light', 'day')
+    kinds = [item.get('kind') for item in stage_set.get('cutouts', [])]
+    later = round(min(total - 0.2, max(1.5, total * 0.6)), 2)
+    extra = []
+    if mood != 'day' and 'lamp' in kinds: extra += ['Is there a pool of light on the ground under the lit street lamp?',
+                                                    'Is a character standing near the lit lamp brighter than one standing far from it (or than the dark ground around)?']
+    if mood != 'day' and 'tv' in kinds: extra += ['Does the TV screen throw a coloured (bluish) glow onto the wall or the people near it?']
+    if mood != 'day' and ('lamp' in kinds or 'floorlamp' in kinds or stage_set.get('lamps')): extra += ['Does each character\'s shadow point away from the nearest lit lamp?']
+    # Trời tối dần trong cảnh: đèn chỉ bật khi trời đã tối được hơn nửa — hỏi về đèn sau khi trời chuyển xong.
+    for op in sky_ops:
+        if op['to'] == 'night' and op['turn'] < len(turns): later = round(min(total - 0.2, float(turns[op['turn']][0]) + op['dur'] * 0.85), 2)
+    # Không hỏi về đèn / TV đúng lúc đang MẤT ĐIỆN: dời sang sau lúc có điện lại (hay bỏ nếu không còn lúc nào).
+    cuts, off = [], None
+    for op in sorted(power_ops, key=lambda op: op['turn']):
+        start = float(turns[op['turn']][0]) if op['turn'] < len(turns) else total
+        if not op['on'] and off is None: off = start
+        elif op['on'] and off is not None: cuts.append((off, start + 2.5)); off = None
+    if off is not None: cuts.append((off, total + 1))
+    for a, b in cuts:
+        if a - 0.2 <= later <= b: later = round(b, 2) if b < total - 0.2 else None
+    # Không có trời chuyển / mất điện: hỏi ngay ở góc toàn mở cảnh (đèn, TV có trong khung) — một lúc giữa cảnh thường là góc
+    # cận, đèn ngoài khung (đợt 23: 5 câu "không thấy đèn").
+    if extra and later is not None and not sky_ops and not power_ops: moments[0]['ask'] += extra
+    elif extra and later is not None: moments.append({'t': later, 'what': 'light of the place', 'ask': extra})
     for op in power_ops:
         if op['on']: moments.append({'t': at(op['turn'], 2.0), 'what': 'power back on', 'ask': ['Are the lamps lit and the room clearly brighter than during the power cut?']})
         else: moments.append({'t': at(op['turn'], 1.0), 'what': 'power cut', 'ask': [
@@ -363,7 +393,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
     for op in sky_ops:
         moments.append({'t': at(op['turn'], 0.3), 'what': f'sky turning to {op["to"]} — start', 'ask': ['Is the whole room in the frame (walls, floor, the lamp), not a close-up of one face?']})
         moments.append({'t': at(op['turn'], op['dur'] + 0.5), 'what': f'sky turning to {op["to"]} — end', 'ask': [
-            'Is the room clearly darker and bluer than in the previous frame?'] + (['Is a lamp switched on and glowing?'] if op['to'] == 'night' and stage_set.get('light', 'day') != 'night' else [])})
+            f'Is the place clearly darker and bluer than in the frame at {at(op["turn"], 0.3):g} s?', f'Is the sky (or the windows) darker than in the frame at {at(op["turn"], 0.3):g} s?'] + (['Is a lamp switched on and glowing?'] if op['to'] == 'night' and stage_set.get('light', 'day') != 'night' else [])})
     for op in lamp_ops:
         moments.append({'t': at(op['turn'], op['delay'] + op['dur'] + 0.4), 'what': f'lamp {"on" if op["on"] else "off"}', 'ask': [
             'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
@@ -765,7 +795,8 @@ def main():
                 if item[1:] not in names: fail(f'{where}: "{item}" refers to a character that is not in the scene')
                 # Bối cảnh 3D: chỉ tay / vuốt ve nhắm theo vị trí TRONG PHÒNG (set.target), không theo màn hình lúc dựng —
                 # máy quay còn đổi góc sau đó.
-                if stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat', 'shine'): parts.append(f"set.target({actor}, {item[1:]})")
+                if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
+                elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body')")
                 else: parts.append(item[1:])
             else:
@@ -1387,6 +1418,7 @@ def main():
                 lamps.append({'name': f'screen{n + 1}', 'kind': 'screen', 'x': item['x'], 'z': float(item['z']) + 30, 'y': round(float(item.get('y', 0)) + tall * (0.25 if tv else 0.3)), 'color': '#a8d8ff', 'power': 0.9 if tv else 0.5, 'range': 1300 if tv else 420, 'on': True})
         light = {'mood': stage_set.get('light', 'day')}
         if room.get('gloss'): light['gloss'] = True
+        if room.get('skyline'): light['skyline'] = float(room['skyline'])
         if stage_set.get('shading') is False: light['shading'] = False        # không đổ bóng trên thân nhân vật: render nhanh hơn
         if stage_set.get('lens') is False: light['lens'] = False              # không chỉnh màu / tối góc / hạt phim
         if lamps: light['lamps'] = lamps

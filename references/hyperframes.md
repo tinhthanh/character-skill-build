@@ -619,6 +619,7 @@ character facing right is seen more from the front as the camera moves to the ri
 | `set.drive(tl)` | call it once the master timeline is built: it adds an empty tween over the whole timeline whose setter schedules `set.update()` on every frame, including frames the renderer reaches with `seek(t)`, which skips `onUpdate`. Without it, a frame rendered that way keeps the camera of the frame drawn before it; HyperFrames renders frames in parallel, so during a camera move neighbouring frames alternate between two camera positions and the picture flickers. `tools/scene.py` writes it |
 | `set.project(x, y, z)` | where a point of the set lands: `{ x, y, scale, depth }` |
 | `set.target(from, to, part = 'head')` | aim for `from.point(…)` / `from.stroke(…)` at `to`'s head — or with `'body'` at its body, for `listen` / `inject` — from positions in the room — use it instead of passing the rig: those actions otherwise aim for the camera angle at build time. The hand reaches in `from`'s own plane only: give both the same `z` |
+| `set.aimAt(from, to)` | aim for `from.shine(…)` (flashlight) at where `to`'s head really appears on the screen, depth included — a pet nearer the camera looks lower than in `from`'s plane. `tools/scene.py` uses it for `["shine", "@cat"]` |
 
 Limits to know before you plan a shot:
 

@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.63.0
+
+Added — the light outdoors, on the TV, and in a vertical frame
+- **The sky follows the time of day**: the part of the frame above the walls (the set's background) gets a layer
+  that turns warm and dim in the evening and dark blue at night. A vertical frame shows half its height above
+  the walls, and that was bright blue in the middle of the night. A sky painted on a wall (the park:
+  `"skyline": 0.58` in `room`) darkens the same way.
+- **Street lamps throw a pool of light** on the ground below them in the evening and at night, and their shadows
+  are darker (people's shadows used to sit right under their feet).
+- **The TV glows on the wall** behind it at night, in the colour of the picture it is showing, flickering with it.
+- **Shadows soften with distance**: dark and sharp at the feet, paler and blurred towards the tail; long shadows
+  blur more.
+- **`set.aimAt(from, to)`**: a target where `to` really appears on the screen, for `shine` — a pet nearer the
+  camera than the person looks lower than it would in the person's plane, and the beam went over its head. The
+  flashlight beam is also longer and lights what lies along it further away.
+- In the evening the side of a character facing the sun is a little warmer and the far side darker.
+- A wide (full) shot moves back up to 35 % to take in a piece of furniture the frame edge would cut in half (the
+  TV in a vertical living room); a vertical frame may move further sideways for it.
+
+Changed — the lighting check
+- Harder questions: long evening shadows pointing the same way, a pool of light under a street lamp, a person
+  near a lamp brighter than the dark around, shadows pointing away from the lamp, the TV's glow, which side of a
+  character faces the light, and the place getting darker than at the start of the sky change (named by time).
+- A question about something that is not in the frame can be answered "n/a"; it is left out of the score and
+  listed. Questions about lamps go in the wide opening shot when nothing changes the light, after nightfall when
+  the sky turns, and never while the power is off.
+
+Measured — `light_audit.py` on a 5-scene vertical film (park evening → night, street at night, TV, power cut,
+clinic)
+- With the 0.62.0 lighting and the new questions: 28 / 49 — many of them asked about lamps out of the frame.
+- After the sky layer, lamp pools, TV glow and the question fixes: 37 / 45 (3 n/a). Still failing: furniture cut
+  by the edge of the vertical frame (fixed after this run for full shots, checked on the frame), the TV glow
+  (made brighter after this run), the lamp head out of frame at the end of the sky change, the exam table's
+  shadow in the vertical clinic shot.
+
 ## 0.62.0
 
 Added — checking the light from still frames
