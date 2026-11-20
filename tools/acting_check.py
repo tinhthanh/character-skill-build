@@ -109,7 +109,9 @@ def check_put_down(folder, c, frames):
         x0, x1 = min(b['x0'] for b in boxes), max(b['x1'] for b in boxes)
         body = who['body']
         apart = max(body['x0'] - x1, 0, x0 - body['x1']) / who['tall']
-        spots.append((t, apart, (x0 + x1) / 2 / who['tall']))
+        # Chỗ con vật SO VỚI người đặt (chia chiều cao người): máy cắt sang góc khác giữa các lúc đo thì vị trí trên màn hình đổi
+        # mà con vật không hề đi (đợt 30: "trượt 39,6 %" khi máy cắt sang góc bé vuốt con chó).
+        spots.append((t, apart, ((x0 + x1) / 2 - (body['x0'] + body['x1']) / 2) / who['tall']))
     if not spots: return [{'scene': folder, 'what': f'{c["who"]} puts {c["target"]} down', 'ok': None, 'note': 'not both in the frame (or still carried)'}]
     worst = max(spots, key=lambda s: s[1])
     slide = max(s[2] for s in spots) - min(s[2] for s in spots)

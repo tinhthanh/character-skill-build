@@ -22,7 +22,7 @@ Added — the machine sees what the reviewers saw in 0.69.0
 
 Fixed — measured on the 4 dot29 trial scenes (clinic hand-over, living-room hand-over, sofa, bench), the 4 lighting
 trial scenes, the two 0.68.0 acting scenes and the park CI scene: with the new checks the 0.69.0 code fails 6 acting
-measurements (in 4 scenes) and 7 furniture moments (in the 8 trial scenes); now 99 of 99 pass, and 27 of 27 on the
+measurements (in 4 scenes) and 7 furniture moments (in the 8 trial scenes); now 99 of 99 pass, and 30 of 30 on the
 two CI scenes
 - **A seated person reaches the pet past their knees**: they lean over their knees towards it — up to 40°, just enough
   for its head to come within reach — and the arm is aimed from the real, seated shoulder (it was aimed from the
@@ -34,6 +34,13 @@ two CI scenes
   height from her, park CI scene 19.9 % → 0.0 %. The offset belongs to the receiver (`petDrop`, read by the pet's
   `dropX()`), so seeking anywhere in the timeline gives the same place; `tools/scene.py` tells `takePet` where a pet
   that walked earlier stood (`{ petAt }`) — at build time its state is back at frame 0.
+- **A later turn finds the pet where it was put down**: `tools/scene.py` follows `carry` → `handOverPet` → `putDown`
+  and stores where the receiver puts the pet (the same spot as the rig), so a later stroke / pick-up / walk-over aims
+  there. Before, the boy who had just put the dog down by his feet walked over to the bench, where grandpa had picked
+  it up, to stroke it: 12.2 % of his height from the dog → 0.9 %, no step. The park CI scene ends with that stroke.
+- `acting_check`: "stays put" compares the pet's place with the person who put it down (a camera cut between the
+  moments read as a 39.6 % slide), and its last moment is before the next turn; a kneeling person is no longer taken as
+  seated on the bench behind them (seat line "+6.7 % sunk in").
 - **Furniture no longer cut by the frame edge**: `frameOn` fixed one piece at a time, and the last pass of the full
   shot re-centred the camera to take in the coffee table, which put the TV it had just pushed out back on the right
   edge (49 %). Now, when something is still cut, it tries a range of camera positions (and, for a full or medium
@@ -41,8 +48,6 @@ two CI scenes
   cut; boxes are measured by their nearer face, not their middle. All 7 furniture misses above pass.
 
 Known
-- A pet put down by the receiver is placed by the runtime; `tools/scene.py` still thinks it stands where it was picked
-  up, so a later turn that reaches for it (stroke, pick up) may step to the wrong place.
 - Stroking from a sofa, granny leans far over her knees (up to 40°) and the cat stands partly behind her shins.
 - To keep the furniture whole a medium shot of two subjects far apart can be almost as wide as the full shot.
 

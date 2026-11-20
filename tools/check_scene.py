@@ -595,7 +595,9 @@ with tempfile.TemporaryDirectory() as work:
         {'name': 'ong', 'id': 'grandpa', 'z': -880, 'x': 380, 'on': 'bench', 'seated': True, 'holds': 'cup', 'holdsHidden': True},
         {'name': 'be', 'id': 'boy', 'z': -880, 'x': -200, 'holds': 'cup'}, {'name': 'cho', 'species': 'corgi', 'z': -880, 'x': 820}],
         'script': [{'who': 'be', 'do': [['handOver', '@ong']]}, {'who': 'ong', 'do': [['stroke', '@cho']]}, {'who': 'ong', 'do': [['carry', '@cho']]},
-                   {'who': 'ong', 'do': [['handOverPet', '@be']]}, {'who': 'be', 'do': ['putDown']}]}
+                   {'who': 'ong', 'do': [['handOverPet', '@be']]}, {'who': 'be', 'do': ['putDown']},
+                   # Đợt 30: bé vuốt con chó vừa đặt xuống cạnh chân mình — scene.py phải biết nó ở đó, không ở cạnh ghế đá.
+                   {'who': 'be', 'do': [['stroke', '@cho']]}]}
     path = os.path.join(os.path.dirname(stage), '_check_handover.json')
     try:
         json.dump(handover, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -607,13 +609,15 @@ with tempfile.TemporaryDirectory() as work:
         html = open(os.path.join(work, 'handover', 'index.html'), encoding='utf-8').read()
         for needle in ('items: {"L": "cup"}, itemsHidden: true', '[ong, ["take", be]]', '[be, ["takePet", ong, { petAt: ', '// cho comes over to ong (seated) for "stroke"', "set.target(ong, cho, 'head', { at: "):
             if needle not in html: problems.append(f'handover: {needle} is not in the composition')
+        if '// be steps closer to cho' in html: problems.append('handover: the boy walks to where the dog was picked up, not to where he put it down')
         checks = [m['check'] for m in json.load(open(os.path.join(work, 'handover', 'moments.json'), encoding='utf-8')) if m.get('check')]
-        if sorted((c['who'], c['kind'], c['to']) for c in checks) != [('be', 'handOver', 'hands'), ('be', 'putDown', 'floor'), ('ong', 'carry', 'body'), ('ong', 'handOverPet', 'hands'), ('ong', 'stroke', 'body')]:
+        if sorted((c['who'], c['kind'], c['to']) for c in checks) != [('be', 'handOver', 'hands'), ('be', 'putDown', 'floor'), ('be', 'stroke', 'body'), ('ong', 'carry', 'body'), ('ong', 'handOverPet', 'hands'), ('ong', 'stroke', 'body')]:
             problems.append(f'handover: moments.json checks are {checks}')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'handover')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('handover: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         elif 'in the arms' not in done.stdout or 'seated on the seat' not in done.stdout: problems.append('handover: acting_check did not measure the carried pet and the seated person:\n' + done.stdout[-400:])
         # Đợt 30: bé NHẬN con chó rồi đặt xuống — nó nằm cạnh chân bé, không trượt về cạnh ghế đá (chỗ ông bế nó lên).
+        elif 'be stroke cho — hand reaches' not in done.stdout: problems.append('handover: acting_check did not measure the boy stroking the dog he put down:\n' + done.stdout[-400:])
         elif 'be puts cho down — next to the feet' not in done.stdout or 'stays put' not in done.stdout: problems.append('handover: acting_check did not measure the put-down:\n' + done.stdout[-400:])
         done = subprocess.run([sys.executable, os.path.join(HERE, 'light_side.py'), os.path.join(work, 'handover')], capture_output=True, text=True)
         if done.returncode != 0 or ' pass' not in done.stdout or '0/0' in done.stdout: problems.append('handover light: ' + (done.stdout.strip() or done.stderr.strip())[-600:])

@@ -439,7 +439,9 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                          for step in timings['reaches'][n] if step['name'] == 'putDown'), None)
             if not step: continue
             t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
-            times = [round(t0 + (t1 - t0) * 0.62, 2), round(t1, 2), round(min(t1 + 0.8, float(timings.get('duration') or t1 + 0.8)), 2)]
+            # Lúc đo cuối: 0,8 s sau bước, nhưng trước lượt kế — lượt sau người đặt có thể bước đi (đo chỗ con vật so với người ấy).
+            after = min([t1 + 0.8, float(timings.get('duration') or t1 + 0.8)] + [float(a) - 0.05 for a, _ in turns if float(a) > t1 + 0.1])
+            times = [round(t0 + (t1 - t0) * 0.62, 2), round(t1, 2), round(max(t1, after), 2)]
             moments.append({'t': times[1], 'what': f'{op["who"]} puts {op["target"]} down', 'ask': [f'Is the animal ({op["target"]}) on the floor right next to {op["who"]}\'s feet (not across the room, not sliding away)?'],
                             'check': {'kind': 'putDown', 'who': op['who'], 'target': op['target'], 'to': 'floor', 'times': times}})
             continue
@@ -1211,7 +1213,9 @@ def main():
                     # Rig 2D chỉ vươn tay trong MẶT PHẲNG của chính nó: con vật / người nhận đứng gần máy hơn (hay xa hơn) thì
                     # trên màn hình nó thấp hơn (cao hơn) chỗ bàn tay với tới. Bước lại gần chỉ đi theo trục x.
                     reach_notes.append(f'{where}: "{who["name"]}" reaches for "{step[1][1:]}" ({step[0]}), which stands at z {float(names[step[1][1:]].get("z", -300)):g} — {abs(float(names[step[1][1:]].get("z", -300)) - float(who.get("z", -300))):g} units nearer or further than "{who["name"]}" (z {float(who.get("z", -300)):g}). A hand only reaches in its own plane: give them the same z (within 60)')
-                gap = float(names[step[1][1:]]['x']) - float(who['x'])
+                # Con vật người NHẬN đã đặt xuống (`takePet` … `putDown`) đứng cạnh chân người ấy, không ở chỗ được bế lần đầu:
+                # `_drop` (đơn vị phòng) — `x` chỉ là quãng nó tự đi (`s.x`, cho `at` / `petAt`) (đợt 30).
+                gap = float(names[step[1][1:]]['x']) + names[step[1][1:]].get('_drop', 0) - float(who['x'])
                 # Đưa đồ: hai bàn tay gặp nhau ở giữa như bắt tay (0,28 — đợt 29: 0,45 để tay cách tay 20 % chiều cao); trao con vật
                 # đang bế: 0,34 (0,42: 7,8 %); bắt tay: 0,22; chạm tới con vật: gần như vuốt ve.
                 # Soi đèn / đưa bánh thưởng tới ĐẦU con vật (cao hơn thân, xa vai hơn): đứng sát hơn nữa (0,16), không thì tay
@@ -1243,7 +1247,7 @@ def main():
                         if other is who or other['_pet'] or other.get('seated') or abs(float(other.get('z', -300)) - float(who.get('z', -300))) > 60: continue
                         if abs(float(other['x']) - spot) >= 0.3 * who['_host_height']: continue
                         # Lùi về phía xa con vật hơn — sang hẳn bên kia chỗ đứng mới, chừa khoảng cho hai thân người.
-                        side = -1 if float(target['x']) > spot else 1
+                        side = -1 if float(target['x']) + target.get('_drop', 0) > spot else 1
                         aside = spot + side * 0.4 * max(who['_host_height'], other['_host_height']) - float(other['x'])
                         turns.append((f'  // {other["name"]} makes room for {who["name"]} by {step[1][1:]}', f"[{other['name']}, ['walk', 4, {round(aside / other['_unit'])}]]"))
                         emitted[0] += 1
@@ -1375,6 +1379,12 @@ def main():
                     pet = names[held]
                     walked = (float(pet['x']) - float(pet['_x0'])) / pet['_unit'] if pet.get('_unit') and pet.get('_x0') is not None else 0
                     extra = f", {{ petAt: {round(walked, 1):g} }}"
+                    # CHỖ NGƯỜI NHẬN SẼ ĐẶT NÓ XUỐNG — tính đúng như rig (`takePet`): cạnh chân người nhận, phía không có người trao,
+                    # cách 60 đơn vị khung người + 1/4 bề ngang khung con vật. Lượt sau với tới / đi tới con vật tính từ chỗ ấy
+                    # (đợt 30: tính từ chỗ cũ thì bé bước sang tận ghế đá để vuốt con chó đang nằm cạnh chân mình).
+                    giver, taker = names[entry['who']], names[name]
+                    side = -1 if float(giver['x']) > float(taker['x']) else 1
+                    pet['_drop'] = float(taker['x']) + side * (60 * taker['_unit'] + 100 * pet['_unit']) - float(pet['x'])
                 code = '{ together: [' + code + f", [{names[name]['name']}, [{js('take' if kind == 'handOver' else 'takePet')}, {names[entry['who']]['name']}{extra}]]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
