@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.64.0
+
+Fixed — the camera and the light it is meant to show
+- After the sky turns to night the wide shot is held until the change is three quarters done, so the lamps are
+  seen switching on — the next close shot came first and the street lamp head was out of the frame.
+- A turn where someone walks may cut away from the previous shot after 1 s, like a spoken line: holding the
+  shot for 2.5 s let the boy walk out of a medium shot, half his head left at the frame edge.
+- A pet squints when the flashlight beam crosses its face ON THE SCREEN (the beam is aimed on the screen): measured
+  in the room, a pet nearer the camera than the person was off the beam's line even when the beam hit its face.
+- The soft shadow under a box spreads 40 further to each side, and the exam lamp hangs behind and to the right
+  of the table: its shadow falls diagonally to the front left and shows even in a vertical frame, where the
+  strip of floor in front of the table is very thin.
+
+Added
+- `"grain": false` in a scene's `"set"` (`set.light({ grain: false })`): drop only the film grain. Measured on a
+  13.6 s vertical scene: about 17.5 s to render with grain, 14 s without (the grain is the costly part of the
+  lens layer; the colour grade, vignette, body shading and blurred shadows cost little). Use it for drafts.
+- Walking past lamps at night: two moments in `moments.json` (start and end of the walk) asking whether the
+  shadow changed direction or length and whether the character is brighter nearer a lamp.
+
+Measured
+- `light_audit.py` on park → night, a walk past two street lamps, a power cut with a flashlight, the clinic
+  (vertical): 32 / 39 (3 n/a). The new walking questions pass (the shadow turns from right to left past the lamp;
+  he is brighter next to it), the lamp is seen lit after nightfall, the exam table shows its shadow. Failing:
+  which side faces the light (three times — the shading is too soft to read at that size), the TV cut by the edge
+  in the power-cut opening, the cat's squint in the power cut (fixed after the run, above), the boy under the lamp
+  not brighter than the lit ground, flat characters in the clinic.
+- Tried and dropped: aiming the flashlight through a fixed straight-on camera instead of the camera at build
+  time — in a vertical frame the real camera is nearer and tilted more, and the beam went over the cat's head.
+- Per-frame update (seek + `set.update` + style and layout) is about 0.35 ms — the time goes into painting, not
+  into the script.
+- Two replacements for the grain did not render faster (a noise tile drawn once on a canvas; the same noise with
+  normal blending), and the machine's load made later timings noisy (the same render 17 s, then 29 s), so the
+  grain stays as it was, with the switch to turn it off.
+
 ## 0.63.0
 
 Added — the light outdoors, on the TV, and in a vertical frame

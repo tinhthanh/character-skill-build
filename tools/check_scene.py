@@ -523,6 +523,7 @@ with tempfile.TemporaryDirectory() as work:
     lit['script'].append({'who': 'vet', 'power': 'off'})                             # đợt 20: mất điện, trời chuyển, tắt ống kính
     lit['script'].append({'who': 'vet', 'power': 'on', 'sky': {'to': 'day', 'dur': 4}})
     lit['set']['lens'] = False
+    lit['set']['grain'] = False                                                      # đợt 24: bỏ riêng hạt phim
     path = os.path.join(os.path.dirname(stage), '_check_light.json')
     try:
         json.dump(lit, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -534,7 +535,7 @@ with tempfile.TemporaryDirectory() as work:
         html = open(os.path.join(work, 'lit', 'index.html'), encoding='utf-8').read()
         for needle in ('set.light({"mood": "night"', '"kind": "ceiling"', '"on": false', '"windows": [', 'set.lamp("tran", true, 0.6)', 'set.lamp("tran", false, 1)',
                        "['point', set.targetPoint(vet, set.lampPoint(\"tran\"))]", '.start + 0.85', 'set.lamp("tran", false, 0.12)', 'set.lamp("tran", true, 0.9)',
-                       'set.shift("day", 4)', '"lens": false'):
+                       'set.shift("day", 4)', '"lens": false', '"grain": false'):
             if needle not in html: problems.append(f'light: {needle} is not in the composition')
         # Đợt 22: moments.json — các khoảnh khắc ánh sáng (mất điện, có điện, trời chuyển, bật / tắt đèn) kèm câu hỏi có / không.
         moments_path = os.path.join(work, 'lit', 'moments.json')

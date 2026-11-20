@@ -506,7 +506,16 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     let glare = 0;
     if (lighting.torches.length && actor.height) {
       const box = rig.shotBox('face'), [fx, fy] = toSet(actor, box.x + box.width / 2, box.y + box.height / 2), reach = Math.max(90, 1.4 * box.width * actor.height / 470);
-      for (const torch of lighting.torches) if (torch.owner !== actor) glare = Math.max(glare, clamp(1.4 - beamGap(torch, fx, fy, actor.spot.z) / reach, 0, 1) * (torch.kind === 5 ? 1 : 0.85));
+      // Đo TRÊN MÀN HÌNH: luồng sáng là một nét vẽ trên màn hình (nhắm theo hình chiếu — `aimAt`), con vật gần máy hơn người
+      // cầm đèn thì trong không gian nó không nằm trên đường thẳng của luồng dù trên hình luồng rọi trúng mặt (đợt 24).
+      const face = set.project(fx, fy, actor.spot.z), r = Math.max(12, reach * face.scale);
+      for (const torch of lighting.torches) {
+        if (torch.owner === actor) continue;
+        const a = set.project(torch.hx, torch.hy, torch.z), tip = set.project(torch.x, torch.y, torch.z), ext = torch.kind === 5 ? 1.4 : 0.5;
+        const bx = tip.x + (tip.x - a.x) * ext, by = tip.y + (tip.y - a.y) * ext, vx = bx - a.x, vy = by - a.y;
+        const t = clamp(((face.x - a.x) * vx + (face.y - a.y) * vy) / (vx * vx + vy * vy || 1), 0, 1), gap = Math.hypot(a.x + vx * t - face.x, a.y + vy * t - face.y);
+        glare = Math.max(glare, clamp(1.4 - gap / r, 0, 1) * (torch.kind === 5 ? 1 : 0.85));
+      }
     }
     const eye = actor.eye || (actor.eye = { wrote: null, base: null });
     const own = eye.wrote && rig.s.matY === eye.wrote[0] && rig.s.dongTu === eye.wrote[1] ? eye.base : [rig.s.matY, rig.s.dongTu];
@@ -606,7 +615,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * mặc định bật khi trời tối / chiều. `windows`: [{ x, y, width, height, z }] — ô cửa trên tường sau (góc trên-trái), hắt
      * vệt nắng lên sàn ban ngày / chiều. Gọi một lần sau khi dựng phòng; `lamp(name, on)` bật / tắt trên timeline.
      */
-    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true, clouds = true, lens = true, skyline = 0 } = {}) {
+    light({ mood = 'day', lamps = [], windows = [], gloss = false, shading = true, clouds = true, lens = true, grain = true, skyline = 0 } = {}) {
       if (!MOODS[mood]) throw new Error(`[character] set.light: mood must be ${Object.keys(MOODS).join(', ')} — got ${JSON.stringify(mood)}`);
       const preset = MOODS[mood];
       lighting = { mood: preset, key: norm(preset.key), lamps: [], torches: [], pools: [], skyline, windows, gloss, dust: [], shading, clouds: clouds && !!preset.sun, cloud: 1, sunFaces: [], patches: [], base: preset, shift: null, lens: null, bloom: [] };
@@ -620,9 +629,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       view.insertBefore(lighting.sky, view.firstChild);
       lighting.skyKey = '';
       if (lens) {
-        const grain = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 1.6 -0.3"/></filter><rect width="220" height="220" filter="url(#n)"/></svg>')}")`;
+        const grainImage = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 1.6 -0.3"/></filter><rect width="220" height="220" filter="url(#n)"/></svg>')}")`;
         const make = (css) => { const el = document.createElement('div'); el.setAttribute('data-lens', ''); el.style.cssText = `position:absolute;inset:0;pointer-events:none;z-index:9000;${css}`; view.appendChild(el); return el; };
-        lighting.lens = { grade: make('mix-blend-mode:soft-light'), vignette: make(''), grain: make(`background-image:${grain};background-size:220px 220px;mix-blend-mode:overlay`), last: '' };
+        // `grain: false`: bỏ riêng hạt phim — lớp tốn nhất của ống kính (~20 % thời gian render, đo ở đợt 24); bản nháp dùng.
+        lighting.lens = { grade: make('mix-blend-mode:soft-light'), vignette: make(''), grain: grain ? make(`background-image:${grainImage};background-size:220px 220px;mix-blend-mode:overlay`) : null, last: '' };
       }
       lamps.forEach((spec, n) => {
         const color = spec.color || '#ffd59a', lamp = { name: spec.name || `lamp${n + 1}`, x: spec.x || 0, y: spec.y ?? 600, z: spec.z ?? -500, rgb: rgbOf(color),
@@ -798,7 +808,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // BÓNG TIẾP ĐẤT dưới hộp: một vệt tối mềm trên sàn, nhỉnh hơn chân hộp — không có nó cái bàn như dán lên sàn.
       // Một tấm TỐI ĐỀU bo góc, nhoè mép — không phải chuyển sắc tròn: tâm của chuyển sắc nằm khuất dưới thân hộp, phần lộ ra
       // ở mép thì gần như trong suốt; tô đỏ để soát thì thấy rõ (đợt 22: bàn khám như lơ lửng).
-      face(layer(0), width + 36, depth + 60, `translate3d(${x - 18}px, ${-y - 2}px, ${z - depth - 18}px) rotateX(90deg)`,
+      // Loang sang HAI BÊN rộng hơn (40 mỗi bên): máy thấp, dải sàn trước hộp hẹp — hai bên hộp mới là chỗ thấy bóng (đợt 24).
+      face(layer(0), width + 80, depth + 60, `translate3d(${x - 40}px, ${-y - 2}px, ${z - depth - 18}px) rotateX(90deg)`,
         `background:rgba(0,0,0,.3);border-radius:24px;filter:blur(10px);opacity:${y > 0 ? 0 : 1}`);
       const geomTop = { origin: [x, y + height, z - depth], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0], kind: 'box' };
       face(group, width, depth, `translate3d(${x}px, ${top}px, ${z - depth}px) rotateX(90deg)`, paint(tone.top, '#f1f4f5'), middle, geomTop);
@@ -881,6 +892,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const of = (rig) => actors.find((actor) => actor.rig === rig);
       if (!of(from) || !of(to)) throw new Error('[character] set.aimAt(from, to): both must be rigs placed with set.place()');
       const inner = set.target(from, to);
+      // Đo trên MÀN HÌNH lúc dựng timeline (góc máy lúc ấy). Đợt 24 thử thay bằng một máy quay chuẩn nhìn thẳng (không phụ
+      // thuộc góc máy) — khung dọc máy gần và chúc hơn nhiều, luồng đèn đi ngang qua đầu con mèo: bỏ, giữ cách này.
       const screen = () => {
         const a = of(from), b = of(to);
         if (!a.frame || !b.width) return null;
@@ -1003,11 +1016,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             lens.last = key;
             lens.grade.style.background = `rgba(${g.slice(0, 3).map(Math.round).join(',')},${g[3].toFixed(3)})`;
             lens.vignette.style.background = `radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,${mood.vignette.toFixed(3)}) 100%)`;
-            lens.grain.style.opacity = (mood.grain * 4.4).toFixed(3);                     // nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
+            if (lens.grain) lens.grain.style.opacity = (mood.grain * 4.4).toFixed(3);                     // nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
           }
           // Hạt phim: đổi chỗ mỗi khung hình (24 lần / giây), theo thời gian timeline.
           const frame = Math.floor(time * 24);
-          lens.grain.style.backgroundPosition = `${(frame * 73) % 220}px ${(frame * 131) % 220}px`;
+          if (lens.grain) lens.grain.style.backgroundPosition = `${(frame * 73) % 220}px ${(frame * 131) % 220}px`;
         }
         for (const lamp of lighting.lamps) {
           if (lamp.kind !== 'screen') continue;
@@ -1488,7 +1501,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Nhịp CÓ LỜI được ưu tiên: người đang nói phải lên hình — góc trước chỉ cần giữ 1 s (không thì câu của cậu bé
         // hiện chữ trên cảnh cận con mèo, cảnh thử đợt 14).
         let at = beat.time;
-        const hold = beat.speech ? Math.min(minShot, 1.0) : minShot;
+        const hold = beat.speech || beat.move ? Math.min(minShot, 1.0) : minShot;      // `move`: có người đi — đổi góc kịp trước khi họ ra khỏi khung
         if (shot && at - shot.at < hold) at = shot.at + hold;
         const next = beats.slice(index + 1).find((later) => later.fixed);
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có

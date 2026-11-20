@@ -180,7 +180,7 @@ PET_MOODS = ('happy', 'excited', 'sad', 'scared', 'angry', 'curious', 'guilty', 
 MOODS = ('happy', 'sad', 'surprised', 'angry', 'thinking', 'laughing', 'worried', 'confused', 'tired', 'crying', 'embarrassed', 'sleepy')
 BACKGROUND_KEYS = ('wall', 'wallDark', 'floor', 'floorHeight', 'image', 'preset')
 # BỐI CẢNH 3D ("set"): phòng dựng bằng mặt phẳng, máy quay đổi góc theo từng lượt ("view"). Xem runtime/set3d.js.
-SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps', 'shading', 'lens')
+SET_KEYS = ('sky', 'room', 'boxes', 'panels', 'cutouts', 'camera', 'origin', 'preset', 'light', 'lamps', 'shading', 'lens', 'grain')
 LIGHT_MOODS = ('day', 'evening', 'night')
 LAMP_KEYS = ('name', 'x', 'y', 'z', 'color', 'power', 'range', 'on', 'kind')
 # BỐI CẢNH DỰNG SẴN (`"set": { "preset": "reception" }`): đồ đạc của một căn phòng quen thuộc, đặt theo phòng mặc định
@@ -203,8 +203,9 @@ SET_PRESETS = {
                    {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff', 'window': True}],
         'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 600}],
         # ĐÈN KHÁM treo trên bàn, sáng cả ban ngày: một vùng sáng tập trung trên bàn, bóng đổ rõ dưới bàn và dưới chân người
-        # — phòng khám trắng sáng đều thì phẳng như tờ giấy (Gemini soát ánh sáng đợt 21: 2/10).
-        'lamps': [{'name': 'exam', 'x': 200, 'y': 640, 'z': -720, 'kind': 'ceiling', 'color': '#fff4e0', 'power': 0.8, 'range': 900, 'on': True}],
+        # — phòng khám trắng sáng đều thì phẳng như tờ giấy (Gemini soát ánh sáng đợt 21: 2/10). Đèn ở SAU, lệch PHẢI bàn: bóng
+        # bàn đổ chéo sang trái phía trước — thấy được cả ở khung dọc, nơi dải sàn trước bàn rất hẹp (đợt 24).
+        'lamps': [{'name': 'exam', 'x': 430, 'y': 640, 'z': -760, 'kind': 'ceiling', 'color': '#fff4e0', 'power': 0.8, 'range': 900, 'on': True}],
         'spots': 'pet on the table: "on": "table", x 200, z -560 · vet: x 40, z -560 · owner: x 360, z -560',
     },
     'pharmacy': {
@@ -399,6 +400,17 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
     for op in gear_ops:
         pet = pet_of(op['target'])
+        if op['kind'] == 'walk':
+            # ĐI NGANG QUA ĐÈN (tối, có đèn): hai khung đầu / cuối quãng đi — bóng phải xoay / dài ngắn theo vị trí đèn, người sáng
+            # lên khi tới gần đèn (đợt 24).
+            if stage_set.get('light', 'day') == 'day' or not (any(item.get('kind') in ('lamp', 'floorlamp') for item in stage_set.get('cutouts', [])) or stage_set.get('lamps')): continue
+            t0, t1 = at(op['turn'], min(1.4, op['dur'] * 0.3)), at(op['turn'], max(0.8, op['dur'] - 0.3))
+            if t0 is None or t1 is None or t1 - t0 < 1: continue
+            moments.append({'t': t0, 'what': f'{op["who"]} walking — start', 'ask': ['Does the walking character cast a shadow on the ground?']})
+            moments.append({'t': t1, 'what': f'{op["who"]} walking — end', 'ask': [
+                f'Compared with the frame at {t0:g} s, has the walking character\'s shadow changed direction or length?',
+                f'Is the walking character brighter in whichever of the two frames ({t0:g} s or this one) they stand nearer a lit lamp?']})
+            continue
         if op['kind'] == 'shine':
             moments.append({'t': at(op['turn'], 1.3), 'what': 'flashlight', 'ask': [
                 'Is there a bright beam of light coming out of the flashlight?', 'Does the beam fade with distance and have soft edges (not a flat hard-edged shape)?']
@@ -1180,6 +1192,8 @@ def main():
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or not isinstance(turn.get('do'), list): continue
             for step in turn['do']:
+                if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
+                    gear_ops.append({'turn': emitted[0], 'kind': 'walk', 'who': turn.get('who'), 'target': None, 'dur': float(step[1])})
                 if isinstance(step, list) and step and step[0] in ('shine', 'examine'):
                     target = step[1][1:] if len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None
                     gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': target})
@@ -1224,7 +1238,13 @@ def main():
             turns.append((f'  // {who["name"]} steps back after reaching close', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
             emitted[0] += 1
             who['x'] = float(who['x']) + move
-        if director: beats.append(beat_of(entry, first_turn, emitted[0] - 1))
+        if director:
+            beat = beat_of(entry, first_turn, emitted[0] - 1)
+            # Nhịp có người ĐI (walk): đổi góc sớm như nhịp có lời — giữ góc cũ đủ 2,5 s thì người đi ra khỏi khung, còn nửa cái
+            # đầu ở mép (cảnh thử đợt 24).
+            group = entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]
+            if any(isinstance(step, list) and step and step[0] == 'walk' for turn in group if isinstance(turn, dict) for step in (turn.get('do') or [])): beat['move'] = True
+            beats.append(beat)
 
     camera_notes = []
     # Máy quay vòng tới đâu thì người nhìn sang ngang được tới đó, không xa hơn: rig xoay tới nghiêng hẳn là hết (không
@@ -1421,6 +1441,7 @@ def main():
         if room.get('skyline'): light['skyline'] = float(room['skyline'])
         if stage_set.get('shading') is False: light['shading'] = False        # không đổ bóng trên thân nhân vật: render nhanh hơn
         if stage_set.get('lens') is False: light['lens'] = False              # không chỉnh màu / tối góc / hạt phim
+        if stage_set.get('grain') is False: light['grain'] = False            # bỏ riêng hạt phim (~20 % thời gian render): bản nháp
         if lamps: light['lamps'] = lamps
         if windows: light['windows'] = windows
         lamp_names = [lamp.get('name', f'lamp{n + 1}') for n, lamp in enumerate(lamps)]
@@ -1759,10 +1780,14 @@ def main():
                 near = [who['name'] for who in names.values() if abs(float(who['_x0']) - centre) <= 700]
                 beats[0]['subjects'] = near or lead['subjects']
         if director:
-            items = []
+            items, hold = [], None
             for beat in beats:
                 time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
-                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '') + ' }')
+                # Sau lượt TRỜI CHUYỂN: giữ góc toàn tới khi trời chuyển được 75 % (đèn đã tự bật) — cắt sang góc cận sớm thì không
+                # ai thấy đèn sáng lên (đợt 24: đầu đèn đường ngoài khung lúc trời tối xong).
+                if hold and not beat.get('drift') and not beat.get('fixed'): time = f"Math.max({time}, {hold})"
+                if beat.get('drift'): hold = f"T0 + talk.turns[{beat['first']}].start + {beat['drift'] * 0.75:g}"
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '') + ' }')
             moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n"
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
