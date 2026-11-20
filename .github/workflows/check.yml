@@ -12,6 +12,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # tools/light_side.py so độ sáng trên ảnh chụp bằng Pillow (đợt 29).
+      - name: Install Pillow
+        run: python -m pip install --quiet Pillow
       # Chrome có sẵn trên runner ubuntu-latest; tools/chrome.sh tự tìm google-chrome.
       - name: Every character × every action
         run: sh tools/check.sh
