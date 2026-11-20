@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.65.0
+
+Fixed — light that reads at small sizes
+- **Which side faces the light**: the shading on a character is stronger the smaller it is on screen (up to 1.5 ×
+  below 700 px tall), the dark half starts right after the middle of the body (0.95 of the darkness instead of
+  0.75), the lit side glows a little more, and in the day the far side turns cool blue-grey instead of just
+  darker. With no lamp near, a thin rim of light sits on the edge facing the sun or the sky.
+- **Under a lamp at night** a character is lit 1.7 × more by the lamp (the lamp is the only light), has a faint glow
+  of the lamp's colour round them, and their shadow is at least their own height and darker — it used to sit
+  right under the feet.
+- **The flashlight follows the pet on every frame**: the arm holding it is turned each frame so the beam, measured
+  on the screen (lens → pet's face, through each SVG element's screen matrix), points at the pet under whatever
+  camera angle is on. It used to be aimed once, when the timeline was built.
+- A vertical full shot may pull back up to 60 % to take in a piece of furniture the edge would cut in half (35 %
+  in a landscape frame).
+
+Measured — the same frames (park → night, a walk past street lamps, a power cut with a flashlight, the clinic)
+checked by two models
+- Gemini 4 Hydrogen: 31 / 39 (3 n/a). Gemini 3.8 Flash: 28 / 39. They agree on 37 of the 42 answers.
+- Both say no to: which side faces the light (three scenes), shadows pointing away from the street lamp (twice),
+  the walking boy's shadow changing, an object cut by the edge in the power-cut opening. The shading and
+  lamp-shadow changes above were made after these runs and checked on the frames, not re-scored.
+- They disagree on long evening shadows, a character brighter near the lamp (twice), the cat lit by the beam, and
+  the cat's shadow — treat single answers to those as noise.
+- Gemini 4 Carbon is a paid model in AI Studio; it was not used.
+
 ## 0.64.0
 
 Fixed — the camera and the light it is meant to show

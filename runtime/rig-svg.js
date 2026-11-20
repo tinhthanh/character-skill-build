@@ -2704,6 +2704,8 @@ export class RigSVG {
     if (!screen) this.#openUp(t);
     const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(muc);
     const batK = 'bat' + ben, cangK = 'cang' + ben;
+    // Bối cảnh 3D đọc chỗ này để nhắm lại luồng đèn ở từng khung theo góc máy lúc ấy (set3d `aimTorch`).
+    this.shineAim = { target: muc, side: ben };
     t.set(s, { ['tay' + ben]: 'nam', ['gadget' + ben]: 5 }, 0.05);
     if (screen) t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
     t.to(s, { [batK]: bat, [cangK]: 0, than: ben === 'L' ? 1.5 : -1.5, dau, nhinX, nhinY, cuoi: 0.1, chum: 0.2, duration: 0.45, ease: 'sine.out' }, 0.05);

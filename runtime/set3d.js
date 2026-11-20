@@ -228,8 +228,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // Đèn ở TRƯỚC nhân vật (phía máy quay) chiếu vào mặt ta thấy; đèn ở SAU lưng chỉ cho viền sáng — không làm mặt trước
       // sáng bừng (bà đứng trước cây đèn lúc chiều: tóc cháy trắng, cảnh thử đợt 19).
       const front = clamp(0.55 + 0.45 * (lamp.z - z) / Math.max(1, Math.hypot(lamp.x - x, lamp.z - z)), 0.15, 1);
-      level += k * 0.6 * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
-      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front });
+      // Trời TỐI: đèn là nguồn sáng duy nhất — người đứng trong vũng đèn phải sáng nổi lên hơn mặt đất tối quanh đó (đợt 25:
+      // "cậu bé dưới đèn không sáng hơn nền").
+      const night = mood.dark > 0.3 && lamp.kind !== 'screen' ? 1.7 : 1;
+      level += k * 0.6 * night * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
+      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front, screen: lamp.kind === 'screen' });
     }
     // ĐÈN SOI / ĐÈN PIN trong tay người (`examine`, `shine`): nguồn sáng nhỏ, gần, trắng — đi theo bàn tay. Con vật ở cuối
     // luồng sáng bừng lên một phía (Gemini đợt 20: luồng đèn khám như miếng dán, không chiếu sáng gì).
@@ -334,7 +337,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
         // Lúc chạng vạng nắng là nguồn chính — bóng theo đèn đường chỉ nhạt, không thì bóng con vật đổi phía khi nó đi
         // qua cột đèn (Gemini soát ánh sáng đợt 16).
-        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * 0.25, tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 1.3) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
+        // Đêm: bóng theo đèn đường ít nhất dài bằng người và đậm hơn — ngắn quá thì nó nằm ngay dưới chân, hai mô hình chấm đều
+        // nói "bóng không đổ ra xa cột đèn" (đợt 25).
+        const nightLamp = lighting.mood.dark > 0.3;
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * (nightLamp ? 0.9 : 0.25), tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 1.8) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
       }
       // ĐÈN PIN rọi vào: bóng đậm đổ ra phía sau, ngược phía bàn tay cầm đèn — rõ nhất khi phòng tối (Gemini đợt 21: "không
       // có bóng con mèo sau luồng đèn").
@@ -498,6 +504,31 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     }
     lighting.torches = torches;
   };
+  // NHẮM ĐÈN PIN Ở TỪNG KHUNG: góc tay do `shine` đặt lúc dựng timeline (theo góc máy lúc ấy); máy cắt sang góc khác thì luồng
+  // lệch khỏi con vật (đợt 24). Ở đây đo lại trên màn hình — mặt kính → mặt con vật — và xoay bắp tay cho luồng chĩa đúng,
+  // cộng độ lệch đo được vào góc đang vẽ.
+  const aimTorch = (torch) => {
+    const rig = torch.owner.rig, aim = rig.shineAim, to = aim && aim.target && aim.target.aimTo;
+    if (torch.kind !== 5 || !to || !rig.el || aim.side !== torch.side) return;
+    const pet = actors.find((actor) => actor.rig === to);
+    if (!pet || !pet.width || typeof to.shotBox !== 'function') return;
+    const group = gadgetOf(rig.el['gadget' + torch.side], 5), lensEl = group && group.querySelector('[data-lens]'), tipEl = group && group.querySelector('[data-tip]');
+    // Đo THẲNG TRÊN MÀN HÌNH (ma trận màn hình của từng phần tử SVG) — đổi qua toạ độ bối cảnh rồi chiếu lại thì lệch tới 18°
+    // khi SVG không lấp kín đúng tỉ lệ host (đo ở cảnh thử đợt 25).
+    const screenOf = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); return ctm ? new DOMPoint(x, y).matrixTransform(ctm) : null; };
+    const l = lensEl && screenOf(lensEl, +lensEl.getAttribute('cx'), +lensEl.getAttribute('cy')), t = tipEl && screenOf(tipEl, +tipEl.getAttribute('cx'), +tipEl.getAttribute('cy'));
+    const box = to.shotBox('face'), f = screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2);
+    if (!l || !t || !f) return;
+    const now = Math.atan2(t.y - l.y, t.x - l.x), want = Math.atan2(f.y - l.y, f.x - l.x);
+    let delta = (want - now) * 180 / Math.PI;
+    delta = ((delta + 540) % 360) - 180;
+    // Độ lệch đo trên tư thế ĐANG VẼ (giá trị `bat` hiện có — của động tác, hay lần chỉnh trước nếu động tác không đặt lại):
+    // cộng thẳng vào đó, hội tụ sau một hai khung. Tay phải: luồng chúc xuống khi `bat` giảm; tay trái ngược lại.
+    const key = 'bat' + torch.side;
+    const next = clamp(rig.s[key] + clamp(torch.side === 'R' ? -delta : delta, -60, 60), -15, 172);
+    if (Math.abs(rig.s[key] - next) > 0.05) { rig.s[key] = next; rig.render(); }
+  };
+
   // CON VẬT BỊ RỌI ĐÈN VÀO MẶT nheo mắt, đồng tử co lại. Ghi đè trạng thái mắt của rig như cách quay bù theo góc máy (xem
   // `huong` ở cuối `update`): nhận ra giá trị do động tác đặt bằng cách so với lần ghi trước — không cộng dồn.
   const squint = (actor) => {
@@ -902,7 +933,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const [hx, hy] = toSet(b, box.x + box.width / 2, box.y + box.height / 2), p = set.project(hx, hy, b.spot.z);
         return { x: (p.x - a.frame.left) / a.frame.w * size.w, y: (p.y - a.frame.top) / a.frame.h * size.h };
       };
-      return { get x() { const s = screen(); return s ? s.x : inner.x; }, get y() { const s = screen(); return s ? s.y : inner.y; } };
+      return { aimFrom: from, aimTo: to, get x() { const s = screen(); return s ? s.x : inner.x; }, get y() { const s = screen(); return s ? s.y : inner.y; } };
     },
 
     /** Một ĐIỂM của bối cảnh [x, y, z] nhìn từ nhân vật `from`, trong khung 400 × 470 của nó — đích cho `point` (với tay tới
@@ -1058,7 +1089,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return a.at.depth - b.at.depth;
       });
       // Đèn trong tay (đèn soi, đèn pin): tìm trước khi chiếu sáng từng nhân vật.
-      if (lighting) { findTorches(); torchPools(); for (const actor of actors) squint(actor); }
+      if (lighting) { findTorches(); for (const torch of lighting.torches) aimTorch(torch); if (lighting.torches.some((t) => t.kind === 5)) findTorches(); torchPools(); for (const actor of actors) squint(actor); }
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
@@ -1119,10 +1150,27 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             // Ngược sáng: phía trước tối đều, không còn một phía được chiếu rõ.
             if (dim > 0) glow *= 1 - dim;
-            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
+            // NHỎ TRÊN MÀN HÌNH thì sáng tối phải đậm hơn mới đọc ra (đợt 25: "phía nào hướng về đèn?" hỏng 3 lần ở khung dọc, nhân
+            // vật cao ~400 px): dưới 700 px tăng dần tới 1,5 lần.
+            const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
+            amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
+            // Ban ngày / phòng sáng: phía khuất NGẢ LẠNH hẳn (xanh xám), không chỉ tối đi — đọc ra hướng sáng (phòng khám "phẳng").
+            const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
+            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
+            actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
             if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
+          // Đứng GẦN ĐÈN lúc tối: một quầng nhạt màu đèn ôm quanh người — đèn tách người khỏi nền tối.
+          if (actor.rig && lighting.mood.dark > 0.3) {
+            const near = L.sources.find((src) => !src.window && !src.sun && !src.torch && !src.screen && src.k > 0.15);
+            if (near) lit += ` drop-shadow(0 0 ${(9 / scale).toFixed(2)}px rgba(${near.rgb},${Math.min(0.45, near.k * 0.6).toFixed(3)}))`;
+          }
+          if ((!L.rim || L.rim.k <= 0.08) && actor.rig && actor.keySide && lighting.mood.name !== 'night') {
+            // Không có nguồn gần: một VIỀN MẢNH ở mép hướng về hướng sáng chính (nắng, trời) — mép ấy sáng hơn mép kia (đợt 25).
+            const px = (1.6 / scale).toFixed(2), tone = lighting.mood.name === 'evening' ? lighting.mood.sunColor : '255,252,240';
+            lit += ` drop-shadow(${actor.keySide * px}px ${(-px * 0.3).toFixed(2)}px 0 rgba(${tone},0.5))`;
+          }
           if (L.rim && L.rim.k > 0.08) {                                                  // cả đạo cụ phẳng (cây, TV): viền sáng phía nguồn sáng
             // Phòng tối: viền dày hơn (3,4 px trên màn hình) — viền sáng là thứ tách nhân vật khỏi nền tối.
             // Ánh cửa sổ ban ngày: viền trắng rõ hơn (phòng khám sáng gắt sau lưng — Gemini đợt 20).
@@ -1397,7 +1445,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             // Góc TOÀN (mở cảnh): không dời được thì lùi máy lấy trọn đồ vật, nếu chỉ phải lùi ≤ 35 % — khung dọc hẹp, cái TV ở
             // mép phải bị cắt đôi ở mọi cảnh phòng khách (đợt 23).
             const wider = { ...region, x0: Math.min(region.x0, a - margin), x1: Math.max(region.x1, b + margin) }, test = solve(wider);
-            if (test.distance <= cam.distance * 1.35) { region = wider; cam = test; }
+            if (test.distance <= cam.distance * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }      // khung dọc hẹp: lùi xa hơn (đợt 25: TV cắt đôi lúc mất điện)
           }
         }
       }

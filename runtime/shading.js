@@ -56,10 +56,12 @@ export function attachShade(svg, root) {
       const half = b.width * 0.5;
       grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
       grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
-      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.5, glow).toFixed(3));
+      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.6, glow).toFixed(3));
       // Màu phía khuất: màu bóng của giờ trong ngày (đêm: xanh lạnh) — đen thuần thì thành xám đục (Gemini, đợt 17).
       stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
-      stops[2].setAttribute('stop-opacity', Math.min(0.7, amount * 0.75).toFixed(3));        // nửa khuất: tối rõ ngay sau giữa thân
+      // Nửa khuất tối rõ NGAY sau giữa thân (0,95 × độ tối): một ranh giới sáng / tối đọc được ở cỡ nhỏ — 0,75 thì người chấm
+      // (hai mô hình, đợt 25) đều thấy nhân vật "sáng đều hai bên".
+      stops[2].setAttribute('stop-opacity', Math.min(0.75, amount * 0.95).toFixed(3));
       stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
       // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
       const lift = fill && fillAmount > 0.003;

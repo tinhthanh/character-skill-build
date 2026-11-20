@@ -1,4 +1,4 @@
-/* VGCharacter v0.64.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.65.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -102,9 +102,9 @@ function attachShade(svg, root) {
       const half = b.width * 0.5;
       grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
       grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
-      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.5, glow).toFixed(3));
+      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.6, glow).toFixed(3));
       stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
-      stops[2].setAttribute('stop-opacity', Math.min(0.7, amount * 0.75).toFixed(3));        // nửa khuất: tối rõ ngay sau giữa thân
+      stops[2].setAttribute('stop-opacity', Math.min(0.75, amount * 0.95).toFixed(3));
       stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
       const lift = fill && fillAmount > 0.003;
       stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
@@ -1771,6 +1771,7 @@ class RigSVG {
     if (!screen) this.#openUp(t);
     const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(muc);
     const batK = 'bat' + ben, cangK = 'cang' + ben;
+    this.shineAim = { target: muc, side: ben };
     t.set(s, { ['tay' + ben]: 'nam', ['gadget' + ben]: 5 }, 0.05);
     if (screen) t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
     t.to(s, { [batK]: bat, [cangK]: 0, than: ben === 'L' ? 1.5 : -1.5, dau, nhinX, nhinY, cuoi: 0.1, chum: 0.2, duration: 0.45, ease: 'sine.out' }, 0.05);
@@ -5332,8 +5333,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       if (d >= lamp.range * 1.15) continue;
       const k = lamp.power * lamp.level * (lamp.pulse ?? 1) * Math.pow(1 - d / (lamp.range * 1.15), 1.5);
       const front = clamp(0.55 + 0.45 * (lamp.z - z) / Math.max(1, Math.hypot(lamp.x - x, lamp.z - z)), 0.15, 1);
-      level += k * 0.6 * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
-      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front });
+      const night = mood.dark > 0.3 && lamp.kind !== 'screen' ? 1.7 : 1;
+      level += k * 0.6 * night * (0.35 + 0.65 * front); warm += k * lamp.warmth * (0.4 + 0.6 * front);
+      sources.push({ k, x: lamp.x, y: lamp.y, z: lamp.z, rgb: lamp.rgb, front, screen: lamp.kind === 'screen' });
     }
     for (const torch of lighting.torches) {
       if (torch.owner === self) continue;
@@ -5413,7 +5415,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const dx = x - lamp.x, dz = z - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y - y);
         if (d >= lamp.range * 1.3 || flat < 1) continue;
         const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
-        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * 0.25, tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 1.3) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
+        const nightLamp = lighting.mood.dark > 0.3;
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * (nightLamp ? 0.9 : 0.25), tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 1.8) * strength * seen });       // đêm: bóng theo đèn đường đậm hơn (đợt 23: "bóng nằm ngay dưới chân")
       }
       for (const torch of lighting.torches) {
         if (torch.kind !== 5 || torch.owner === actor) continue;
@@ -5546,6 +5549,23 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
     }
     lighting.torches = torches;
+  };
+  const aimTorch = (torch) => {
+    const rig = torch.owner.rig, aim = rig.shineAim, to = aim && aim.target && aim.target.aimTo;
+    if (torch.kind !== 5 || !to || !rig.el || aim.side !== torch.side) return;
+    const pet = actors.find((actor) => actor.rig === to);
+    if (!pet || !pet.width || typeof to.shotBox !== 'function') return;
+    const group = gadgetOf(rig.el['gadget' + torch.side], 5), lensEl = group && group.querySelector('[data-lens]'), tipEl = group && group.querySelector('[data-tip]');
+    const screenOf = (element, x, y) => { const ctm = element && element.getScreenCTM && element.getScreenCTM(); return ctm ? new DOMPoint(x, y).matrixTransform(ctm) : null; };
+    const l = lensEl && screenOf(lensEl, +lensEl.getAttribute('cx'), +lensEl.getAttribute('cy')), t = tipEl && screenOf(tipEl, +tipEl.getAttribute('cx'), +tipEl.getAttribute('cy'));
+    const box = to.shotBox('face'), f = screenOf(to.svg, box.x + box.width / 2, box.y + box.height / 2);
+    if (!l || !t || !f) return;
+    const now = Math.atan2(t.y - l.y, t.x - l.x), want = Math.atan2(f.y - l.y, f.x - l.x);
+    let delta = (want - now) * 180 / Math.PI;
+    delta = ((delta + 540) % 360) - 180;
+    const key = 'bat' + torch.side;
+    const next = clamp(rig.s[key] + clamp(torch.side === 'R' ? -delta : delta, -60, 60), -15, 172);
+    if (Math.abs(rig.s[key] - next) > 0.05) { rig.s[key] = next; rig.render(); }
   };
   const squint = (actor) => {
     const rig = actor.rig;
@@ -5831,7 +5851,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const [hx, hy] = toSet(b, box.x + box.width / 2, box.y + box.height / 2), p = set.project(hx, hy, b.spot.z);
         return { x: (p.x - a.frame.left) / a.frame.w * size.w, y: (p.y - a.frame.top) / a.frame.h * size.h };
       };
-      return { get x() { const s = screen(); return s ? s.x : inner.x; }, get y() { const s = screen(); return s ? s.y : inner.y; } };
+      return { aimFrom: from, aimTo: to, get x() { const s = screen(); return s ? s.x : inner.x; }, get y() { const s = screen(); return s ? s.y : inner.y; } };
     },
     targetPoint(from, point) {
       const actor = actors.find((item) => item.rig === from);
@@ -5940,7 +5960,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (isPerson(a.actor) !== isPerson(b.actor) && together(a.actor, b.actor)) return isPerson(a.actor) ? 1 : -1;
         return a.at.depth - b.at.depth;
       });
-      if (lighting) { findTorches(); torchPools(); for (const actor of actors) squint(actor); }
+      if (lighting) { findTorches(); for (const torch of lighting.torches) aimTorch(torch); if (lighting.torches.some((t) => t.kind === 5)) findTorches(); torchPools(); for (const actor of actors) squint(actor); }
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
@@ -5986,10 +6006,22 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const a = set.project(...from), b = set.project(...centre);
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
             if (dim > 0) glow *= 1 - dim;
-            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, mood.shade, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
+            const tallPx = (actor.height || 0) * at.scale, small = clamp((700 - tallPx) / 400, 0, 1);
+            amount = Math.min(0.75, amount * (1 + 0.5 * small)); glow = Math.min(0.5, glow * (1 + 0.6 * small) + (mood.name === 'night' ? 0 : 0.06 * small));
+            const darkSide = mood.name === 'day' ? '52,82,140' : mood.shade;
+            actor.rig.lightShade(b.x - a.x, b.y - a.y, amount, rgb, glow, darkSide, fill ? fill.rgb : null, fill ? clamp(fill.k * 1.1, 0, 0.5) : 0);
+            actor.keySide = Math.sign(a.x - b.x) || 1;                                     // phía nguồn sáng chính trên màn hình (viền mảnh bên dưới)
             if (typeof actor.rig.lightBounce === 'function') { const up = bounceAt(actor, L); actor.rig.lightBounce(up.rgb, up.amount); }
           }
           const scale = Math.max(0.3, at.scale), wide = lighting.mood.dark > 0.2 ? 3.4 : 2.2;
+          if (actor.rig && lighting.mood.dark > 0.3) {
+            const near = L.sources.find((src) => !src.window && !src.sun && !src.torch && !src.screen && src.k > 0.15);
+            if (near) lit += ` drop-shadow(0 0 ${(9 / scale).toFixed(2)}px rgba(${near.rgb},${Math.min(0.45, near.k * 0.6).toFixed(3)}))`;
+          }
+          if ((!L.rim || L.rim.k <= 0.08) && actor.rig && actor.keySide && lighting.mood.name !== 'night') {
+            const px = (1.6 / scale).toFixed(2), tone = lighting.mood.name === 'evening' ? lighting.mood.sunColor : '255,252,240';
+            lit += ` drop-shadow(${actor.keySide * px}px ${(-px * 0.3).toFixed(2)}px 0 rgba(${tone},0.5))`;
+          }
           if (L.rim && L.rim.k > 0.08) {                                                  // cả đạo cụ phẳng (cây, TV): viền sáng phía nguồn sáng
             const px = ((L.rim.window ? 3 : wide) * Math.min(1, L.rim.k * (L.rim.window ? 2.4 : 1.6)) / scale).toFixed(2);
             lit += ` drop-shadow(${sideOf(L.rim) * px}px ${(-px * 0.4).toFixed(2)}px 0 rgba(${L.rim.rgb},${Math.min(0.75, L.rim.k * 1.1).toFixed(3)}))`;
@@ -6181,7 +6213,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (fits(out)) cam = { ...cam, x: out }; else if (!front && fits(into)) cam = { ...cam, x: into };
           else if (!front && size === 'full') {
             const wider = { ...region, x0: Math.min(region.x0, a - margin), x1: Math.max(region.x1, b + margin) }, test = solve(wider);
-            if (test.distance <= cam.distance * 1.35) { region = wider; cam = test; }
+            if (test.distance <= cam.distance * (H > W * 1.2 ? 1.6 : 1.35)) { region = wider; cam = test; }      // khung dọc hẹp: lùi xa hơn (đợt 25: TV cắt đôi lúc mất điện)
           }
         }
       }
@@ -6574,7 +6606,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.64.0';
+const VERSION = '0.65.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
