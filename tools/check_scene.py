@@ -607,7 +607,7 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('handover: the scene does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'handover', 'index.html'), encoding='utf-8').read()
-        for needle in ('items: {"L": "cup"}, itemsHidden: true', '[ong, ["take", be]]', '[be, ["takePet", ong, { petAt: ', '// cho comes over to ong (seated) for "stroke"', "set.target(ong, cho, 'crown', { at: "):
+        for needle in ('items: {"L": "cup"}, itemsHidden: true', '[ong, ["take", be]]', '[be, ["takePet", ong, { petAt: ', '// cho comes over to ong (seated) for "stroke"', "set.target(ong, cho, 'top', { at: "):      # con chó tới từ phía HÔNG ông (đợt 31): người vẽ trước, tay trên đỉnh đầu
             if needle not in html: problems.append(f'handover: {needle} is not in the composition')
         if '// be steps closer to cho' in html: problems.append('handover: the boy walks to where the dog was picked up, not to where he put it down')
         checks = [m['check'] for m in json.load(open(os.path.join(work, 'handover', 'moments.json'), encoding='utf-8')) if m.get('check')]
@@ -620,7 +620,7 @@ with tempfile.TemporaryDirectory() as work:
         elif 'be stroke cho — hand reaches' not in done.stdout: problems.append('handover: acting_check did not measure the boy stroking the dog he put down:\n' + done.stdout[-400:])
         elif 'be puts cho down — next to the feet' not in done.stdout or 'stays put' not in done.stdout: problems.append('handover: acting_check did not measure the put-down:\n' + done.stdout[-400:])
         # Đợt 31: tay ông vuốt con chó thấy được (0.70.0: khuất hẳn sau mặt nó, 1 %), ông cúi ≤ 25°.
-        elif "ong's hand on cho in view" not in done.stdout or 'ong stroke cho — leans no more than' not in done.stdout: problems.append('handover: acting_check did not measure the hand in view or the lean:\n' + done.stdout[-400:])
+        elif "ong's hand on cho in view" not in done.stdout or "ong's hand rests on cho" not in done.stdout or 'ong stroke cho — leans no more than' not in done.stdout: problems.append('handover: acting_check did not measure the hand in view or the lean:\n' + done.stdout[-400:])
         done = subprocess.run([sys.executable, os.path.join(HERE, 'light_side.py'), os.path.join(work, 'handover')], capture_output=True, text=True)
         if done.returncode != 0 or ' pass' not in done.stdout or '0/0' in done.stdout: problems.append('handover light: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
 
@@ -646,7 +646,7 @@ with tempfile.TemporaryDirectory() as work:
             problems.append('sofa: acting_check did not measure the stroke or the furniture at the edges:\n' + done.stdout[-400:])
         # Đợt 31: con mèo đứng TRƯỚC ống chân bà (0.70.0: thấy 66 %, bà cúi 40°), tay bà trên đỉnh đầu nó; góc trung hẹp hơn 85 %
         # góc toàn (0.70.0: 99 % — máy lùi lấy trọn bàn nước).
-        elif 'meo in view at' not in done.stdout or "ba's hand on meo in view" not in done.stdout or 'ba stroke meo — leans no more than' not in done.stdout or 'medium shot of' not in done.stdout:
+        elif 'meo in view at' not in done.stdout or "ba's hand on meo in view" not in done.stdout or "ba's hand rests on meo" not in done.stdout or 'ba stroke meo — leans no more than' not in done.stdout or 'medium shot of' not in done.stdout:
             problems.append('sofa: acting_check did not measure the cat in view, the hand in view, the lean or the medium shot:\n' + done.stdout[-400:])
         if "set.target(ba, meo, 'crown'" not in html: problems.append("sofa: granny does not aim at the top of the cat's head (set.target(ba, meo, 'crown'))")
 

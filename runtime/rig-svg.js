@@ -3345,7 +3345,9 @@ export class RigSVG {
     // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
     // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
     const across = (k === 'L') !== (tx < HONG.x);
-    let shoulder = VAI[k];
+    // Vai THẬT của nhân vật (đợt 31): `VAI` là vai của dáng chuẩn người lớn — bé (chân ngắn, thân ngắn) có vai thấp hơn ~150
+    // đơn vị khung, con mèo trên bàn khám ngang đầu bé thành "dưới vai", tay chúc xuống vuốt mép bàn.
+    let shoulder = { x: HONG.x + (VAI[k].x - HONG.x) * this.nv.coThan, y: this.#shoulderY() };
     // Thân ngả về phía con vật làm cánh tay bên ấy nhấc lên đúng chừng ấy độ — trừ đi, không thì bàn tay chĩa cao hơn đích.
     let lean = clamp((tx - HONG.x) * 0.06, -9, 9), tilt = Math.abs(lean), bend = 0;
     if (s.seat > 0.5 && !across) {

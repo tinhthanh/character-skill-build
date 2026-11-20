@@ -105,7 +105,8 @@ of `moments.json` no piece of furniture (sofa, table, TV stand, TV, counter) may
 right edge of the frame (`set.propFraming()`; foreground props excepted).
 A pet a hand touches (stroke, examine, treat…) must be in view at the moment asked about: from three captures (as is,
 without the pet, the pet drawn on top of everything) at least 70 % of it and 60 % of its head show, and from two more
-(the toucher on top, then with the hands painted) at least 50 % of the touching hand shows. A seated person leans at most
+(the toucher on top, then with the hands painted) at least 70 % of the touching hand shows and at least 5 % of it lies
+on or against the pet (a hand in view that hovers beside it is not a touch). A seated person leans at most
 25° to reach a pet on the floor. Every medium shot the automatic camera chose (`set.shotLog`) must be narrower than
 85 % of the full shot of the same subjects — a cut to it would barely change the frame.
 It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene, a park scene and a living-room scene.
@@ -120,16 +121,17 @@ What the scene tool now does for the acting, so the measurements pass without ex
 - `bé → ông: đưa` (`handOver`) makes the other person **take** it at the same time (when they have the item put
   away), and `trao` (`handOverPet`) adds the other's `takePet`; both reach for the point between their shoulders, like a
   handshake, and the item sits in the hand on the receiver's side.
-- A pet walks over to a **seated** person who strokes or picks it up and stops **in front of their shins**, by the knees
-  (0.22 × their height), drawn over that person (`set.place(pet, { over: person })`); the hand aims at the top of its
-  head (`set.target(…, 'crown')`) so the hand rests on it in view, and the person leans over their knees towards it at
-  most 25°.
+- A pet walks over to a **seated** person who strokes or picks it up and stops on the side it comes from, 0.22 × their
+  height away. On the knee side it stands **in front of their shins**, drawn over that person (`set.place(pet, { over:
+  person })`), and the hand rests on the top edge of its head (`set.target(…, 'crown')`); on the hip side the person is
+  drawn in front and the hand rests on the top of its head (`'top'`). The person leans towards it at most 25°.
 - A pet handed over (`trao`) and put down by the receiver lands next to the receiver's feet, on the side away from
   the giver — not back where it was first picked up.
 - When the automatic medium shot of two subjects is almost as wide as their full shot (≥ 85 %, mostly to keep furniture
   whole), the camera lets furniture that nobody uses (a coffee table — not the TV, not the sofa someone sits on) touch the
-  frame edge and stays at 80 % of the full shot; when the subjects stand too far apart even so, it keeps the full shot
-  instead of cutting to a near copy. `tools/scene.py` says when a medium shot is still that wide.
+  frame edge and stays at 80 % of the full shot; failing that it frames the person acting and the pet at the moment of
+  the action; only when even that is too wide (or would cut the pet) does it keep the full shot instead of cutting to a
+  near copy. `tools/scene.py` says when a medium shot is still that wide.
   `acting_check` also measures that a carried pet is in the arms and that a seated person sits on the seat
   (within 3 % of their height of the top of the sofa / bench).
 

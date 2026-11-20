@@ -107,7 +107,8 @@ def on_lap(hand, who, pet=None, seen=None):
 
 
 SEATED_LEAN = 25      # người ngồi cúi tới con vật dưới sàn ≤ 25° (đợt 31; RigSVG.SEATED_LEAN)
-HAND_SHOWN = 0.5       # bàn tay chạm con vật thấy ≥ 50 % (vòng quanh lòng bàn tay) — con vật vẽ trước người thì tay dễ khuất sau nó
+HAND_SHOWN = 0.7       # bàn tay chạm con vật thấy ≥ 70 % — con vật vẽ trước người thì tay dễ khuất sau nó (0.71.0: 50 %)
+CONTACT = 0.05         # … và ≥ 5 % bàn tay sát hình con vật (≤ 3 px): đặt lên nó, không lơ lửng
 SEEN = 0.70            # con vật được chạm: thấy ≥ 70 % hình nó (đợt 31)
 SEEN_HEAD = 0.60       # … và ≥ 60 % cái đầu
 
@@ -194,12 +195,16 @@ def pet_pixels(folder, jobs, keep=None):
                 # Trong khung hình vẽ của bàn tay (cổ tay trở ra), không phải một vòng quanh lòng bàn tay: vòng ấy lấy cả đầu gối
                 # người ngồi ngay sau con vật.
                 hb = hand.get('box') or {'x0': hand['x'] - who['tall'] * 0.03, 'x1': hand['x'] + who['tall'] * 0.03, 'y0': hand['y'] - who['tall'] * 0.03, 'y1': hand['y'] + who['tall'] * 0.03}
-                mine = shown = 0
+                # TIẾP XÚC (đợt 31): phần bàn tay nằm sát (≤ 3 px) hình con vật — đè lên nó hay chạm mép. Tay thấy trọn mà không sát
+                # hình con vật là tay lơ lửng trên đầu nó.
+                pet_px = lambda x, y: 0 <= x < W and 0 <= y < H and differ(pc[x, y], pb[x, y])
+                mine = shown = near = 0
                 for y in range(max(0, int(hb['y0'])), min(H, int(hb['y1']) + 1)):
                     for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
                         if not differ(pd[x, y], pe[x, y]): continue
                         mine += 1; shown += not differ(pa[x, y], pd[x, y])
-                if mine >= 30: result[(t, name)]['hand'] = shown / mine
+                        near += any(pet_px(x + dx, y + dy) for dx in (-3, 0, 3) for dy in (-3, 0, 3))
+                if mine >= 30: result[(t, name)]['hand'] = shown / mine; result[(t, name)]['contact'] = near / mine
         return result
     finally:
         server.terminate()
@@ -226,6 +231,8 @@ def check_seen(folder, checks, keep=None):
         if part.get('hand') is not None:
             results.append({'scene': folder, 'what': f'{toucher}\'s hand on {name} in view at {t:g} s', 'ok': part['hand'] >= HAND_SHOWN, 'hand': round(part['hand'], 3),
                             'note': f'{part["hand"] * 100:.0f} % of the hand shows (least {HAND_SHOWN * 100:g} %)'})
+            results.append({'scene': folder, 'what': f'{toucher}\'s hand rests on {name} at {t:g} s', 'ok': part['contact'] >= CONTACT, 'contact': round(part['contact'], 3),
+                            'note': f'{part["contact"] * 100:.0f} % of the hand is on or against {name} (least {CONTACT * 100:g} %; less is a hand hovering over it)'})
     return results
 
 
@@ -288,7 +295,8 @@ def check_shots(folder, log):
             results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s', 'ok': None, 'note': f'kept the full shot — the medium one was {shot["first"] * 100:.0f} % as wide'})
             continue
         results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s narrower than the full shot', 'ok': shot['ratio'] < MEDIUM_WIDE, 'ratio': shot['ratio'],
-                        'note': f'{shot["ratio"] * 100:.0f} % as wide as the full shot (limit {MEDIUM_WIDE * 100:g} %)' + (f'; {shot["first"] * 100:.0f} % before furniture at the edges was let go' if shot.get('how') == 'loose' else '')})
+                        'note': f'{shot["ratio"] * 100:.0f} % as wide as the full shot (limit {MEDIUM_WIDE * 100:g} %)' + (f'; {shot["first"] * 100:.0f} % before furniture at the edges was let go' if shot.get('how') == 'loose' else '')
+                                + (f'; {shot["first"] * 100:.0f} % framed over the whole beat, now at the moment of the action' if shot.get('how') == 'moment' else '')})
     return results
 
 

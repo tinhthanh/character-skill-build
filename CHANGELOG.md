@@ -7,8 +7,9 @@ Added — the machine sees a pet hidden behind a person, a hidden hand, and a me
   about), from the pixels: it captures the frame as is, without the pet, and with the pet drawn on top of everything
   (characters are flat layers ordered by z-index); the pet's shape is where the last two differ, what shows is where the
   first two differ, inside its drawn head and body. At least 70 % of the pet and 60 % of its head must show. Two more
-  captures (the toucher drawn on top, then with the hands painted magenta) give the **touching hand**: at least 50 % of
-  it must show. And a **seated person leans at most 25°** to reach a pet on the floor (`actingProbe` now gives each
+  captures (the toucher drawn on top, then with the hands painted magenta) give the **touching hand**: at least 70 % of
+  it must show, and at least 5 % of it must lie on or against the pet (within 3 px of its shape) — a hand in full view
+  that hovers beside the pet is not a touch. And a **seated person leans at most 25°** to reach a pet on the floor (`actingProbe` now gives each
   person's `lean` and each hand's drawn box). On the 0.70.0 code: granny on the sofa — cat 66 % shown (head 72 %), leaning
   40°; grandpa on the bench — his hand 1 % shown (wholly behind the dog's face, which no check saw), leaning 40°.
 - **Medium shots are measured against the full shot**: `set.direct` logs every automatic medium shot with the width of
@@ -24,33 +25,52 @@ Added — the machine sees a pet hidden behind a person, a hidden hand, and a me
 
 Fixed — measured on the 10 trial scenes of 0.69.0 / 0.70.0 (4 dot29 scenes, 2 acting scenes, 4 lighting scenes) and the
 4 3D examples: with the new checks the 0.70.0 code fails 4 acting measurements (cat hidden, hand hidden, two 40° leans)
-and 12 medium shots; now 127 of 127 pass in the trial scenes and 16 of 16 in the examples (the 0.70.0 code: 10 of 11 —
+and 12 medium shots (and, with the contact check, the boy stroking the exam table in acting-1); now 140 of 140 pass in the trial scenes and 16 of 16 in the examples (the 0.70.0 code: 10 of 11 —
 `examples/lighting/dem-mat-dien` cut the TV and the sofa)
-- **A pet that walks over to a seated person stops in front of their shins**, by the knees (0.22 × their height, was
-  0.3, behind the shins), drawn over that person; the hand aims at the top of its head so it rests on it in view; the
-  lean is at most 25° (was 40°). Granny strokes the cat: 66 % → 99 % of the cat shows, head 72 % → 99 %, lean 40° →
-  24°, hand 0.6 → 0.5 % of her height from it, 63 % of the hand shows. Grandpa on the bench: hand 1 % → 88 % shown, lean
-  40° → 3°, hand 1.0 → 0.7 %. The pet keeps its depth (moving it nearer the camera instead left the boy who later strokes
-  it with his hand hovering above its head — hands reach in their own plane).
+- **A pet that walks over to a seated person stops on the side it comes from**, 0.22 × their height away (was 0.3,
+  always on the knee side, behind the shins). On the knee side it stands in front of the shins, drawn over that person,
+  and the hand rests just over the top edge of its head (`'crown'`), in front of the ears' outline, not behind them; on
+  the hip side (no legs there) the person is drawn in front and the hand rests on the top of the head (`'top'`, 15 %
+  down — aimed at the middle of the face it hid the face: 57 % of the cat's head showed). The lean is at most 25° (was
+  40°). Granny strokes the cat: 66 % → 99 % of the cat shows, head 72 % → 99 %, lean 40° → 24°, 92 % of the hand shows
+  (16 % on the cat); grandpa on the bench: hand 1 % → 97 % shown (7 % on the dog), lean 40° → 1°; the living-room CI
+  scene: hand 88 %. A cat or dog that comes from the hip side (trial variants): cat 98 %, head 97 %, hand 100 %;
+  dog 100 %, hand 91 %. The pet keeps its depth (moving it nearer the camera instead left the boy who later strokes it
+  with his hand hovering above its head — hands reach in their own plane).
 - **A medium shot almost as wide as the full shot** (≥ 85 %): the camera builds it again no further back than 80 % of
   the full shot, letting furniture nobody uses (the coffee table — never the TV or the sofa someone sits on) touch or
   cross the frame edge; if the subjects stand too far apart even so, it keeps the full shot rather than cut to a near
   copy. b1 99 % → 79 %, b2 100 % → 77 %, a1 97 % → 62 %, a2 94 % → 82 %, acting-1 90 % → 71 %, the lighting scenes 88 %
-  → 79–84 %; kept the full shot: acting-2 (twice), the vertical power cut, the clinic opening. `acting_check` allows
+  → 79–84 %. Before keeping the full shot it tries the medium shot of the person acting and the pet **at the moment of
+  the action** (the middle of the beat — a long beat merges every place they stood: the boy walks up, kneels, stands
+  up): acting-2 92 % / 89 % → 82 % / 82 %, the boy and the dog both whole, at the stroke and the treat. An alternative
+  medium shot is taken only when every pet in it is whole (`lastFrame.whole`), and the step that raises the bottom of
+  the frame to the knees no longer does it when that cuts a pet that is a subject (the dog showed only its ears).
+  Still the full shot: one-person shots while walking in (clinic, park openings) and granny with the cat in the vertical
+  power cut. `acting_check` allows
   such a cut except at the opening moment, where the reviewer is asked about the furniture.
+- **Reaching from the real shoulder when standing**: `#reachLow` aimed from the shoulder of the standard adult figure —
+  the boy's shoulder is about 150 frame units lower, so the cat on the exam table at his head height counted as below
+  the shoulder and he stroked the table edge by its tail (0 % of the hand on the cat — the new contact check; "hand
+  reaches" passed at 1.3 % because the cat's body box includes the tail). He also stands 0.16 × his height from a pet on
+  a table to stroke or brush it, as for examining (was 0.24). Now 0.1 %, 100 % of the hand on the cat.
+- **A pet cut by the bottom edge of the frame** (seen by `tools/scene.py`): the camera takes it in whole if that means
+  backing off at most 1.8×, or moves sideways so it is wholly out.
 - **A close shot that widens into a two-shot** (a person next to the pet could not be pushed out of the frame) is framed
   as the medium shot of both, so the furniture step runs: in `examples/lighting/dem-mat-dien` the close shot of the cat
   took in granny's head with the TV 15 % shown at the right edge and the sofa cut at the left (the power-cut moment);
   now both are whole.
 
+  In the `acting-1` trial scene the cat on the table was cut by the bottom edge of the vet's close shot (67 %, 1.8–4.8 s,
+  `tools/scene.py` warned): gone with the change above — that shot is now the medium shot of the vet and the cat.
+
 Known
-- The close shot of the vet in the `acting-1` trial scene has the cat on the table cut by the bottom edge (67 % shows,
-  1.8–4.8 s; `tools/scene.py` warns) — the bottom-edge rule only lifts the frame for someone who peeks in below the
-  subject.
-- With the pet in front of the shins, the stroking hand rests on its crown, partly behind its ears (50–60 % of the
-  hand shows on the sofa); a pet that walks to a seated person always stands on the side the knees point to.
-- When the medium shot falls back to the full shot, the moment asked about is seen smaller (acting-2: the boy and the
-  dog far apart).
+- The new bottom-edge rule for pets is not reached by any trial scene or example any more (the case that needed it went
+  with the two-shot change); it is not exercised by CI.
+- Medium shots kept as full shots: one person walking in (clinic, park, the vertical power cut's opening) and, in the
+  vertical power cut, granny with the cat.
+- A pet on the knee side shows the stroking hand over its head's outline (7–16 % of the hand on it); during the strokes
+  the hand rises a little off the head before coming down again.
 
 ## 0.70.0
 

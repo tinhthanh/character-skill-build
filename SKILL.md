@@ -187,7 +187,7 @@ clips for every voice file.
    feet-to-floor offset as a share of the character's height, a carried pet held against the body, a seated person's
    seat on the sofa / bench, a pet put down next to the feet of whoever put it down, no furniture cut by the frame edge
    at any moment, a touched pet in view (≥ 70 %, head ≥ 60 %, measured from the pixels) with the touching hand in view
-   (≥ 50 %), a seated person leaning no more than 25° to reach it, every automatic medium shot narrower than 85 % of the
+   (≥ 70 %) and on it, a seated person leaning no more than 25° to reach it, every automatic medium shot narrower than 85 % of the
    full shot, exit code 1 when a hand misses or a foot floats. `python3 tools/light_side.py <id>` measures
    from the pixels whether the half of each character facing the main light is brighter than the other half.
 4. **Change what the scene file cannot say** by editing `index.html` — it is plain,

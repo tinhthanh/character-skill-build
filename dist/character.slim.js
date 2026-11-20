@@ -2232,7 +2232,7 @@ class RigSVG {
     const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
     const across = (k === 'L') !== (tx < HONG.x);
-    let shoulder = VAI[k];
+    let shoulder = { x: HONG.x + (VAI[k].x - HONG.x) * this.nv.coThan, y: this.#shoulderY() };
     let lean = clamp((tx - HONG.x) * 0.06, -9, 9), tilt = Math.abs(lean), bend = 0;
     if (s.seat > 0.5 && !across) {
       const px = HONG.x, py = HONG.y + this.hangChan() + this.#lowered(), bx = this.#shoulderX(k), by = this.#shoulderY();
@@ -5907,7 +5907,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       const head = () => {
         const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
-        const down = part === 'crown' ? 0 : 0.5;
+        const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
         const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
@@ -6402,6 +6402,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               cam = { ...cam, distance, y: top - 0.57 * H * distance / k };
             }
           }
+          {
+            const bottom = cam.y - below, shown = (m.top - bottom) / ((m.top - m.base) || 1);
+            if (!m.person && m.base < bottom && shown > 0.05 && shown < 0.95) {
+              const pad = (m.top - m.base) * 0.08;
+              const wider = { x0: Math.min(region.x0, m.x0), x1: Math.max(region.x1, m.x1), y0: Math.min(region.y0, m.base - pad), y1: region.y1 }, test = solve(wider, Math.max(fill, 0.8));
+              if (test.distance <= cam.distance * 1.8 && test.distance <= limit) { region = wider; cam = test; continue; }
+              const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
+              if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+            }
+          }
           const ceiling = cam.y + above;
           if (m.person && m.top > ceiling && m.base < ceiling - (above + below) * 0.02 && m.base > region.y0 - (above + below) * 0.5) {
             const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
@@ -6422,11 +6432,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rel <= 0 || rel >= 0.2) continue;
         const down = bottom - m.base + 0.03 * span;
         if (region.y1 <= cam.y - down + 0.57 * span - 0.02 * span) cam = { ...cam, y: cam.y - down };
-        else cam = { ...cam, y: cam.y + (0.3 - rel) * h };
+        else {
+          const raised = cam.y + (0.3 - rel) * h, newBottom = raised - 0.43 * span;
+          if (!shots.some((pet) => !pet.person && pet.base < newBottom)) cam = { ...cam, y: raised };
+        }
         break;
       }
       const z = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
-      set.lastFrame = { region, cam, others, shots, stillCut };                                    // để soát: số đo của lần gọi gần nhất
+      const span = (H * cam.distance) / k, half = (W / 2) * cam.distance / k;
+      const whole = shots.filter((m) => !m.person).every((m) => m.base >= cam.y - 0.43 * span - span * 0.01 && m.top <= cam.y + 0.57 * span && m.x0 >= cam.x - half && m.x1 <= cam.x + half);
+      set.lastFrame = { region, cam, others, shots, stillCut, whole };                                    // để soát: số đo của lần gọi gần nhất
       return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
     },
     shotLog: [],
@@ -6453,8 +6468,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
             try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
-            if (loose && loose.distance < MEDIUM_WIDE * full.distance && !set.lastFrame.stillCut) { values = loose; how = 'loose'; }
-            else { values = full; size = 'full'; how = 'full'; }
+            if (loose && loose.distance < MEDIUM_WIDE * full.distance && !set.lastFrame.stillCut && set.lastFrame.whole) { values = loose; how = 'loose'; }
+            else {
+              let moment = null;
+              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
+              if (moment && moment.distance < MEDIUM_WIDE * full.distance && !set.lastFrame.stillCut && set.lastFrame.whole) { values = moment; how = 'moment'; }
+              else { values = full; size = 'full'; how = 'full'; }      // (3) vẫn không được: giữ góc toàn
+            }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,

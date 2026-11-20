@@ -893,6 +893,7 @@ def main():
                 at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
                 if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_front') is not None and other['_front'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'crown'{at})")
+                elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_back') is not None and other['_back'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'top'{at})")
                 elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
                 else: parts.append(item[1:])
@@ -1235,6 +1236,9 @@ def main():
                 # (đo bằng tools/acting_check.py, đợt 28).
                 wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
+                # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
+                # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
+                if step[0] in ('stroke', 'brush') and target['_pet'] and target.get('on') and not who.get('seated'): wanted = 0.16 * who['_host_height']
                 # Người NGỒI quay 3/4 về phía con vật (xem `state.facing` của người ngồi): đầu gối chìa ra phía ấy — con vật dừng xa
                 # hơn một chút, không thì nó đứng khuất sau hai đầu gối (đợt 29: con mèo tới cạnh bà trên sofa).
                 # Con vật dưới sàn tới người NGỒI (đợt 31): đứng TRƯỚC ống chân người ấy (lớp vẽ trên, `over` — xem `_front`),
@@ -1242,7 +1246,21 @@ def main():
                 # cúi 40° qua đầu gối, con mèo khuất 34 % sau ống chân và bàn tay; tay ông ghế đá khuất hẳn sau mặt con chó.
                 if who.get('seated') and target['_pet'] and stage_set is not None and not target.get('on'):
                     wanted = 0.22 * who['_host_height']
-                    target['_front'] = who
+                    # BÊN NÀO (đợt 31): bên con vật đi tới — không vòng qua trước hai ống chân người ngồi. Phía ĐẦU GỐI: nó vẽ TRÊN người
+                    # (`over`, không khuất sau ống chân), tay đặt lên đỉnh đầu ('crown'). Phía HÔNG (không có chân che): người vẽ trước
+                    # như thường, tay đặt lên đỉnh đầu ('top', 15 % xuống) — nhắm giữa mặt thì bàn tay che mất mặt nó (đo: đầu mèo lộ 57 %),
+                    # nhắm lưng thì người ngồi cúi 25° vẫn không tới lưng con chó thấp.
+                    knees = (1 if float(names[who['faces']]['_x0']) > float(who['_x0']) else -1) if who.get('faces') else (1 if float(who['_x0']) < 0 else -1)
+                    side = 1 if float(target['x']) + target.get('_drop', 0) >= float(who['x']) else -1
+                    if side == knees: target['_front'] = who
+                    else: target['_back'] = who
+                    pet = target
+                    move = float(pet['x']) + pet.get('_drop', 0) - (float(who['x']) + side * wanted)
+                    if abs(move) > 0.05 * who['_host_height']:
+                        turns.append((f'  // {pet["name"]} comes over to {who["name"]} (seated) for "{step[0]}"', f"[{pet['name']}, ['walk', 4, {round(-move / pet['_unit'])}]]"))
+                        emitted[0] += 1
+                        pet['x'] = float(pet['x']) - move
+                    continue
                 if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
                     # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
                     # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
