@@ -1,4 +1,4 @@
-/* VGCharacter v0.61.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.62.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -7977,6 +7977,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     }
     // SƯƠNG MỜ trên tường lúc chiều / tối: không khí giữa máy quay và tường xa có màu — căn phòng có chiều sâu.
     const fog = f.kind === 'wall' && mood.fog ? [`linear-gradient(${mood.fog}, ${mood.fog})`] : [];
+    // TƯỜNG TỐI DẦN LÊN TRÊN (ban ngày / chiều): đèn và cửa sổ chiếu xuống, mép trần nhận ít sáng — tường trắng đều một màu
+    // từ chân tới trần thì phòng phẳng như tờ giấy (Gemini đợt 21: phòng khám 2/10).
+    if (f.kind === 'wall' && mood.name !== 'night') fog.push(`linear-gradient(to bottom, rgba(${mood.shade},.16), rgba(${mood.shade},.05) 40%, rgba(${mood.shade},0) 70%)`);
     const layers = [...glow, ...fog, ...(mood.tint ? [`linear-gradient(${mood.tint}, ${mood.tint})`] : []), ...(f.glowEl.dataset.ao ? [f.glowEl.dataset.ao] : [])];
     f.glowEl.style.background = layers.length ? layers.join(', ') : 'none';
   };
@@ -8111,6 +8114,21 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // qua cột đèn (Gemini soát ánh sáng đợt 16).
         casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * tall / (lamp.y - y - tall), tall * 0.25, tall * 2.2), alpha: (lighting.mood.name === 'evening' ? 0.3 : 0.85) * strength * seen });
       }
+      // ĐÈN PIN rọi vào: bóng đậm đổ ra phía sau, ngược phía bàn tay cầm đèn — rõ nhất khi phòng tối (Gemini đợt 21: "không
+      // có bóng con mèo sau luồng đèn").
+      for (const torch of lighting.torches) {
+        if (torch.kind !== 5 || torch.owner === actor) continue;
+        const gap = beamGap(torch, x, y + tall * 0.5, z), near = clamp(1 - gap / torch.range, 0, 1);
+        if (near <= 0.05) continue;
+        const dx = x - torch.hx, dz = (z - torch.z) || 1, flat = Math.hypot(dx, dz), lift = Math.max(30, torch.hy - y - tall * 0.6);
+        const dark = clamp((lighting.mood.dark - 0.1) / 0.5, 0.25, 1);
+        // Hướng bóng chủ yếu SANG NGANG (ngược phía bàn tay trên màn hình): đúng hình học thì nó đổ về phía máy quay, ra ngoài
+        // đáy khung — người xem không thấy con vật có bóng (đợt 22).
+        // Theo HƯỚNG LUỒNG (bàn tay → điểm rọi), không theo hiệu toạ độ con vật − bàn tay: con vật đứng gần như ngay dưới tay
+        // thì hiệu ấy nhỏ, bóng ngả về phía đèn (Gemini đợt 22, lượt 2).
+        const along = Math.sign(torch.x - torch.hx) || Math.sign(dx) || 1;
+        casts.push({ angle: Math.atan2(0.18, along), length: clamp(flat * tall / lift, tall * 0.8, tall * 2.2), alpha: 0.95 * near * dark * seen });
+      }
       // Ô CỬA ban ngày (ánh trời tán xạ): bóng mềm, nhạt, đổ ra xa cửa sổ — về phía máy quay.
       if (lighting.mood.sun) for (const win of lighting.windows) {
         const wx = win.x + win.width / 2, dx = x - wx, dz = z - win.z, flat = Math.hypot(dx, dz);
@@ -8161,7 +8179,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const dx = cx - lamp.x, dz = cz - lamp.z, flat = Math.hypot(dx, dz), d = Math.hypot(flat, lamp.y);
         if (d >= lamp.range * 1.3 || flat < 1) continue;
         const strength = lamp.power * lamp.level * (1 - d / (lamp.range * 1.3));
-        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * b.height / (lamp.y - b.height), b.height * 0.3, b.height * 2.5) + across / 2, alpha: (lighting.mood.name === 'evening' ? 0.6 : 1.1) * strength });
+        casts.push({ angle: Math.atan2(dz, dx), length: clamp(flat * b.height / (lamp.y - b.height), b.height * 0.6, b.height * 2.5) + across / 2, alpha: (lighting.mood.name === 'evening' ? 0.6 : 1.8) * strength });
       }
       const sun = lighting.mood.sun, sunlit = sunAt(cx, cz);
       if (sun && (lighting.mood.name === 'evening' || sunlit > 0)) casts.push({ angle: Math.atan2(sun[2], sun[0]), length: b.height * (lighting.mood.name === 'evening' ? 1.8 : 1.3) + across / 2, alpha: Math.max(lighting.mood.name === 'evening' ? 0.6 * sunFade() : 0, 0.75 * sunlit) });
@@ -8175,7 +8193,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       prop.casts.forEach((el, n) => {
         const cast = casts[n], up = prop.climbs[n];
         if (!cast || cast.alpha < 0.01) { if (el.style.opacity !== '0') el.style.opacity = '0'; if (up && up.style.opacity !== '0') up.style.opacity = '0'; return; }
-        const shade = lighting.mood.shade, stops = [[`${shade},.66`, 0], [`${shade},.3`, 0.45], [`${shade},.06`, 0.85], [`${shade},0`, 1]], opacity = Math.min(1, cast.alpha).toFixed(3);
+        // Đậm ĐỀU tới mép hộp rồi mới nhạt dần: phần dưới thân hộp thì khuất, phần lộ ra ngoài hộp mới là cái người xem thấy —
+        // nhạt từ tâm thì tới mép hộp bóng đã gần hết (đợt 22: bàn khám không có bóng).
+        const shade = lighting.mood.shade, edge = Math.min(0.75, (Math.max(b.width, b.depth) / 2) / cast.length);
+        const stops = [[`${shade},.75`, 0], [`${shade},.7`, edge], [`${shade},.32`, edge + (1 - edge) * 0.5], [`${shade},0`, 1]], opacity = Math.min(1, cast.alpha).toFixed(3);
         // Gốc bóng ở TÂM hộp: tính chỗ chạm tường từ tâm, phần trên tường rộng bằng hộp.
         const hit = wallHit(cx, cz, cast.angle, cast.length);
         if (hit) {
@@ -8184,7 +8205,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         } else if (up && up.style.opacity !== '0') up.style.opacity = '0';
         Object.assign(el.style, { width: (hit ? hit.t : cast.length).toFixed(1) + 'px', height: across.toFixed(1) + 'px', opacity,
           background: `linear-gradient(to right, ${ramp(stops, cast.length)})`,
-          transform: `translate3d(${cx.toFixed(1)}px, -0.8px, ${cz.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
+          transform: `translate3d(${cx.toFixed(1)}px, -2.2px, ${cz.toFixed(1)}px) rotateY(${(-cast.angle * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg) translate(0px, ${(-across / 2).toFixed(1)}px)` });
       });
     }
   };
@@ -8312,7 +8333,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // Đèn soi nhỏ: phóng to hơn tỉ lệ thật, không thì giữa phòng khám sáng nó biến mất (Gemini đợt 21).
       const reach = len * (torch.kind === 5 ? 1.15 : 1.5), wide = reach * (torch.kind === 5 ? 0.62 : 0.8);
       const night = clamp((lighting.mood.dark - 0.1) / 0.5, 0, 1), strength = (torch.kind === 5 ? 0.55 : 1) + 0.4 * night;
-      live.push({ from, angle: Math.atan2(dy, dx), reach, wide, strength, hidden: torch.owner.host.style.display === 'none', z: +(torch.owner.host.style.zIndex || 1) });
+      live.push({ from, angle: Math.atan2(dy, dx), reach, wide, strength, night, hidden: torch.owner.host.style.display === 'none', z: +(torch.owner.host.style.zIndex || 1) });
     }
     while (lighting.beams.length < live.length) {
       const el = document.createElement('div'), spot = document.createElement('div');
@@ -8325,9 +8346,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const b = live[n];
       if (!b || b.hidden) { el.style.display = 'none'; spot.style.display = 'none'; flare.style.display = 'none'; return; }
       // QUẦNG Ở MẶT KÍNH: đầu đèn chói, loá ra một vòng nhỏ.
-      const f = Math.max(10, b.wide * 0.32);
+      // Phòng SÁNG: hoà `screen` trên nền trắng thì không còn gì — đèn soi ban ngày thấy được nhờ chấm loá ở đầu đèn có một
+      // quầng xám rất mảnh quanh nó (tương phản với nền sáng) và điểm rọi trắng phủ thường lên lông con vật (đợt 22).
+      const day = 1 - b.night, f = Math.max(10, b.wide * 0.32) * (1 + 0.4 * day);
+      flare.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen'; spot.style.mixBlendMode = day > 0.5 ? 'normal' : 'screen';
       Object.assign(flare.style, { display: '', zIndex: 8992, width: (2 * f).toFixed(1) + 'px', height: (2 * f).toFixed(1) + 'px',
-        background: `radial-gradient(closest-side, rgba(255,255,250,${(0.95 * b.strength).toFixed(3)}), rgba(255,246,210,${(0.35 * b.strength).toFixed(3)}) 40%, rgba(255,240,190,0))`,
+        background: `radial-gradient(closest-side, rgba(255,255,252,${(0.95 * b.strength).toFixed(3)}), rgba(255,250,225,${(0.55 * b.strength).toFixed(3)}) 30%, rgba(255,246,210,${(0.2 * b.strength).toFixed(3)}) 55%, rgba(110,110,100,${(0.14 * day).toFixed(3)}) 72%, rgba(110,110,100,0))`,
         transform: `translate(${(b.from[0] - f).toFixed(1)}px, ${(b.from[1] - f).toFixed(1)}px)` });
       const a = b.strength;
       // Mép luồng NHOÈ theo cỡ luồng trên màn hình (Gemini đợt 21: "tam giác trắng cạnh sắc"); quầng sáng ở mặt kính đèn.
@@ -8339,7 +8363,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // ĐIỂM RỌI: quầng trắng nơi luồng gặp vật (điểm `data-tip`, 87 % luồng).
       const r = b.wide * 0.42, cx = b.from[0] + Math.cos(b.angle) * b.reach * 0.87, cy = b.from[1] + Math.sin(b.angle) * b.reach * 0.87;
       Object.assign(spot.style, { display: '', zIndex: 8991, width: (2 * r).toFixed(1) + 'px', height: (2 * r).toFixed(1) + 'px',
-        background: `radial-gradient(closest-side, rgba(255,255,245,${(0.75 * a).toFixed(3)}), rgba(255,248,214,${(0.3 * a).toFixed(3)}) 55%, rgba(255,244,190,0))`,
+        background: `radial-gradient(closest-side, rgba(255,255,245,${((b.night > 0.5 ? 0.75 : 0.55) * a).toFixed(3)}), rgba(255,248,214,${(0.3 * a).toFixed(3)}) 55%, rgba(255,244,190,0))`,
         transform: `translate(${(cx - r).toFixed(1)}px, ${(cy - r).toFixed(1)}px)` });
     });
   };
@@ -8521,8 +8545,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       layer(0).appendChild(group);
       const top = -y - height, middle = [x + width / 2, y + height / 2, z - depth / 2];
       // BÓNG TIẾP ĐẤT dưới hộp: một vệt tối mềm trên sàn, nhỉnh hơn chân hộp — không có nó cái bàn như dán lên sàn.
-      face(layer(0), width + 60, depth + 60, `translate3d(${x - 30}px, ${-y - 0.6}px, ${z - depth - 30}px) rotateX(90deg)`,
-        `background:radial-gradient(closest-side, rgba(0,0,0,.26), rgba(0,0,0,.12) 70%, rgba(0,0,0,0));opacity:${y > 0 ? 0 : 1}`);
+      // Một tấm TỐI ĐỀU bo góc, nhoè mép — không phải chuyển sắc tròn: tâm của chuyển sắc nằm khuất dưới thân hộp, phần lộ ra
+      // ở mép thì gần như trong suốt; tô đỏ để soát thì thấy rõ (đợt 22: bàn khám như lơ lửng).
+      face(layer(0), width + 36, depth + 60, `translate3d(${x - 18}px, ${-y - 2}px, ${z - depth - 18}px) rotateX(90deg)`,
+        `background:rgba(0,0,0,.3);border-radius:24px;filter:blur(10px);opacity:${y > 0 ? 0 : 1}`);
       const geomTop = { origin: [x, y + height, z - depth], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0], kind: 'box' };
       face(group, width, depth, `translate3d(${x}px, ${top}px, ${z - depth}px) rotateX(90deg)`, paint(tone.top, '#f1f4f5'), middle, geomTop);
       face(group, depth, height, `translate3d(${x}px, ${top}px, ${z}px) rotateY(90deg)`, paint(tone.side, '#7da3b0') + ';filter:brightness(.94)', middle,
@@ -8794,7 +8820,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const mood = lighting.mood, centre = [actor.where, actor.spot.y + (actor.height || 0) * 0.45, actor.spot.z];
             let from, amount, glow = 0, rgb = '255,255,255';
             if (L.rim && L.rim.k > 0.12) { from = [L.rim.x, L.rim.y, L.rim.z]; amount = clamp(0.26 + L.rim.k * 0.5, 0, 0.6); glow = clamp(L.rim.k * 0.35, 0, 0.34) * (L.rim.front ?? 1); rgb = L.rim.rgb; }
-            else { const key = mood.sun && mood.name === 'evening' ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood.name === 'night' ? 0.12 : mood.name === 'evening' ? 0.3 : 0.16; }
+            else { const key = mood.sun && mood.name === 'evening' ? norm(mood.sun) : lighting.key; from = [centre[0] - key[0] * 800, centre[1] - key[1] * 800, centre[2] - key[2] * 800]; amount = mood.name === 'night' ? 0.12 : mood.name === 'evening' ? 0.3 : 0.24; }
             const a = set.project(...from), b = set.project(...centre);
             // Thú nhỏ, mình ngang: khối sáng tối phải đậm hơn mới đọc ra (Gemini đợt 17: "mèo còn phẳng").
             if (!isPerson(actor)) { amount = Math.min(0.68, amount * 1.45); glow = Math.min(0.4, glow * 1.3); }
@@ -8993,7 +9019,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const h = m.top - m.base;
         // Con vật: chừa chỗ cho DẤU CẢM XÚC trên đầu (! ? zzz) — không thì dấu ló ra ngoài mép khung (phim dọc đợt 15).
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
-        return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.66 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.04 * h : 0) };
+        // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
+        // vai một chút (0,62) — không cắt ngang giữa ngực.
+        return { x0: m.x0, x1: m.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
       const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base) } : a || b);
@@ -9042,6 +9070,28 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if ((lamp.level < 0.5 && !lamps) || (lamp.kind === 'screen' && !(lamps && lighting.mood.name !== 'day')) || lamp.x < region.x0 - reach || lamp.x > region.x1 + reach) continue;      // `lamps`: lượt bật / tắt đèn — lấy cả đèn đang tắt
         const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
         if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3)) { region = wider; cam = test; }
+      }
+      // ĐỒ VẬT BỊ MÉP KHUNG CẮT ĐÔI (TV, bàn nước — Gemini đợt 21): dời ngang tối đa 35 % nửa khung để nó ra hẳn hay vào trọn,
+      // nếu chủ thể vẫn trọn trong khung. Vật ở tiền cảnh (gần máy hơn chủ thể) thì để: lấp ló ở mép là cách dựng tiền cảnh.
+      {
+        const zMeanProps = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
+        const spans = props.filter((prop) => prop.spec).map((prop) => ({ a: prop.spec.x, b: prop.spec.x + prop.spec.width, z: prop.spec.z - prop.spec.depth / 2 }))
+          .concat(actors.filter((actor) => !actor.rig && !actor.lamp && actor.content && actor.width).map((actor) => {
+            const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z };
+          }));
+        for (const span of spans) {
+          // Tiền cảnh: chỉ đẩy ra hẳn một MẨU lấp ló ở mép (nhánh cây chọc vào khung — Gemini đợt 22), không kéo nó vào.
+          const front = span.z > zMeanProps + 150;
+          const half = (W / 2) * cam.distance / k, plane = (x) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - span.z));
+          const a = plane(span.a), b = plane(span.b);
+          if (b - a > half) continue;
+          const shown = (Math.min(b, cam.x + half) - Math.max(a, cam.x - half)) / (b - a);
+          if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.12 || shown >= 0.88) continue;
+          const margin = half * 0.04, left = (a + b) / 2 < cam.x;
+          const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * 0.35;
+          const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
+          if (fits(out)) cam = { ...cam, x: out }; else if (!front && fits(into)) cam = { ...cam, x: into };
+        }
       }
       const others = seen.filter(Boolean)
         // Góc cận: người bên cạnh tính theo ĐẦU (Gemini soát phim đợt 18: góc cận con mèo lấy nửa mặt bác sĩ ở mép khung).
@@ -9598,7 +9648,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.61.0';
+const VERSION = '0.62.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

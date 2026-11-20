@@ -536,6 +536,16 @@ with tempfile.TemporaryDirectory() as work:
                        "['point', set.targetPoint(vet, set.lampPoint(\"tran\"))]", '.start + 0.85', 'set.lamp("tran", false, 0.12)', 'set.lamp("tran", true, 0.9)',
                        'set.shift("day", 4)', '"lens": false'):
             if needle not in html: problems.append(f'light: {needle} is not in the composition')
+        # Đợt 22: moments.json — các khoảnh khắc ánh sáng (mất điện, có điện, trời chuyển, bật / tắt đèn) kèm câu hỏi có / không.
+        moments_path = os.path.join(work, 'lit', 'moments.json')
+        if not os.path.isfile(moments_path): problems.append('light: moments.json is not written next to the composition')
+        else:
+            moments = json.load(open(moments_path, encoding='utf-8'))
+            whats = [m['what'] for m in moments]
+            for wanted in ('opening', 'power cut', 'power back on', 'sky turning to day — end', 'lamp on', 'lamp off'):
+                if wanted not in whats: problems.append(f'light: moments.json has no "{wanted}" moment (has {whats})')
+            if any(not m['ask'] or not isinstance(m['t'], (int, float)) for m in moments) or [m['t'] for m in moments] != sorted(m['t'] for m in moments):
+                problems.append('light: moments.json moments need a time, questions, and to be in time order')
 
     # Đợt 18: kịch bản nhiều cảnh → film.json; mở đầu "hook"; thông báo trong kịch bản chữ.
     multi = os.path.join(work, 'phim.txt')

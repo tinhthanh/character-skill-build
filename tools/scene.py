@@ -202,6 +202,9 @@ SET_PRESETS = {
         'panels': [{'wall': 'back', 'at': -380, 'y': 560, 'width': 260, 'height': 190, 'color': '#ffffff', 'border': '10px solid #dfe9ec'},
                    {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff', 'window': True}],
         'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 600}],
+        # ĐÈN KHÁM treo trên bàn, sáng cả ban ngày: một vùng sáng tập trung trên bàn, bóng đổ rõ dưới bàn và dưới chân người
+        # — phòng khám trắng sáng đều thì phẳng như tờ giấy (Gemini soát ánh sáng đợt 21: 2/10).
+        'lamps': [{'name': 'exam', 'x': 200, 'y': 640, 'z': -720, 'kind': 'ceiling', 'color': '#fff4e0', 'power': 0.8, 'range': 900, 'on': True}],
         'spots': 'pet on the table: "on": "table", x 200, z -560 · vet: x 40, z -560 · owner: x 360, z -560',
     },
     'pharmacy': {
@@ -339,6 +342,43 @@ def place_sounds(html, timings, sounds, base, out, copied):
     marker = '\n\n  <script src="https://cdn.jsdelivr.net/npm/gsap'
     if marker not in html: fail('could not place the "sounds" clips (the composition has no gsap <script> after its clips)')
     return html.replace(marker, '\n  <!-- "sounds": one clip each time the action plays -->\n' + '\n'.join(clips) + marker, 1), len(clips)
+
+
+def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, names):
+    """NHỮNG KHOẢNH KHẮC ÁNH SÁNG của cảnh, kèm câu hỏi có / không mà câu trả lời đúng là "có" — cho tools/light_audit.py
+    chụp ảnh tĩnh đúng lúc ấy và hỏi từng điều cụ thể (chấm cả video thì người / máy chấm nói ngược với hình: đợt 21)."""
+    turns, total = timings.get('turns', []), float(timings['duration'])
+    at = lambda turn, delay: round(min(total - 0.1, float(turns[turn][0]) + delay), 2) if turn < len(turns) else None
+    pet_of = lambda name: name and names.get(name, {}).get('_pet')
+    moments = [{'t': round(min(1.0, total / 2), 2), 'what': 'opening', 'ask': [
+        'Does every character cast a visible shadow on the floor (a darker patch under or beside the feet)?',
+        'Do the characters take on the colour of the room light (not flat and pasted on)?']
+        + (['Do the pieces of furniture (tables, sofa, counters) cast shadows on the floor?'] if stage_set.get('boxes') or stage_set.get('preset') else [])
+        + ['Is every piece of furniture and every object near the edges either fully inside the frame or fully outside it (none cut in half by the frame edge)?']}]
+    for op in power_ops:
+        if op['on']: moments.append({'t': at(op['turn'], 2.0), 'what': 'power back on', 'ask': ['Are the lamps lit and the room clearly brighter than during the power cut?']})
+        else: moments.append({'t': at(op['turn'], 1.0), 'what': 'power cut', 'ask': [
+            'Is the room dark, with every lamp and screen off?', 'Is the window frame about as dark as the wall around it (not bright white)?',
+            'Are the characters dim, not lit as if a lamp shone on them?']})
+    for op in sky_ops:
+        moments.append({'t': at(op['turn'], 0.3), 'what': f'sky turning to {op["to"]} — start', 'ask': ['Is the whole room in the frame (walls, floor, the lamp), not a close-up of one face?']})
+        moments.append({'t': at(op['turn'], op['dur'] + 0.5), 'what': f'sky turning to {op["to"]} — end', 'ask': [
+            'Is the room clearly darker and bluer than in the previous frame?'] + (['Is a lamp switched on and glowing?'] if op['to'] == 'night' and stage_set.get('light', 'day') != 'night' else [])})
+    for op in lamp_ops:
+        moments.append({'t': at(op['turn'], op['delay'] + op['dur'] + 0.4), 'what': f'lamp {"on" if op["on"] else "off"}', 'ask': [
+            'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
+    for op in gear_ops:
+        pet = pet_of(op['target'])
+        if op['kind'] == 'shine':
+            moments.append({'t': at(op['turn'], 1.3), 'what': 'flashlight', 'ask': [
+                'Is there a bright beam of light coming out of the flashlight?', 'Does the beam fade with distance and have soft edges (not a flat hard-edged shape)?']
+                + (['Is there a pool of light on the floor or on the wall?'] if stage_set.get('light', 'day') != 'day' else [])
+                + (['Is the animal brighter where the beam reaches it?', "Are the animal's eyes narrowed (squinting) in the light?",
+                    'Does the animal cast a shadow on the floor on the side away from the flashlight?'] if pet else [])})
+        else:
+            moments.append({'t': at(op['turn'], 1.2), 'what': 'examining light', 'ask': [
+                'Is a small beam or spot of light from the examining light visible?'] + (["Are the animal's eyes narrowed (squinting) in the light?"] if pet else [])})
+    return sorted((m for m in moments if m['t'] is not None), key=lambda m: m['t'])
 
 
 def read_timings(folder, target):
@@ -565,7 +605,8 @@ def main():
             if not preset: fail(f'set.preset must be one of {", ".join(SET_PRESETS)} — got {js(stage_set["preset"])}')
             # Đồ của bối cảnh dựng sẵn ĐI TRƯỚC, đồ người viết khai thêm cộng vào sau; `room` gộp từng khoá (khai thêm thì đè).
             merged = {key: value for key, value in stage_set.items() if key != 'preset'}
-            for key in ('boxes', 'panels', 'cutouts'): merged[key] = [dict(item) for item in preset.get(key, [])] + list(stage_set.get(key, []))
+            for key in ('boxes', 'panels', 'cutouts', 'lamps'): merged[key] = [dict(item) for item in preset.get(key, [])] + list(stage_set.get(key, []))
+            if not merged['lamps']: del merged['lamps']
             if 'room' in preset: merged['room'] = dict(preset['room'], **stage_set.get('room', {}))
             stage_set = scene['set'] = merged
             preset_note = f'set.preset: where people stand — {preset["spots"]}'
@@ -884,6 +925,7 @@ def main():
     toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
     lamp_ops = []                                           # { turn, name, on, dur } — bật / tắt đèn của bối cảnh 3D
     power_ops, sky_ops = [], []                             # mất điện / có điện · trời chuyển giờ
+    gear_ops = []                                           # đèn trong tay (rọi đèn pin, soi đèn khám) — cho moments.json
     popups = []                                             # { turn, cutout: số thứ tự, title, text, hold } — thông báo trên màn hình đạo cụ 3D
     # GÓC MÁY của bối cảnh 3D: `"view"` trên một lượt đổi máy quay đúng lúc lượt ấy bắt đầu. `emitted` đếm số lượt THẬT SỰ
     # đã phát ra trong talk.turns (kể cả lượt "bước lại gần" chèn thêm), để biết lượt ấy mang chỉ số nào.
@@ -1103,6 +1145,13 @@ def main():
                 spec = turn['sky'] if isinstance(turn['sky'], dict) else {'to': turn['sky']}
                 if not isinstance(spec, dict) or set(spec) - {'to', 'dur'} or spec.get('to') not in ('day', 'evening', 'night'): fail(f'{where}: "sky" is "day", "evening", "night" or {{ "to": "night", "dur": 6 }} — got {js(turn["sky"])}')
                 sky_ops.append({'turn': emitted[0], 'to': spec['to'], 'dur': float(spec.get('dur', 6))})
+        # Đèn trong tay: ghi lại lượt nào rọi / soi, để moments.json hỏi đúng lúc ấy (tools/light_audit.py).
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or not isinstance(turn.get('do'), list): continue
+            for step in turn['do']:
+                if isinstance(step, list) and step and step[0] in ('shine', 'examine'):
+                    target = step[1][1:] if len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None
+                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': target})
         # THẺ THÔNG BÁO trên khung (`"toast"`): gắn với lượt của chính mục này (sau các bước lại gần vừa chèn).
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or 'toast' not in turn: continue
@@ -1754,6 +1803,8 @@ def main():
     final, sound_count = place_sounds(final, timings, sounds, base, out, copied)
     # Thời gian của cảnh cho tools/film.py (phụ đề .srt của cả phim): tổng độ dài và từng câu thoại.
     json.dump({'duration': total, 'lines': timings.get('lines', [])}, open(os.path.join(out, 'timings.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    if stage_set is not None:
+        json.dump(light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, names), open(os.path.join(out, 'moments.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     if outro: final = final.replace('__OUTRO_START__', f'{timings["outro"]:.2f}').replace('__OUTRO_DUR__', f'{max(0.5, total - timings["outro"]):.2f}')
     # Dấu vân tay của nội dung vừa sinh: lần chạy sau biết tệp có bị sửa tay hay chưa.
     final = final.replace('</html>\n', f'</html>\n<!-- scene.py:{fingerprint(final)} -->\n')

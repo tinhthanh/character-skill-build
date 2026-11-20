@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.62.0
+
+Added — checking the light from still frames
+- **`tools/light_audit.py`**: a lighting check that asks one yes / no question about one still frame at a time,
+  instead of a score for a whole video. `tools/scene.py` now writes `moments.json` next to a 3D scene: the moments
+  that matter for the light (the opening, a power cut, the power coming back, the sky turning, a lamp switched,
+  a flashlight, an examining light), each with questions whose right answer is "yes" ("Are the animal's eyes
+  narrowed in the light?"). `light_audit.py scene-dirs… -o audit/` captures a sheet of those frames per scene and
+  writes `prompt.txt`; `--score answers.json` counts the yes answers, lists the failures and appends the run to
+  `history.json`. Scoring the whole video, the reviewer contradicted the frames (wave 21); on stills it agreed
+  with them.
+- **Exam room**: an examining lamp hangs behind the table, lit in the day: a cone of light, a lit area on the
+  table, shadows of the table and the people towards the camera.
+
+Fixed — after the still-frame check
+- Furniture shadows: the soft shadow under a box is now an even, blurred dark patch reaching just past its
+  edges (a round gradient had its dark middle hidden under the box and almost nothing showed), and a long
+  shadow stays dark up to the edge of the box before it fades — the exam table no longer floats.
+- Walls get slightly darker towards the ceiling in the day and the evening: a white room is no longer flat as
+  paper.
+- The examining light shows in a bright room: a bigger glint at the lamp with a faint grey ring round it, and a
+  hotspot laid over the fur rather than blended (blending with `screen` vanishes on white).
+- A flashlight makes the pet it lights cast a shadow, mostly sideways away from the hand (the geometric
+  direction, towards the camera, falls out of the frame).
+- Close shots keep 8 % headroom above the head and cut just below the shoulders, not across the chest.
+- Things cut in half by the side of the frame (a TV, a table): the camera moves sideways, at most a third of
+  half the frame, so that they are fully in or fully out; a sliver of a foreground plant is pushed out.
+- Character shading in the day is a little stronger (0.24): in a bright clinic they read less pasted on.
+
+Measured — `light_audit.py` on the trial film (living room evening → night, power cut with a flashlight, clinic)
+- 0.61.0: 22 / 23 yes — the exam table had no shadow.
+- First draft of 0.62.0, with 4 new questions (27): 23 / 27 — a sliver of the foreground plant at the frame
+  edge (twice), no shadow of the cat in the flashlight, flat characters in the clinic.
+- Second draft: 26 / 27 — the cat's shadow fell towards the flashlight; fixed after that run (it now follows the
+  direction of the beam), checked on the frame, not re-scored.
+
 ## 0.61.0
 
 Added — light you can hold, light that bounces
