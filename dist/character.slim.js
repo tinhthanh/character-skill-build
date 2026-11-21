@@ -64,6 +64,39 @@ return { MARKS, freshMark, attachMark, drawMark, markTweens, markOff };
 __m['runtime/shading.js'] = (function () {
 const NS = 'http://www.w3.org/2000/svg';
 let counter = 0;
+function localMatrix(node) {
+  const list = node && node.transform && node.transform.baseVal;
+  let m = new DOMMatrix();
+  if (list) for (let i = 0; i < list.numberOfItems; i++) m = m.multiply(list.getItem(i).matrix);
+  return m;
+}
+const outlineCache = new WeakMap();
+const SHAPE_KEYS = ['d', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'points'];
+function outlinePoints(svg, group, skip = null) {
+  const out = [];
+  for (const el of group.querySelectorAll('path, circle, ellipse, rect, polygon')) {
+    if (typeof el.getTotalLength !== 'function' || (skip && skip(el))) continue;
+    let hidden = false, m = new DOMMatrix();
+    for (let node = el; node && node !== svg; node = node.parentNode) {
+      if ((node.style && (node.style.display === 'none' || node.style.visibility === 'hidden')) || (node.getAttribute && (node.getAttribute('display') === 'none' || node.getAttribute('opacity') === '0'))) { hidden = true; break; }
+      m = localMatrix(node).multiply(m);
+    }
+    if (hidden) continue;
+    const key = SHAPE_KEYS.map((name) => el.getAttribute(name)).join('|');
+    let shape = outlineCache.get(el);
+    if (!shape || shape.key !== key) {
+      const style = getComputedStyle(el), length = el.getTotalLength(), points = [];
+      const fill = style.fill !== 'none', edge = style.stroke && style.stroke !== 'none' ? (parseFloat(style.strokeWidth) || 0) / 2 : 0;
+      if (fill && length > 0) { const count = Math.max(16, Math.ceil(length)); for (let n = 0; n <= count; n++) points.push(el.getPointAtLength(length * n / count)); }
+      shape = { key, edge, points };
+      outlineCache.set(el, shape);
+    }
+    if (!shape.points.length) continue;
+    const scale = Math.hypot(m.a, m.b), edge = shape.edge * scale;
+    for (const p of shape.points) out.push({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f, edge });
+  }
+  return out;
+}
 function attachShade(svg, root) {
   if (!svg || !root || !root.id || typeof document === 'undefined') return null;
   const id = `shade${++counter}`;
@@ -81,6 +114,7 @@ function attachShade(svg, root) {
   for (const [key, value] of Object.entries({ x: -2000, y: -2000, width: 4400, height: 4400, fill: `url(#${id}-grad)`, mask: `url(#${id}-mask)`, 'pointer-events': 'none', 'data-shade': '' })) cover.setAttribute(key, value);
   const up = cover.cloneNode();
   up.setAttribute('fill', `url(#${id}-bounce)`); up.removeAttribute('data-shade'); up.setAttribute('data-bounce', ''); up.style.display = 'none';
+  cover.id = `${id}-cover`; up.id = `${id}-up`;
   svg.appendChild(defs); svg.appendChild(up); svg.appendChild(cover);
   const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
   const rise = defs.querySelectorAll('linearGradient')[1], riseStops = rise.querySelectorAll('stop');
@@ -131,11 +165,11 @@ function attachShade(svg, root) {
     },
   };
 }
-return { attachShade };
+return { localMatrix, outlinePoints, attachShade };
 })();
 __m['runtime/rig-svg.js'] = (function () {
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
-const { attachShade } = __m['runtime/shading.js'];
+const { attachShade, outlinePoints } = __m['runtime/shading.js'];
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
 const NGHI = Object.freeze({
@@ -172,6 +206,7 @@ const NGHI = Object.freeze({
   plungerL: 0, plungerR: 0,     // 0…1 pít-tông ống tiêm ấn xuống (`inject`)         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
+  onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   tayL: 'mo', tayR: 'mo',
 });
 const MAU_MAC_DINH = {
@@ -2209,7 +2244,7 @@ class RigSVG {
     return t;
   }
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
-  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4;
+  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
     let tx = 300, ty = 400, span = 0;                 // span: bề ngang đầu con vật (khung của người) — quãng tay trượt khi vuốt
@@ -2259,7 +2294,9 @@ class RigSVG {
       return { upper, fore, dir, bent };
     };
     const { upper, fore, dir } = solve(tx, ty);
-    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve };
+    const follow = live && !live.el && typeof live.follow === 'function' ? (x, y) => live.follow(x, y, typeof this.bakeTime === 'number' ? this.bakeTime : null) : null;
+    const crown = live && !live.el && typeof live.crown === 'function' ? (x0, x1, bins) => live.crown(x0, x1, typeof this.bakeTime === 'number' ? this.bakeTime : null, bins) : null;
+    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve, follow, crown, shoulderX: shoulder.x };
   }
   #leanTo(t, reach, hand) {
     const s = this.s, N = this.NGHI, { k, upper, fore, lean, crouch, tx } = reach;
@@ -2270,6 +2307,22 @@ class RigSVG {
     if (reach.bend) { const other = k === 'L' ? 'R' : 'L'; t.to(s, { ['bat' + other]: -reach.bend, ['cang' + other]: -20, ['aim' + other]: 0, duration: 0.45, ease: 'power2.out' }, 0); }
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, than: N.than - lean, dau: N.dau + lean * 0.8, dauY: 7, nhinX: clamp((tx - HONG.x) * 0.02, -3, 3), nhinY: 2.4, vai: N.vai + 3,
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
+  }
+  #outline(group) {
+    let x0 = Infinity, x1 = -Infinity, bottom = -Infinity;
+    const points = [];
+    for (const q of outlinePoints(this.svg, group)) {
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); bottom = Math.max(bottom, q.y + q.edge); points.push({ x: q.x, y: q.y - q.edge }, { x: q.x, y: q.y + q.edge });
+    }
+    const columns = (n) => {
+      const out = new Array(n).fill(null), width = (x1 - x0) / n || 1;
+      for (const q of points) {
+        const i = Math.min(n - 1, Math.floor((q.x - x0) / width));
+        if (!out[i]) out[i] = { high: q.y, low: q.y }; else { out[i].high = Math.min(out[i].high, q.y); out[i].low = Math.max(out[i].low, q.y); }
+      }
+      return out;
+    };
+    return Number.isFinite(bottom) ? { x0, x1, bottom, columns } : null;
   }
   stroke(target = null) {
     const t = this.tl(), reach = this.#reachLow(target), { k, upper, fore } = reach, s = this.s;
@@ -2286,21 +2339,79 @@ class RigSVG {
       return scale * (Math.max(box.y * sin, (box.y + box.height) * sin) + half * cos);
     };
     const line = reach.ty + below(reach.dir) - RigSVG.STROKE_LIFT;
-    const place = (x) => {
-      let y = reach.ty, pose = reach.solve(x, y);
-      for (let n = 0; n < 4; n++) { y = line - below(pose.dir); pose = reach.solve(x, y); }
+    const place = (x, y = line) => {
+      let pose = reach.solve(x, y - below(reach.dir));
+      for (let n = 0; n < 4; n++) pose = reach.solve(x, y - below(pose.dir));
       return pose;
     };
     const reachable = (sign) => {
       let g = glide, pose = place(reach.tx + sign * g);
       while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
-      return pose;
+      return g;
     };
-    const ahead = glide ? reachable(1) : { upper: upper + 3, fore: fore + 5 };
-    const back = glide ? reachable(-1) : { upper: upper - 2, fore: fore - 4 };
-    for (let n = 0; n < 3; n++) {
-      t.to(s, { ['cang' + k]: back.fore, ['bat' + k]: back.upper, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
-       .to(s, { ['cang' + k]: ahead.fore, ['bat' + k]: ahead.upper, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+    if (glide) {
+      const limit = (sign) => { let g = 0; while (g < 40 && place(reach.tx + sign * (g + 1)).bent) g += 1; return reach.tx + sign * g; };
+      const bentHere = reach.solve(reach.tx, reach.ty).bent, far = bentHere ? limit(1) : reach.tx + glide, near = bentHere ? limit(-1) : reach.tx - glide;
+      const crowned = !!(reach.crown && this.el['coTay' + k] && reach.crown(reach.tx - 1, reach.tx + 1, 1));      // đích 'crown' đo được đỉnh đầu
+      const back = reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
+      const ease = (f) => (1 - Math.cos(Math.PI * f)) / 2;
+      t.to(glider, { u: 1, duration: span, ease: 'none', onUpdate: () => {
+        if (glider.u <= 0) return;                                  // tua về trước lúc trượt: để các tween cúi người lo
+        const time = glider.u * span, at = Math.max(0, time - lead) / 0.2, n = Math.min(5, Math.floor(at)), f = ease(at - n), p = knots[n] + (knots[n + 1] - knots[n]) * f;
+        const width = crowned ? reach.crown(0, 0, 0) : null;
+        const centre = width ? (width.x0 + width.x1) / 2 : reach.follow ? reach.follow(reach.tx, line).x : reach.tx;
+        let x = Math.max(near, Math.min(far, centre + p * (p < 0 ? back : ahead)));
+        let y = line;
+        if (reach.follow) {
+          const a = reach.follow(x - 10, line), b = reach.follow(x + 10, line);
+          y = a.y + (b.y - a.y) * (x - a.x) / ((b.x - a.x) || 1);
+        }
+        let pose = place(x, y);
+        const w = time < lead ? ease(time / lead) : 1;
+        const apply = (q) => { s['bat' + k] = upper + (q.upper - upper) * w; s['cang' + k] = fore + (q.fore - fore) * w; };
+        if (crowned) {
+          const judge = (h) => {
+            const q = place(x, h); apply(q);
+            const extra = this.bakeBreath, was = { than: s.than, tho: s.tho };
+            if (extra) { s.than = was.than + extra.than; s.tho = Math.min(1, was.tho + extra.tho); }
+            this.apDung();
+            if (extra) { s.than = was.than; s.tho = was.tho; }
+            const hand = this.#outline(this.el['coTay' + k]);
+            if (!hand) return null;
+            const bins = Math.max(1, Math.round((hand.x1 - hand.x0) / 2)), tops = reach.crown(hand.x0, hand.x1, bins), cols = hand.columns(bins);
+            let area = 0, sunk = 0, touch = 0;
+            cols.forEach((col, i) => {
+              if (!col) return;
+              area += col.low - col.high;
+              if (tops[i] === null) return;
+              sunk += Math.max(0, col.low - Math.max(tops[i], col.high)); touch += Math.max(0, col.low - Math.max(tops[i] - RigSVG.STROKE_BAND, col.high));
+            });
+            return area > 0 ? { h, sunk: sunk / area, touch: touch / area, off: Math.abs(h - y) } : null;
+          };
+          const rank = (p) => (p.sunk > RigSVG.STROKE_SUNK ? 0 : p.touch < RigSVG.STROKE_TOUCH ? 1 : 2), near = (a, b) => Math.abs(a - b) < 0.005;
+          const pick = (p, q, a, b, more) => (near(a, b) ? (p.off <= q.off ? p : q) : (more ? a > b : a < b) ? p : q);
+          const better = (p, q) => (!q ? p : !p ? q : rank(p) !== rank(q) ? (rank(p) > rank(q) ? p : q)
+            : rank(p) === 1 ? pick(p, q, p.touch, q.touch, true) : pick(p, q, p.sunk, q.sunk, false));
+          const last = this.strokeFit && Math.abs(this.strokeFit.time - (this.bakeTime ?? -1)) < 0.05 ? this.strokeFit.offset : null;
+          const search = () => {
+            let best = null;
+            if (last !== null) for (let d = -6; d <= 6; d += 2) best = better(best, judge(y + last + d));
+            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d));
+            if (best) { const coarse = best.h; for (const d of [-2, -1, 1, 2]) best = better(best, judge(coarse + d)); const fine = best.h; for (const d of [-0.5, 0.5]) best = better(best, judge(fine + d)); }
+            return best;
+          };
+          let best = search();
+          for (let n = 0; n < 5 && (!best || best.touch <= 0); n++) { x -= 3 * (Math.sign(x - reach.shoulderX) || 1); best = search(); }
+          if (best) { this.strokeFit = { time: this.bakeTime ?? -1, offset: best.h - y }; y = best.h; pose = place(x, y); }
+        }
+        apply(pose);
+      } }, 0.48 - lead);
+      if (crowned) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.3).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 0.48 - lead + span);
+    } else {
+      for (let n = 0; n < 3; n++) {
+        t.to(s, { ['cang' + k]: fore - 4, ['bat' + k]: upper - 2, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+         .to(s, { ['cang' + k]: fore + 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+      }
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 1.7);
@@ -3234,7 +3345,7 @@ return { veKhuonMat, beRongTaiY, veChanMay, RigSVG };
 })();
 __m['runtime/rig-thu.js'] = (function () {
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
-const { attachShade } = __m['runtime/shading.js'];
+const { attachShade, outlinePoints } = __m['runtime/shading.js'];
 const KHUNG = { w: 400, h: 330 };
 const LIE = { truocY: 48, sauY: 44, tnX: 46, txX: 46, snX: -8, sxX: -8 };
 const HELD = { truocY: 30, sauY: 38, tnX: -4, txX: 2, snX: -10, sxX: -10, dauY: -4 };
@@ -3853,6 +3964,22 @@ class RigThu {
     let x = 0;
     if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
     return x;
+  }
+  headPose() {
+    const s = this.#view(), { S, ng } = this.#khung(), d = this.nv.dau;
+    return { x: S.x + d.dx + (s.dauX || 0), y: S.y + d.dy + (s.dauY || 0) - ng * 2, turn: s.dau || 0 };
+  }
+  follow(x, y, from = null) {
+    const s = this.#view(), k = s.huong < 0 ? -1 : 1, away = this.isCarried(), ref = from || this.headPose(), now = this.headPose();
+    const ox = away ? 0 : s.x + this.dropX(), oy = away ? 0 : s.y;
+    const turn = (now.turn - ref.turn) * Math.PI / 180, vx = 200 + (x - ox - 200) * k - ref.x, vy = y - oy - ref.y;
+    const nx = now.x + vx * Math.cos(turn) - vy * Math.sin(turn), ny = now.y + vx * Math.sin(turn) + vy * Math.cos(turn);
+    return { x: 200 + (nx - 200) * k + ox, y: ny + oy };
+  }
+  crownPoints() {
+    const head = this.el && this.el.dau;
+    if (!head) return [];
+    return outlinePoints(this.svg, head, (el) => !!(this.markEl && this.markEl.contains(el))).map((q) => ({ x: q.x, y: q.y - q.edge }));
   }
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
   shotBox(kind = 'full') {
@@ -5717,6 +5844,7 @@ return { createLighting };
 __m['runtime/set3d.js'] = (function () {
 const { PROP_FRAME } = __m['runtime/props.js'];
 const { createLighting } = __m['runtime/lighting.js'];
+const { localMatrix } = __m['runtime/shading.js'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
 const FURNITURE = ['tv', 'table', 'counter', 'chair', 'stool', 'monitor', 'carrier', 'scale'];
@@ -5744,6 +5872,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const base = { yaw: 0, pitch: 6, distance: 1700, lens: 1700, x: 0, y: 300, z: -350, zoom: 1, blur: 0 };
   const camera = { ...base }, marks = [];
   const backdrop = [], props = [], actors = [], layers = [], focused = [], surfaces = [];
+  let ghostCount = 0;                                    // bàn tay vuốt chép lên trên con vật (đợt 32)
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
   let trial = null;                                  // máy THỬ (đợt 32): `direct` đo đồ đạc ở mép một góc chưa đặt — đè lên máy của timeline
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
@@ -5950,11 +6079,49 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
+      let pose = null, seen = null;
+      const mark = () => { if (typeof to.headPose === 'function') pose = to.headPose(); };
       return {
-        get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
-        get y() { const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
+        get x() { mark(); const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
+        get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
+        follow(xp, yp, time = null) {
+          if (typeof to.follow !== 'function') return { x: xp, y: yp };
+          const reel = typeof time === 'number' && to.lastSequence ? to.lastSequence : null, before = reel ? reel.totalTime() : 0;
+          if (reel) reel.totalTime(Math.min(time, reel.duration()), false);
+          try { return followNow(xp, yp); } finally { if (reel) reel.totalTime(before, false); }
+        },
+        crown(x0, x1, time = null, bins = 1) {
+          if (part !== 'crown' || typeof to.crownPoints !== 'function') return null;
+          if (typeof time !== 'number' || !seen || seen.time !== time) {
+            const reel = typeof time === 'number' && to.lastSequence ? to.lastSequence : null, before = reel ? reel.totalTime() : 0;
+            if (reel) reel.totalTime(Math.min(time, reel.duration()), false);
+            try { seen = { time, points: to.crownPoints().map((q) => toFrom(q.x, q.y)) }; } finally { if (reel) reel.totalTime(before, false); }
+          }
+          if (bins === 0) {                                   // bề ngang của đầu: { x0, x1 }
+            const xs = seen.points.map((q) => q.x);
+            return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs) } : null;
+          }
+          const tops = new Array(bins).fill(null), width = (x1 - x0) / bins || 1;
+          for (const q of seen.points) {
+            if (q.x < x0 || q.x > x1) continue;
+            const i = Math.min(bins - 1, Math.floor((q.x - x0) / width));
+            if (tops[i] === null || q.y < tops[i]) tops[i] = q.y;
+          }
+          return tops;
+        },
       };
+      function toPet(xp, yp) {
+        const a = of(from), fa = facts(a), b = of(to), fb = facts(b), shift = (to.s.x || 0) + (typeof to.dropX === 'function' ? to.dropX() : 0);
+        const X = a.spot.x + (xp - fa.size.w / 2) * fa.unit, Y = a.spot.y + (fa.ground - yp) * fa.unit;
+        return { x: (X - fb.x) / fb.unit + fb.size.w / 2 + shift, y: fb.ground - (Y - b.spot.y) / fb.unit };
+      }
+      function toFrom(px, py) {
+        const a = of(from), fa = facts(a), b = of(to), fb = facts(b), shift = (to.s.x || 0) + (typeof to.dropX === 'function' ? to.dropX() : 0);
+        const X = fb.x + (px - fb.size.w / 2 - shift) * fb.unit, Y = b.spot.y + (fb.ground - py) * fb.unit;
+        return { x: fa.size.w / 2 + (X - a.spot.x) / fa.unit, y: fa.ground - (Y - a.spot.y) / fa.unit };
+      }
+      function followNow(xp, yp) { const p = toPet(xp, yp), q = to.follow(p.x, p.y, pose); return toFrom(q.x, q.y); }
     },
     aimAt(from, to) {
       const of = (rig) => actors.find((actor) => actor.rig === rig);
@@ -6262,9 +6429,47 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           }
         }
       }
+      for (const pet of actors) {
+        if (!pet.over || !pet.rig) continue;
+        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
+        let ghost = pet.ghost;
+        const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
+        if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
+        if (!ghost) {
+          ghost = pet.ghost = document.createElement('div');
+          ghost.dataset.ghost = '1';
+          const mask = `ghost${++ghostCount}`;
+          ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use/></g>
+            <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+              <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
+            <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+        }
+        if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
+        ghost.className = person.host.className;
+        ghost.style.cssText = person.host.style.cssText;
+        ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
+        ghost.style.pointerEvents = 'none';
+        const svg = ghost.firstChild, use = svg.firstChild.firstChild;
+        const box = person.rig.svg.getAttribute('viewBox');
+        if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
+        const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
+        for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
+        for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
+          const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
+          if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
+        }
+        let chain = new DOMMatrix();
+        for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
+          chain = localMatrix(node).multiply(chain);
+        }
+        const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
+        svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
+        ghost.style.display = '';
+      }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -6284,17 +6489,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const head = h && h.width ? { x0: toX(h.left), x1: toX(h.right), top: toY(h.top), base: toY(h.bottom) } : null;
         const upperEl = actor.rig.el && actor.rig.el.than, u = upperEl && upperEl !== part ? drawnRect(upperEl) : null;
         const upper = u && u.width ? { x0: toX(u.left), x1: toX(u.right) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, rig: actor.rig };
+        const coreEls = [actor.rig.el && actor.rig.el.dau, actor.rig.el && actor.rig.el.ao].filter(Boolean).map(drawnRect).filter((r) => r.width > 0);
+        const core = coreEls.length && typeof actor.rig.seatY === 'function' ? { x0: toX(Math.min(...coreEls.map((r) => r.left))), x1: toX(Math.max(...coreEls.map((r) => r.right))) } : null;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
       };
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
       const regionOf = (m) => {
         const h = m.top - m.base;
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
-        const across = size !== 'full' && m.upper ? m.upper : m;                         // góc trung / cận: bề ngang phần trên thân (đợt 32)
+        const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core) } : a || b);
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
       const mergeHead = (a, b) => (a && b ? merge(a, b) : a || b);
       const mergeOther = (a, b) => (a && b ? { ...merge(a, b), head: mergeHead(a.head, b.head) } : a || b);
@@ -6306,7 +6513,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
-      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.66 };
+      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill) => {
@@ -6494,19 +6701,52 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     ruleLog: [],                                                                           // luật khung hình đã chạy (đợt 32: con vật ở mép dưới)
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
       const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
+      const edgeCut = (v) => {
+        const kept = { ...camera };
+        trial = { ...v }; set.update();
+        const cut = set.propFraming().filter((p) => !p.minor && !p.front);
+        trial = null; Object.assign(camera, kept); set.update();
+        return cut;
+      };
+      const tallView = view.clientHeight > view.clientWidth * 1.2;
+      const nameOfRig = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.id || actor.host.dataset.name || '' : ''; };
+      const nudge = (v, subjects) => {
+        const cut = edgeCut(v);
+        if (!cut.length) return v;
+        const names = subjects.map(nameOfRig), toward = cut[0].edge === 'right' ? 1 : -1;
+        for (const sign of [toward, -toward]) for (const grow of [1, 1.04, 1.08, 1.12, 1.2, 1.3, 1.45]) for (const d of [0, 8, 16, 24, 32, 48, 64, 80]) {
+          if (grow === 1 && !d) continue;
+          const test = { ...v, x: +(v.x + sign * d).toFixed(1), distance: +(v.distance * grow).toFixed(1) }, kept = { ...camera };
+          trial = { ...test }; set.update();
+          const props = set.propFraming().filter((p) => !p.minor && !p.front), people = set.framing().filter((c) => names.includes(c.name));
+          trial = null; Object.assign(camera, kept); set.update();
+          if (props.length < cut.length && !people.length) { set.ruleLog.push({ rule: 'nudge', from: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), by: sign * d, grow }); return test; }
+        }
+        return v;
+      };
       let shot = null;
       for (const [index, beat] of beats.entries()) {
         if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
         if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects)) continue;
         let at = beat.time;
-        const hold = beat.speech || beat.move ? Math.min(minShot, 1.0) : minShot;      // `move`: có người đi — đổi góc kịp trước khi họ ra khỏi khung
+        const hold = beat.speech || beat.move || (shot && shot.insert) ? Math.min(minShot, 1.0) : minShot;
         if (shot && at - shot.at < hold) at = shot.at + hold;
         const next = beats.slice(index + 1).find((later) => later.fixed);
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
         let values;
         const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
         try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
-        let size = beat.size;
+        if (beat.size === 'full' && tallView && beat.subjects.some((rig) => typeof rig.seatY === 'function')) {
+          const cut = edgeCut(values);
+          if (cut.length) {
+            let roomy = null;
+            try { roomy = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); }, roomy: true }); } catch (error) { roomy = null; }
+            const after = roomy ? edgeCut(roomy) : null, used = !!(after && after.length < cut.length);
+            set.ruleLog.push({ rule: 'roomyFull', t: +at.toFixed(2), cut: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), roomy: after ? after.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`) : null, used });
+            if (used) values = roomy;
+          }
+        }
+        let size = beat.size, reaction = null;
         if (beat.size === 'medium') {
           const seek = (time) => { tl.seek(time, false); set.update(); };
           let full = null, how = 'medium';
@@ -6516,39 +6756,60 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
             try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
-            const edgeCut = (v) => { trial = { ...v }; set.update(); const cut = set.propFraming().filter((p) => !p.minor && !p.front); trial = null; set.update(); return cut; };
-            const usable = (v) => {
+            const usable = (v, sliver = false) => {
               if (!v) return false;
-              const frame = set.lastFrame, cut = edgeCut(v), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
+              const frame = set.lastFrame, cut = edgeCut(v).filter((p) => !(sliver && p.shown < 0.35)), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
               return { ok, ratio: +(v.distance / full.distance).toFixed(3), cut: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), whole: frame.whole };
             };
-            const judged = (name, v) => { const r = usable(v); if (r) tries[name] = { ratio: r.ratio, cut: r.cut, whole: r.whole }; return r && r.ok; };
-            if (judged('loose', loose)) { values = loose; how = 'loose'; }
+            const judged = (name, v) => {
+              if (!v) return null;
+              const w = nudge(v, beat.subjects), r = usable(w, name === 'core');
+              tries[name] = { ratio: r.ratio, cut: r.cut, whole: r.whole, ...(w !== v ? { nudged: true } : {}) };
+              return r.ok ? w : null;
+            };
+            let got = null;
+            if ((got = judged('loose', loose))) { values = got; how = 'loose'; }
             else {
               let moment = null;
               try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
-              if (judged('moment', moment)) { values = moment; how = 'moment'; }
+              if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true }); } catch (error) { return null; } })()))) {
+                values = got; how = 'core';
+                const roomier = { ...got, distance: +Math.max(got.distance, full.distance * 0.75).toFixed(1) };
+                if (roomier.distance > got.distance) { const r = usable(roomier, true); if (r && r.ok) { values = roomier; tries.core.widened = r.ratio; } }
+              }
               else {
                 let single = null;
                 const actor = beat.subjects[0], person = actor && typeof actor.seatY === 'function';
                 if (person && beat.subjects.length > 1) {
                   try { single = set.frameOn([actor], 'full', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { single = null; }
                 }
-                if (judged('single', single)) { values = single; how = 'single'; }
+                if ((got = judged('single', single))) {
+                  values = got; how = 'single';
+                  const others = beat.subjects.filter((rig) => rig !== actor), cutAt = Math.max(at + 1.2, (at + beat.end) / 2);
+                  if (others.length && cutAt <= beat.end - 1.2 && !(next && cutAt > next.time - 0.8)) {
+                    let pet = null;
+                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: [(cutAt + beat.end) / 2], seek }); } catch (error) { pet = null; }
+                    if (pet) reaction = { values: pet, at: cutAt, subjects: others };
+                  }
+                }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
               }
             }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,
-                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries });
+                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries,
+                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
+        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1));
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
         if (beat.drift) tl.add(set.move({ distance: +(values.distance * 1.14).toFixed(1) }, Math.max(0.5, Math.min(beat.drift, beat.end - at)), 'sine.inOut'), at + 0.05);
         shot = { subjects: beat.subjects, size, at };
+        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true }; }
       }
       tl.seek(0, false); set.update();
       return cuts;
@@ -7180,14 +7441,22 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
   const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
   if (firstFrame) restore(firstFrame);
   const frames = [];
-  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  const breath = keys.indexOf('tho'), sway = keys.indexOf('than'), breathing = breathe && breath >= 0 && duration > 1.5;
+  const breathAt = (time) => {
+    const fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
+    return { tho: fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)), than: sway >= 0 ? fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6) : 0 };
+  };
+  for (let n = 0; n < count; n++) {
+    rig.bakeTime = Math.min(duration, n / sampleRate); rig.bakeBreath = breathing ? breathAt(rig.bakeTime) : null;
+    source.totalTime(rig.bakeTime, false); frames.push(snapshot());
+  }
+  delete rig.bakeTime; delete rig.bakeBreath;
   source.kill();
-  const breath = keys.indexOf('tho'), sway = keys.indexOf('than');
-  if (breathe && breath >= 0 && duration > 1.5) {
+  if (breathing) {
     frames.forEach((frame, n) => {
-      const time = Math.min(duration, n / sampleRate), fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
-      frame[breath] = Math.min(1, frame[breath] + fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)));
-      if (sway >= 0) frame[sway] += fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6);
+      const extra = breathAt(Math.min(duration, n / sampleRate));
+      frame[breath] = Math.min(1, frame[breath] + extra.tho);
+      if (sway >= 0) frame[sway] += extra.than;
     });
   }
   const numeric = keys.map((k) => typeof rig.NGHI[k] === 'number');
@@ -7462,7 +7731,11 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
     clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại
     lastLine = parallel.length === 1 ? spokeLast : null;
   });
-  const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
+  const entries = [...cast.entries()], baked = new Map();
+  for (const [rig, mine] of [...entries].sort((p, q) => (typeof p[0].follow === 'function' ? 0 : 1) - (typeof q[0].follow === 'function' ? 0 : 1))) {
+    restore(rig); baked.set(rig, sequence(rig, mine.steps, { gap: stepGap }));
+  }
+  const sequences = entries.map(([rig]) => baked.get(rig));
   const rigs = [...cast.keys()];
   const duration = Math.max(...sequences.map((item) => item.duration()));
   let cameraTimeline = null;

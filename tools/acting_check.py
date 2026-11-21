@@ -252,15 +252,16 @@ def check_seen(folder, checks, keep=None):
     return results
 
 
-TRACK_SUNK = 0.25      # lúc vuốt: tối đa 25 % bàn tay lún qua viền con vật (khuất sau nó) ở bất kỳ mốc nào (đợt 32) — chặt hơn
-                       # HAND_SHOWN ở lúc được hỏi (≤ 30 % khuất); 0.71.0: 64 % (bà, mèo), 40 % (ông, chó)
+TRACK_SUNK = 0.10      # lúc vuốt: tối đa 10 % bàn tay lún qua viền con vật (khuất sau nó) ở bất kỳ mốc nào (đợt 32) — chặt hơn
+                       # HAND_SHOWN ở lúc được hỏi (≤ 30 % khuất); 0.71.0: 64 % (bà, mèo), 40 % (ông, chó); 0.72.0 lượt đầu: 16–21 %
+TRACK_CONTACT = 0.15   # … và ≥ 15 % bàn tay sát hình con vật ở MỌI mốc (đợt 32, lượt hai — 0.72.0 lượt đầu: thấp nhất 5–7 %)
 
 
 def check_track(folder, checks, keep=None):
     """TAY VUỐT SUỐT ĐỘNG TÁC (đợt 32): ở mọi mốc của dải `track` (mỗi 0,1 s suốt các lần vuốt), bàn tay vẫn SÁT con vật
-    (≥ 5 % bàn tay trong 3 px quanh hình nó — tay nhấc khỏi đầu là hỏng) và không lún qua viền nó quá 25 % (con vật vẽ trước
-    người: phần lún vào là phần khuất sau đầu / lưng nó). Đợt 31 chỉ đo ở lúc được hỏi: bà vuốt mèo — tay nhấc khỏi đầu giữa
-    hai lần vuốt."""
+    (≥ 15 % bàn tay trong 3 px quanh hình nó — tay nhấc khỏi đầu, hay chỉ chạm một mép, là hỏng) và không lún qua viền nó quá
+    10 % (con vật vẽ trước người: phần lún vào là phần khuất sau đầu / lưng nó). Đợt 31 chỉ đo ở lúc được hỏi: bà vuốt mèo — tay
+    nhấc khỏi đầu giữa hai lần vuốt."""
     tracks = [c for c in checks if c.get('track')]
     jobs = [(t, c['target'], c['who']) for c in tracks for t in c['track']]
     if not jobs: return []
@@ -271,12 +272,12 @@ def check_track(folder, checks, keep=None):
         rows = [(t, found.get((t, c['target'])) or {}) for t in c['track']]
         rows = [(t, r) for t, r in rows if 'contact' in r]
         if not rows: results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand on it throughout', 'ok': None, 'note': 'hand not measured'}); continue
-        off = [(t, r) for t, r in rows if r['contact'] < CONTACT]
+        off = [(t, r) for t, r in rows if r['contact'] < TRACK_CONTACT]
         worst_gap = max(rows, key=lambda tr: tr[1].get('gap', 0))
         least = min(rows, key=lambda tr: tr[1]['contact'])
         results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand on it throughout ({len(rows)} moments)', 'ok': not off,
                         'contact': [round(r['contact'], 3) for _, r in rows], 'gap': [round(r.get('gap', 0), 4) for _, r in rows],
-                        'note': f'{len(off)} of {len(rows)} moments with the hand off it' + (f' (at {", ".join(f"{t:g}" for t, _ in off)} s)' if off else '')
+                        'note': f'{len(off)} of {len(rows)} moments with less than {TRACK_CONTACT * 100:g} % of the hand on it' + (f' (at {", ".join(f"{t:g}" for t, _ in off)} s)' if off else '')
                                 + f'; least contact {least[1]["contact"] * 100:.0f} % at {least[0]:g} s; widest gap {worst_gap[1].get("gap", 0) * 100:.1f} % of height at {worst_gap[0]:g} s'})
         deep = max(rows, key=lambda tr: tr[1].get('sunk', 0))
         results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand not sunk past its outline', 'ok': deep[1].get('sunk', 0) <= TRACK_SUNK,

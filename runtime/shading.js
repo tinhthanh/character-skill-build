@@ -8,6 +8,50 @@ const NS = 'http://www.w3.org/2000/svg';
 let counter = 0;
 
 /** Gắn lớp đổ bóng vào `svg` cho nhóm hình vẽ `root` (có id). Trả về { set(dx, dy, amount, rgb, glow) } hay null. */
+/** Phép biến đổi RIÊNG của một phần tử SVG (thuộc tính `transform`), không `consolidate()` — hàm ấy viết đè danh sách. */
+export function localMatrix(node) {
+  const list = node && node.transform && node.transform.baseVal;
+  let m = new DOMMatrix();
+  if (list) for (let i = 0; i < list.numberOfItems; i++) m = m.multiply(list.getItem(i).matrix);
+  return m;
+}
+
+// Điểm mẫu trên đường viền của từng hình, trong hệ của CHÍNH hình ấy: hình không đổi (cùng `d`, cùng kích thước) thì khỏi lấy mẫu
+// lại — bàn tay vuốt dò hàng chục độ cao mỗi khung (đợt 32).
+const outlineCache = new WeakMap();
+const SHAPE_KEYS = ['d', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'points'];
+
+/**
+ * ĐƯỜNG VIỀN của các hình TÔ (không tính nét không tô, hình đang ẩn — `display: none`, `visibility: hidden`, `opacity="0"`) trong
+ * `group`, trong hệ của SVG gốc `svg`: [{ x, y, edge }] — `edge` là nửa bề dày nét viền (nét tô ra ngoài hình chừng ấy).
+ * Các điểm cách nhau ~1 đơn vị của hình. `skip(el)`: bỏ qua thêm.
+ */
+export function outlinePoints(svg, group, skip = null) {
+  const out = [];
+  for (const el of group.querySelectorAll('path, circle, ellipse, rect, polygon')) {
+    if (typeof el.getTotalLength !== 'function' || (skip && skip(el))) continue;
+    let hidden = false, m = new DOMMatrix();
+    for (let node = el; node && node !== svg; node = node.parentNode) {
+      if ((node.style && (node.style.display === 'none' || node.style.visibility === 'hidden')) || (node.getAttribute && (node.getAttribute('display') === 'none' || node.getAttribute('opacity') === '0'))) { hidden = true; break; }
+      m = localMatrix(node).multiply(m);
+    }
+    if (hidden) continue;
+    const key = SHAPE_KEYS.map((name) => el.getAttribute(name)).join('|');
+    let shape = outlineCache.get(el);
+    if (!shape || shape.key !== key) {
+      const style = getComputedStyle(el), length = el.getTotalLength(), points = [];
+      const fill = style.fill !== 'none', edge = style.stroke && style.stroke !== 'none' ? (parseFloat(style.strokeWidth) || 0) / 2 : 0;
+      if (fill && length > 0) { const count = Math.max(16, Math.ceil(length)); for (let n = 0; n <= count; n++) points.push(el.getPointAtLength(length * n / count)); }
+      shape = { key, edge, points };
+      outlineCache.set(el, shape);
+    }
+    if (!shape.points.length) continue;
+    const scale = Math.hypot(m.a, m.b), edge = shape.edge * scale;
+    for (const p of shape.points) out.push({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f, edge });
+  }
+  return out;
+}
+
 export function attachShade(svg, root) {
   if (!svg || !root || !root.id || typeof document === 'undefined') return null;
   const id = `shade${++counter}`;
@@ -27,6 +71,8 @@ export function attachShade(svg, root) {
   // người (vệt nắng vàng trên sàn gỗ: chân, váy ấm lên). Cũng cắt theo bóng nhân vật.
   const up = cover.cloneNode();
   up.setAttribute('fill', `url(#${id}-bounce)`); up.removeAttribute('data-shade'); up.setAttribute('data-bounce', ''); up.style.display = 'none';
+  // id: bối cảnh 3D vẽ lại hai lớp này (qua `<use>`) trên bàn tay vuốt chép lên trên con vật (set3d, đợt 32)
+  cover.id = `${id}-cover`; up.id = `${id}-up`;
   svg.appendChild(defs); svg.appendChild(up); svg.appendChild(cover);
   const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
   const rise = defs.querySelectorAll('linearGradient')[1], riseStops = rise.querySelectorAll('stop');

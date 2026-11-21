@@ -19,7 +19,7 @@
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
 
 import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
-import { attachShade } from './shading.js';
+import { attachShade, outlinePoints } from './shading.js';
 
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
@@ -58,6 +58,7 @@ const NGHI = Object.freeze({
   plungerL: 0, plungerR: 0,     // 0…1 pít-tông ống tiêm ấn xuống (`inject`)         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
+  onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   tayL: 'mo', tayR: 'mo',
 });
 
@@ -3312,7 +3313,9 @@ export class RigSVG {
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
   // VUỐT (đợt 32): bàn tay trượt ± 20 % bề ngang đầu con vật (tối đa 10 đơn vị khung), mép dưới bàn tay cao hơn đích 4 đơn vị —
   // đo trên b1 / b2 (tools/acting_check.py, dải mốc vuốt): rộng 30 % thì tay lún qua tai con mèo 22 %, không nâng thì 19 %.
-  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4;
+  // Đích 'crown' (bàn tay vẽ trên đầu con vật — set3d `onTopL/R`), mỗi khung: độ cao cổ tay cho phần bàn tay ĐÈ lên đầu (đo trên
+  // hình vẽ, từng cột) ít nhất mà phần đè + dải `STROKE_BAND` đơn vị quanh viền đầu ≥ `STROKE_TOUCH` bàn tay, đè ≤ `STROKE_SUNK`.
+  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
 
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
@@ -3388,7 +3391,11 @@ export class RigSVG {
       return { upper, fore, dir, bent };
     };
     const { upper, fore, dir } = solve(tx, ty);
-    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve };
+    // Đích biết ĐẦU CON VẬT đang dụi / gật tới đâu (`set.target(…).follow`, đợt 32): `stroke` hỏi lại mỗi khung hình. Đích là
+    // chính rig con vật (`live.el`) thì không — `RigThu.follow` tính trong khung của con vật.
+    const follow = live && !live.el && typeof live.follow === 'function' ? (x, y) => live.follow(x, y, typeof this.bakeTime === 'number' ? this.bakeTime : null) : null;
+    const crown = live && !live.el && typeof live.crown === 'function' ? (x0, x1, bins) => live.crown(x0, x1, typeof this.bakeTime === 'number' ? this.bakeTime : null, bins) : null;
+    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve, follow, crown, shoulderX: shoulder.x };
   }
 
   // Cúi người và đưa tay tới đích thấp (dùng chung cho vuốt ve, nghe tim phổi, tiêm).
@@ -3407,6 +3414,27 @@ export class RigSVG {
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
   }
 
+  // KHUNG HÌNH VẼ của một nhóm (bàn tay) trong khung 400 × 470 của nhân vật, đo trên đường viền các hình tô của nó (đợt 32):
+  // { x0, x1, bottom, columns(n) }. Ghép transform từng lớp tới SVG gốc — không qua màn hình (bối cảnh 3D chiếu nghiêng).
+  #outline(group) {
+    let x0 = Infinity, x1 = -Infinity, bottom = -Infinity;
+    const points = [];
+    // nét viền: hình thấy được dày thêm nửa bề dày nét mỗi phía
+    for (const q of outlinePoints(this.svg, group)) {
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); bottom = Math.max(bottom, q.y + q.edge); points.push({ x: q.x, y: q.y - q.edge }, { x: q.x, y: q.y + q.edge });
+    }
+    // `columns(n)`: mép trên / dưới của nhóm trong n cột đều nhau từ x0 tới x1 — { high, low } (`null`: cột trống).
+    const columns = (n) => {
+      const out = new Array(n).fill(null), width = (x1 - x0) / n || 1;
+      for (const q of points) {
+        const i = Math.min(n - 1, Math.floor((q.x - x0) / width));
+        if (!out[i]) out[i] = { high: q.y, low: q.y }; else { out[i].high = Math.min(out[i].high, q.y); out[i].low = Math.max(out[i].low, q.y); }
+      }
+      return out;
+    };
+    return Number.isFinite(bottom) ? { x0, x1, bottom, columns } : null;
+  }
+
   /**
    * VUỐT VE một con vật (hay chạm vào một thứ gì thấp hơn mình): cúi người, đưa bàn tay tới `target` — một rig thú,
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
@@ -3417,7 +3445,6 @@ export class RigSVG {
     // TRƯỢT THEO ĐẦU (đợt 32): bàn tay đi tới đi lui giữa hai điểm trên cùng đường ngang của đích (đỉnh đầu con vật), mỗi điểm
     // một lời giải hai đốt tay — trước đây lắc khớp ±(4°, 9°) nên bàn tay vẽ một cung: nhấc khỏi đầu rồi lún qua viền nó (bà vuốt
     // mèo: 4 / 13 mốc tay rời đầu, có lúc 64 % bàn tay khuất sau đầu mèo). Quãng trượt: `STROKE_GLIDE` bề ngang đầu mỗi bên.
-    // Đích không đo được bề ngang (một điểm) thì giữ cách lắc cũ, nhỏ hơn.
     const glide = reach.span && !reach.across ? Math.min(RigSVG.STROKE_MAX, reach.span * RigSVG.STROKE_GLIDE) : 0;
     // MÉP DƯỚI BÀN TAY trên một đường (đợt 32): đặt cổ tay cùng một độ cao chưa đủ — đầu "lùi" cẳng tay dựng, bàn tay nằm
     // ngang, hở khỏi đầu con mèo; đầu "tới" bàn tay chúc 26°, lún qua viền nó (mép dưới lệch 14 đơn vị khung). Bàn tay nối dài
@@ -3433,9 +3460,10 @@ export class RigSVG {
       return scale * (Math.max(box.y * sin, (box.y + box.height) * sin) + half * cos);
     };
     const line = reach.ty + below(reach.dir) - RigSVG.STROKE_LIFT;
-    const place = (x) => {
-      let y = reach.ty, pose = reach.solve(x, y);
-      for (let n = 0; n < 4; n++) { y = line - below(pose.dir); pose = reach.solve(x, y); }
+    // Đặt cổ tay cho mép dưới bàn tay nằm ở (x, y). `y` mặc định: đường lúc dựng.
+    const place = (x, y = line) => {
+      let pose = reach.solve(x, y - below(reach.dir));
+      for (let n = 0; n < 4; n++) pose = reach.solve(x, y - below(pose.dir));
       return pose;
     };
     // Trong TẦM TAY: điểm xa quá thì cánh tay duỗi thẳng mà cổ tay vẫn không xuống tới đường (bà ngồi sofa đã cúi hết 25°) —
@@ -3443,13 +3471,98 @@ export class RigSVG {
     const reachable = (sign) => {
       let g = glide, pose = place(reach.tx + sign * g);
       while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
-      return pose;
+      return g;
     };
-    const ahead = glide ? reachable(1) : { upper: upper + 3, fore: fore + 5 };
-    const back = glide ? reachable(-1) : { upper: upper - 2, fore: fore - 4 };
-    for (let n = 0; n < 3; n++) {
-      t.to(s, { ['cang' + k]: back.fore, ['bat' + k]: back.upper, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
-       .to(s, { ['cang' + k]: ahead.fore, ['bat' + k]: ahead.upper, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+    if (glide) {
+      // BÁM THEO ĐẦU TỪNG KHUNG (đợt 32, lượt hai): đường trượt dựng một lần lúc dựng timeline thì đầu con vật dụi / nghiêng
+      // khi được vuốt (mèo gừ gừ: nghiêng ±7°, dời ±3) kéo tai nó lên quá mép bàn tay — 16–21 % bàn tay khuất sau tai ở hai đầu
+      // quãng trượt; nhấc khỏi đầu ở chiều kia. Giờ mỗi khung: điểm dưới bàn tay trên đường ấy dời theo đầu con vật
+      // (`follow`), rồi giải lại hai đốt tay. Nhịp như cũ: lùi – tới ba lần, mỗi chặng 0,2 s, sine.
+      // TẦM TAY hai phía: xa nhất mà khuỷu còn gập (duỗi thẳng là cổ tay không xuống tới đường — bàn tay hở).
+      const limit = (sign) => { let g = 0; while (g < 40 && place(reach.tx + sign * (g + 1)).bent) g += 1; return reach.tx + sign * g; };
+      const bentHere = reach.solve(reach.tx, reach.ty).bent, far = bentHere ? limit(1) : reach.tx + glide, near = bentHere ? limit(-1) : reach.tx - glide;
+      const crowned = !!(reach.crown && this.el['coTay' + k] && reach.crown(reach.tx - 1, reach.tx + 1, 1));      // đích 'crown' đo được đỉnh đầu
+      // `lead`: hoà dần từ dáng cúi (tween của `#leanTo`, xong ở 0,45 s) sang dáng bám đầu TRƯỚC khi trượt — tới 0,45 s đã bám trọn.
+      const back = reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
+      const ease = (f) => (1 - Math.cos(Math.PI * f)) / 2;
+      t.to(glider, { u: 1, duration: span, ease: 'none', onUpdate: () => {
+        if (glider.u <= 0) return;                                  // tua về trước lúc trượt: để các tween cúi người lo
+        const time = glider.u * span, at = Math.max(0, time - lead) / 0.2, n = Math.min(5, Math.floor(at)), f = ease(at - n), p = knots[n] + (knots[n + 1] - knots[n]) * f;
+        // Tâm quãng trượt BÁM THEO ĐẦU cả chiều ngang (mèo gừ gừ: đầu dời ngang tới nửa bề ngang nó — giữ đường cũ thì bàn tay
+        // vuốt vào khoảng không), nhưng không quá TẦM TAY (`far`): đầu dụi ra xa thì bàn tay dừng ở mép tầm, vẫn trên đầu nó.
+        // Độ cao: đường dưới bàn tay xoay / dời cùng đầu, đọc ở đúng chỗ bàn tay.
+        // Đích 'crown': tâm là giữa bề ngang ĐẦU ĐANG VẼ ở giây ấy (đo trên hình) — điểm `follow` của một đầu cứng lệch nửa đầu khi
+        // con mèo dụi nghiêng.
+        const width = crowned ? reach.crown(0, 0, 0) : null;
+        const centre = width ? (width.x0 + width.x1) / 2 : reach.follow ? reach.follow(reach.tx, line).x : reach.tx;
+        let x = Math.max(near, Math.min(far, centre + p * (p < 0 ? back : ahead)));
+        let y = line;
+        if (reach.follow) {
+          const a = reach.follow(x - 10, line), b = reach.follow(x + 10, line);
+          y = a.y + (b.y - a.y) * (x - a.x) / ((b.x - a.x) || 1);
+        }
+        let pose = place(x, y);
+        const w = time < lead ? ease(time / lead) : 1;
+        const apply = (q) => { s['bat' + k] = upper + (q.upper - upper) * w; s['cang' + k] = fore + (q.fore - fore) * w; };
+        // Đích 'crown' (con vật vẽ trước người; bàn tay vẽ lại trên nó — set3d): đo BÀN TAY THẬT vừa vẽ và MÉP TRÊN THẬT của đầu
+        // con vật (cả tai) ở đúng giây ấy, rồi đặt cổ tay cho bàn tay đè lên đầu vừa đủ — tai vểnh, đầu nghiêng, con vật ngồi thấp
+        // xuống tới đâu bàn tay theo tới đó. Mô hình bàn tay (`below`) lệch tới vài chục đơn vị với hình vẽ (ngón cái thõng).
+        // Đáy bàn tay đổi GẤP theo độ cao cổ tay (gần duỗi thẳng, cẳng tay xoay nhiều: dời cổ tay 1 đơn vị, đầu ngón dời 10–20) —
+        // không lặp sửa sai số được, nên DÒ các độ cao cổ tay. Mỗi độ cao: vẽ bàn tay (cộng sẵn nhịp thở), đo từng cột 2 đơn vị
+        // phần bàn tay nằm dưới đỉnh đầu ngay dưới nó (đè) và phần sát đỉnh ấy trong `STROKE_BAND` (chạm) — so điểm thấp nhất của
+        // bàn tay với điểm cao nhất của đầu thì bàn tay lơ lửng: ngón cái thõng ở chỗ đầu thấp, tai nhô dưới các ngón kia.
+        if (crowned) {
+          const judge = (h) => {
+            const q = place(x, h); apply(q);
+            // nhịp thở `sequence` sẽ cộng vào khung này (thân đung đưa ±0,7°: vai dời, đáy bàn tay dời cả đơn vị)
+            const extra = this.bakeBreath, was = { than: s.than, tho: s.tho };
+            if (extra) { s.than = was.than + extra.than; s.tho = Math.min(1, was.tho + extra.tho); }
+            this.apDung();
+            if (extra) { s.than = was.than; s.tho = was.tho; }
+            const hand = this.#outline(this.el['coTay' + k]);
+            if (!hand) return null;
+            const bins = Math.max(1, Math.round((hand.x1 - hand.x0) / 2)), tops = reach.crown(hand.x0, hand.x1, bins), cols = hand.columns(bins);
+            let area = 0, sunk = 0, touch = 0;
+            cols.forEach((col, i) => {
+              if (!col) return;
+              area += col.low - col.high;
+              if (tops[i] === null) return;
+              sunk += Math.max(0, col.low - Math.max(tops[i], col.high)); touch += Math.max(0, col.low - Math.max(tops[i] - RigSVG.STROKE_BAND, col.high));
+            });
+            return area > 0 ? { h, sunk: sunk / area, touch: touch / area, off: Math.abs(h - y) } : null;
+          };
+          // Lún trong mức và chạm đủ (`STROKE_TOUCH`): lún ít nhất; lún trong mức mà chưa chạm đủ: chạm nhiều nhất; quá mức: lún ít
+          // nhất. Ngang nhau (sai khác < 0,5 %): độ cao gần đường hơn — không thì cổ tay nhảy tới một lời giải xa (bàn tay lật ngửa
+          // lên khi không độ cao nào chạm).
+          const rank = (p) => (p.sunk > RigSVG.STROKE_SUNK ? 0 : p.touch < RigSVG.STROKE_TOUCH ? 1 : 2), near = (a, b) => Math.abs(a - b) < 0.005;
+          const pick = (p, q, a, b, more) => (near(a, b) ? (p.off <= q.off ? p : q) : (more ? a > b : a < b) ? p : q);
+          const better = (p, q) => (!q ? p : !p ? q : rank(p) !== rank(q) ? (rank(p) > rank(q) ? p : q)
+            : rank(p) === 1 ? pick(p, q, p.touch, q.touch, true) : pick(p, q, p.sunk, q.sunk, false));
+          // Dò quanh độ cao của khung trước (lấy mẫu đi tuần tự từng khung): ±6, bước 2; khung đầu / tua nhảy: cả dải −24…12, bước 3.
+          const last = this.strokeFit && Math.abs(this.strokeFit.time - (this.bakeTime ?? -1)) < 0.05 ? this.strokeFit.offset : null;
+          const search = () => {
+            let best = null;
+            if (last !== null) for (let d = -6; d <= 6; d += 2) best = better(best, judge(y + last + d));
+            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d));
+            if (best) { const coarse = best.h; for (const d of [-2, -1, 1, 2]) best = better(best, judge(coarse + d)); const fine = best.h; for (const d of [-0.5, 0.5]) best = better(best, judge(fine + d)); }
+            return best;
+          };
+          let best = search();
+          // Không độ cao nào chạm (đầu xa của quãng trượt, tay đã duỗi hết mà không hạ tới đầu con vật): lùi điểm trượt về phía
+          // người, mỗi lần 3 đơn vị.
+          for (let n = 0; n < 5 && (!best || best.touch <= 0); n++) { x -= 3 * (Math.sign(x - reach.shoulderX) || 1); best = search(); }
+          if (best) { this.strokeFit = { time: this.bakeTime ?? -1, offset: best.h - y }; y = best.h; pose = place(x, y); }
+        }
+        apply(pose);
+      } }, 0.48 - lead);
+      // Đích 'crown': bàn tay vẽ TRÊN đầu con vật trong lúc trượt (set3d, `onTopL/R`) — tween rất ngắn, không `set` ở mốc 0.
+      if (crowned) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.3).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 0.48 - lead + span);
+    } else {
+      // Đích không đo được bề ngang (một điểm): giữ cách lắc cũ, nhỏ.
+      for (let n = 0; n < 3; n++) {
+        t.to(s, { ['cang' + k]: fore - 4, ['bat' + k]: upper - 2, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+         .to(s, { ['cang' + k]: fore + 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+      }
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 1.7);

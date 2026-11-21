@@ -32,7 +32,7 @@
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
 import { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } from './marks.js';
-import { attachShade } from './shading.js';
+import { attachShade, outlinePoints } from './shading.js';
 
 const KHUNG = { w: 400, h: 330 };
 // DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
@@ -843,6 +843,37 @@ export class RigThu {
     if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
     return x;
   }
+
+  /** DÁNG ĐẦU lúc này (đợt 32): tâm đầu trong hệ của thân và góc nghiêng — mốc cho `follow`. */
+  headPose() {
+    const s = this.#view(), { S, ng } = this.#khung(), d = this.nv.dau;
+    return { x: S.x + d.dx + (s.dauX || 0), y: S.y + d.dy + (s.dauY || 0) - ng * 2, turn: s.dau || 0 };
+  }
+
+  /**
+   * ĐIỂM TRÊN ĐẦU, THEO ĐẦU (đợt 32): (x, y) trong khung của con vật, gắn vào đầu lúc nó ở dáng `from` (`headPose()`). Trả về
+   * chỗ điểm ấy đang ở bây giờ — đầu đã dụi / gật / nghiêng, con vật đã ngồi xuống — để bàn tay vuốt bám theo từng khung.
+   */
+  follow(x, y, from = null) {
+    const s = this.#view(), k = s.huong < 0 ? -1 : 1, away = this.isCarried(), ref = from || this.headPose(), now = this.headPose();
+    const ox = away ? 0 : s.x + this.dropX(), oy = away ? 0 : s.y;
+    // về hệ của thân (bỏ phần dời, lật lại theo hướng), bỏ dáng cũ, đặt dáng mới, rồi trả về khung
+    const turn = (now.turn - ref.turn) * Math.PI / 180, vx = 200 + (x - ox - 200) * k - ref.x, vy = y - oy - ref.y;
+    const nx = now.x + vx * Math.cos(turn) - vy * Math.sin(turn), ny = now.y + vx * Math.sin(turn) + vy * Math.cos(turn);
+    return { x: 200 + (nx - 200) * k + ox, y: ny + oy };
+  }
+
+  /**
+   * ĐƯỜNG VIỀN CỦA ĐẦU (cả tai) trên HÌNH ĐANG VẼ, trong khung con vật (đợt 32): các điểm cách nhau ~1 đơn vị trên viền các hình
+   * tô trong đầu (không tính dấu cảm xúc, hình đang ẩn, nét không tô). Bàn tay vuốt đặt mép dưới lên mép trên của chúng.
+   */
+  crownPoints() {
+    const head = this.el && this.el.dau;
+    if (!head) return [];
+    // NÉT VIỀN tô ra ngoài hình nửa bề dày: mép trên thấy được cao hơn đường hình chừng ấy.
+    return outlinePoints(this.svg, head, (el) => !!(this.markEl && this.markEl.contains(el))).map((q) => ({ x: q.x, y: q.y - q.edge }));
+  }
+
 
   /** Đang được bế: hình nằm trong tay một người khác (không trong host của nó). */
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }

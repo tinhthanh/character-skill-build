@@ -405,17 +405,28 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
   const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
   if (firstFrame) restore(firstFrame);
   const frames = [];
-  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  // NHỊP THỞ nền (xem dưới): phần cộng thêm ở giây `time`.
+  const breath = keys.indexOf('tho'), sway = keys.indexOf('than'), breathing = breathe && breath >= 0 && duration > 1.5;
+  const breathAt = (time) => {
+    const fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
+    return { tho: fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)), than: sway >= 0 ? fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6) : 0 };
+  };
+  // `bakeTime`: giây đang lấy mẫu — động tác cần trạng thái của nhân vật KHÁC ở đúng lúc ấy (vuốt theo đầu con vật) đọc nó.
+  // `bakeBreath`: phần nhịp thở sẽ cộng vào khung ấy — động tác đo hình vẽ của chính mình (bàn tay vuốt) cộng sẵn cho đúng.
+  for (let n = 0; n < count; n++) {
+    rig.bakeTime = Math.min(duration, n / sampleRate); rig.bakeBreath = breathing ? breathAt(rig.bakeTime) : null;
+    source.totalTime(rig.bakeTime, false); frames.push(snapshot());
+  }
+  delete rig.bakeTime; delete rig.bakeBreath;
   source.kill();
   // NHỊP THỞ nền, chồng lên mọi khung: phần lớn động tác tới dáng đích rồi GIỮ một hai giây, và trong lúc giữ nhân vật
   // là một bức tượng. Ngực phồng xẹp chậm (chu kỳ 3,4 s) và thân đung đưa rất nhẹ (chu kỳ 5,6 s) suốt cả chuỗi; mờ
   // dần ở 0,6 s đầu và cuối để chuỗi vẫn bắt đầu và kết thúc đúng trạng thái của các động tác. `breathe: false` để tắt.
-  const breath = keys.indexOf('tho'), sway = keys.indexOf('than');
-  if (breathe && breath >= 0 && duration > 1.5) {
+  if (breathing) {
     frames.forEach((frame, n) => {
-      const time = Math.min(duration, n / sampleRate), fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
-      frame[breath] = Math.min(1, frame[breath] + fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)));
-      if (sway >= 0) frame[sway] += fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6);
+      const extra = breathAt(Math.min(duration, n / sampleRate));
+      frame[breath] = Math.min(1, frame[breath] + extra.tho);
+      if (sway >= 0) frame[sway] += extra.than;
     });
   }
 
@@ -855,7 +866,13 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
     clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại
     lastLine = parallel.length === 1 ? spokeLast : null;
   });
-  const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
+  // CON VẬT LẤY MẪU TRƯỚC (đợt 32): lúc lấy mẫu chuỗi của người vuốt, bàn tay hỏi dáng đầu con vật ở đúng giây ấy (`stroke` →
+  // `follow` tua chuỗi đã lấy mẫu của nó). Thứ tự trong `sequences` vẫn là thứ tự xuất hiện.
+  const entries = [...cast.entries()], baked = new Map();
+  for (const [rig, mine] of [...entries].sort((p, q) => (typeof p[0].follow === 'function' ? 0 : 1) - (typeof q[0].follow === 'function' ? 0 : 1))) {
+    restore(rig); baked.set(rig, sequence(rig, mine.steps, { gap: stepGap }));
+  }
+  const sequences = entries.map(([rig]) => baked.get(rig));
   const rigs = [...cast.keys()];
   const duration = Math.max(...sequences.map((item) => item.duration()));
 

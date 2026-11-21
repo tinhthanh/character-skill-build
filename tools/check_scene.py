@@ -699,13 +699,40 @@ with tempfile.TemporaryDirectory() as work:
             problems.append('portrait: acting_check did not count the medium shots kept as full shots:\n' + done.stdout[-400:])
         # Luồng đèn pin chĩa SANG PHẢI (phía con mèo), không lên trần: đầu đèn ở bên phải tay cầm, không cao hơn nó nhiều.
         aim = page_eval(os.path.join(work, 'portrait'), """(() => { const tl = Object.values(window.__timelines)[0], log = window.__set.shotLog.find((s) => s.how === 'single');
-            if (!log) return { single: false }; tl.seek((log.t + log.end) / 2, false); window.__set.update();
+            if (!log) return { single: false }; tl.seek((log.t + (log.then ? log.then.t : log.end)) / 2, false); window.__set.update();
             const ba = document.querySelector('[data-set3d][data-name="ba"]'), lens = ba && ba.querySelector('[data-lens]'), tip = ba && ba.querySelector('[data-tip]');
             if (!lens || !tip) return { single: true, torch: false };
             const at = (el) => new DOMPoint(+el.getAttribute('cx'), +el.getAttribute('cy')).matrixTransform(el.getScreenCTM());
             const a = at(lens), b = at(tip); return { single: true, torch: true, angle: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI }; })()""")
         if not aim or not aim.get('single'): problems.append(f'portrait: the shine is not framed as a single shot of granny ({aim})')
         elif aim.get('torch') and not -60 <= aim['angle'] <= 60: problems.append(f'portrait: the torch beam points {aim["angle"]:.0f}° (screen), not towards the cat on the right')
+        # Đợt 32, lượt hai: góc đơn của bà rồi CẮT SANG CON MÈO trong cùng lượt — người chấm thấy cả hai (lượt đầu: con mèo không
+        # có mặt trong lượt ấy).
+        then = page_eval(os.path.join(work, 'portrait'), """(() => { const tl = Object.values(window.__timelines)[0], log = window.__set.shotLog.find((s) => s.how === 'single');
+            if (!log || !log.then) return { then: null }; tl.seek((log.then.t + log.end) / 2, false); window.__set.update();
+            const cat = window.__set.actingProbe().find((a) => a.name === 'meo'), W = window.innerWidth, H = window.innerHeight, parts = cat && cat.parts ? Object.values(cat.parts) : [];
+            return { then: log.then, inside: parts.length > 0 && parts.every((r) => r.x0 >= -2 && r.x1 <= W + 2 && r.y1 <= H + 2 && r.y0 >= -2) }; })()""")
+        if not then or not then.get('then') or then['then'].get('subjects') != ['meo']: problems.append(f'portrait: the single shot of granny does not cut to the cat within the turn ({then})')
+        elif not then.get('inside'): problems.append(f'portrait: the cut to the cat after the single shot does not frame the whole cat ({then})')
+
+    # Đợt 32, lượt hai: GÓC MỞ ĐẦU KHUNG DỌC một người đứng giữ cỡ 80 % chiều cao (lượt đầu đợt 32: 66 % cho mọi góc toàn dọc —
+    # thừa sàn, thừa tường); góc trung của người ấy vẫn hẹp hơn 85 % góc toàn (bề ngang theo lõi khi hai tay múa chìa ngang).
+    # (0.72.0 lượt đầu: người cao 0,86 khung — nay 1,03; góc trung 0,71 góc toàn.)
+    opening = {'id': 'opening', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],
+               'script': [{'who': 'be', 'say': 'Chào mọi người, mình là Bin.'}, {'who': 'be', 'say': 'Hôm nay mình đi dạo nhé.'}]}
+    path = os.path.join(os.path.dirname(stage), '_check_opening.json')
+    try:
+        json.dump(opening, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'opening'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('opening: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        got = page_eval(os.path.join(work, 'opening'), """(() => { const tl = Object.values(window.__timelines)[0]; tl.seek(window.__sceneTimings.turns[0][0] + 0.3, false); window.__set.update();
+            const boy = window.__set.actingProbe().find((a) => a.name === 'be');
+            return { tall: boy ? boy.tall / window.innerHeight : null, shots: window.__set.shotLog.map((s) => [s.how, s.ratio]) }; })()""")
+        if not got or got.get('tall') is None or got['tall'] < 0.95: problems.append(f'opening: the vertical opening shot of one standing person is wider than the 80 % full shot ({got})')
+        elif not got.get('shots') or any(how == 'full' or ratio is None or ratio >= 0.85 for how, ratio in got['shots']): problems.append(f'opening: a medium shot is not narrower than 85 % of the full shot ({got})')
 
     # Đợt 32: CON VẬT Ở MÉP DƯỚI — bác sĩ nói giọng ngạc nhiên (góc cận) cạnh con husky trên một cái bệ cao: góc cận cắt ngang
     # chân, thân con chó. Luật (0.71.0) nới khung lấy trọn nó; không có luật thì khung thân nó lòi 16 % dưới mép (1134 > 1080 px).

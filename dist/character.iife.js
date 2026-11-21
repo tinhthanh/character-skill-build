@@ -97,6 +97,50 @@ const NS = 'http://www.w3.org/2000/svg';
 let counter = 0;
 
 /** Gắn lớp đổ bóng vào `svg` cho nhóm hình vẽ `root` (có id). Trả về { set(dx, dy, amount, rgb, glow) } hay null. */
+/** Phép biến đổi RIÊNG của một phần tử SVG (thuộc tính `transform`), không `consolidate()` — hàm ấy viết đè danh sách. */
+function localMatrix(node) {
+  const list = node && node.transform && node.transform.baseVal;
+  let m = new DOMMatrix();
+  if (list) for (let i = 0; i < list.numberOfItems; i++) m = m.multiply(list.getItem(i).matrix);
+  return m;
+}
+
+// Điểm mẫu trên đường viền của từng hình, trong hệ của CHÍNH hình ấy: hình không đổi (cùng `d`, cùng kích thước) thì khỏi lấy mẫu
+// lại — bàn tay vuốt dò hàng chục độ cao mỗi khung (đợt 32).
+const outlineCache = new WeakMap();
+const SHAPE_KEYS = ['d', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'points'];
+
+/**
+ * ĐƯỜNG VIỀN của các hình TÔ (không tính nét không tô, hình đang ẩn — `display: none`, `visibility: hidden`, `opacity="0"`) trong
+ * `group`, trong hệ của SVG gốc `svg`: [{ x, y, edge }] — `edge` là nửa bề dày nét viền (nét tô ra ngoài hình chừng ấy).
+ * Các điểm cách nhau ~1 đơn vị của hình. `skip(el)`: bỏ qua thêm.
+ */
+function outlinePoints(svg, group, skip = null) {
+  const out = [];
+  for (const el of group.querySelectorAll('path, circle, ellipse, rect, polygon')) {
+    if (typeof el.getTotalLength !== 'function' || (skip && skip(el))) continue;
+    let hidden = false, m = new DOMMatrix();
+    for (let node = el; node && node !== svg; node = node.parentNode) {
+      if ((node.style && (node.style.display === 'none' || node.style.visibility === 'hidden')) || (node.getAttribute && (node.getAttribute('display') === 'none' || node.getAttribute('opacity') === '0'))) { hidden = true; break; }
+      m = localMatrix(node).multiply(m);
+    }
+    if (hidden) continue;
+    const key = SHAPE_KEYS.map((name) => el.getAttribute(name)).join('|');
+    let shape = outlineCache.get(el);
+    if (!shape || shape.key !== key) {
+      const style = getComputedStyle(el), length = el.getTotalLength(), points = [];
+      const fill = style.fill !== 'none', edge = style.stroke && style.stroke !== 'none' ? (parseFloat(style.strokeWidth) || 0) / 2 : 0;
+      if (fill && length > 0) { const count = Math.max(16, Math.ceil(length)); for (let n = 0; n <= count; n++) points.push(el.getPointAtLength(length * n / count)); }
+      shape = { key, edge, points };
+      outlineCache.set(el, shape);
+    }
+    if (!shape.points.length) continue;
+    const scale = Math.hypot(m.a, m.b), edge = shape.edge * scale;
+    for (const p of shape.points) out.push({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f, edge });
+  }
+  return out;
+}
+
 function attachShade(svg, root) {
   if (!svg || !root || !root.id || typeof document === 'undefined') return null;
   const id = `shade${++counter}`;
@@ -116,6 +160,8 @@ function attachShade(svg, root) {
   // người (vệt nắng vàng trên sàn gỗ: chân, váy ấm lên). Cũng cắt theo bóng nhân vật.
   const up = cover.cloneNode();
   up.setAttribute('fill', `url(#${id}-bounce)`); up.removeAttribute('data-shade'); up.setAttribute('data-bounce', ''); up.style.display = 'none';
+  // id: bối cảnh 3D vẽ lại hai lớp này (qua `<use>`) trên bàn tay vuốt chép lên trên con vật (set3d, đợt 32)
+  cover.id = `${id}-cover`; up.id = `${id}-up`;
   svg.appendChild(defs); svg.appendChild(up); svg.appendChild(cover);
   const grad = defs.querySelector('linearGradient'), stops = grad.querySelectorAll('stop');
   const rise = defs.querySelectorAll('linearGradient')[1], riseStops = rise.querySelectorAll('stop');
@@ -184,7 +230,7 @@ function attachShade(svg, root) {
   };
 }
 
-return { attachShade };
+return { localMatrix, outlinePoints, attachShade };
 })();
 
 /* ───── runtime/rig-svg.js ───── */
@@ -210,7 +256,7 @@ __m['runtime/rig-svg.js'] = (function () {
 //  • tayL/tayR  : 'mo' | 'nam' | 'cai' | 'chi'.
 
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
-const { attachShade } = __m['runtime/shading.js'];
+const { attachShade, outlinePoints } = __m['runtime/shading.js'];
 
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
@@ -249,6 +295,7 @@ const NGHI = Object.freeze({
   plungerL: 0, plungerR: 0,     // 0…1 pít-tông ống tiêm ấn xuống (`inject`)         // 1 = đang ÁP ĐIỆN THOẠI lên má bằng tay ấy (thế giữ: `phoneUp` / `phoneDown`, xem apDung)   // 0 = mặt trước món đồ, 1 = mặt LƯNG (phần tử `data-back`) — điện thoại áp lên má thì quay lưng ra ngoài
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
+  onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   tayL: 'mo', tayR: 'mo',
 });
 
@@ -3503,7 +3550,9 @@ class RigSVG {
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
   // VUỐT (đợt 32): bàn tay trượt ± 20 % bề ngang đầu con vật (tối đa 10 đơn vị khung), mép dưới bàn tay cao hơn đích 4 đơn vị —
   // đo trên b1 / b2 (tools/acting_check.py, dải mốc vuốt): rộng 30 % thì tay lún qua tai con mèo 22 %, không nâng thì 19 %.
-  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4;
+  // Đích 'crown' (bàn tay vẽ trên đầu con vật — set3d `onTopL/R`), mỗi khung: độ cao cổ tay cho phần bàn tay ĐÈ lên đầu (đo trên
+  // hình vẽ, từng cột) ít nhất mà phần đè + dải `STROKE_BAND` đơn vị quanh viền đầu ≥ `STROKE_TOUCH` bàn tay, đè ≤ `STROKE_SUNK`.
+  static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
 
   #reachLow(target, hand = null, part = 'head') {
     const s = this.s;
@@ -3579,7 +3628,11 @@ class RigSVG {
       return { upper, fore, dir, bent };
     };
     const { upper, fore, dir } = solve(tx, ty);
-    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve };
+    // Đích biết ĐẦU CON VẬT đang dụi / gật tới đâu (`set.target(…).follow`, đợt 32): `stroke` hỏi lại mỗi khung hình. Đích là
+    // chính rig con vật (`live.el`) thì không — `RigThu.follow` tính trong khung của con vật.
+    const follow = live && !live.el && typeof live.follow === 'function' ? (x, y) => live.follow(x, y, typeof this.bakeTime === 'number' ? this.bakeTime : null) : null;
+    const crown = live && !live.el && typeof live.crown === 'function' ? (x0, x1, bins) => live.crown(x0, x1, typeof this.bakeTime === 'number' ? this.bakeTime : null, bins) : null;
+    return { k, upper, fore, dir, lean, crouch, tx, ty, span, across, bend, solve, follow, crown, shoulderX: shoulder.x };
   }
 
   // Cúi người và đưa tay tới đích thấp (dùng chung cho vuốt ve, nghe tim phổi, tiêm).
@@ -3598,6 +3651,27 @@ class RigSVG {
               cuoi: 0.9, mayL: 0.5, mayR: 0.5, duration: 0.45, ease: 'power2.out' }, 0);
   }
 
+  // KHUNG HÌNH VẼ của một nhóm (bàn tay) trong khung 400 × 470 của nhân vật, đo trên đường viền các hình tô của nó (đợt 32):
+  // { x0, x1, bottom, columns(n) }. Ghép transform từng lớp tới SVG gốc — không qua màn hình (bối cảnh 3D chiếu nghiêng).
+  #outline(group) {
+    let x0 = Infinity, x1 = -Infinity, bottom = -Infinity;
+    const points = [];
+    // nét viền: hình thấy được dày thêm nửa bề dày nét mỗi phía
+    for (const q of outlinePoints(this.svg, group)) {
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); bottom = Math.max(bottom, q.y + q.edge); points.push({ x: q.x, y: q.y - q.edge }, { x: q.x, y: q.y + q.edge });
+    }
+    // `columns(n)`: mép trên / dưới của nhóm trong n cột đều nhau từ x0 tới x1 — { high, low } (`null`: cột trống).
+    const columns = (n) => {
+      const out = new Array(n).fill(null), width = (x1 - x0) / n || 1;
+      for (const q of points) {
+        const i = Math.min(n - 1, Math.floor((q.x - x0) / width));
+        if (!out[i]) out[i] = { high: q.y, low: q.y }; else { out[i].high = Math.min(out[i].high, q.y); out[i].low = Math.max(out[i].low, q.y); }
+      }
+      return out;
+    };
+    return Number.isFinite(bottom) ? { x0, x1, bottom, columns } : null;
+  }
+
   /**
    * VUỐT VE một con vật (hay chạm vào một thứ gì thấp hơn mình): cúi người, đưa bàn tay tới `target` — một rig thú,
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
@@ -3608,7 +3682,6 @@ class RigSVG {
     // TRƯỢT THEO ĐẦU (đợt 32): bàn tay đi tới đi lui giữa hai điểm trên cùng đường ngang của đích (đỉnh đầu con vật), mỗi điểm
     // một lời giải hai đốt tay — trước đây lắc khớp ±(4°, 9°) nên bàn tay vẽ một cung: nhấc khỏi đầu rồi lún qua viền nó (bà vuốt
     // mèo: 4 / 13 mốc tay rời đầu, có lúc 64 % bàn tay khuất sau đầu mèo). Quãng trượt: `STROKE_GLIDE` bề ngang đầu mỗi bên.
-    // Đích không đo được bề ngang (một điểm) thì giữ cách lắc cũ, nhỏ hơn.
     const glide = reach.span && !reach.across ? Math.min(RigSVG.STROKE_MAX, reach.span * RigSVG.STROKE_GLIDE) : 0;
     // MÉP DƯỚI BÀN TAY trên một đường (đợt 32): đặt cổ tay cùng một độ cao chưa đủ — đầu "lùi" cẳng tay dựng, bàn tay nằm
     // ngang, hở khỏi đầu con mèo; đầu "tới" bàn tay chúc 26°, lún qua viền nó (mép dưới lệch 14 đơn vị khung). Bàn tay nối dài
@@ -3624,9 +3697,10 @@ class RigSVG {
       return scale * (Math.max(box.y * sin, (box.y + box.height) * sin) + half * cos);
     };
     const line = reach.ty + below(reach.dir) - RigSVG.STROKE_LIFT;
-    const place = (x) => {
-      let y = reach.ty, pose = reach.solve(x, y);
-      for (let n = 0; n < 4; n++) { y = line - below(pose.dir); pose = reach.solve(x, y); }
+    // Đặt cổ tay cho mép dưới bàn tay nằm ở (x, y). `y` mặc định: đường lúc dựng.
+    const place = (x, y = line) => {
+      let pose = reach.solve(x, y - below(reach.dir));
+      for (let n = 0; n < 4; n++) pose = reach.solve(x, y - below(pose.dir));
       return pose;
     };
     // Trong TẦM TAY: điểm xa quá thì cánh tay duỗi thẳng mà cổ tay vẫn không xuống tới đường (bà ngồi sofa đã cúi hết 25°) —
@@ -3634,13 +3708,98 @@ class RigSVG {
     const reachable = (sign) => {
       let g = glide, pose = place(reach.tx + sign * g);
       while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
-      return pose;
+      return g;
     };
-    const ahead = glide ? reachable(1) : { upper: upper + 3, fore: fore + 5 };
-    const back = glide ? reachable(-1) : { upper: upper - 2, fore: fore - 4 };
-    for (let n = 0; n < 3; n++) {
-      t.to(s, { ['cang' + k]: back.fore, ['bat' + k]: back.upper, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
-       .to(s, { ['cang' + k]: ahead.fore, ['bat' + k]: ahead.upper, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+    if (glide) {
+      // BÁM THEO ĐẦU TỪNG KHUNG (đợt 32, lượt hai): đường trượt dựng một lần lúc dựng timeline thì đầu con vật dụi / nghiêng
+      // khi được vuốt (mèo gừ gừ: nghiêng ±7°, dời ±3) kéo tai nó lên quá mép bàn tay — 16–21 % bàn tay khuất sau tai ở hai đầu
+      // quãng trượt; nhấc khỏi đầu ở chiều kia. Giờ mỗi khung: điểm dưới bàn tay trên đường ấy dời theo đầu con vật
+      // (`follow`), rồi giải lại hai đốt tay. Nhịp như cũ: lùi – tới ba lần, mỗi chặng 0,2 s, sine.
+      // TẦM TAY hai phía: xa nhất mà khuỷu còn gập (duỗi thẳng là cổ tay không xuống tới đường — bàn tay hở).
+      const limit = (sign) => { let g = 0; while (g < 40 && place(reach.tx + sign * (g + 1)).bent) g += 1; return reach.tx + sign * g; };
+      const bentHere = reach.solve(reach.tx, reach.ty).bent, far = bentHere ? limit(1) : reach.tx + glide, near = bentHere ? limit(-1) : reach.tx - glide;
+      const crowned = !!(reach.crown && this.el['coTay' + k] && reach.crown(reach.tx - 1, reach.tx + 1, 1));      // đích 'crown' đo được đỉnh đầu
+      // `lead`: hoà dần từ dáng cúi (tween của `#leanTo`, xong ở 0,45 s) sang dáng bám đầu TRƯỚC khi trượt — tới 0,45 s đã bám trọn.
+      const back = reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
+      const ease = (f) => (1 - Math.cos(Math.PI * f)) / 2;
+      t.to(glider, { u: 1, duration: span, ease: 'none', onUpdate: () => {
+        if (glider.u <= 0) return;                                  // tua về trước lúc trượt: để các tween cúi người lo
+        const time = glider.u * span, at = Math.max(0, time - lead) / 0.2, n = Math.min(5, Math.floor(at)), f = ease(at - n), p = knots[n] + (knots[n + 1] - knots[n]) * f;
+        // Tâm quãng trượt BÁM THEO ĐẦU cả chiều ngang (mèo gừ gừ: đầu dời ngang tới nửa bề ngang nó — giữ đường cũ thì bàn tay
+        // vuốt vào khoảng không), nhưng không quá TẦM TAY (`far`): đầu dụi ra xa thì bàn tay dừng ở mép tầm, vẫn trên đầu nó.
+        // Độ cao: đường dưới bàn tay xoay / dời cùng đầu, đọc ở đúng chỗ bàn tay.
+        // Đích 'crown': tâm là giữa bề ngang ĐẦU ĐANG VẼ ở giây ấy (đo trên hình) — điểm `follow` của một đầu cứng lệch nửa đầu khi
+        // con mèo dụi nghiêng.
+        const width = crowned ? reach.crown(0, 0, 0) : null;
+        const centre = width ? (width.x0 + width.x1) / 2 : reach.follow ? reach.follow(reach.tx, line).x : reach.tx;
+        let x = Math.max(near, Math.min(far, centre + p * (p < 0 ? back : ahead)));
+        let y = line;
+        if (reach.follow) {
+          const a = reach.follow(x - 10, line), b = reach.follow(x + 10, line);
+          y = a.y + (b.y - a.y) * (x - a.x) / ((b.x - a.x) || 1);
+        }
+        let pose = place(x, y);
+        const w = time < lead ? ease(time / lead) : 1;
+        const apply = (q) => { s['bat' + k] = upper + (q.upper - upper) * w; s['cang' + k] = fore + (q.fore - fore) * w; };
+        // Đích 'crown' (con vật vẽ trước người; bàn tay vẽ lại trên nó — set3d): đo BÀN TAY THẬT vừa vẽ và MÉP TRÊN THẬT của đầu
+        // con vật (cả tai) ở đúng giây ấy, rồi đặt cổ tay cho bàn tay đè lên đầu vừa đủ — tai vểnh, đầu nghiêng, con vật ngồi thấp
+        // xuống tới đâu bàn tay theo tới đó. Mô hình bàn tay (`below`) lệch tới vài chục đơn vị với hình vẽ (ngón cái thõng).
+        // Đáy bàn tay đổi GẤP theo độ cao cổ tay (gần duỗi thẳng, cẳng tay xoay nhiều: dời cổ tay 1 đơn vị, đầu ngón dời 10–20) —
+        // không lặp sửa sai số được, nên DÒ các độ cao cổ tay. Mỗi độ cao: vẽ bàn tay (cộng sẵn nhịp thở), đo từng cột 2 đơn vị
+        // phần bàn tay nằm dưới đỉnh đầu ngay dưới nó (đè) và phần sát đỉnh ấy trong `STROKE_BAND` (chạm) — so điểm thấp nhất của
+        // bàn tay với điểm cao nhất của đầu thì bàn tay lơ lửng: ngón cái thõng ở chỗ đầu thấp, tai nhô dưới các ngón kia.
+        if (crowned) {
+          const judge = (h) => {
+            const q = place(x, h); apply(q);
+            // nhịp thở `sequence` sẽ cộng vào khung này (thân đung đưa ±0,7°: vai dời, đáy bàn tay dời cả đơn vị)
+            const extra = this.bakeBreath, was = { than: s.than, tho: s.tho };
+            if (extra) { s.than = was.than + extra.than; s.tho = Math.min(1, was.tho + extra.tho); }
+            this.apDung();
+            if (extra) { s.than = was.than; s.tho = was.tho; }
+            const hand = this.#outline(this.el['coTay' + k]);
+            if (!hand) return null;
+            const bins = Math.max(1, Math.round((hand.x1 - hand.x0) / 2)), tops = reach.crown(hand.x0, hand.x1, bins), cols = hand.columns(bins);
+            let area = 0, sunk = 0, touch = 0;
+            cols.forEach((col, i) => {
+              if (!col) return;
+              area += col.low - col.high;
+              if (tops[i] === null) return;
+              sunk += Math.max(0, col.low - Math.max(tops[i], col.high)); touch += Math.max(0, col.low - Math.max(tops[i] - RigSVG.STROKE_BAND, col.high));
+            });
+            return area > 0 ? { h, sunk: sunk / area, touch: touch / area, off: Math.abs(h - y) } : null;
+          };
+          // Lún trong mức và chạm đủ (`STROKE_TOUCH`): lún ít nhất; lún trong mức mà chưa chạm đủ: chạm nhiều nhất; quá mức: lún ít
+          // nhất. Ngang nhau (sai khác < 0,5 %): độ cao gần đường hơn — không thì cổ tay nhảy tới một lời giải xa (bàn tay lật ngửa
+          // lên khi không độ cao nào chạm).
+          const rank = (p) => (p.sunk > RigSVG.STROKE_SUNK ? 0 : p.touch < RigSVG.STROKE_TOUCH ? 1 : 2), near = (a, b) => Math.abs(a - b) < 0.005;
+          const pick = (p, q, a, b, more) => (near(a, b) ? (p.off <= q.off ? p : q) : (more ? a > b : a < b) ? p : q);
+          const better = (p, q) => (!q ? p : !p ? q : rank(p) !== rank(q) ? (rank(p) > rank(q) ? p : q)
+            : rank(p) === 1 ? pick(p, q, p.touch, q.touch, true) : pick(p, q, p.sunk, q.sunk, false));
+          // Dò quanh độ cao của khung trước (lấy mẫu đi tuần tự từng khung): ±6, bước 2; khung đầu / tua nhảy: cả dải −24…12, bước 3.
+          const last = this.strokeFit && Math.abs(this.strokeFit.time - (this.bakeTime ?? -1)) < 0.05 ? this.strokeFit.offset : null;
+          const search = () => {
+            let best = null;
+            if (last !== null) for (let d = -6; d <= 6; d += 2) best = better(best, judge(y + last + d));
+            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d));
+            if (best) { const coarse = best.h; for (const d of [-2, -1, 1, 2]) best = better(best, judge(coarse + d)); const fine = best.h; for (const d of [-0.5, 0.5]) best = better(best, judge(fine + d)); }
+            return best;
+          };
+          let best = search();
+          // Không độ cao nào chạm (đầu xa của quãng trượt, tay đã duỗi hết mà không hạ tới đầu con vật): lùi điểm trượt về phía
+          // người, mỗi lần 3 đơn vị.
+          for (let n = 0; n < 5 && (!best || best.touch <= 0); n++) { x -= 3 * (Math.sign(x - reach.shoulderX) || 1); best = search(); }
+          if (best) { this.strokeFit = { time: this.bakeTime ?? -1, offset: best.h - y }; y = best.h; pose = place(x, y); }
+        }
+        apply(pose);
+      } }, 0.48 - lead);
+      // Đích 'crown': bàn tay vẽ TRÊN đầu con vật trong lúc trượt (set3d, `onTopL/R`) — tween rất ngắn, không `set` ở mốc 0.
+      if (crowned) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.3).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 0.48 - lead + span);
+    } else {
+      // Đích không đo được bề ngang (một điểm): giữ cách lắc cũ, nhỏ.
+      for (let n = 0; n < 3; n++) {
+        t.to(s, { ['cang' + k]: fore - 4, ['bat' + k]: upper - 2, duration: 0.2, ease: 'sine.inOut' }, 0.48 + n * 0.4)
+         .to(s, { ['cang' + k]: fore + 5, ['bat' + k]: upper + 3, duration: 0.2, ease: 'sine.inOut' }, 0.68 + n * 0.4);
+      }
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 1.7);
@@ -5156,7 +5315,7 @@ __m['runtime/rig-thu.js'] = (function () {
 //                         (độ; 0 = thõng xuống, dương = đưa ra trước / lên)
 
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
-const { attachShade } = __m['runtime/shading.js'];
+const { attachShade, outlinePoints } = __m['runtime/shading.js'];
 
 const KHUNG = { w: 400, h: 330 };
 // DÁNG NẰM: hạ vai và hông xuống sát nền — chân tự gập nhờ IK — chân trước duỗi ra trước, chân sau thu vào. `nam` là
@@ -5967,6 +6126,37 @@ class RigThu {
     if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
     return x;
   }
+
+  /** DÁNG ĐẦU lúc này (đợt 32): tâm đầu trong hệ của thân và góc nghiêng — mốc cho `follow`. */
+  headPose() {
+    const s = this.#view(), { S, ng } = this.#khung(), d = this.nv.dau;
+    return { x: S.x + d.dx + (s.dauX || 0), y: S.y + d.dy + (s.dauY || 0) - ng * 2, turn: s.dau || 0 };
+  }
+
+  /**
+   * ĐIỂM TRÊN ĐẦU, THEO ĐẦU (đợt 32): (x, y) trong khung của con vật, gắn vào đầu lúc nó ở dáng `from` (`headPose()`). Trả về
+   * chỗ điểm ấy đang ở bây giờ — đầu đã dụi / gật / nghiêng, con vật đã ngồi xuống — để bàn tay vuốt bám theo từng khung.
+   */
+  follow(x, y, from = null) {
+    const s = this.#view(), k = s.huong < 0 ? -1 : 1, away = this.isCarried(), ref = from || this.headPose(), now = this.headPose();
+    const ox = away ? 0 : s.x + this.dropX(), oy = away ? 0 : s.y;
+    // về hệ của thân (bỏ phần dời, lật lại theo hướng), bỏ dáng cũ, đặt dáng mới, rồi trả về khung
+    const turn = (now.turn - ref.turn) * Math.PI / 180, vx = 200 + (x - ox - 200) * k - ref.x, vy = y - oy - ref.y;
+    const nx = now.x + vx * Math.cos(turn) - vy * Math.sin(turn), ny = now.y + vx * Math.sin(turn) + vy * Math.cos(turn);
+    return { x: 200 + (nx - 200) * k + ox, y: ny + oy };
+  }
+
+  /**
+   * ĐƯỜNG VIỀN CỦA ĐẦU (cả tai) trên HÌNH ĐANG VẼ, trong khung con vật (đợt 32): các điểm cách nhau ~1 đơn vị trên viền các hình
+   * tô trong đầu (không tính dấu cảm xúc, hình đang ẩn, nét không tô). Bàn tay vuốt đặt mép dưới lên mép trên của chúng.
+   */
+  crownPoints() {
+    const head = this.el && this.el.dau;
+    if (!head) return [];
+    // NÉT VIỀN tô ra ngoài hình nửa bề dày: mép trên thấy được cao hơn đường hình chừng ấy.
+    return outlinePoints(this.svg, head, (el) => !!(this.markEl && this.markEl.contains(el))).map((q) => ({ x: q.x, y: q.y - q.edge }));
+  }
+
 
   /** Đang được bế: hình nằm trong tay một người khác (không trong host của nó). */
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
@@ -8536,6 +8726,7 @@ __m['runtime/set3d.js'] = (function () {
 
 const { PROP_FRAME } = __m['runtime/props.js'];
 const { createLighting } = __m['runtime/lighting.js'];
+const { localMatrix } = __m['runtime/shading.js'];
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const CAMERA_KEYS = ['yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'];
@@ -8595,6 +8786,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   const base = { yaw: 0, pitch: 6, distance: 1700, lens: 1700, x: 0, y: 300, z: -350, zoom: 1, blur: 0 };
   const camera = { ...base }, marks = [];
   const backdrop = [], props = [], actors = [], layers = [], focused = [], surfaces = [];
+  let ghostCount = 0;                                    // bàn tay vuốt chép lên trên con vật (đợt 32)
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
   let trial = null;                                  // máy THỬ (đợt 32): `direct` đo đồ đạc ở mép một góc chưa đặt — đè lên máy của timeline
 
@@ -8911,12 +9103,61 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
+      // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
+      let pose = null, seen = null;
+      const mark = () => { if (typeof to.headPose === 'function') pose = to.headPose(); };
       return {
-        get x() { const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
-        get y() { const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
+        get x() { mark(); const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
+        get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         // BỀ NGANG ĐẦU con vật trong khung của `from` (đợt 32): quãng bàn tay trượt khi vuốt (`stroke`).
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
+        // ĐIỂM (x, y) trong khung của `from`, gắn vào đầu `to` lúc đầu chưa gật / nghiêng: chỗ nó đang ở bây giờ (đợt 32) — bàn tay
+        // vuốt bám theo đầu con vật đang dụi, tính lại mỗi khung hình (`stroke`).
+        // `time`: giây trong chuỗi (`sequence`) của `to` — đang lấy mẫu chuỗi của `from` thì con vật chưa ở đúng giây ấy: tua chuỗi
+        // đã lấy mẫu của nó tới đó, đo, rồi tua về.
+        follow(xp, yp, time = null) {
+          if (typeof to.follow !== 'function') return { x: xp, y: yp };
+          const reel = typeof time === 'number' && to.lastSequence ? to.lastSequence : null, before = reel ? reel.totalTime() : 0;
+          if (reel) reel.totalTime(Math.min(time, reel.duration()), false);
+          try { return followNow(xp, yp); } finally { if (reel) reel.totalTime(before, false); }
+        },
+        // ĐỈNH ĐẦU THẬT (đợt 32, chỉ đích 'crown' — con vật vẽ trước người, bàn tay đặt lên mép trên của nó): y trong khung của
+        // `from` của mép trên đầu `to` (cả tai) trong khoảng ngang [x0, x1] của `from` chia `bins` cột, ở giây `time` của chuỗi `to`.
+        // `bins` = 0: bề ngang cả đầu { x0, x1 }.
+        crown(x0, x1, time = null, bins = 1) {
+          if (part !== 'crown' || typeof to.crownPoints !== 'function') return null;
+          // Viền đầu đo một lần cho mỗi giây `time` (bàn tay dò nhiều độ cao trong cùng một khung).
+          if (typeof time !== 'number' || !seen || seen.time !== time) {
+            const reel = typeof time === 'number' && to.lastSequence ? to.lastSequence : null, before = reel ? reel.totalTime() : 0;
+            if (reel) reel.totalTime(Math.min(time, reel.duration()), false);
+            try { seen = { time, points: to.crownPoints().map((q) => toFrom(q.x, q.y)) }; } finally { if (reel) reel.totalTime(before, false); }
+          }
+          if (bins === 0) {                                   // bề ngang của đầu: { x0, x1 }
+            const xs = seen.points.map((q) => q.x);
+            return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs) } : null;
+          }
+          const tops = new Array(bins).fill(null), width = (x1 - x0) / bins || 1;
+          for (const q of seen.points) {
+            if (q.x < x0 || q.x > x1) continue;
+            const i = Math.min(bins - 1, Math.floor((q.x - x0) / width));
+            if (tops[i] === null || q.y < tops[i]) tops[i] = q.y;
+          }
+          return tops;
+        },
       };
+      // Khung của `from` ↔ khung của `to` (cùng đổi qua toạ độ bối cảnh).
+      function toPet(xp, yp) {
+        const a = of(from), fa = facts(a), b = of(to), fb = facts(b), shift = (to.s.x || 0) + (typeof to.dropX === 'function' ? to.dropX() : 0);
+        const X = a.spot.x + (xp - fa.size.w / 2) * fa.unit, Y = a.spot.y + (fa.ground - yp) * fa.unit;
+        return { x: (X - fb.x) / fb.unit + fb.size.w / 2 + shift, y: fb.ground - (Y - b.spot.y) / fb.unit };
+      }
+      function toFrom(px, py) {
+        const a = of(from), fa = facts(a), b = of(to), fb = facts(b), shift = (to.s.x || 0) + (typeof to.dropX === 'function' ? to.dropX() : 0);
+        const X = fb.x + (px - fb.size.w / 2 - shift) * fb.unit, Y = b.spot.y + (fb.ground - py) * fb.unit;
+        return { x: fa.size.w / 2 + (X - a.spot.x) / fa.unit, y: fa.ground - (Y - a.spot.y) / fa.unit };
+      }
+      // (x, y) của `from` → khung của `to` → `to.follow` (đầu đang gật / nghiêng) → về khung của `from`.
+      function followNow(xp, yp) { const p = toPet(xp, yp), q = to.follow(p.x, p.y, pose); return toFrom(q.x, q.y); }
     },
 
     /**
@@ -9354,6 +9595,51 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           }
         }
       }
+      // BÀN TAY VUỐT VẼ TRÊN CON VẬT (đợt 32). Con vật `over` một người ngồi vẽ trên cả người ấy (không khuất sau hai ống chân) —
+      // nên bàn tay đặt lên đỉnh đầu nó cũng khuất sau đầu nó: tay đè vào đầu là "lún qua viền" (bà vuốt mèo: chạm ≈ lún + 6 %,
+      // không có độ cao bàn tay nào vừa chạm ≥ 15 % vừa lún ≤ 10 %). Trong lúc vuốt (`onTopL/R` của người ấy), vẽ thêm bàn tay ấy
+      // ở một lớp ngay TRÊN con vật: một host chép đúng chỗ, cỡ, ánh sáng (`filter`) của host người, trong đó một SVG cùng khung
+      // chỉ có `<use>` của nhóm cổ tay, đặt bằng các lớp transform của tay người — trùng từng điểm với bàn tay thật.
+      for (const pet of actors) {
+        if (!pet.over || !pet.rig) continue;
+        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
+        let ghost = pet.ghost;
+        const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
+        if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
+        if (!ghost) {
+          ghost = pet.ghost = document.createElement('div');
+          ghost.dataset.ghost = '1';
+          // bàn tay, rồi hai lớp đổ bóng / hắt sáng của người (`shading.js`) cắt theo đúng hình bàn tay — thiếu chúng thì bản chép
+          // sáng hơn bàn tay thật (người ngồi trong nửa tối của chuyển sắc)
+          const mask = `ghost${++ghostCount}`;
+          ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use/></g>
+            <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+              <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
+            <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+        }
+        if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
+        ghost.className = person.host.className;
+        ghost.style.cssText = person.host.style.cssText;
+        ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
+        ghost.style.pointerEvents = 'none';
+        const svg = ghost.firstChild, use = svg.firstChild.firstChild;
+        const box = person.rig.svg.getAttribute('viewBox');
+        if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
+        const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
+        for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
+        for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
+          const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
+          if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
+        }
+        let chain = new DOMMatrix();
+        for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
+          chain = localMatrix(node).multiply(chain);
+        }
+        const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
+        svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
+        ghost.style.display = '';
+      }
       return frame;
     },
 
@@ -9372,7 +9658,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      */
     // `limit` (đợt 31): khoảng cách máy tối đa — góc trung không lùi quá chừng ấy để lấy trọn đồ đạc; đồ đạc PHỤ (không phải TV,
     // không ai ngồi / đứng trên nó) thì được lẹm mép. `direct` đặt nó khi góc trung gần rộng bằng góc toàn.
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -9398,7 +9684,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // lùi tới đúng khoảng cách góc toàn (góc trung = 100 % góc toàn, phải giữ góc toàn).
         const upperEl = actor.rig.el && actor.rig.el.than, u = upperEl && upperEl !== part ? drawnRect(upperEl) : null;
         const upper = u && u.width ? { x0: toX(u.left), x1: toX(u.right) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, rig: actor.rig };
+        // LÕI (đợt 32, lượt hai): đầu và thân áo — không có hai cánh tay. `core`: góc trung lấy bề ngang theo lõi (`direct` thử khi góc
+        // trung thường gần bằng góc toàn): hai tay đang múa (giảng giải) chìa ngang làm phần trên thân rộng ~0,6 chiều cao người —
+        // khung dọc hẹp thì góc trung không chặt hơn ~0,95 góc toàn 80 %; bàn tay ra mép khung ở góc trung là chuyện thường. Không
+        // dùng mặc định: góc trung một người theo lõi là cái mặt choán cả khung dọc (0,43 góc toàn — thành góc cận).
+        const coreEls = [actor.rig.el && actor.rig.el.dau, actor.rig.el && actor.rig.el.ao].filter(Boolean).map(drawnRect).filter((r) => r.width > 0);
+        const core = coreEls.length && typeof actor.rig.seatY === 'function' ? { x0: toX(Math.min(...coreEls.map((r) => r.left))), x1: toX(Math.max(...coreEls.map((r) => r.right))) } : null;
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
@@ -9408,12 +9700,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
-        const across = size !== 'full' && m.upper ? m.upper : m;                         // góc trung / cận: bề ngang phần trên thân (đợt 32)
+        const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core) } : a || b);
       // Người KHÁC cũng đo qua các mốc: bác sĩ bước tới khám rồi lùi về ngay trong nhịp — đo ở đầu / cuối nhịp thì không thấy
       // lúc họ đứng sát con vật (đợt 18: góc cận con mèo vẫn lẹm nửa mặt bác sĩ).
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -9430,10 +9722,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       // Khung DỌC: người chiếm ít chiều cao hơn — trung cảnh ở 86 % là một cái đầu to đầy khung, mặt rơi đúng chỗ phụ đề.
-      // Góc TOÀN dọc (đợt 32): người chiếm 66 % chiều cao (trước: 80 %). Khung dọc hẹp: góc trung một người bị bề ngang chặn —
-      // đầu chibi rộng ~0,44 chiều cao người, phải lọt 90 % bề ngang khung — nên không thể chặt hơn ~0,93 góc toàn 80 %: cắt
-      // sang góc trung gần như không đổi khung (bác sĩ phòng khám, bé ở công viên). Góc toàn chừa sàn và tường quanh người.
-      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: 0.66 };
+      // Góc TOÀN dọc: người chiếm 80 % chiều cao. `roomy` (đợt 32): 66 % — `direct` dùng khi góc 80 % còn lẹm đồ đạc quan trọng
+      // (cái TV lúc mất điện). Lượt đầu đợt 32 dùng 66 % cho mọi góc toàn dọc để góc trung một người chặt hơn được: góc mở đầu
+      // một người đứng thừa sàn, thừa tường — nay góc trung khung dọc lấy bề ngang theo LÕI (đầu, thân áo) thay vào.
+      const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill) => {
@@ -9703,6 +9995,37 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
 
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
       const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
+      // ĐỒ ĐẠC Ở MÉP của một góc thử (đợt 32): đo bằng phép chiếu THẬT — đặt máy thử (`trial`) rồi `propFraming()`, như
+      // acting_check chấm. Ước lượng phẳng của `frameOn` (`stillCut`) bỏ qua góc ngẩng / độ sâu.
+      // Trả lại ĐÚNG máy cũ sau khi thử (đợt 32, lượt hai): `update` chép máy thử đè lên `camera` — để nguyên thì các phép đo sau
+      // (`frameOn` chiếu bằng máy hiện có) đo từ góc thử cuối cùng: góc cận con mèo lệch sang, lẹm TV 97 % (`dem-mat-dien`).
+      const edgeCut = (v) => {
+        const kept = { ...camera };
+        trial = { ...v }; set.update();
+        const cut = set.propFraming().filter((p) => !p.minor && !p.front);
+        trial = null; Object.assign(camera, kept); set.update();
+        return cut;
+      };
+      const tallView = view.clientHeight > view.clientWidth * 1.2;
+      // NHÍCH MÁY cho đồ đạc quan trọng hết lẹm mép (đợt 32, lượt hai): góc đã chọn còn lẹm một món (TV lộ 97 % — dời máy để
+      // đẩy người bên cạnh ra khỏi góc cận con mèo thì kéo nó tới mép) — thử dời máy về phía nó (hay ra xa nó) 0…80 đơn vị, lùi xa thêm 0…45 % (góc trung vẫn phải hẹp hơn 85 % góc toàn — `direct`),
+      // nhận cách đầu tiên lẹm ít món hơn mà không chủ thể nào bị mép khung cắt.
+      const nameOfRig = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.id || actor.host.dataset.name || '' : ''; };
+      const nudge = (v, subjects) => {
+        const cut = edgeCut(v);
+        if (!cut.length) return v;
+        const names = subjects.map(nameOfRig), toward = cut[0].edge === 'right' ? 1 : -1;
+        // về phía món ấy (lấy trọn) trước, rồi ra xa nó (đẩy hẳn ra ngoài — cái bàn khám lộ 12 % ở mép góc trung bác sĩ)
+        for (const sign of [toward, -toward]) for (const grow of [1, 1.04, 1.08, 1.12, 1.2, 1.3, 1.45]) for (const d of [0, 8, 16, 24, 32, 48, 64, 80]) {
+          if (grow === 1 && !d) continue;
+          const test = { ...v, x: +(v.x + sign * d).toFixed(1), distance: +(v.distance * grow).toFixed(1) }, kept = { ...camera };
+          trial = { ...test }; set.update();
+          const props = set.propFraming().filter((p) => !p.minor && !p.front), people = set.framing().filter((c) => names.includes(c.name));
+          trial = null; Object.assign(camera, kept); set.update();
+          if (props.length < cut.length && !people.length) { set.ruleLog.push({ rule: 'nudge', from: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), by: sign * d, grow }); return test; }
+        }
+        return v;
+      };
       let shot = null;
       for (const [index, beat] of beats.entries()) {
         if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
@@ -9710,7 +10033,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Nhịp CÓ LỜI được ưu tiên: người đang nói phải lên hình — góc trước chỉ cần giữ 1 s (không thì câu của cậu bé
         // hiện chữ trên cảnh cận con mèo, cảnh thử đợt 14).
         let at = beat.time;
-        const hold = beat.speech || beat.move ? Math.min(minShot, 1.0) : minShot;      // `move`: có người đi — đổi góc kịp trước khi họ ra khỏi khung
+        // `move`: có người đi — đổi góc kịp trước khi họ ra khỏi khung. `insert`: góc đang có là góc CHÈN phản ứng của con vật
+        // (đợt 32) — giữ đủ 2,5 s thì đẩy lùi nhịp sau (lượt có điện lại mất góc toàn của nó, phim-4).
+        const hold = beat.speech || beat.move || (shot && shot.insert) ? Math.min(minShot, 1.0) : minShot;
         if (shot && at - shot.at < hold) at = shot.at + hold;
         const next = beats.slice(index + 1).find((later) => later.fixed);
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
@@ -9725,7 +10050,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // `acting_check` chấm).
         // Gần bằng: (1) dựng lại góc trung không lùi quá 80 % góc toàn — đồ đạc phụ được lẹm mép (`limit`); (2) góc trung đo đúng
         // lúc động tác; (3) vẫn không được (hai chủ thể đứng xa nhau) thì GIỮ GÓC TOÀN: không cắt sang một khung gần như cũ.
-        let size = beat.size;
+        // GÓC TOÀN DỌC còn lẹm đồ đạc quan trọng (đợt 32, lượt hai): lùi thành góc rộng 66 % nếu nó lẹm ít hơn — cái TV lúc
+        // mất điện / có điện lại. Không thì giữ 80 %.
+        if (beat.size === 'full' && tallView && beat.subjects.some((rig) => typeof rig.seatY === 'function')) {
+          const cut = edgeCut(values);
+          if (cut.length) {
+            let roomy = null;
+            try { roomy = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); }, roomy: true }); } catch (error) { roomy = null; }
+            const after = roomy ? edgeCut(roomy) : null, used = !!(after && after.length < cut.length);
+            set.ruleLog.push({ rule: 'roomyFull', t: +at.toFixed(2), cut: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), roomy: after ? after.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`) : null, used });
+            if (used) values = roomy;
+          }
+        }
+        let size = beat.size, reaction = null;
         if (beat.size === 'medium') {
           const seek = (time) => { tl.seek(time, false); set.update(); };
           let full = null, how = 'medium';
@@ -9735,23 +10072,37 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
             try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
-            // ĐỒ ĐẠC Ở MÉP của góc thử (đợt 32): đo bằng phép chiếu THẬT — đặt máy thử (`trial`) rồi `propFraming()`, như
-            // acting_check chấm. Ước lượng phẳng của `frameOn` (`stillCut`) bỏ qua góc ngẩng / độ sâu: góc trung bác sĩ phòng khám
-            // khung dọc ước 0,58 "lẹm" mà hình thật không lẹm gì — góc trung bị bỏ, giữ góc toàn.
-            const edgeCut = (v) => { trial = { ...v }; set.update(); const cut = set.propFraming().filter((p) => !p.minor && !p.front); trial = null; set.update(); return cut; };
-            const usable = (v) => {
+            // Đồ đạc ở mép: `edgeCut` (phép chiếu thật) — góc trung bác sĩ phòng khám khung dọc ước phẳng 0,58 "lẹm" mà hình thật
+            // không lẹm gì: góc trung bị bỏ, giữ góc toàn.
+            // `sliver`: một mẩu đồ đạc lộ < 35 % ở mép được (góc trung lõi — như góc trung thường, vốn không soát đồ đạc).
+            const usable = (v, sliver = false) => {
               if (!v) return false;
-              const frame = set.lastFrame, cut = edgeCut(v), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
+              const frame = set.lastFrame, cut = edgeCut(v).filter((p) => !(sliver && p.shown < 0.35)), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
               return { ok, ratio: +(v.distance / full.distance).toFixed(3), cut: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), whole: frame.whole };
             };
-            const judged = (name, v) => { const r = usable(v); if (r) tries[name] = { ratio: r.ratio, cut: r.cut, whole: r.whole }; return r && r.ok; };
-            if (judged('loose', loose)) { values = loose; how = 'loose'; }
+            // Góc thử còn lẹm đồ đạc: nhích máy trước khi chấm (`nudge`). Trả về góc dùng được, hay null.
+            const judged = (name, v) => {
+              if (!v) return null;
+              const w = nudge(v, beat.subjects), r = usable(w, name === 'core');
+              tries[name] = { ratio: r.ratio, cut: r.cut, whole: r.whole, ...(w !== v ? { nudged: true } : {}) };
+              return r.ok ? w : null;
+            };
+            let got = null;
+            if ((got = judged('loose', loose))) { values = got; how = 'loose'; }
             else {
               // (2) góc trung của người làm động tác + con vật, đo ĐÚNG LÚC động tác (giữa nhịp) — nhịp dài gộp mọi chỗ họ đứng
               // (bé bước tới, quỳ, đứng lên: khung rộng 89–92 % góc toàn). Người xem thấy động tác to hơn, không phải góc toàn.
               let moment = null;
               try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
-              if (judged('moment', moment)) { values = moment; how = 'moment'; }
+              if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true }); } catch (error) { return null; } })()))) {
+                // (2b) KHUNG DỌC: bề ngang theo LÕI (đầu, thân áo) — hai tay đang múa được ra mép khung (đợt 32, lượt hai).
+                values = got; how = 'core';
+                // Lõi một người choán cả bề ngang (bác sĩ phòng khám: 0,57 góc toàn — thành góc cận mặt): nới ra tới 0,75 góc toàn nếu
+                // vẫn dùng được.
+                const roomier = { ...got, distance: +Math.max(got.distance, full.distance * 0.75).toFixed(1) };
+                if (roomier.distance > got.distance) { const r = usable(roomier, true); if (r && r.ok) { values = roomier; tries.core.widened = r.ratio; } }
+              }
               else {
                 // (3) GÓC ĐƠN của người làm (đợt 32): hai chủ thể đứng xa nhau — khung dọc hẹp, bà trên sofa rọi đèn pin sang con
                 // mèo giữa phòng: góc hai người nào cũng gần bằng góc toàn (98 %) hay lẹm TV. Quay người làm một mình ở cỡ trung
@@ -9761,23 +10112,37 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                 if (person && beat.subjects.length > 1) {
                   try { single = set.frameOn([actor], 'full', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { single = null; }
                 }
-                if (judged('single', single)) { values = single; how = 'single'; }
+                if ((got = judged('single', single))) {
+                  values = got; how = 'single';
+                  // CẮT SANG CON VẬT TRONG CÙNG LƯỢT (đợt 32, lượt hai): góc đơn bỏ mất con vật — người xem (và người chấm) không thấy nó
+                  // phản ứng với động tác (bà rọi đèn pin, con mèo giật mình). Nửa sau nhịp: góc trung của các chủ thể còn lại, đo
+                  // đúng lúc ấy. Nhịp quá ngắn (mỗi góc < 1,2 s) thì thôi.
+                  const others = beat.subjects.filter((rig) => rig !== actor), cutAt = Math.max(at + 1.2, (at + beat.end) / 2);
+                  if (others.length && cutAt <= beat.end - 1.2 && !(next && cutAt > next.time - 0.8)) {
+                    let pet = null;
+                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: [(cutAt + beat.end) / 2], seek }); } catch (error) { pet = null; }
+                    if (pet) reaction = { values: pet, at: cutAt, subjects: others };
+                  }
+                }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
               }
             }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,
-                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries });
+                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries,
+                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
           // Thành góc toàn của đúng những chủ thể của góc đang có: giữ nguyên, không cắt.
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
+        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1));
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
         // `drift` (giây): máy LÙI CHẬM ra trong lúc ấy — trời chuyển tối, cả căn phòng đổi màu trước mắt người xem.
         if (beat.drift) tl.add(set.move({ distance: +(values.distance * 1.14).toFixed(1) }, Math.max(0.5, Math.min(beat.drift, beat.end - at)), 'sine.inOut'), at + 0.05);
         shot = { subjects: beat.subjects, size, at };
+        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true }; }
       }
       tl.seek(0, false); set.update();
       return cuts;
@@ -10710,17 +11075,28 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
   const duration = Math.max(source.duration(), 1e-3), count = Math.ceil(duration * sampleRate) + 1;
   if (firstFrame) restore(firstFrame);
   const frames = [];
-  for (let n = 0; n < count; n++) { source.totalTime(Math.min(duration, n / sampleRate), false); frames.push(snapshot()); }
+  // NHỊP THỞ nền (xem dưới): phần cộng thêm ở giây `time`.
+  const breath = keys.indexOf('tho'), sway = keys.indexOf('than'), breathing = breathe && breath >= 0 && duration > 1.5;
+  const breathAt = (time) => {
+    const fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
+    return { tho: fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)), than: sway >= 0 ? fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6) : 0 };
+  };
+  // `bakeTime`: giây đang lấy mẫu — động tác cần trạng thái của nhân vật KHÁC ở đúng lúc ấy (vuốt theo đầu con vật) đọc nó.
+  // `bakeBreath`: phần nhịp thở sẽ cộng vào khung ấy — động tác đo hình vẽ của chính mình (bàn tay vuốt) cộng sẵn cho đúng.
+  for (let n = 0; n < count; n++) {
+    rig.bakeTime = Math.min(duration, n / sampleRate); rig.bakeBreath = breathing ? breathAt(rig.bakeTime) : null;
+    source.totalTime(rig.bakeTime, false); frames.push(snapshot());
+  }
+  delete rig.bakeTime; delete rig.bakeBreath;
   source.kill();
   // NHỊP THỞ nền, chồng lên mọi khung: phần lớn động tác tới dáng đích rồi GIỮ một hai giây, và trong lúc giữ nhân vật
   // là một bức tượng. Ngực phồng xẹp chậm (chu kỳ 3,4 s) và thân đung đưa rất nhẹ (chu kỳ 5,6 s) suốt cả chuỗi; mờ
   // dần ở 0,6 s đầu và cuối để chuỗi vẫn bắt đầu và kết thúc đúng trạng thái của các động tác. `breathe: false` để tắt.
-  const breath = keys.indexOf('tho'), sway = keys.indexOf('than');
-  if (breathe && breath >= 0 && duration > 1.5) {
+  if (breathing) {
     frames.forEach((frame, n) => {
-      const time = Math.min(duration, n / sampleRate), fade = Math.min(1, time / 0.6, (duration - time) / 0.6);
-      frame[breath] = Math.min(1, frame[breath] + fade * 0.7 * (0.5 - 0.5 * Math.cos(2 * Math.PI * time / 3.4)));
-      if (sway >= 0) frame[sway] += fade * 0.7 * Math.sin(2 * Math.PI * time / 5.6);
+      const extra = breathAt(Math.min(duration, n / sampleRate));
+      frame[breath] = Math.min(1, frame[breath] + extra.tho);
+      if (sway >= 0) frame[sway] += extra.than;
     });
   }
 
@@ -11160,7 +11536,13 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
     clock = Math.max(clock, finish + gap);                   // lượt vào sớm không được kéo đồng hồ chung lùi lại
     lastLine = parallel.length === 1 ? spokeLast : null;
   });
-  const sequences = [...cast.entries()].map(([rig, mine]) => { restore(rig); return sequence(rig, mine.steps, { gap: stepGap }); });
+  // CON VẬT LẤY MẪU TRƯỚC (đợt 32): lúc lấy mẫu chuỗi của người vuốt, bàn tay hỏi dáng đầu con vật ở đúng giây ấy (`stroke` →
+  // `follow` tua chuỗi đã lấy mẫu của nó). Thứ tự trong `sequences` vẫn là thứ tự xuất hiện.
+  const entries = [...cast.entries()], baked = new Map();
+  for (const [rig, mine] of [...entries].sort((p, q) => (typeof p[0].follow === 'function' ? 0 : 1) - (typeof q[0].follow === 'function' ? 0 : 1))) {
+    restore(rig); baked.set(rig, sequence(rig, mine.steps, { gap: stepGap }));
+  }
+  const sequences = entries.map(([rig]) => baked.get(rig));
   const rigs = [...cast.keys()];
   const duration = Math.max(...sequences.map((item) => item.duration()));
 

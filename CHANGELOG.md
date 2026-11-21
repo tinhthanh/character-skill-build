@@ -47,13 +47,49 @@ the full shot (the 0.71.0 code: 5 kept, and the stroke track fails in b1 and b2)
   → 0 of 13 (least contact 7 %), sunk 64 % → 16 %; b2: 3 of 13 → 0, 40 % → 6 %; living-room CI scene: 67 % → 21 %; the boy
   kneeling to the dog (acting-2, he is drawn in front) stays at 93 % contact, 0 % sunk.
 
+Fixed (second pass — the three Known items of the first pass) — the 14 trial scenes and examples: 169 of 169 pass, 0
+medium shots kept as the full shot
+- **The stroking hand follows the pet's head frame by frame, and lies on top of it.** Each character's actions are
+  sampled into frames once (`sequence`), so the hand cannot read the pet as it plays: the pet's sequence is now sampled
+  first, and while the person's is sampled (`rig.bakeTime`) the stroke seeks the pet's sampled sequence to the same second
+  and reads its head as drawn — the outline of its filled shapes, ears included (`RigThu.crownPoints`, cached per shape).
+  Every frame the wrist height is searched (around the last frame's) for the hand, as drawn with the breathing that the
+  sequence adds afterwards, to cover the head enough: column by column (2 units) the part of the hand over the head plus a
+  1.2-unit band ≥ 16 % of the hand. The middle of the glide follows the head as drawn (a purring cat shifts it half a head
+  sideways); a point the straight arm cannot bring down to the head moves back toward the person. A pet drawn over a
+  seated person (`over`, so it is not hidden behind the shins) also hid the hand on its head: the hand always counted as
+  "sunk" (contact ≈ sunk + 6 %, no height gave ≥ 15 % contact with ≤ 10 % sunk). While stroking (`onTopL/R`), the 3D set
+  now draws that hand again in a layer just above the pet — a host copying the person's place, size and light, with a
+  `<use>` of the wrist group and of the person's shading cut to the hand's shape — the same pixels as the real hand.
+  `tools/scene.py` gives such a pet the depth of the seated person (only when nobody else reaches for it): 28–48 units
+  nearer the camera, its head showed 4–6 units lower and to the side of the hand in a medium shot. `acting_check` now asks
+  ≥ 15 % contact at every moment of the track and ≤ 10 % sunk (was 5 % and 25 %). Least contact / most sunk: b1 7 % / 16 %
+  → 25 % / 3 %; b2 6 % sunk → 28 % / 4 %; living-room CI scene 5 % / 21 % → 16 % / 5 %; acting-2 (the boy is drawn in front)
+  74 % / 0 %.
+- **The single shot cuts to the pet within the turn**: after the single shot of the person acting (vertical, two subjects
+  far apart), the camera cuts to a medium shot of the pet for the second half of the beat (`shotLog[…].then`); the next
+  beat waits only 1 s after this insert, not 2.5 s (the vertical power cut lost its power-back-on full shot). Power cut:
+  granny with the torch 4.1–5.6 s, then the cat 5.6–7.1 s.
+- **The vertical full shot fills 80 % again**; 66 % only where the 80 % shot still cuts important furniture (`roomy`,
+  `set.ruleLog` `roomyFull`). A vertical medium shot that is not narrower than 85 % of the full shot now has another retry:
+  the width of the person's core — head and shirt, not the gesturing arms (`how: 'core'`, widened to 75 % of the full
+  shot when that still works). Opening of one standing person, height of the person's frame on screen: street 0.86 →
+  1.03, park 0.38 → 0.43; the CI scene (a boy alone in the street) 0.86 → 1.03 with its medium shot at 0.71.
+- **Framing tries no longer move the camera**: `direct` placed a trial camera by copying it over the real one and never
+  put the real one back — every later measurement was taken from the last trial's angle (the close shot of the cat in
+  `dem-mat-dien` slid over and cut the TV, 97 %). And a chosen shot that still cuts important furniture is nudged
+  sideways (0–80 units, either way) and back (up to 45 %) until it does not, without cutting its subjects (`set.ruleLog`
+  `nudge`); retries are nudged before they are judged.
+- `tools/check_scene.py`: the vertical power cut must cut from granny's single shot to the whole cat within the turn; a
+  vertical opening of one person standing must fill ≥ 0.95 of the height (0.72.0 first pass: 0.86); the living-room
+  stroke is held to the new limits. The first-pass code fails all three.
+
 Known
-- The stroking hand still sinks 16–21 % behind a cat's ears at the ends of the glide (the cat's head bobs while it is
-  stroked; the line is fixed at build time), and the living-room CI scene's least contact is 5 %, at the limit.
-- The single shot of the person acting (vertical, two subjects far apart) leaves the pet out of that shot; it is used
-  only when no two-shot works, but a reviewer may want the pet's reaction in the same frame.
-- The vertical full shot is wider (person 66 % of the height): openings of a single standing person show more floor
-  and wall than before.
+- A pet stroked by a seated person keeps its own depth when someone else reaches for it too: in a medium shot its head
+  then shows 4–6 frame units off where the hand is placed (the hand is placed in the stroker's plane).
+- The core-width medium shot lets gesturing hands leave the vertical frame at its edges.
+- The insert of the pet after a single shot is a fixed medium shot of the pet; it does not wait for its reaction (a
+  reaction step on the next turn plays in the next shot).
 
 ## 0.71.0
 

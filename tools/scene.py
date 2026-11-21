@@ -1223,6 +1223,7 @@ def main():
                 turn['do'] = ['kneel'] + steps + ['standUp']
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
+                names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
                 # Người đang NGỒI (ghế đá, ghế phòng chờ) không đứng dậy đi tới: con vật ĐI TỚI người (bế, vuốt ve…). Đích là
                 # người thì thôi — người ngồi chỉ với tới chỗ mình.
                 if who.get('seated') and not names[step[1][1:]]['_pet']: continue
@@ -1818,6 +1819,13 @@ def main():
             # bàn tay nhắm ĐỈNH ĐẦU nó ('crown'). Giữ nguyên z: dời nó lại gần máy thì người khác (bé quỳ vuốt nó) với tay trong mặt
             # phẳng của mình, lơ lửng trên đầu nó.
             over = f", over: {who['_front']['name']}" if who.get('_front') is not None else ''
+            # CÙNG CHIỀU SÂU với người ngồi vuốt nó (đợt 32) — khi chỉ người ấy với tay tới nó: thứ tự lớp đã do `over` lo, còn đứng
+            # gần máy hơn 28–48 đơn vị thì ở góc trung đầu nó hiện thấp hơn / lệch ngang 4–6 đơn vị khung so với chỗ bàn tay (rig 2D
+            # vươn trong mặt phẳng của mình): bàn tay vuốt hở trên đầu nó.
+            front = who.get('_front')
+            if front is not None and who.get('_reachers', set()) <= {front['name']}:
+                front_box = stage_set['boxes'][boxes.index(front['on'])] if front.get('on') and front.get('seated') and front['on'] in boxes else None
+                depth_z = float(front_box['z']) + 12 if front_box else float(front.get('z', -300))
             setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
