@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.74.0
+
+Added
+- `cheer({ narrow: true })`: a narrow cheer for vertical frames — two fists pumped beside the shoulders (upper arm 70°,
+  forearm up) instead of the wide V; about as wide as the head. `tools/scene.py` uses it for every person who cheers in a
+  vertical frame (height > 1.2 × width) unless the script gives the step its own arguments. Catalog row `cheer narrow`.
+- `tools/check_scene.py`: the vertical park scene (the vet waves, the boy cheers, the vet points) must give the boy the
+  narrow cheer and no full shot chosen for the gesture; granny and the boy at two depths reaching for one cat, with a still
+  camera (no cut at all), must move the cat during its own walk. The 0.73.0 code fails both.
+
+Fixed
+- **The two-handed cheer cut to the full shot in the middle of the medium shots** (Known 0.73.0). The V-shaped cheer
+  needed ~1.02 × the full shot; the narrow one fits the medium shot. Vertical park, the boy's cheer: full shot 116 %
+  (`how: 'gesture'`) → medium shot 82 % of the full shot; his left hand 58 % → 51 % of its width inside the edge (least 5 %);
+  the other medium shots unchanged (71 %, 83 %, 79 %).
+- **A pet slid in depth with neither a cut nor a walk** (Known 0.73.0, `how: 'slide'`). Trial scene: granny on the sofa
+  strokes the cat, then the boy feeds it, with a still camera (`"camera": false`, no cut) — 13 frames of the cat drifting
+  toward the camera standing still (15.3–15.75 s). Now `tools/scene.py` gives the pet a short walk toward the next reacher
+  (40 frame units, a few steps) before that person's turn, whenever it must change plane; `set.settleDepths` spreads the
+  move over that walk and makes the depth follow the pet's own x (sampled every frame of the walk), so the depth stands
+  while the feet stand (turning round, settling). Spread evenly over the walk it still slid 15 frames (the turn and the
+  settle); following x: 0 frames. With a cut in the span the move still happens on the cut (the living-room CI scene: on
+  the cut at 12.96 s). Side effect in the still scene: the boy's hand on the cat 43 % in view → passes (the cat stands
+  40 units nearer him).
+
+Checked — the 20 3D scenes (`examples/scene-3d`, the three `examples/lighting` scripts, the 11 distinct trial scenes of
+dot29–33, the 4 lighting trials of dot31, and the still-camera scene above), rebuilt on this code: `acting_check` 292 of
+293 pass, 0 medium shots kept as the full shot; `light_side` 24 of 24 judged pass (4 more — backlit, or at night without a lamp —
+reported, not judged).
+
+Known
+- Still camera, very wide room shot: granny's stroking hand sinks up to 12 % past the cat's outline (8–12 % over the 13
+  moments; limit 10 %) while contact stays 50–59 %; the same stroke in a medium shot is ≤ 5 %. The hand is a few dozen
+  pixels there, so antialiased edge pixels weigh much more — not yet shown whether it is the drawing or the measurement.
+
 ## 0.73.0
 
 Added — the machine measures the gesturing hands in the frame and the pet's reaction in its insert
