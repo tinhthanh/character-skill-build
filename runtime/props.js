@@ -1,4 +1,4 @@
-// props.js — ĐẠO CỤ CẢNH vẽ sẵn: ghế, ghế đẩu, bàn, quầy, chậu cây, máy tính xách tay, màn hình.
+// props.js — ĐẠO CỤ CẢNH vẽ sẵn: ghế, ghế đẩu, bàn, quầy, chậu cây, máy tính xách tay, màn hình, xe máy…
 //
 // Đạo cụ vẽ trong CÙNG KHUNG với nhân vật người (400 × 470, sàn ở y = 458, giữa khung x = 200).
 // Nhờ vậy muốn ghế nằm đúng dưới người ngồi thì chỉ cần cho host của ghế CÙNG `left`, `bottom`
@@ -157,7 +157,36 @@ const DRAW = {
     <path d="M ${x0 + 6} ${top + h * 0.55} H ${doorX + (d > 0 ? 0 : w * 0.34)}" stroke="${dark}" stroke-width="2" opacity=".6"/>
     <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
   },
+  // XE MÁY (xe tay ga) nhìn ngang, cỡ thật so với người: mặt yên cao `SCOOTER_SEAT` (khung), đầu xe về phía `facing`
+  // ('right' mặc định). Vẽ trong hệ toạ độ riêng 360 × 270 (sàn ở 270, giữa yên ở x 150) rồi co về khung bằng một phép
+  // biến đổi — lật ngang khi xe quay trái. Mỗi bánh là một nhóm `data-wheel` có nan hoa, xoay quanh tâm của nó bằng
+  // `prop.roll()` khi xe chạy. Người lái ngồi đúng giữa yên (x 200 của khung): nâng rig lên `rideLift(rig)` đơn vị khung.
+  scooter: ({ facing = 'right', color, dark, line }) => {
+    const k = SCOOTER_K, d = facing === 'left' ? -1 : 1, w = (v) => (v / k).toFixed(2), tyre = '#2b2f36', rim = '#c9d1d9';
+    const wheel = ([cx, cy]) => `<g data-wheel="1" data-cx="${cx}" data-cy="${cy}" transform="rotate(0 ${cx} ${cy})">
+      <circle cx="${cx}" cy="${cy}" r="40" fill="${tyre}" stroke="#16191e" stroke-width="${w(1.6)}"/>
+      <circle cx="${cx}" cy="${cy}" r="24.8" fill="${rim}" stroke="#16191e" stroke-width="${w(1.2)}"/>
+      <path d="${[0, 72, 144, 216, 288].map((a) => `M ${cx} ${cy} L ${(cx + Math.sin(a * Math.PI / 180) * 24).toFixed(1)} ${(cy - Math.cos(a * Math.PI / 180) * 24).toFixed(1)}`).join(' ')}" stroke="#8a95a3" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="${tyre}"/></g>`;
+    return `
+    <g transform="translate(200 ${PROP_FRAME.floor}) scale(${(d * k).toFixed(4)} ${k.toFixed(4)}) translate(-150 -270)">
+      ${SCOOTER_WHEELS.map(wheel).join('')}
+      <path d="M 50 210 Q 40 156 100 152 H 206 L 222 200 L 258 124 L 272 124 L 246 210 Z" fill="${color}" stroke="${line}" stroke-width="${w(1.6)}" stroke-linejoin="round"/>
+      <path d="M 52 194 Q 56 204 64 210 H 246 L 251 194 Z" fill="${dark}" opacity=".55"/>
+      <path d="M 90 152 Q 96 ${SCOOTER_SEAT_TOP} 130 ${SCOOTER_SEAT_TOP} H 196 Q 214 ${SCOOTER_SEAT_TOP + 2} 210 152 Z" fill="#3b4450" stroke="#1f242b" stroke-width="${w(1.4)}" stroke-linejoin="round"/>
+      <rect x="110" y="168" width="60" height="9" rx="4" fill="${rim}" stroke="${line}" stroke-width="${w(1)}"/>
+      <path d="M 262 124 L 246 78" stroke="#3b4450" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 230 76 H 272" stroke="#2b2f36" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
+    </g>`;
+  },
 };
+
+// Xe máy: hệ toạ độ vẽ 360 × 270 (sàn 270), tâm hai bánh, mặt yên, và hệ số co về khung (1,22 — cỡ thật so với người
+// mặc định: yên cao ≈ một nửa người đứng, như xe tay ga thật).
+const SCOOTER_WHEELS = [[76, 228], [276, 228]];
+const SCOOTER_SEAT_TOP = 130, SCOOTER_K = 1.22, SCOOTER_WHEEL_R = 40;
+const SCOOTER_SEAT = PROP_FRAME.floor - (270 - SCOOTER_SEAT_TOP) * SCOOTER_K;   // y khung của mặt yên
 
 // THẺ THÔNG BÁO trên màn hình (laptop quay ra người xem, màn hình để bàn): ẩn sẵn, `prop.notify()` bật nó lên. Nằm ở nửa
 // dưới màn hình, rộng gần bằng màn hình; chữ cỡ theo bề ngang màn hình.
@@ -184,13 +213,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+const DEFAULT_COLOR = { scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
@@ -199,11 +228,13 @@ export const PROP_KINDS = Object.keys(DRAW);
  *     back     chiều cao lưng ghế tính từ mặt ghế (92)
  *     on       máy tính: chiều cao mặt bàn / quầy nó đặt lên, tính từ sàn (150 — khớp bàn, quầy mặc định)
  *     image    máy tính: ảnh trên màn hình (đường dẫn / URL); laptop chỉ hiện khi `facing: 'viewer'`
- *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'
+ *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'; xe máy: 'right' (mặc định) | 'left'
  *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
  *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
  *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'
- * Trả về { svg, kind, seatY }. Host nên có cùng `bottom` và `height` với host của nhân vật.
+ * Trả về { svg, kind, seatY, notify }; xe máy thêm `rideLift(rig)` (nâng người lái bao nhiêu đơn vị khung để ngồi trên yên)
+ * và `roll(distance, duration, ease)` (timeline quay bánh khi xe đi `distance` đơn vị khung). Host nên có cùng `bottom` và
+ * `height` với host của nhân vật.
  */
 export function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
@@ -212,14 +243,16 @@ export function createProp(host, kind, options = {}) {
   if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
   if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
-  if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
+  if (kind === 'scooter') {
+    if (facing !== undefined && facing !== 'right' && facing !== 'left') throw new Error(`[character] prop "scooter": facing must be 'right' or 'left', got ${JSON.stringify(facing)}`);
+  } else if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
   if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
   if (on !== undefined && !(typeof on === 'number' && on >= 0)) throw new Error(`[character] prop "${kind}": on must be a number ≥ 0 (frame units above the floor), got ${JSON.stringify(on)}`);
   for (const [name, value] of Object.entries({ width, height, back }))
     if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
   const sitter = options.for;
   if (sitter !== undefined && typeof (sitter && sitter.seatY) !== 'function') throw new Error(`[character] prop "${kind}": \`for\` must be a person rig (createCharacter(...).rig)`);
-  const seat = sitter ? sitter.seatY() : SEAT_DEFAULT;
+  const seat = kind === 'scooter' ? SCOOTER_SEAT : sitter ? sitter.seatY() : SEAT_DEFAULT;
   const o = { seat, color, dark: shade(color, -0.28), line: shade(color, -0.55) };
   if (width !== undefined) o.w = width;
   if (height !== undefined) o.height = height;
@@ -234,7 +267,26 @@ export function createProp(host, kind, options = {}) {
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
   const svg = host.firstElementChild;
-  return { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  if (kind === 'scooter') {
+    // Người cầm lái ngồi trên yên: rig ở thế `ride` có hông ở `rideSeatY()` khi chân chạm sàn — nâng nó lên bấy nhiêu đơn vị
+    // khung (nhân với chiều cao host / 470 để ra px) thì hông nằm trên mặt yên, chân đặt lên sàn để chân.
+    prop.rideLift = (rig) => {
+      if (typeof (rig && rig.rideSeatY) !== 'function') throw new Error('[character] prop "scooter": rideLift(rig) needs a person rig');
+      return Math.max(0, rig.rideSeatY() - SCOOTER_SEAT);
+    };
+    // BÁNH XE LĂN: xe đi được `distance` đơn vị khung (dương = về phía đầu xe) trong `duration` giây → mỗi bánh quay
+    // distance / bán kính. Trả về một timeline để đặt vào timeline của cảnh (cùng `ease` với chuyển động của xe).
+    prop.roll = (distance, duration, ease = 'power2.out') => {
+      const turn = distance / (SCOOTER_WHEEL_R * SCOOTER_K) * 180 / Math.PI, t = gsap.timeline();
+      svg.querySelectorAll('[data-wheel]').forEach((g) => {
+        const c = `${g.dataset.cx} ${g.dataset.cy}`;
+        t.fromTo(g, { attr: { transform: `rotate(0 ${c})` } }, { attr: { transform: `rotate(${turn.toFixed(2)} ${c})` }, duration, ease }, 0);
+      });
+      return t;
+    };
+  }
+  return prop;
 }
 
 /**

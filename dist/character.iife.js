@@ -1,4 +1,4 @@
-/* VGCharacter v0.73.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.74.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -268,6 +268,7 @@ const NGHI = Object.freeze({
   batL: 11, batR: 11, cangL: -17, cangR: -17, vungL: 0, vungR: 0,
   duiL: 0, duiR: 0, ongL: 0, ongR: 0, nhacL: 0, nhacR: 0,
   seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
+  ride: 0,                 // 0…1 CẦM LÁI xe máy (`ride`): nghiêng hẳn, đùi nằm ngang ra trước, hai tay nắm tay lái (xem apDung)
   kneel: 0,                // 0…1 QUỲ (cộng với `seat` = 1): ống chân cũng chĩa về phía người xem, rút ngắn một nửa — người hạ thêm
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
@@ -476,6 +477,10 @@ const LOOK_DOWN = { head: 10, eyes: 4.5, lids: 0.5 };      // đầu hạ 10: 14
 const CLAP_POSE = [22, -138];             // hai bàn tay gặp nhau trước ngực
 const WAI_POSE = [16, -150];              // hai lòng bàn tay áp nhau trước ngực, cao hơn vỗ tay
 const COUNT_BEAT = 0.8;                   // mỗi nhịp đếm ngón giữ 0,8 s cho người xem kịp đọc
+const RIDE_THIGH = 84;                    // cầm lái: đùi gần (độ) xoay ra trước — gần nằm ngang; đùi xa ít hơn 6° cho hai chân khỏi chồng khít
+const RIDE_KNEE = 76;                     // …ống chân gập lại gần thẳng đứng, bàn chân hơi ra trước (sàn để chân)
+const RIDE_LEAN = 7;                      // …lưng hơi đổ về trước
+const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, về phía mặt): bắp tay ra trước–xuống, cẳng tay ngang hơn tới tay lái
 const COUNT_POSE = [35, 135];             // khuỷu HẠ, cẳng tay dựng lên: bàn tay giơ cạnh vai (khuỷu cao, cẳng tay chúc xuống thì bàn tay nằm dưới cẳng tay, ngón chĩa ngược vào tay áo)
 const WATCH_POSE = [24, -120];            // cẳng tay NGANG trước ngực, mặt đồng hồ hướng ra (sát cằm thì ở cảnh cận chỉ còn mẩu tay áo cạnh cằm)
 const SHAKE_POSE = [40, 50];
@@ -991,7 +996,7 @@ class RigSVG {
   static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   static SIDESTEP = 70;                  // quãng `walk` ngắn hơn chừng này (đơn vị khung) thì bước nhích, không quay ngang
   // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
-  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff'];
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet'];
   // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
@@ -1523,9 +1528,15 @@ class RigSVG {
     // Đi sang TRÁI là ảnh gương: mọi góc khớp đổi dấu, nên phải đưa về quy ước
     // "đi sang phải" (× dấu của h) trước khi hỏi bàn chân đang lăn tới đâu.
     const dauH = Math.sign(h || 1);
+    // CẦM LÁI (`ride`): cộng thêm vào góc khớp chân — đùi xoay ra TRƯỚC (về phía đang quay mặt) tới gần nằm ngang, ống
+    // chân gập lại gần thẳng đứng, bàn chân hơi đưa ra trước lên sàn để chân. Cộng vào chứ không ghi đè `dui`/`ong`: động
+    // tác nào xong cũng khép hai kênh ấy về 0, còn `ride` là thế giữ (xem #khep).
+    const ride = clamp(s.ride || 0, 0, 1);
+    const legDui = (ben) => s['dui' + ben] - dauH * ride * (ben === (h >= 0 ? 'L' : 'R') ? RIDE_THIGH : RIDE_THIGH - 6);
+    const legOng = (ben) => s['ong' + ben] + dauH * ride * RIDE_KNEE;
     const goc = (dui, ong) => ah * dauH * (RigSVG.#lanBanChan(dauH * dui, dauH * ong) - dauH * (dui + ong));
     for (const ben of ['L', 'R']) {
-      const dui = s['dui' + ben], ong = s['ong' + ben];
+      const dui = legDui(ben), ong = legOng(ben);
       e['ban' + ben].setAttribute('opacity', 1 - ah);
       e['banNg' + ben].setAttribute('opacity', ah);
       const tf = `rotate(${goc(dui, ong)} 0 ${DAI.ong}) scale(${h < 0 ? -1 : 1} 1)`;
@@ -1740,10 +1751,10 @@ class RigSVG {
     // Phần thẳng đứng của đùi luôn bằng của dáng nhìn thẳng (1 − 0,72 × seat): đùi xoay φ thì dài thêm 1/cos φ — quay dở
     // (đang vuốt con chó, huong −0,3) mà để đùi dài theo `sideSit` thì đầu gối thấp quá, bàn chân lún 4,5 % chiều cao.
     const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
-    e.chanL.setAttribute('transform', `rotate(${s.duiL + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
-    e.chanR.setAttribute('transform', `rotate(${s.duiR - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
-    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongL - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
-    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${s.ongR + splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.chanL.setAttribute('transform', `rotate(${legDui('L') + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
+    e.chanR.setAttribute('transform', `rotate(${legDui('R') - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
+    e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${legOng('L') - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
+    e.ongR.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${legOng('R') + splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
 
     // ── VÁY / TẠP DỀ: một tứ giác từ eo xuống gấu, hai góc gấu BÁM theo hai đùi.
     if (e.skirt) {
@@ -1753,10 +1764,10 @@ class RigSVG {
       // hệ toạ độ nhóm chân. Quá gối thì đi tiếp theo hướng ống chân.
       const along = (side, offset) => {
         const hipX = (side === 'L' ? -1 : 1) * (cachChan * (1 - ah * 0.7) + ah * 3) + legShift;
-        const a = (s['dui' + side] + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay) + sitFold) * RAD;
+        const a = (legDui(side) + (side === 'L' ? 1 : -1) * (s['nhac' + side] * 6 + splay) + sitFold) * RAD;
         const squash = (1 - s['nhac' + side] * 0.42) * thighSeen;                // đùi rút ngắn khi nhấc gối / khi ngồi
         const onThigh = Math.min(reach, thigh) * squash, past = Math.max(0, reach - thigh);
-        const b = a + (s['ong' + side] - (side === 'L' ? 1 : -1) * splay - sitFold) * RAD;
+        const b = a + (legOng(side) - (side === 'L' ? 1 : -1) * splay - sitFold) * RAD;
         return [hipX + offset * Math.cos(a) - onThigh * Math.sin(a) - past * Math.sin(b), offset * Math.sin(a) + onThigh * Math.cos(a) + past * Math.cos(b)];
       };
       const waist = cachChan * (1 - ah * 0.7) + ah * 3 + halfLeg;
@@ -1783,7 +1794,7 @@ class RigSVG {
     // `torsoWidth` kéo cả thân trên ra theo chiều ngang. Đầu nằm trong nhóm thân nên bị kéo theo —
     // chỗ đặt đầu (bên dưới) chia lại cho đúng bằng hệ số ấy để đầu vẫn tròn.
     const wide = clamp(this.nv.torsoWidth || 1, 0.7, 1.6);
-    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than + h * stoop * 10}) scale(${this.nv.coThan * wide} ${this.nv.coThan * (1 - stoop * 0.05)})`);
+    e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than + h * stoop * 10 + dauH * ride * RIDE_LEAN}) scale(${this.nv.coThan * wide} ${this.nv.coThan * (1 - stoop * 0.05)})`);
     e.chanG.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) scale(1 ${this.nv.coChan})`);
     // NHẤC VAI — cổ, đầu, hai cánh tay, đệm vai VÀ THÂN ÁO đều dời theo cùng
     // một lượng. Thiếu thân áo ở đây là `shrug()` (vai −9) nhấc đệm vai lên
@@ -2032,6 +2043,18 @@ class RigSVG {
       rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * cradle;
       rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * cradle;
     }
+    // CẦM LÁI: hai tay vươn ra trước–xuống tới tay lái (góc TRÊN MÀN HÌNH, cùng hướng với mặt), bàn tay nắm lại. Tay nào
+    // GIƠ HẲN LÊN (vẫy, chỉ — bắp tay lệch dáng nghỉ quá 40°) thì nhả tay lái dần, xong lại về nắm; nhịp tay lúc nói
+    // không làm buông tay lái.
+    const rideGrip = { L: 0, R: 0 };
+    if (ride) for (const side of ['L', 'R']) {
+      const off = Math.abs(s['bat' + side] - this.#restArm(side)[0]);         // chỉ BẮP TAY giơ lên mới tính: cử chỉ lúc nói chủ yếu gập cẳng tay
+      const w = ride * clamp(1 - (off - 40) / 40, 0, 1) * (1 - clamp(s['ov' + side], 0, 1));
+      rideGrip[side] = w;
+      if (!w) continue;
+      rotation['bat' + side] += (-dauH * RIDE_ARM[0] - rotation['bat' + side]) * w;
+      rotation['cang' + side] += (-dauH * RIDE_ARM[1] - rotation['cang' + side]) * w;
+    }
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
 
@@ -2105,7 +2128,7 @@ class RigSVG {
       // vẫn giữ dáng nắm của tư thế nghỉ — nếu không cái cốc sẽ dính lơ lửng vào lòng bàn tay xoè.
       const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
       // Đang ÔM con vật: bàn tay khum lại ôm lấy nó (xoè ngửa phía dưới đọc thành bưng một cái khay).
-      const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s.omRise >= 0.5 ? 'nam' : s['tay' + ben];
+      const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s.omRise >= 0.5 || rideGrip[ben] >= 0.5 ? 'nam' : s['tay' + ben];
       // Buông thõng → lòng bàn tay úp vào đùi, nhìn từ trước chỉ thấy cạnh tay (hẹp ~60%),
       // ngón hơi hướng vào thân. Tay càng giơ lên / vung xa thì bàn tay càng xoè phẳng ra.
       const bat = Math.abs(armAngle(ben, 'bat')), cang = Math.abs(armAngle(ben, 'cang')), vung = Math.abs(s['vung' + ben]);      // góc THẬT đang vẽ (kể cả tay gần thả xuôi)
@@ -2585,7 +2608,7 @@ class RigSVG {
     // (Giá trị đọc lúc DỰNG timeline — `sequence()` lo cho trạng thái lúc ấy đúng.)
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
-    so.seat = this.s.seat; so.huong = this.s.huong; so.kneel = this.s.kneel;
+    so.seat = this.s.seat; so.huong = this.s.huong; so.kneel = this.s.kneel; so.ride = this.s.ride;
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
@@ -2902,7 +2925,8 @@ class RigSVG {
   // Người HẠ XUỐNG bao nhiêu (đơn vị khung) vì ngồi (`seat`: đùi rút) và quỳ (`kneel`: ống chân rút thêm).
   #lowered() {
     const nv = this.nv, s = this.s;
-    return DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + DAI.ong * nv.daiOng * nv.coChan * KNEEL_SHIN * clamp(s.kneel || 0, 0, 1);
+    return DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + DAI.ong * nv.daiOng * nv.coChan * KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)
+      + DAI.dui * nv.daiDui * nv.coChan * clamp(s.ride || 0, 0, 1);          // cầm lái: đùi nằm ngang — hông hạ đúng một đùi, bàn chân vẫn trên nền
   }
 
   #shoulderY() {
@@ -4656,6 +4680,36 @@ class RigSVG {
     t.set(s, { om: 0 }, 0.6);                                                              // con vật về chỗ của nó
     this.#khep(t, 0.45, 0.65, { om: 0, omRise: 0, omHome: 0, huong: c.facing });
     return t;
+  }
+
+  /**
+   * CẦM LÁI XE MÁY và giữ thế ấy: quay hẳn sang ngang (giữ hướng đang quay; đang nhìn thẳng thì sang phải), đùi nằm ngang
+   * ra trước, ống chân xuống sàn để chân, lưng hơi đổ tới, hai tay nắm tay lái trước ngực. Các động tác sau (nói, gật,
+   * nhìn, vẫy một tay) diễn khi vẫn ngồi trên xe; `getOff()` đứng xuống. Hông ở cao độ `rideSeatY()` — đặt yên xe ở đó.
+   * Xe là một hình (cutout / đạo cụ) do cảnh tự đặt; rig không vẽ xe.
+   */
+  ride() {
+    const t = this.tl(), s = this.s, side = s.huong < -0.1 ? -1 : 1;
+    t.to(s, { dauY: 2, cuoi: 0.6, duration: 0.25, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.55, 0.05, { ride: 1, seat: 0, kneel: 0, huong: side });
+    return t;
+  }
+
+  /** XUỐNG XE: thôi thế cầm lái, đứng thẳng lại, giữ hướng đang quay. */
+  getOff() {
+    const t = this.tl(), s = this.s;
+    t.to(s, { dauY: 2.5, duration: 0.2, ease: 'power2.in' }, 0);
+    this.#khep(t, 0.55, 0.05, { ride: 0 });
+    return t;
+  }
+
+  /**
+   * Cao độ YÊN XE khớp với nhân vật này khi cầm lái (y trong khung 400 × 470, sàn ở 458): mặt dưới của đùi lúc `ride = 1`.
+   * Như `seatY()` của ghế: dời / co hình chiếc xe sao cho mặt yên nằm ở đây.
+   */
+  rideSeatY() {
+    const nv = this.nv;
+    return HONG.y + DOI_Y + this.hangChan() + DAI.dui * nv.daiDui * nv.coChan + 13 * nv.dayChan * nv.coChan;
   }
 
   /** NGỒI XUỐNG và ở yên trong dáng ngồi; các động tác sau (nói, gật, vẫy…) diễn khi đang ngồi. */
@@ -7310,7 +7364,7 @@ return { KIT, dungDau, dangKyDau };
 
 /* ───── runtime/props.js ───── */
 __m['runtime/props.js'] = (function () {
-// props.js — ĐẠO CỤ CẢNH vẽ sẵn: ghế, ghế đẩu, bàn, quầy, chậu cây, máy tính xách tay, màn hình.
+// props.js — ĐẠO CỤ CẢNH vẽ sẵn: ghế, ghế đẩu, bàn, quầy, chậu cây, máy tính xách tay, màn hình, xe máy…
 //
 // Đạo cụ vẽ trong CÙNG KHUNG với nhân vật người (400 × 470, sàn ở y = 458, giữa khung x = 200).
 // Nhờ vậy muốn ghế nằm đúng dưới người ngồi thì chỉ cần cho host của ghế CÙNG `left`, `bottom`
@@ -7469,7 +7523,36 @@ const DRAW = {
     <path d="M ${x0 + 6} ${top + h * 0.55} H ${doorX + (d > 0 ? 0 : w * 0.34)}" stroke="${dark}" stroke-width="2" opacity=".6"/>
     <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
   },
+  // XE MÁY (xe tay ga) nhìn ngang, cỡ thật so với người: mặt yên cao `SCOOTER_SEAT` (khung), đầu xe về phía `facing`
+  // ('right' mặc định). Vẽ trong hệ toạ độ riêng 360 × 270 (sàn ở 270, giữa yên ở x 150) rồi co về khung bằng một phép
+  // biến đổi — lật ngang khi xe quay trái. Mỗi bánh là một nhóm `data-wheel` có nan hoa, xoay quanh tâm của nó bằng
+  // `prop.roll()` khi xe chạy. Người lái ngồi đúng giữa yên (x 200 của khung): nâng rig lên `rideLift(rig)` đơn vị khung.
+  scooter: ({ facing = 'right', color, dark, line }) => {
+    const k = SCOOTER_K, d = facing === 'left' ? -1 : 1, w = (v) => (v / k).toFixed(2), tyre = '#2b2f36', rim = '#c9d1d9';
+    const wheel = ([cx, cy]) => `<g data-wheel="1" data-cx="${cx}" data-cy="${cy}" transform="rotate(0 ${cx} ${cy})">
+      <circle cx="${cx}" cy="${cy}" r="40" fill="${tyre}" stroke="#16191e" stroke-width="${w(1.6)}"/>
+      <circle cx="${cx}" cy="${cy}" r="24.8" fill="${rim}" stroke="#16191e" stroke-width="${w(1.2)}"/>
+      <path d="${[0, 72, 144, 216, 288].map((a) => `M ${cx} ${cy} L ${(cx + Math.sin(a * Math.PI / 180) * 24).toFixed(1)} ${(cy - Math.cos(a * Math.PI / 180) * 24).toFixed(1)}`).join(' ')}" stroke="#8a95a3" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="${tyre}"/></g>`;
+    return `
+    <g transform="translate(200 ${PROP_FRAME.floor}) scale(${(d * k).toFixed(4)} ${k.toFixed(4)}) translate(-150 -270)">
+      ${SCOOTER_WHEELS.map(wheel).join('')}
+      <path d="M 50 210 Q 40 156 100 152 H 206 L 222 200 L 258 124 L 272 124 L 246 210 Z" fill="${color}" stroke="${line}" stroke-width="${w(1.6)}" stroke-linejoin="round"/>
+      <path d="M 52 194 Q 56 204 64 210 H 246 L 251 194 Z" fill="${dark}" opacity=".55"/>
+      <path d="M 90 152 Q 96 ${SCOOTER_SEAT_TOP} 130 ${SCOOTER_SEAT_TOP} H 196 Q 214 ${SCOOTER_SEAT_TOP + 2} 210 152 Z" fill="#3b4450" stroke="#1f242b" stroke-width="${w(1.4)}" stroke-linejoin="round"/>
+      <rect x="110" y="168" width="60" height="9" rx="4" fill="${rim}" stroke="${line}" stroke-width="${w(1)}"/>
+      <path d="M 262 124 L 246 78" stroke="#3b4450" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 230 76 H 272" stroke="#2b2f36" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
+    </g>`;
+  },
 };
+
+// Xe máy: hệ toạ độ vẽ 360 × 270 (sàn 270), tâm hai bánh, mặt yên, và hệ số co về khung (1,22 — cỡ thật so với người
+// mặc định: yên cao ≈ một nửa người đứng, như xe tay ga thật).
+const SCOOTER_WHEELS = [[76, 228], [276, 228]];
+const SCOOTER_SEAT_TOP = 130, SCOOTER_K = 1.22, SCOOTER_WHEEL_R = 40;
+const SCOOTER_SEAT = PROP_FRAME.floor - (270 - SCOOTER_SEAT_TOP) * SCOOTER_K;   // y khung của mặt yên
 
 // THẺ THÔNG BÁO trên màn hình (laptop quay ra người xem, màn hình để bàn): ẩn sẵn, `prop.notify()` bật nó lên. Nằm ở nửa
 // dưới màn hình, rộng gần bằng màn hình; chữ cỡ theo bề ngang màn hình.
@@ -7496,13 +7579,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+const DEFAULT_COLOR = { scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 
 const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading }
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
@@ -7511,11 +7594,13 @@ const PROP_KINDS = Object.keys(DRAW);
  *     back     chiều cao lưng ghế tính từ mặt ghế (92)
  *     on       máy tính: chiều cao mặt bàn / quầy nó đặt lên, tính từ sàn (150 — khớp bàn, quầy mặc định)
  *     image    máy tính: ảnh trên màn hình (đường dẫn / URL); laptop chỉ hiện khi `facing: 'viewer'`
- *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'
+ *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'; xe máy: 'right' (mặc định) | 'left'
  *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
  *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
  *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'
- * Trả về { svg, kind, seatY }. Host nên có cùng `bottom` và `height` với host của nhân vật.
+ * Trả về { svg, kind, seatY, notify }; xe máy thêm `rideLift(rig)` (nâng người lái bao nhiêu đơn vị khung để ngồi trên yên)
+ * và `roll(distance, duration, ease)` (timeline quay bánh khi xe đi `distance` đơn vị khung). Host nên có cùng `bottom` và
+ * `height` với host của nhân vật.
  */
 function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
@@ -7524,14 +7609,16 @@ function createProp(host, kind, options = {}) {
   if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
   if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
-  if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
+  if (kind === 'scooter') {
+    if (facing !== undefined && facing !== 'right' && facing !== 'left') throw new Error(`[character] prop "scooter": facing must be 'right' or 'left', got ${JSON.stringify(facing)}`);
+  } else if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
   if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
   if (on !== undefined && !(typeof on === 'number' && on >= 0)) throw new Error(`[character] prop "${kind}": on must be a number ≥ 0 (frame units above the floor), got ${JSON.stringify(on)}`);
   for (const [name, value] of Object.entries({ width, height, back }))
     if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
   const sitter = options.for;
   if (sitter !== undefined && typeof (sitter && sitter.seatY) !== 'function') throw new Error(`[character] prop "${kind}": \`for\` must be a person rig (createCharacter(...).rig)`);
-  const seat = sitter ? sitter.seatY() : SEAT_DEFAULT;
+  const seat = kind === 'scooter' ? SCOOTER_SEAT : sitter ? sitter.seatY() : SEAT_DEFAULT;
   const o = { seat, color, dark: shade(color, -0.28), line: shade(color, -0.55) };
   if (width !== undefined) o.w = width;
   if (height !== undefined) o.height = height;
@@ -7546,7 +7633,26 @@ function createProp(host, kind, options = {}) {
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
   const svg = host.firstElementChild;
-  return { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  if (kind === 'scooter') {
+    // Người cầm lái ngồi trên yên: rig ở thế `ride` có hông ở `rideSeatY()` khi chân chạm sàn — nâng nó lên bấy nhiêu đơn vị
+    // khung (nhân với chiều cao host / 470 để ra px) thì hông nằm trên mặt yên, chân đặt lên sàn để chân.
+    prop.rideLift = (rig) => {
+      if (typeof (rig && rig.rideSeatY) !== 'function') throw new Error('[character] prop "scooter": rideLift(rig) needs a person rig');
+      return Math.max(0, rig.rideSeatY() - SCOOTER_SEAT);
+    };
+    // BÁNH XE LĂN: xe đi được `distance` đơn vị khung (dương = về phía đầu xe) trong `duration` giây → mỗi bánh quay
+    // distance / bán kính. Trả về một timeline để đặt vào timeline của cảnh (cùng `ease` với chuyển động của xe).
+    prop.roll = (distance, duration, ease = 'power2.out') => {
+      const turn = distance / (SCOOTER_WHEEL_R * SCOOTER_K) * 180 / Math.PI, t = gsap.timeline();
+      svg.querySelectorAll('[data-wheel]').forEach((g) => {
+        const c = `${g.dataset.cx} ${g.dataset.cy}`;
+        t.fromTo(g, { attr: { transform: `rotate(0 ${c})` } }, { attr: { transform: `rotate(${turn.toFixed(2)} ${c})` }, duration, ease }, 0);
+      });
+      return t;
+    };
+  }
+  return prop;
 }
 
 /**
@@ -10823,7 +10929,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.73.0';
+const VERSION = '0.74.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

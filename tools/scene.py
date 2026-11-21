@@ -42,7 +42,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "panels": [ { "wall": "back", "at": -520, "y": 520, "width": 340, "height": 210 } ],
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
-                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left"), tree, lamp
+                      bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left"), tree, lamp,
+                      scooter ("facing": "right" | "left"); any cutout may "drive": { "from": -1500, "dur": 3.2, "ease" } in
+                      at the start (the conversation waits until it stops; a scooter's wheels turn)
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "preset": "reception" | "exam" | "pharmacy" | "living-room" | "park" | "street" — a ready-made room or an
            outdoor place (your boxes etc. are added). A person "seated": true with "on": "<box>" sits on that box's front edge
@@ -50,7 +52,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "light": "day" | "evening" | "night",  "lamps": [ { "name", "x", "y", "z", "color", "power", "on",
            "kind": "point" | "ceiling" } ] — a "lamp" cutout is a light too; a back-wall panel "window": true casts
            sunlight. "lamp": "on" / "off" / { "name", "on", "dur" } on a turn switches a lamp.
-  characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>";
+  characters take "x" (0 = middle of the room), "z" (negative = further in) and optionally "on": "<box name>",
+  or "rides": "<scooter cutout name>" (sits on it, moves with it; "getOff" steps down);
   a turn takes "view": { "yaw": -24, "distance": 980, "dur": 2 } or { "wide": true } (the whole room, long lens).
   The camera stays near eye level: pitch −8…15°, yaw within ±60°.
   Not combined with "props", "background", "camera", "layout": "presenter" or "shot". "enter" / "exit" walk through a side wall.
@@ -100,6 +103,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
                is added at the same time; a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
                together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
+               "ride" … "getOff": a person astride a scooter, side-on, hands on the bars. In a 3D set the easy way is
+               "rides": "<scooter cutout name>" on the character — seated on it from the first frame, "getOff" in
+               one of its turns steps it down beside the scooter (examples/scene-ride/scene.json).
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
@@ -170,10 +176,10 @@ def known(where, given, allowed):
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds', 'hook')
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side')
+CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
-PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door')
+PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door', 'facing')
 # Động tác mà bàn tay phải TỚI được đích: tới đầu / thân con vật, hay tới tay người kia (đợt 28: soát diễn xuất).
 # Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
 REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
@@ -265,10 +271,11 @@ SET_PRESETS = {
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall', 'gloss', 'skyline')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on')
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on', 'drive')
+DRIVE_KEYS = ('from', 'dur', 'ease')               # một cutout CHẠY VÀO đầu cảnh: từ x `from` tới x của nó trong `dur` giây
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
-FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
+FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
@@ -766,8 +773,18 @@ def main():
             if item.get('image') and not os.path.isfile(os.path.join(folder, item['image'])): fail(f'set.cutouts[{n}].image not found: {item["image"]} (looked in {folder})')
             for key in ('x', 'z'):
                 if not isinstance(item.get(key), (int, float)): fail(f'set.cutouts[{n}] needs a number "{key}"')
-            if ('screen' in item or 'facing' in item) and item.get('kind') not in SCREEN_KINDS: fail(f'set.cutouts[{n}]: "screen" and "facing" are for "laptop" and "monitor" only')
-            if 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop only)')
+            if 'screen' in item and item.get('kind') not in SCREEN_KINDS: fail(f'set.cutouts[{n}]: "screen" is for "laptop" and "monitor" only')
+            if 'facing' in item and item.get('kind') == 'scooter':
+                if item['facing'] not in ('right', 'left'): fail(f'set.cutouts[{n}].facing must be "right" or "left" (the way the scooter points)')
+            elif 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop) or "right" / "left" (scooter)')
+            if 'drive' in item:
+                drive = item['drive']
+                if not isinstance(drive, dict): fail(f'set.cutouts[{n}].drive must be {{ "from": <x>, "dur": <seconds>, "ease" }} — got {js(drive)}')
+                known(f'set.cutouts[{n}].drive', drive, DRIVE_KEYS)
+                if not isinstance(drive.get('from'), (int, float)): fail(f'set.cutouts[{n}].drive needs a number "from" (the x it starts at, e.g. -1300 — outside the left wall)')
+                if not isinstance(drive.get('dur', 3), (int, float)) or not 0.5 <= drive.get('dur', 3) <= 12: fail(f'set.cutouts[{n}].drive.dur must be 0.5…12 seconds')
+                if not isinstance(drive.get('ease', 'power2.out'), str): fail(f'set.cutouts[{n}].drive.ease must be a GSAP ease name such as "power2.out"')
+                if drive['from'] == item['x']: fail(f'set.cutouts[{n}].drive.from is its own x — nothing to drive')
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
             if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
             if 'on' in item and (item.get('kind') not in ('lamp', 'floorlamp') or item['on'] not in (True, False)): fail(f'set.cutouts[{n}].on is for a "lamp": true (lit) or false (off until a turn switches it on with "lamp")')
@@ -798,6 +815,7 @@ def main():
     width, height = int(scene.get('width', 1920)), int(scene.get('height', 1080))
     out = os.path.abspath(args.output or os.path.join(base, scene_id))
     copied = {}                                             # ảnh đã chép: nguồn → tên trong thư mục ra
+    drives = []                                             # cutout chạy vào đầu cảnh (`drive`) — hội thoại chờ chúng dừng
     # Cỡ mặc định theo KHUNG HÌNH: người cao 0,7 khung ngang (760 px ở 1920×1080), nhưng không rộng quá
     # ba phần tư bề ngang của khung dọc; thú bằng 0,43 người.
     person_default = round(min(0.7 * height, 0.75 * width))
@@ -828,7 +846,10 @@ def main():
         if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name): fail(f'character name "{name}" must be a plain identifier (letters, digits, underscore)')
         if bool(who.get('id')) == bool(who.get('species')): fail(f'character "{name}" needs either "id" (a person) or "species" (a pet)')
         pet = bool(who.get('species'))
-        if 'x' not in who: fail(f'character "{name}" needs "x" (where it stands, px from the left)')
+        if 'rides' in who:                                   # người cầm lái đứng theo xe (kiểm tra kỹ ở dưới)
+            ridden = next((item for item in (stage_set or {}).get('cutouts', []) if isinstance(item, dict) and item.get('name') == who['rides'] and isinstance(item.get('x'), (int, float))), None)
+            if ridden: who['x'] = ridden['x']
+        if 'x' not in who: fail(f'character "{name}" needs "x" (where it stands, px from the left)' + (' — or "rides" must name a scooter cutout' if 'rides' in who else ''))
         if who.get('enter') not in (None, False, True, 'left', 'right'): fail(f'character "{name}": "enter" must be "left", "right" or true (the nearer edge)')
         # `true` = mép GẦN chỗ đứng hơn: đi vào từ mép xa là băng ngang qua những nhân vật đứng giữa đường.
         nearer = 'left' if float(who['x']) < (0 if stage_set is not None else width / 2) else 'right'          # bối cảnh 3D: x = 0 là giữa phòng
@@ -836,6 +857,18 @@ def main():
         if not who.get('enter'): who.pop('enter', None)
         if late.get(name) is True: late[name] = nearer
         if pet and who.get('voice'): fail(f'character "{name}": a pet cannot have a "voice"')
+        # NGƯỜI CẦM LÁI (`rides`: tên một cutout xe máy): ngồi trên yên từ khung đầu, đi cùng xe; "getOff" trong lượt của mình
+        # thì bước xuống cạnh xe. Chỗ đứng (x, z) lấy theo xe — không cần ghi.
+        if 'rides' in who:
+            scooters = {item.get('name'): item for item in (stage_set or {}).get('cutouts', []) if item.get('kind') == 'scooter' and item.get('name')}
+            if stage_set is None: fail(f'character "{name}": "rides" needs a 3D set ("set") with a scooter cutout')
+            if pet: fail(f'character "{name}": a pet cannot ride — only people have the "ride" stance')
+            if who['rides'] not in scooters: fail(f'character "{name}": "rides" must name a set.cutouts item with "kind": "scooter" and a "name" (scooters here: {", ".join(scooters) or "none"}) — got {js(who["rides"])}')
+            for key in ('enter', 'on', 'seated'):
+                if who.get(key): fail(f'character "{name}": "rides" cannot be combined with "{key}"')
+            if name in late: fail(f'character "{name}" rides in — it cannot also "enter" on a turn')
+            if [w.get('name') for w in cast if w.get('rides') == who['rides']].index(name): fail(f'scooter "{who["rides"]}" has two riders — one per scooter')
+            who['x'], who['z'] = scooters[who['rides']]['x'], float(scooters[who['rides']]['z']) - 15
         if stage_set is None and ('z' in who or 'on' in who): fail(f'character "{name}": "z" and "on" place a character in a 3D set — add "set" at the top of the scene file')
         if stage_set is not None:
             if 'on' in who and who['on'] not in [box.get('name') for box in stage_set.get('boxes', [])]: fail(f'character "{name}": "on" must name one of set.boxes (got {js(who["on"])})')
@@ -1497,13 +1530,14 @@ def main():
     # ── đạo cụ ──
     props = []
     for index, prop in enumerate(scene.get('props', [])):
-        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale, carrier) and "x"')
+        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale, carrier, tree, lamp, scooter) and "x"')
+        if 'facing' in prop and (prop['kind'] != 'scooter' or prop['facing'] not in ('right', 'left')): fail(f'props[{index}].facing must be "right" or "left" (scooter only)')
         if 'fill' in prop and (prop['kind'] != 'bowl' or prop['fill'] not in ('food', 'water', 'empty')): fail(f'props[{index}].fill must be "food", "water" or "empty" (bowl only)')
         if 'reading' in prop and (prop['kind'] != 'scale' or not isinstance(prop['reading'], str)): fail(f'props[{index}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         known(f'props[{index}]', prop, PROP_KEYS)
         host_height = float(prop.get('height', person_default))
         props.append({'element': f'prop-{index + 1}-{prop["kind"]}', 'kind': prop['kind'], 'left': float(prop['x']) - host_height * PERSON[0] / PERSON[1] / 2, 'host_height': host_height,
-                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back', 'fill', 'reading', 'door') if key in prop}})
+                      'front': bool(prop.get('front')), 'options': {key: prop[key] for key in ('color', 'width', 'tabletop', 'back', 'fill', 'reading', 'door', 'facing') if key in prop}})
     for who in names.values():                              # ghế của người ngồi: cùng chỗ, cùng cỡ với người ấy
         if who.get('seated') in ('chair', 'stool'):
             who['_seat'] = {'element': f'{who["_element"]}-{who["seated"]}', 'kind': who['seated'], 'left': who['_left'] + (who['_walk'] * who['_unit']), 'host_height': who['_host_height']}
@@ -1618,11 +1652,25 @@ def main():
             tone = {'top': item.get('top', '#f1f4f5'), 'front': colour, 'side': item.get('side', colour)}
             numbers = ', '.join(f"{key}: {item[key]:g}" for key in ('x', 'z', 'width', 'depth', 'height', 'y') if key in item)
             setup.append(f"    const box{n + 1} = set.box({{ {numbers}, colors: {js(tone)}" + (f", name: {js(item['name'])}" if item.get('name') else '') + " });")
+        riders = {who['rides']: who for who in names.values() if who.get('rides')}
         for n, item in enumerate(stage_set.get('cutouts', [])):
             # Tấm hình phẳng đứng trong phòng (đạo cụ vẽ sẵn hay ảnh) — đặt sát máy quay là có tiền cảnh.
             # Máy tính vẽ trong CÙNG khung với người (400 × 470): mặc định cao bằng người, để nó cùng tỉ lệ với nhân vật.
             tall = float(item.get('height', round(person_default * (1 if item.get('kind') in SCREEN_KINDS + FLOOR_KINDS else 0.74))))
-            where_ = ', '.join(f"{key}: {float(item[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
+            rider = riders.get(item.get('name')) if item.get('kind') == 'scooter' else None
+            if item.get('kind') == 'scooter' and 'height' not in item:
+                # Xe máy vẽ trong khung người: cùng chiều cao host với người lái (cùng đơn vị), không có người lái thì bằng
+                # người mặc định của bối cảnh 3D.
+                tall = rider['_host_height'] if rider else round(person_default * 0.74)
+            if item.get('drive'):
+                item['drive'] = dict({'dur': 3, 'ease': 'power2.out'}, **item['drive'])
+                item['_n'], item['_tall'] = n + 1, tall
+                if item.get('kind') == 'scooter' and 'facing' not in item: item['facing'] = 'right' if item['drive']['from'] < item['x'] else 'left'
+                drives.append(item)
+            if rider: rider['_scooter'] = dict(item, _n=n + 1, _tall=tall)
+            start_x = dict(item, x=item['drive']['from']) if item.get('drive') else item
+            where_ = ', '.join(f"{key}: {float(start_x[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
+            spot = f"const cutout{n + 1}Spot = " if item.get('drive') or rider else ''
             if item.get('kind'):
                 options = {'color': item.get('color')}
                 if item['kind'] in SCREEN_KINDS:
@@ -1634,9 +1682,10 @@ def main():
                         options['image'] = name
                 for key in ('fill', 'reading', 'door'):
                     if key in item: options[key] = item[key]
+                if item['kind'] == 'scooter' and item.get('facing'): options['facing'] = item['facing']
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
-                setup.append(f"    const cutout{n + 1} = document.createElement('div'), cutout{n + 1}Prop = VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); set.stand(cutout{n + 1}, {{ {where_} }});" + (f"          // {item['name']}" if item.get('name') else ''))
+                setup.append(f"    const cutout{n + 1} = document.createElement('div'), cutout{n + 1}Prop = VGCharacter.createProp(cutout{n + 1}, {js(item['kind'])}{look}); {spot}set.stand(cutout{n + 1}, {{ {where_} }});" + (f"          // {item['name']}" if item.get('name') else ''))
             else:
                 name = copy_asset(base, out, item['image'], copied)
                 # Kích thước ảnh ghi sẵn: set.stand đo phần tử để căn giữa và đặt chân — ảnh chưa tải xong thì rộng 0, nên khung
@@ -1644,7 +1693,7 @@ def main():
                 size = image_size(os.path.join(out, name))
                 dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
                 if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
-                setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} set.stand(cutout{n + 1}, {{ {where_} }});")
+                setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} {spot}set.stand(cutout{n + 1}, {{ {where_} }});")
         # ÁNH SÁNG: giờ trong ngày + đèn. Cây đèn đường / đèn cây có trong bối cảnh (cutout "lamp") tự là một nguồn sáng ở
         # chỗ bóng đèn của nó (554 / 470 chiều cao khung); "lamps" thêm đèn tuỳ ý (đèn trần: "kind": "ceiling").
         lamps = [dict(item) for item in stage_set.get('lamps', [])]
@@ -1868,25 +1917,34 @@ def main():
                 if abs(float(box['height']) - seat_height) > 30: notes.append(f'character "{who["name"]}" sits on "{who["on"]}", which is {float(box["height"]):g} high — the seat of a character this size is about {seat_height:.0f}; make the box about that high, or the character floats above it / sinks into it')
             # Chỗ đứng LÚC ĐẦU (`_x0`): `who['x']` đã bị các lượt "bước lại gần" trong kịch bản cập nhật thành chỗ đứng sau
             # cùng — đặt nhân vật ở đó rồi cho nó bước thêm là nó đi quá, đứng chồng lên người kia.
-            # Con vật một người NGỒI vuốt / bế (đợt 31): vẽ TRÊN người ấy (`over`) — đứng trước hai ống chân, không khuất sau chúng;
-            # bàn tay nhắm ĐỈNH ĐẦU nó ('crown'). Giữ nguyên z: dời nó lại gần máy thì người khác (bé quỳ vuốt nó) với tay trong mặt
-            # phẳng của mình, lơ lửng trên đầu nó.
-            over = f", over: {who['_front']['name']}" if who.get('_front') is not None else ''
-            # CÙNG CHIỀU SÂU với người ngồi vuốt nó (đợt 32) — khi chỉ người ấy với tay tới nó: thứ tự lớp đã do `over` lo, còn đứng
-            # gần máy hơn 28–48 đơn vị thì ở góc trung đầu nó hiện thấp hơn / lệch ngang 4–6 đơn vị khung so với chỗ bàn tay (rig 2D
-            # vươn trong mặt phẳng của mình): bàn tay vuốt hở trên đầu nó.
-            front = who.get('_front')
-            if front is not None and who.get('_reachers', set()) <= {front['name']}:
-                depth_z = plane_of(front)
-            # HAI NGƯỜI ở hai chiều sâu cùng với tới con vật (đợt 33): nó đứng ở mặt phẳng của người đang với tới — lúc đầu là người
-            # thứ nhất, rồi dời sang mặt phẳng người kế ngay trước lượt của họ (`set.depth`, xem `depth_code`). Giữ z riêng thì ở góc
-            # trung đầu nó lệch 4–6 đơn vị khung so với bàn tay (bà ngồi sofa vuốt mèo, rồi bé quỳ cho ăn: 0 % tay chạm đầu mèo).
-            hops = pet_depths.get(who['name']) if who['_pet'] else None
-            if hops: depth_z = hops[0][1]
-            setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
+            if who.get('_scooter'):
+                # Ngồi trên yên: đặt ở chỗ xe XUẤT PHÁT, nâng lên `rideLift` (đơn vị khung → px), thế cầm lái từ khung đầu,
+                # quay theo hướng xe chạy — trước khi dựng hội thoại (các lượt của nó bắt đầu từ thế ấy).
+                ride = who['_scooter']; start = ride['drive']['from'] if ride.get('drive') else float(ride['x'])
+                setup.append(f"    const {who['name']}Spot = set.place({who['name']}, {{ x: {start:g}, z: {depth_z:g}, height: {who['_host_height']:g} }});")
+                setup.append(f"    {who['name']}Spot.y = cutout{ride['_n']}Prop.rideLift({who['name']}) * {who['_host_height']:g} / {PERSON[1]};   // on the seat of {ride['name']}")
+                setup.append(f"    {who['name']}.state.ride = 1; {who['name']}.state.facing = {-1 if ride.get('facing') == 'left' else 1};      // riding")
+            else:
+                # Con vật một người NGỒI vuốt / bế (đợt 31): vẽ TRÊN người ấy (`over`) — đứng trước hai ống chân, không khuất sau chúng;
+                # bàn tay nhắm ĐỈNH ĐẦU nó ('crown'). Giữ nguyên z: dời nó lại gần máy thì người khác (bé quỳ vuốt nó) với tay trong mặt
+                # phẳng của mình, lơ lửng trên đầu nó.
+                over = f", over: {who['_front']['name']}" if who.get('_front') is not None else ''
+                # CÙNG CHIỀU SÂU với người ngồi vuốt nó (đợt 32) — khi chỉ người ấy với tay tới nó: thứ tự lớp đã do `over` lo, còn đứng
+                # gần máy hơn 28–48 đơn vị thì ở góc trung đầu nó hiện thấp hơn / lệch ngang 4–6 đơn vị khung so với chỗ bàn tay (rig 2D
+                # vươn trong mặt phẳng của mình): bàn tay vuốt hở trên đầu nó.
+                front = who.get('_front')
+                if front is not None and who.get('_reachers', set()) <= {front['name']}:
+                    depth_z = plane_of(front)
+                # HAI NGƯỜI ở hai chiều sâu cùng với tới con vật (đợt 33): nó đứng ở mặt phẳng của người đang với tới — lúc đầu là người
+                # thứ nhất, rồi dời sang mặt phẳng người kế ngay trước lượt của họ (`set.depth`, xem `depth_code`). Giữ z riêng thì ở góc
+                # trung đầu nó lệch 4–6 đơn vị khung so với bàn tay (bà ngồi sofa vuốt mèo, rồi bé quỳ cho ăn: 0 % tay chạm đầu mèo).
+                hops = pet_depths.get(who['name']) if who['_pet'] else None
+                if hops: depth_z = hops[0][1]
+                setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
-                   'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door')}
+                   'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door'),
+                   'facing': prop['options'].get('facing')}
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
         if who.get('_seat') and stage_set is not None:
@@ -1897,7 +1955,7 @@ def main():
         if who.get('seated') and not who['_pet']:
             setup.append(f"    {who['name']}.state.seat = 1;                 // already seated in the first frame")
         # Người có mặt từ đầu thì ĐÃ quay về phía người mình nhìn ngay ở khung 0 — không tốn một nhịp quay mặt đầu cảnh.
-        if who.get('faces') and not who.get('enter') and not who['_late']:
+        if who.get('faces') and not who.get('enter') and not who['_late'] and not who.get('rides'):
             toward = -1 if names[who['faces']]['_x0'] < who['_x0'] else 1          # chỗ đứng LÚC ĐẦU, không phải sau các lượt bước lại gần
             setup.append(f"    {who['name']}.state.facing = {toward if who['_pet'] else toward * 0.55};            // already turned toward {who['faces']}")
         elif who.get('seated') and not who['_pet'] and stage_set is not None and not who['_late']:
@@ -1962,7 +2020,7 @@ def main():
             card_clip('cta', f'position: absolute; left: 50%; top: {round(height * (top + 0.36))}px; transform: translateX(-50%); padding: {round(unit * 0.018)}px {round(unit * 0.05)}px; border-radius: 999px; background: #ffffff; color: {colour}; font-family: system-ui, sans-serif; font-weight: 800; font-size: {round(unit * 0.04)}px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);', content=html_text(card['cta']))
         if which == 'intro':
             intro_dur = dur
-            card_lines.append(f"    // Opening card: the words come in, then the whole card fades into the scene.\n    gsap.utils.toArray('.card-intro:not(#intro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, 0.15 + n * 0.15));\n    tl.to('.card-intro', {{ opacity: 0, duration: 0.45, ease: 'power1.in' }}, T0 - 0.45);")
+            card_lines.append(f"    // Opening card: the words come in, then the whole card fades into the scene.\n    gsap.utils.toArray('.card-intro:not(#intro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, 0.15 + n * 0.15));\n    tl.to('.card-intro', {{ opacity: 0, duration: 0.45, ease: 'power1.in' }}, TI - 0.45);")
         else:
             card_lines.append(f"    // Closing card after the last turn: it fades in over the scene, then the words come in.\n    tl.from('#outro-bg', {{ opacity: 0, duration: 0.5 }}, T1); gsap.utils.toArray('.card-outro:not(#outro-bg)').forEach((el, n) => tl.from(el, {{ opacity: 0, y: 30, duration: 0.5, ease: 'power2.out' }}, T1 + 0.3 + n * 0.15));\n    tl.to({{}}, {{ duration: {dur:g} }}, T1);")
     # MỞ ĐẦU KIỂU "HOOK" (`"hook": { "title", "text", "dur" }`): chữ lớn BẬT lên đè trên cảnh đầu đang diễn rồi tắt — video
@@ -2020,6 +2078,30 @@ def main():
     if toasts: caption_code += "\n    // Notification cards slide in at their data-start and out before their clip ends (tools/scene.py fills both in).\n    document.querySelectorAll('.toast').forEach((element) => { const start = +element.dataset.start, end = start + +element.dataset.duration; tl.from(element, { opacity: 0, y: -30, duration: 0.4, ease: 'back.out(1.6)' }, start); tl.to(element, { opacity: 0, y: -16, duration: 0.3, ease: 'power2.in' }, end - 0.3); });"
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
+    # ── XE CHẠY VÀO (`drive` trên một cutout) và NGƯỜI CẦM LÁI (`rides`) ── xe trượt từ `from` tới chỗ của nó (giảm tốc như
+    # phanh), bánh xe máy quay theo quãng đường; người lái ngồi trên yên đi cùng. Hội thoại bắt đầu khi mọi xe đã dừng
+    # (T0 = thẻ mở đầu + lâu nhất + 0,3 s). "getOff" của người lái — ở lượt nào cũng được — là lúc người ấy bước xuống
+    # đất cạnh xe: hạ người đúng lúc động tác ấy chạy (hạ trước thì có lúc người ngồi bệt dưới đất).
+    drive_wait = max([item['drive']['dur'] for item in drives], default=-0.3) + 0.3
+    ride_lines = []
+    for item in drives:
+        n, d = item['_n'], item['drive']
+        ride_lines.append(f"    tl.fromTo(cutout{n}Spot, {{ x: {d['from']:g} }}, {{ x: {float(item['x']):g}, duration: {d['dur']:g}, ease: {js(d['ease'])} }}, TI);" + (f"          // {item['name']} drives in" if item.get('name') else ''))
+        if item.get('kind') == 'scooter':
+            ahead = (float(item['x']) - d['from']) * (-1 if item.get('facing') == 'left' else 1)
+            ride_lines.append(f"    tl.add(cutout{n}Prop.roll({ahead / (item['_tall'] / PERSON[1]):.1f}, {d['dur']:g}, {js(d['ease'])}), TI);          // its wheels turn")
+    for who in names.values():
+        ride = who.get('_scooter')
+        if not ride: continue
+        d, end = ride.get('drive'), float(ride['x'])
+        if d: ride_lines.append(f"    tl.fromTo({who['name']}Spot, {{ x: {d['from']:g} }}, {{ x: {end:g}, duration: {d['dur']:g}, ease: {js(d['ease'])} }}, TI);          // {who['name']} rides with it")
+        side, step = (-1 if ride.get('facing') == 'left' else 1), 0.42 * who['_host_height']
+        ride_lines.append(f"    {{ const off = talk.turns.filter((turn) => turn.rig === {who['name']}).flatMap((turn) => turn.steps).find((step) => step.name === 'getOff');          // {who['name']} gets off: down beside the scooter\n"
+                          f"      if (off) tl.to({who['name']}Spot, {{ x: {end + side * step:.0f}, y: 0, z: {float(ride['z']) + 70:g}, duration: 0.55, ease: 'power1.inOut' }}, T0 + off.start); }}")
+    ride_code = ("\n    // Vehicles drive in after the opening card; riders sit on them and get off with \"getOff\".\n" + "\n".join(ride_lines)) if ride_lines else ''
+    t0_code = (f"    const TI = {intro_dur:g}, T0 = TI + {drive_wait:g};       // the opening card (0 = none), then vehicles drive in; the conversation starts at T0" if drives
+               else f"    const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)\n    const TI = T0;")
+
     timeline_hook, view_code, drive_code = '', '', ''
     # CHIỀU SÂU CON VẬT THEO LƯỢT (đợt 33): dời nó sang mặt phẳng người kế với tới — thêm TRƯỚC khi máy quay tự đặt góc (`direct` tua
     # timeline để đo khung), tạm là 0,45 s ngay trước lượt ấy; sau `direct`, `settleDepths` dời nó vào lần CẮT CẢNH muộn nhất từ lúc
@@ -2128,8 +2210,8 @@ def main():
     ], {{ {camera_code}gap: {float(scene.get('gap', 0.25))} }});
 
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
-    const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
-    talk.addTo(tl, T0);
+{t0_code}
+    talk.addTo(tl, T0);{ride_code}
 {depth_code}{view_code}{settle_code}{caption_code}{card_code}{drive_code}
 {framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
