@@ -3034,23 +3034,27 @@ class RigSVG {
    * REO MỪNG: hai tay giơ cao, nhún lên hai lần, mặt rạng rỡ. Động tác toàn thân duy nhất để tỏ ra
    * vui — nét mặt và ngón cái thì quá nhỏ trong cảnh toàn. Đang ngồi thì chỉ giơ tay, không nhún.
    * Tay nào đang cầm đồ thì giữ nguyên, chỉ tay kia giơ lên.
+   * `{ narrow: true }` — REO HẸP cho khung dọc (đợt 34): hai nắm tay giơ lên cạnh vai, khuỷu sát thân, đấm nhẹ lên hai
+   * nhịp ("yes!"), thay cho chữ V dang rộng — bề ngang chỉ cỡ cái đầu, nên góc trung khung dọc giữ được cả hai tay.
    */
-  cheer() {
+  cheer({ narrow = false } = {}) {
     const t = this.tl(), s = this.s;
     this.#openUp(t);
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
     const up = {};
     // Giơ thành chữ V mở rộng, không giơ thẳng đứng: đầu chibi to hơn tầm với của tay (nhất là trẻ em),
-    // giơ thẳng thì hai tay khuất sau đầu hoặc trông như đang bịt tai.
-    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = 122; up['cang' + side] = 6; }
-    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, 'xoe'])), 0);
+    // giơ thẳng thì hai tay khuất sau đầu hoặc trông như đang bịt tai. Bản hẹp: cánh tay 70° ra ngoài, cẳng tay gập
+    // thêm 108° — cẳng tay gần thẳng đứng, nắm tay ngang cằm, không che mặt.
+    const [upper, fore, pump] = narrow ? [70, 108, 14] : [122, 6, 26];
+    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = upper; up['cang' + side] = fore; }
+    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, narrow ? 'nam' : 'xoe'])), 0);
     t.to(s, { ...Object.fromEntries(Object.keys(up).map((key) => [key, key.startsWith('bat') ? -4 : 24])), dauY: 3, duration: 0.14, ease: 'power1.in' }, 0);     // lấy đà
     t.to(s, { ...up, vai: -5, dau: -3, dauY: 0, cuoi: 1, mieng: 0.55, mayL: 0.9, mayR: 0.9, duration: 0.36, ease: 'back.out(1.6)' }, 0.14);
     const hop = s.seat > 0.5 ? 0 : -16;                                            // y âm là lên
     for (let i = 0; i < 2; i++) {
       t.to(s, { y: hop, duiL: 0, duiR: 0, duration: 0.17, ease: 'power2.out' }, 0.42 + i * 0.42)
        .to(s, { y: 0, duration: 0.2, ease: 'power2.in' }, 0.59 + i * 0.42);
-      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: 26, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
+      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: narrow ? fore + pump : pump, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
     }
     this.#chop(t, 0.9);
     this.#khep(t, 0.5, 1.4, { y: 0 });
@@ -9090,7 +9094,24 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const walk = (walks ? walks(move.rig) : []).filter(([a, b]) => b > from && a < to).sort((x, y) => y[0] - x[0])[0];
         if (walk) {
           const a = Math.max(walk[0], from), b = Math.min(walk[1], to);
-          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a; continue;
+          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a;
+          // THEO BƯỚC CHÂN (đợt 34): bước `walk` có quãng quay đầu, đứng lấy đà, khép chân — x đứng yên ở đó; trải đều z theo thời
+          // gian thì con vật vẫn trôi về phía máy lúc chân chưa bước (15 khung). Lấy mẫu x của chính nó suốt bước đi (tua timeline),
+          // rồi cho z đi theo đúng phần x đã đi: chân đứng thì z đứng.
+          const tl = move.tween.parent, actor = actors.find((item) => item.rig === move.rig);
+          if (tl && actor && typeof tl.seek === 'function') {
+            const n = Math.max(2, Math.ceil((b - a) * 30)), xs = [], back = tl.time();
+            for (let i = 0; i <= n; i++) { tl.seek(a + (b - a) * i / n, false); xs.push(move.rig.s.x || 0); }
+            tl.seek(back, false);
+            const x0 = xs[0], x1 = xs[n];
+            if (Math.abs(x1 - x0) > 1e-3) {
+              const ease = (p) => { const f = Math.min(n, Math.max(0, p * n)), k = Math.min(n - 1, Math.floor(f)), x = xs[k] + (xs[k + 1] - xs[k]) * (f - k);
+                return Math.min(1, Math.max(0, (x - x0) / (x1 - x0))); };
+              const tween = gsap.to(actor.spot, { z: move.z, duration: Math.max(0.05, b - a), ease, immediateRender: false });
+              tl.remove(move.tween); tl.add(tween, a); move.tween = tween;
+            }
+          }
+          continue;
         }
         move.how = 'slide'; move.at = move.tween.startTime();
       }
