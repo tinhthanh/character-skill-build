@@ -30,6 +30,10 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
     phải TV, không ai ngồi / đứng trên nó) được lẹm mép, trừ ở khoảnh khắc mở cảnh.
   • TAY VUỐT (đợt 32): ở mọi mốc mỗi 0,1 s suốt các lần vuốt, bàn tay sát con vật (≥ 5 % trong 3 px quanh hình nó) và không
     lún qua viền nó quá 25 % — không chỉ ở lúc được hỏi.
+  • TAY TRONG KHUNG (đợt 33): ở lúc được hỏi của mỗi động tác tay (vẫy, chỉ, giơ ngón, reo…), hai bàn tay của người làm nằm
+    trọn trong khung — không lẹm mép trái / phải / trên (góc trung khung dọc theo đầu + thân áo để tay ra ngoài mép).
+  • PHẢN ỨNG CON VẬT (đợt 33): lượt của con vật (sợ, giật mình…) — nó nằm trong khung ở lúc giữa lượt; theo ngay sau góc chèn con
+    vật (sau góc đơn người làm) thì góc chèn giữ tới hết lượt ấy.
   • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`). Đợt 32: góc trung
     bị giữ thành góc toàn cũng là hỏng; dòng cuối đếm số góc như thế.
 """
@@ -232,7 +236,7 @@ def pet_pixels(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -357,6 +361,64 @@ def check_shots(folder, log):
     return results
 
 
+HAND_IN = 2           # bàn tay đang làm động tác: cách mép trái / phải / trên của khung ít nhất 2 px (đợt 33)
+
+
+def frame_size(folder):
+    """Bề ngang, bề cao của khung (data-width / data-height của cảnh)."""
+    html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
+    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
+    return (int(size.group(1)), int(size.group(2))) if size else (1920, 1080)
+
+
+def check_gesture(folder, c, frames):
+    """ĐỘNG TÁC TAY (đợt 33): ở lúc được hỏi (lúc giữa), hai bàn tay của người đang vẫy / chỉ / giơ ngón nằm trọn trong khung —
+    không lẹm mép trái, phải, trên. Bàn tay ở dưới mép dưới (góc trung cắt ngang hông, tay buông) thì thôi."""
+    W, H = frame_size(folder)
+    t = c['times'][len(c['times']) // 2]
+    who = frames[len(c['times']) // 2].get(c['who'])
+    if not who or not who.get('hands'): return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': None, 'note': 'not in the frame'}]
+    out = []
+    for hand in who['hands']:
+        box = hand.get('box')
+        if not box or box['y0'] >= H: continue
+        over = max(HAND_IN - box['x0'], box['x1'] - (W - HAND_IN), HAND_IN - box['y0'], 0)
+        if over > 0: out.append((hand['side'], over, 'left' if box['x0'] < HAND_IN else 'right' if box['x1'] > W - HAND_IN else 'top', box))
+    if not out:
+        return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': True, 'note': f'both hands inside the frame at {t:g} s, the moment asked about'}]
+    side, over, edge, box = max(out, key=lambda item: item[1])
+    width = max(1, box['x1'] - box['x0'])
+    return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': False, 'over': round(over / width, 3),
+             'note': f'the {"left" if side == "L" else "right"} hand reaches {over / width * 100:.0f} % of its width past the {edge} edge at {t:g} s, the moment asked about'}]
+
+
+INSERT_GAP = 3.0      # phản ứng bắt đầu trong 3 s sau lúc cắt sang góc chèn con vật: là phản ứng với động tác vừa rồi (đợt 33)
+
+
+def check_reaction(folder, c, frames, log):
+    """PHẢN ỨNG CỦA CON VẬT (đợt 33): (1) ở lúc giữa lượt của nó, ≥ 70 % khung thân nó nằm trong khung hình; (2) lượt ấy theo ngay
+    sau một góc CHÈN con vật (`shotLog[…].then` — góc đơn người làm rồi cắt sang con vật): góc chèn giữ tới hết lượt (`until`), không
+    cắt sang góc khác giữa chừng."""
+    W, H = frame_size(folder)
+    out, t = [], c['times'][len(c['times']) // 2]
+    pet = frames[len(c['times']) // 2].get(c['who'])
+    box = pet and (pet.get('body') or pet.get('face'))
+    if box:
+        area = max(1, (box['x1'] - box['x0']) * (box['y1'] - box['y0']))
+        seen = max(0, min(box['x1'], W) - max(box['x0'], 0)) * max(0, min(box['y1'], H) - max(box['y0'], 0)) / area
+        out.append({'scene': folder, 'what': f'{c["who"]} reacts in the frame', 'ok': seen >= 0.7, 'note': f'{seen * 100:.0f} % of {c["who"]} in the frame at {t:g} s, the moment asked about (least 70 %)'})
+    else:
+        out.append({'scene': folder, 'what': f'{c["who"]} reacts in the frame', 'ok': False, 'note': f'{c["who"]} not drawn at {t:g} s'})
+    for shot in log or []:
+        then = shot.get('then')
+        if not then or c['who'] not in then.get('subjects', []) or not (then['t'] <= c['start'] <= then['t'] + INSERT_GAP): continue
+        until = then.get('until')
+        held = until is not None and until >= c['end'] - 0.1
+        out.append({'scene': folder, 'what': f'{c["who"]} reacts within the insert of {c["who"]} at {then["t"]:g} s', 'ok': held,
+                    'note': f'the insert holds to {until:g} s, the reaction ends at {c["end"]:g} s' if until is not None else f'the insert ends at the end of the beat — the reaction ({c["start"]:g}–{c["end"]:g} s) plays in the next shot'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
@@ -378,6 +440,12 @@ def check_scene(folder):
             continue
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
+            continue
+        if c['kind'] == 'gesture':
+            results.extend(check_gesture(folder, c, frames))
+            continue
+        if c['kind'] == 'reaction':
+            results.extend(check_reaction(folder, c, frames, log))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):

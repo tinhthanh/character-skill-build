@@ -1,4 +1,4 @@
-/* VGCharacter v0.72.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.73.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -6058,6 +6058,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       if (over) { actors.find((actor) => actor.rig === rig).over = over; set.update(); }
       return spot;
     },
+    depth(rig, z, duration = 0.45, ease = 'sine.inOut') {
+      const actor = actors.find((item) => item.rig === rig);
+      if (!actor) throw new Error('[character] set.depth(rig, z): rig must be placed with set.place()');
+      if (typeof z !== 'number' || !isFinite(z)) throw new Error(`[character] set.depth(rig, z): z must be a number — got ${z}`);
+      return gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+    },
     stand(element, { x = 0, z = 0, y = 0, height = null, ground = null, shadow = true } = {}) {
       if (!element || !element.style) throw new Error('[character] set.stand(element, …): pass an element');
       const prop = element.querySelector && element.querySelector('svg[data-prop]');
@@ -6469,7 +6475,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -6516,8 +6522,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
-      const solve = (region, share = fill) => {
-        const across = H > W * 1.2 ? 0.9 : 0.75;
+      const solve = (region, share = fill, wide = null) => {
+        const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
         const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (share * H), (region.x1 - region.x0) / (across * W)));
         const middle = H > W * 1.2 ? 0.55 : 0.5;
         return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
@@ -6525,7 +6531,42 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const zMean = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
       const deeper = (m) => { const r = regionOf(m), nearer = Math.max(0, m.z - zMean); return nearer > 40 ? { ...r, y0: r.y0 - nearer * 0.35 } : r; };
       let region = shots.map(deeper).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
+      let reach = null;
+      if (Array.isArray(hands) && hands.length && seek && size !== 'full') {
+        const people = wanted.filter((actor) => actor.rig && typeof actor.rig.seatY === 'function' && actor.rig.el);
+        for (const time of hands) {
+          seek(time);
+          for (const actor of people) {
+            const host = actor.host, hidden = host.style.display === 'none';
+            if (!host.contains(actor.rig.svg)) continue;
+            if (hidden) host.style.display = '';
+            const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect();
+            if (!at.scale) { if (hidden) host.style.display = 'none'; continue; }
+            const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
+            for (const key of ['coTayL', 'coTayR']) {
+              const el = actor.rig.el[key];
+              if (!el) continue;
+              const r = drawnRect(el);
+              if (!r.width) continue;
+              const x0 = toX(r.left), x1 = toX(r.right), top = toY(r.top), pad = (x1 - x0) * 0.15;
+              if (toY(r.bottom) < region.y0) continue;                                       // dưới đáy khung (tay buông dưới hông)
+              reach = { ...(reach || region), x0: Math.min((reach || region).x0, x0 - pad), x1: Math.max((reach || region).x1, x1 + pad), y1: Math.max((reach || region).y1, top + pad) };
+            }
+            if (hidden) host.style.display = 'none';
+          }
+        }
+        if (timed) seek(at[0]);
+      }
       let cam = solve(region);
+      if (reach && (reach.x0 < region.x0 || reach.x1 > region.x1 || reach.y1 > region.y1)) {
+        const loose = solve(reach, 0.92, 0.94), middle = H > W * 1.2 ? 0.55 : 0.5;
+        const distance = Math.max(cam.distance, Math.min(loose.distance, limit)), half = (W / 2) * distance / k * 0.97;
+        const x = Math.min(Math.max((reach.x0 + reach.x1) / 2, region.x1 - half), region.x0 + half);
+        const fits = distance >= loose.distance;
+        cam = { x: region.x1 - region.x0 <= 2 * half ? x : (region.x0 + region.x1) / 2, y: (reach.y0 + reach.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
+        cam.y = Math.max(cam.y, region.y1 - 0.55 * H * distance / k);
+        if (fits) region = reach;
+      }
       if (lighting && size !== 'close') for (const lamp of lighting.lamps) {
         const reach = size === 'full' ? 900 : 500;
         if ((lamp.level < 0.5 && !lamps) || (lamp.kind === 'screen' && !(lamps && lighting.mood.name !== 'day')) || lamp.x < region.x0 - reach || lamp.x > region.x1 + reach) continue;      // `lamps`: lượt bật / tắt đèn — lấy cả đèn đang tắt
@@ -6724,10 +6765,32 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
         return v;
       };
+      const handsInside = (v, subjects, times) => {
+        const kept = { ...camera }, W = view.clientWidth, H = view.clientHeight, box = view.getBoundingClientRect();
+        let inside = true;
+        trial = { ...v };
+        for (const time of times) {
+          tl.seek(time, false); set.update();
+          for (const rig of subjects) {
+            if (typeof rig.seatY !== 'function' || !rig.el) continue;
+            for (const key of ['coTayL', 'coTayR']) {
+              const el = rig.el[key], r = el && drawnRect(el);
+              if (!r || !r.width) continue;
+              const x0 = (r.left - box.left) * W / box.width, x1 = (r.right - box.left) * W / box.width, y0 = (r.top - box.top) * H / box.height;
+              if (y0 >= H) continue;
+              if (x0 < 2 || x1 > W - 2 || y0 < 2) inside = false;
+            }
+          }
+        }
+        trial = null; Object.assign(camera, kept); set.update();
+        return inside;
+      };
       let shot = null;
       for (const [index, beat] of beats.entries()) {
         if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
-        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects)) continue;
+        if (shot && shot.insert && shot.until && beat.time < shot.until - 0.05 && beat.subjects.every((rig) => shot.subjects.includes(rig))) continue;
+        const gesture = beat.size !== 'full' && Array.isArray(beat.hands) && beat.hands.length ? beat.hands : null;
+        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects) && (!gesture || !shot.values || handsInside(shot.values, beat.subjects, gesture))) continue;
         let at = beat.time;
         const hold = beat.speech || beat.move || (shot && shot.insert) ? Math.min(minShot, 1.0) : minShot;
         if (shot && at - shot.at < hold) at = shot.at + hold;
@@ -6735,7 +6798,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (at > beat.end - 0.8 || (next && at > next.time - 0.8)) continue;              // không kịp: giữ góc đang có
         let values;
         const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
-        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); }, hands: gesture }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         if (beat.size === 'full' && tallView && beat.subjects.some((rig) => typeof rig.seatY === 'function')) {
           const cut = edgeCut(values);
           if (cut.length) {
@@ -6755,7 +6818,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           try { full = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek }); } catch (error) { full = null; }
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
-            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
+            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { loose = null; }
             const usable = (v, sliver = false) => {
               if (!v) return false;
               const frame = set.lastFrame, cut = edgeCut(v).filter((p) => !(sliver && p.shown < 0.35)), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
@@ -6771,9 +6834,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if ((got = judged('loose', loose))) { values = got; how = 'loose'; }
             else {
               let moment = null;
-              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
+              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { moment = null; }
               if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
-              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true }); } catch (error) { return null; } })()))) {
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
                 values = got; how = 'core';
                 const roomier = { ...got, distance: +Math.max(got.distance, full.distance * 0.75).toFixed(1) };
                 if (roomier.distance > got.distance) { const r = usable(roomier, true); if (r && r.ok) { values = roomier; tries.core.widened = r.ratio; } }
@@ -6788,9 +6851,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                   values = got; how = 'single';
                   const others = beat.subjects.filter((rig) => rig !== actor), cutAt = Math.max(at + 1.2, (at + beat.end) / 2);
                   if (others.length && cutAt <= beat.end - 1.2 && !(next && cutAt > next.time - 0.8)) {
+                    const after = beats[index + 1], through = after && !after.fixed && after.subjects.length && after.subjects.every((rig) => others.includes(rig)) && !(next && after.time >= next.time) ? after : null;
+                    const when = [(cutAt + beat.end) / 2].concat(through ? [(through.time + through.end) / 2] : []);
                     let pet = null;
-                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: [(cutAt + beat.end) / 2], seek }); } catch (error) { pet = null; }
-                    if (pet) reaction = { values: pet, at: cutAt, subjects: others };
+                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: when, seek }); } catch (error) { pet = null; }
+                    if (pet) { seek(when[when.length - 1]); reaction = { values: nudge(pet, others), at: cutAt, subjects: others, until: through ? through.end : beat.end }; }
                   }
                 }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
@@ -6799,8 +6864,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,
-                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries,
-                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
+                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries, ...(gesture ? { hands: handsInside(values, beat.subjects, gesture) } : {}),
+                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), until: +reaction.until.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
         values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1));
@@ -6808,8 +6873,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
         if (beat.drift) tl.add(set.move({ distance: +(values.distance * 1.14).toFixed(1) }, Math.max(0.5, Math.min(beat.drift, beat.end - at)), 'sine.inOut'), at + 0.05);
-        shot = { subjects: beat.subjects, size, at };
-        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true }; }
+        shot = { subjects: beat.subjects, size, at, values };
+        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true, until: reaction.until, values: reaction.values }; }
       }
       tl.seek(0, false); set.update();
       return cuts;
@@ -7196,7 +7261,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.72.0';
+const VERSION = '0.73.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

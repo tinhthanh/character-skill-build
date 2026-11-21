@@ -714,6 +714,49 @@ with tempfile.TemporaryDirectory() as work:
             return { then: log.then, inside: parts.length > 0 && parts.every((r) => r.x0 >= -2 && r.x1 <= W + 2 && r.y1 <= H + 2 && r.y0 >= -2) }; })()""")
         if not then or not then.get('then') or then['then'].get('subjects') != ['meo']: problems.append(f'portrait: the single shot of granny does not cut to the cat within the turn ({then})')
         elif not then.get('inside'): problems.append(f'portrait: the cut to the cat after the single shot does not frame the whole cat ({then})')
+        # Đợt 33: con mèo SỢ ở lượt sau — góc chèn con mèo giữ tới hết lượt ấy (0.72.0: cắt sang góc cận con mèo ngay lúc nó bắt đầu
+        # sợ — phản ứng rơi vào góc kế).
+        elif not then['then'].get('until') or 'meo reacts within the insert of meo' not in done.stdout or 'meo reacts in the frame' not in done.stdout:
+            problems.append(f'portrait: the insert of the cat does not hold through its reaction on the next turn ({then}):\n' + done.stdout[-400:])
+
+    # Đợt 33: HAI NGƯỜI Ở HAI CHIỀU SÂU cùng với tới một con vật — bà ngồi sofa vuốt con mèo, rồi bé (đứng gần máy hơn) quỳ cho nó
+    # ăn. Con mèo đứng ở mặt phẳng của người đang với tới nó, lượt nào người nấy (`set.depth`). 0.72.0: con mèo giữ z riêng, tay
+    # bà hở trên đầu nó 13 / 13 mốc (0 % chạm).
+    pair = {'id': 'pair', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [
+        {'name': 'ba', 'id': 'granny', 'z': -820, 'x': -300, 'on': 'sofa', 'seated': True}, {'name': 'be', 'id': 'boy', 'z': -780, 'x': 520},
+        {'name': 'meo', 'species': 'cat', 'z': -790, 'x': 200}],
+        'script': [{'who': 'ba', 'do': [['stroke', '@meo']]}, {'who': 'be', 'do': [['giveTreat', '@meo']]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_pair.json')
+    try:
+        json.dump(pair, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'pair'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('pair: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'pair', 'index.html'), encoding='utf-8').read()
+        if 'set.depth(meo, -780' not in html: problems.append('pair: the cat does not move into the boy\'s plane before he feeds it (set.depth(meo, -780, …))')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pair')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('pair: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'ba strokes meo — hand on it throughout' not in done.stdout or 'be giveTreat meo — hand reaches' not in done.stdout:
+            problems.append('pair: acting_check did not follow granny\'s stroke or the boy\'s treat:\n' + done.stdout[-400:])
+
+    # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %
+    # bàn tay ở 0.72.0). Góc trung nới theo bàn tay ở lượt có động tác tay, vẫn hẹp hơn 85 % góc toàn.
+    gesture = {'id': 'gesture', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],
+               'script': [{'who': 'be', 'say': 'Chào mọi người, mình là Bin.', 'do': ['wave']}, {'who': 'be', 'say': 'Nhà mình ở đằng kia kìa.', 'do': ['point']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_gesture.json')
+    try:
+        json.dump(gesture, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'gesture'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('gesture: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'gesture')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('gesture: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'be wave — hands in the frame' not in done.stdout or 'be point — hands in the frame' not in done.stdout or '0 medium shots kept as the full shot' not in done.stdout:
+            problems.append('gesture: acting_check did not measure the hands of the wave and the point:\n' + done.stdout[-400:])
 
     # Đợt 32, lượt hai: GÓC MỞ ĐẦU KHUNG DỌC một người đứng giữ cỡ 80 % chiều cao (lượt đầu đợt 32: 66 % cho mọi góc toàn dọc —
     # thừa sàn, thừa tường); góc trung của người ấy vẫn hẹp hơn 85 % góc toàn (bề ngang theo lõi khi hai tay múa chìa ngang).

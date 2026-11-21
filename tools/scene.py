@@ -178,6 +178,9 @@ PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front
 # Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
 REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
                  'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body'}
+# ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
+GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
+            'introduce', 'shrug', 'throwBall')
 CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
@@ -447,6 +450,26 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] == 'reaction':
+            # PHẢN ỨNG CỦA CON VẬT (đợt 33): ở 30 / 50 / 70 % lượt nó thấy được trong khung; `start` / `end` để `acting_check` xét góc chèn
+            # con vật ngay trước có giữ tới hết lượt không.
+            if op['turn'] >= len(turns): continue
+            t0, t1 = float(turns[op['turn']][0]), float(turns[op['turn']][1])
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            moments.append({'t': times[1], 'what': f'{op["who"]} reacts', 'ask': [f'Is the animal ({op["who"]}) in the frame, reacting?'],
+                            'check': {'kind': 'reaction', 'who': op['who'], 'times': times, 'start': round(t0, 2), 'end': round(t1, 2)}})
+            continue
+        if op['kind'] == 'gesture':
+            # ĐỘNG TÁC TAY (đợt 33): ở 40 / 55 / 70 % bước, bàn tay của người làm nằm trong khung — góc trung khung dọc lấy bề ngang
+            # theo đầu + thân áo (`core`) thì tay đang vẫy / chỉ ra ngoài mép.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.4, 0.55, 0.7)]
+            moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}', 'ask': [f'Are {op["who"]}\'s hands inside the frame (not cut off by its edge)?'],
+                            'check': {'kind': 'gesture', 'name': op['name'], 'who': op['who'], 'times': times}})
+            continue
         if op['kind'] == 'putDown':
             # ĐẶT XUỐNG (đợt 30): con vật nằm trên sàn sát chân người đặt, và đứng yên — từ lúc tay thả (60 % bước) tới 0,8 s sau
             # khi bước xong. Trước đây người NHẬN đặt xuống thì nó trượt dọc sàn về chỗ được bế lần đầu.
@@ -1347,6 +1370,10 @@ def main():
                 sky_ops.append({'turn': emitted[0], 'to': spec['to'], 'dur': float(spec.get('dur', 6))})
         # Đèn trong tay: ghi lại lượt nào rọi / soi, để moments.json hỏi đúng lúc ấy (tools/light_audit.py).
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            # PHẢN ỨNG CỦA CON VẬT (đợt 33): lượt của con vật (có `mood` hay `do`) — moments.json đo nó trong khung, và góc chèn nó ngay
+            # trước đó kéo tới hết lượt này.
+            if isinstance(turn, dict) and turn.get('who') in names and names[turn['who']]['_pet'] and (turn.get('mood') or turn.get('do')) and not turn.get('say'):
+                gear_ops.append({'turn': emitted[0], 'kind': 'reaction', 'who': turn['who'], 'target': None})
             if not isinstance(turn, dict) or not isinstance(turn.get('do'), list): continue
             for step in turn['do']:
                 # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
@@ -1355,6 +1382,10 @@ def main():
                 # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
+                # ĐỘNG TÁC TAY của người (đợt 33): moments.json đo bàn tay trong khung ở lúc được hỏi.
+                name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+                if name in GESTURES and turn.get('who') in names and not names[turn['who']]['_pet']:
+                    gear_ops.append({'turn': emitted[0], 'kind': 'gesture', 'name': name, 'who': turn.get('who'), 'target': None})
                 if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
                     # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người
@@ -1788,6 +1819,27 @@ def main():
         track[0] += 1
     # Bối cảnh 3D: host của nhân vật do createSet đặt — mang tên trong kịch bản (data-name) để `set.framing()` nhắc đúng người.
     if stage_set is not None: setup.append("    const host = (name) => { const element = document.createElement('div'); element.dataset.name = name; return element; };")
+    box_names = [box.get('name') for box in (stage_set or {}).get('boxes', [])]
+
+    def plane_of(person):
+        """Chiều sâu (z) mà bàn tay người này vươn trong đó: người ngồi trên một hộp ngồi ngay trước mặt hộp (+12)."""
+        if person.get('on') and person.get('seated') and person['on'] in box_names:
+            return float(stage_set['boxes'][box_names.index(person['on'])]['z']) + 12
+        return float(person.get('z', -300))
+    # Con vật dưới sàn mà NHIỀU NGƯỜI ở các chiều sâu khác nhau với tới (đợt 33): [(lượt, z của người với tới)], chỉ giữ chỗ đổi.
+    pet_depths = {}
+    if stage_set is not None:
+        for op in gear_ops:
+            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'): continue
+            pet, person = names.get(op.get('target') or ''), names.get(op.get('who') or '')
+            if not pet or not person or not pet['_pet'] or person['_pet'] or pet.get('on'): continue
+            pet_depths.setdefault(pet['name'], []).append((op['turn'], plane_of(person)))
+        for name, hops in list(pet_depths.items()):
+            kept = [hops[0]]
+            for turn, z in hops[1:]:
+                if abs(z - kept[-1][1]) > 5: kept.append((turn, z))
+            if len(kept) > 1: pet_depths[name] = kept
+            else: del pet_depths[name]
     for who in names.values():
         mount = f"host({js(who['name'])})" if stage_set is not None else f"$('{who['_element']}')"
         held = {}
@@ -1824,8 +1876,12 @@ def main():
             # vươn trong mặt phẳng của mình): bàn tay vuốt hở trên đầu nó.
             front = who.get('_front')
             if front is not None and who.get('_reachers', set()) <= {front['name']}:
-                front_box = stage_set['boxes'][boxes.index(front['on'])] if front.get('on') and front.get('seated') and front['on'] in boxes else None
-                depth_z = float(front_box['z']) + 12 if front_box else float(front.get('z', -300))
+                depth_z = plane_of(front)
+            # HAI NGƯỜI ở hai chiều sâu cùng với tới con vật (đợt 33): nó đứng ở mặt phẳng của người đang với tới — lúc đầu là người
+            # thứ nhất, rồi dời sang mặt phẳng người kế ngay trước lượt của họ (`set.depth`, xem `depth_code`). Giữ z riêng thì ở góc
+            # trung đầu nó lệch 4–6 đơn vị khung so với bàn tay (bà ngồi sofa vuốt mèo, rồi bé quỳ cho ăn: 0 % tay chạm đầu mèo).
+            hops = pet_depths.get(who['name']) if who['_pet'] else None
+            if hops: depth_z = hops[0][1]
             setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
@@ -1964,6 +2020,12 @@ def main():
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
     timeline_hook, view_code, drive_code = '', '', ''
+    # CHIỀU SÂU CON VẬT THEO LƯỢT (đợt 33): dời nó sang mặt phẳng người kế với tới, xong ngay lúc lượt ấy bắt đầu (0,45 s) — thêm
+    # TRƯỚC khi máy quay tự đặt góc (`direct` tua timeline để đo khung).
+    depth_lines = [f"    tl.add(set.depth({name}, {z:g}, 0.45), Math.max(0, T0 + talk.turns[{turn}].start - 0.45));"
+                   for name, hops in pet_depths.items() for turn, z in hops[1:]]
+    depth_code = ('\n    // A pet two people at different depths reach for stands in the plane of whoever reaches for it now (a hand only reaches in its own plane).\n'
+                  + '\n'.join(depth_lines) + '\n') if depth_lines else ''
     if stage_set is not None:
         timeline_hook = ', onUpdate: set.update'
         # Máy quay áp ở MỌI khung kể cả khi bộ dựng tua bằng seek() (tắt onUpdate) — không có thì hình chớp lúc máy lia.
@@ -2004,14 +2066,20 @@ def main():
                 beats[0]['subjects'] = near or lead['subjects']
         if director:
             items, hold = [], None
+            gestured = any(op['kind'] == 'gesture' for op in gear_ops)
             for beat in beats:
                 time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
                 # Sau lượt TRỜI CHUYỂN: giữ góc toàn tới khi trời chuyển được 75 % (đèn đã tự bật) — cắt sang góc cận sớm thì không
                 # ai thấy đèn sáng lên (đợt 24: đầu đèn đường ngoài khung lúc trời tối xong).
                 if hold and not beat.get('drift') and not beat.get('fixed'): time = f"Math.max({time}, {hold})"
                 if beat.get('drift'): hold = f"T0 + talk.turns[{beat['first']}].start + {beat['drift'] * 0.75:g}"
-                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '') + ' }')
-            moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n"
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '')
+                         + (f", hands: handTimes({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat['size'] != 'full' and gestured else '') + ' }')
+            # ĐỘNG TÁC TAY trong nhịp (đợt 33): các lúc (40 / 55 / 70 % bước) người trong chủ thể vẫy / chỉ / giơ ngón — `direct` lấy cả
+            # hai bàn tay vào góc trung / cận ở các lúc ấy.
+            hand_code = ("    const handTimes = (a, b, rigs) => talk.turns.slice(a, b + 1).filter((turn) => rigs.includes(turn.rig)).flatMap((turn) => turn.steps.filter((step) => "
+                         + js(list(GESTURES)) + ".includes(step.name)).flatMap((step) => [0.4, 0.55, 0.7].map((f) => T0 + step.start + step.duration * f)));\n") if gestured else ''
+            moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n" + hand_code +
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
             moves.insert(0, "    // Automatic views (\"view\": \"close\", { \"on\": … }): measured at build time, at the moment of their turn.\n"
@@ -2058,7 +2126,7 @@ def main():
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
     const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
     talk.addTo(tl, T0);
-{view_code}{caption_code}{card_code}{drive_code}
+{depth_code}{view_code}{caption_code}{card_code}{drive_code}
 {framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
@@ -2067,7 +2135,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'} | set(GESTURES)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

@@ -1,4 +1,4 @@
-/* VGCharacter v0.72.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.73.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -9059,6 +9059,18 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     },
 
     /**
+     * DỜI CHIỀU SÂU (z) của một nhân vật đã đặt — một tween thêm vào timeline: `tl.add(set.depth(cat, -780, 0.45), 9.2)`.
+     * Rig 2D chỉ vươn tay trong mặt phẳng của mình: con vật mà hai người ở hai chiều sâu khác nhau cùng với tới thì đứng ở
+     * mặt phẳng của người đang với tới nó, lượt nào người nấy (đợt 33).
+     */
+    depth(rig, z, duration = 0.45, ease = 'sine.inOut') {
+      const actor = actors.find((item) => item.rig === rig);
+      if (!actor) throw new Error('[character] set.depth(rig, z): rig must be placed with set.place()');
+      if (typeof z !== 'number' || !isFinite(z)) throw new Error(`[character] set.depth(rig, z): z must be a number — got ${z}`);
+      return gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+    },
+
+    /**
      * DỰNG một tấm hình PHẲNG đứng thẳng trong bối cảnh — đạo cụ vẽ sẵn (`createProp(host, 'plant')`), ảnh, SVG: nó luôn
      * quay mặt về ống kính, nét ở mọi cự ly và xếp lớp theo chiều sâu cùng các nhân vật. Đặt nó SÁT MÁY QUAY (z gần mép
      * trước của phòng) là có TIỀN CẢNH: khi máy lia, nó trôi qua khung nhanh hơn hậu cảnh — thị sai.
@@ -9658,7 +9670,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      */
     // `limit` (đợt 31): khoảng cách máy tối đa — góc trung không lùi quá chừng ấy để lấy trọn đồ đạc; đồ đạc PHỤ (không phải TV,
     // không ai ngồi / đứng trên nó) thì được lẹm mép. `direct` đặt nó khi góc trung gần rộng bằng góc toàn.
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -9728,9 +9740,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
-      const solve = (region, share = fill) => {
+      const solve = (region, share = fill, wide = null) => {
         // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
-        const across = H > W * 1.2 ? 0.9 : 0.75;
+        // `wide`: bề ngang được dùng khác (bàn tay đang làm động tác chỉ cần nằm trong khung — đợt 33).
+        const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
         const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (share * H), (region.x1 - region.x0) / (across * W)));
         // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung. Khung DỌC: đặt vùng
         // THẤP hơn (55 %) — phụ đề hai dòng nằm trên đầu nhân vật, ở khoảng tường trống (phim dọc đợt 15: phụ đề ở giữa
@@ -9743,7 +9756,50 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const zMean = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
       const deeper = (m) => { const r = regionOf(m), nearer = Math.max(0, m.z - zMean); return nearer > 40 ? { ...r, y0: r.y0 - nearer * 0.35 } : r; };
       let region = shots.map(deeper).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
+      // BÀN TAY ĐANG LÀM ĐỘNG TÁC (đợt 33): `hands` — các lúc (giây) một người trong chủ thể vẫy / chỉ / giơ ngón: khung lấy cả hai
+      // bàn tay ở các lúc ấy (thêm 15 % bàn tay mỗi bên). Góc trung khung dọc theo lõi (đầu, thân áo) để tay đang chỉ ra ngoài mép.
+      let reach = null;
+      if (Array.isArray(hands) && hands.length && seek && size !== 'full') {
+        const people = wanted.filter((actor) => actor.rig && typeof actor.rig.seatY === 'function' && actor.rig.el);
+        for (const time of hands) {
+          seek(time);
+          for (const actor of people) {
+            // Máy lúc dò còn ở góc trước (người này ngoài khung thì host bị ẩn): hiện tạm để đo, như `measure`.
+            const host = actor.host, hidden = host.style.display === 'none';
+            if (!host.contains(actor.rig.svg)) continue;
+            if (hidden) host.style.display = '';
+            const at = set.project(actor.where, actor.spot.y, actor.spot.z), box = view.getBoundingClientRect();
+            if (!at.scale) { if (hidden) host.style.display = 'none'; continue; }
+            const sx = W / box.width, sy = H / box.height, toX = (px) => actor.where + ((px - box.left) * sx - at.x) / at.scale, toY = (py) => actor.spot.y + (at.y - (py - box.top) * sy) / at.scale;
+            for (const key of ['coTayL', 'coTayR']) {
+              const el = actor.rig.el[key];
+              if (!el) continue;
+              const r = drawnRect(el);
+              if (!r.width) continue;
+              const x0 = toX(r.left), x1 = toX(r.right), top = toY(r.top), pad = (x1 - x0) * 0.15;
+              if (toY(r.bottom) < region.y0) continue;                                       // dưới đáy khung (tay buông dưới hông)
+              reach = { ...(reach || region), x0: Math.min((reach || region).x0, x0 - pad), x1: Math.max((reach || region).x1, x1 + pad), y1: Math.max((reach || region).y1, top + pad) };
+            }
+            if (hidden) host.style.display = 'none';
+          }
+        }
+        if (timed) seek(at[0]);
+      }
       let cam = solve(region);
+      // Bàn tay chỉ cần NẰM TRONG khung (92 % bề cao, 94 % bề ngang), không phải chiếm phần khung của người: reo hai tay lên cao
+      // mà tính như đầu thì góc trung lùi xa hơn cả góc toàn (123 %). Máy lùi đủ cho cả hai, ngắm giữa vùng có tay.
+      if (reach && (reach.x0 < region.x0 || reach.x1 > region.x1 || reach.y1 > region.y1)) {
+        // `limit` (góc trung không được lùi quá — `direct`): lùi tới đó thôi, rồi dời ngang về phía bàn tay hết mức mà người (đầu, thân)
+        // vẫn trọn trong khung — tay chỉ / vẫy ra ngoài ít nhất có thể, góc trung vẫn hẹp hơn góc toàn.
+        const loose = solve(reach, 0.92, 0.94), middle = H > W * 1.2 ? 0.55 : 0.5;
+        const distance = Math.max(cam.distance, Math.min(loose.distance, limit)), half = (W / 2) * distance / k * 0.97;
+        const x = Math.min(Math.max((reach.x0 + reach.x1) / 2, region.x1 - half), region.x0 + half);
+        const fits = distance >= loose.distance;
+        cam = { x: region.x1 - region.x0 <= 2 * half ? x : (region.x0 + region.x1) / 2, y: (reach.y0 + reach.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
+        // Đỉnh khung ở `cam.y` + 57 % bề cao khung: đầu người luôn trọn trong khung, kể cả khi tay giơ cao không vừa.
+        cam.y = Math.max(cam.y, region.y1 - 0.55 * H * distance / k);
+        if (fits) region = reach;
+      }
       // NGUỒN SÁNG TRONG KHUNG: một đèn đang sáng gần chủ thể — lấy cả bóng đèn vào khung nếu chỉ phải lùi máy thêm ≤ 30 %
       // (góc toàn thân: ≤ 60 %)
       // (ánh sáng có nguồn thấy được, Gemini soát ánh sáng đợt 16). Góc cận thì không.
@@ -10026,10 +10082,36 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
         return v;
       };
+      // HAI BÀN TAY TRONG KHUNG của góc `v` ở các lúc `times` (đợt 33): đặt máy thử, tua tới từng lúc, đo bàn tay của các người
+      // trong `subjects` trên màn hình — như `acting_check` chấm. Tay dưới mép dưới (buông dưới hông) thì thôi.
+      const handsInside = (v, subjects, times) => {
+        const kept = { ...camera }, W = view.clientWidth, H = view.clientHeight, box = view.getBoundingClientRect();
+        let inside = true;
+        trial = { ...v };
+        for (const time of times) {
+          tl.seek(time, false); set.update();
+          for (const rig of subjects) {
+            if (typeof rig.seatY !== 'function' || !rig.el) continue;
+            for (const key of ['coTayL', 'coTayR']) {
+              const el = rig.el[key], r = el && drawnRect(el);
+              if (!r || !r.width) continue;
+              const x0 = (r.left - box.left) * W / box.width, x1 = (r.right - box.left) * W / box.width, y0 = (r.top - box.top) * H / box.height;
+              if (y0 >= H) continue;
+              if (x0 < 2 || x1 > W - 2 || y0 < 2) inside = false;
+            }
+          }
+        }
+        trial = null; Object.assign(camera, kept); set.update();
+        return inside;
+      };
       let shot = null;
       for (const [index, beat] of beats.entries()) {
         if (beat.fixed) { shot = { fixed: true, at: beat.time }; continue; }
-        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects)) continue;
+        // Góc chèn con vật giữ qua nhịp phản ứng của nó (đợt 33, xem `until`).
+        if (shot && shot.insert && shot.until && beat.time < shot.until - 0.05 && beat.subjects.every((rig) => shot.subjects.includes(rig))) continue;
+        // Nhịp có ĐỘNG TÁC TAY (`hands`, đợt 33) giữ góc đang có chỉ khi hai bàn tay của người làm nằm trong khung ấy lúc động tác.
+        const gesture = beat.size !== 'full' && Array.isArray(beat.hands) && beat.hands.length ? beat.hands : null;
+        if (shot && !shot.fixed && shot.size === beat.size && same(shot.subjects, beat.subjects) && (!gesture || !shot.values || handsInside(shot.values, beat.subjects, gesture))) continue;
         // Nhịp CÓ LỜI được ưu tiên: người đang nói phải lên hình — góc trước chỉ cần giữ 1 s (không thì câu của cậu bé
         // hiện chữ trên cảnh cận con mèo, cảnh thử đợt 14).
         let at = beat.time;
@@ -10044,7 +10126,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // chỗ đứng — đo một lúc thì người đi ra khỏi khung (Gemini soát cảnh thử đợt 14).
         // `mid`: đo đúng lúc GIỮA nhịp (đang khám / cho thuốc) — không phải cả quãng người bước tới rồi lùi về.
         const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
-        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); } }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
+        try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); }, hands: gesture }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         // SỔ GÓC MÁY (đợt 31): góc trung ghi kèm bề rộng góc TOÀN của cùng chủ thể ở cùng các lúc — cùng ống kính thì bề rộng
         // khung tỉ lệ với khoảng cách máy. Góc trung ≥ 85 % góc toàn là cắt sang một khung gần như cũ (`tools/scene.py` nhắc,
         // `acting_check` chấm).
@@ -10071,7 +10153,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           try { full = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek }); } catch (error) { full = null; }
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
-            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8 }); } catch (error) { loose = null; }
+            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { loose = null; }
             // Đồ đạc ở mép: `edgeCut` (phép chiếu thật) — góc trung bác sĩ phòng khám khung dọc ước phẳng 0,58 "lẹm" mà hình thật
             // không lẹm gì: góc trung bị bỏ, giữ góc toàn.
             // `sliver`: một mẩu đồ đạc lộ < 35 % ở mép được (góc trung lõi — như góc trung thường, vốn không soát đồ đạc).
@@ -10093,9 +10175,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               // (2) góc trung của người làm động tác + con vật, đo ĐÚNG LÚC động tác (giữa nhịp) — nhịp dài gộp mọi chỗ họ đứng
               // (bé bước tới, quỳ, đứng lên: khung rộng 89–92 % góc toàn). Người xem thấy động tác to hơn, không phải góc toàn.
               let moment = null;
-              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8 }); } catch (error) { moment = null; }
+              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { moment = null; }
               if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
-              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true }); } catch (error) { return null; } })()))) {
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
                 // (2b) KHUNG DỌC: bề ngang theo LÕI (đầu, thân áo) — hai tay đang múa được ra mép khung (đợt 32, lượt hai).
                 values = got; how = 'core';
                 // Lõi một người choán cả bề ngang (bác sĩ phòng khám: 0,57 góc toàn — thành góc cận mặt): nới ra tới 0,75 góc toàn nếu
@@ -10119,9 +10201,15 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                   // đúng lúc ấy. Nhịp quá ngắn (mỗi góc < 1,2 s) thì thôi.
                   const others = beat.subjects.filter((rig) => rig !== actor), cutAt = Math.max(at + 1.2, (at + beat.end) / 2);
                   if (others.length && cutAt <= beat.end - 1.2 && !(next && cutAt > next.time - 0.8)) {
+                    // PHẢN ỨNG Ở LƯỢT SAU (đợt 33): nhịp ngay sau chỉ có con vật ấy (nó giật mình, sợ…) — góc chèn kéo dài tới hết nhịp
+                    // ấy, đo cả lúc giữa nhịp ấy; không thì phản ứng rơi vào một góc mới (cắt từ góc trung sang góc cận cùng con vật).
+                    const after = beats[index + 1], through = after && !after.fixed && after.subjects.length && after.subjects.every((rig) => others.includes(rig)) && !(next && after.time >= next.time) ? after : null;
+                    const when = [(cutAt + beat.end) / 2].concat(through ? [(through.time + through.end) / 2] : []);
                     let pet = null;
-                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: [(cutAt + beat.end) / 2], seek }); } catch (error) { pet = null; }
-                    if (pet) reaction = { values: pet, at: cutAt, subjects: others };
+                    try { pet = set.frameOn(others, 'medium', { lamps: !!beat.lamp, tight: true, at: when, seek }); } catch (error) { pet = null; }
+                    // Góc chèn cũng nhích máy cho đồ đạc quan trọng hết lẹm mép (sofa lộ 16 % ở mép trái khi góc chèn nới ra lấy cả
+                    // lúc con mèo giật lùi).
+                    if (pet) { seek(when[when.length - 1]); reaction = { values: nudge(pet, others), at: cutAt, subjects: others, until: through ? through.end : beat.end }; }
                   }
                 }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
@@ -10130,8 +10218,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
           set.shotLog.push({ t: +at.toFixed(2), end: +beat.end.toFixed(2), size: beat.size, subjects: beat.subjects.map(nameOf), how,
-                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries,
-                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
+                             first: full ? +(ratio / full.distance).toFixed(3) : null, ratio: full ? +(values.distance / full.distance).toFixed(3) : null, tries, ...(gesture ? { hands: handsInside(values, beat.subjects, gesture) } : {}),
+                             ...(reaction ? { then: { t: +reaction.at.toFixed(2), until: +reaction.until.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
           // Thành góc toàn của đúng những chủ thể của góc đang có: giữ nguyên, không cắt.
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
@@ -10141,8 +10229,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!glide) cuts.push(at);
         // `drift` (giây): máy LÙI CHẬM ra trong lúc ấy — trời chuyển tối, cả căn phòng đổi màu trước mắt người xem.
         if (beat.drift) tl.add(set.move({ distance: +(values.distance * 1.14).toFixed(1) }, Math.max(0.5, Math.min(beat.drift, beat.end - at)), 'sine.inOut'), at + 0.05);
-        shot = { subjects: beat.subjects, size, at };
-        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true }; }
+        shot = { subjects: beat.subjects, size, at, values };
+        if (reaction) { tl.add(set.cut(reaction.values), reaction.at); cuts.push(reaction.at); shot = { subjects: reaction.subjects, size: 'medium', at: reaction.at, insert: true, until: reaction.until, values: reaction.values }; }
       }
       tl.seek(0, false); set.update();
       return cuts;
@@ -10692,7 +10780,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.72.0';
+const VERSION = '0.73.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

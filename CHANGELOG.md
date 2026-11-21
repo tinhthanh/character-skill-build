@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.73.0
+
+Added — the machine measures the gesturing hands in the frame and the pet's reaction in its insert
+- **Hands in the frame**: `tools/scene.py` gives every hand gesture of a person (wave, point, thumbs up, cheer, call out,
+  V sign… — `GESTURES`) a moment at 40 / 55 / 70 % of the step, and `tools/acting_check.py` fails when a hand of that person
+  lies past the left, right or top edge of the frame at the moment asked about (a hand below the bottom edge, hanging under
+  a medium shot, is left out). On the 0.72.0 code, two vertical trial scenes: the boy waving then pointing in the street —
+  the pointing hand 60 % of its width past the right edge; the vet and the boy in the park — 3 of 3 gestures out (wave 2 %,
+  cheer 33 %, point 24 %).
+- **The pet's reaction**: a pet's own turn (`mood` / `do`) gets a moment; `acting_check` asks ≥ 70 % of the pet in the frame at
+  its middle, and when it starts within 3 s of an insert of that pet (`shotLog[…].then`) the insert must hold until the turn
+  ends (`then.until`). On the 0.72.0 code the vertical power cut fails: the insert of the cat ended with the shine, the
+  cat's fright (7.7–10.05 s) played in a new close shot of the same cat.
+- `set.depth(rig, z, duration)`: a tween that moves a placed rig to another depth.
+- `tools/check_scene.py`: granny on the sofa strokes the cat, then a boy standing 40 units nearer the camera feeds it (the cat
+  must move into his plane, granny's hand stay on its head through the strokes); a boy waving and pointing in a vertical
+  frame (both hands in the frame, no medium shot kept as the full shot); the vertical power cut must hold the insert of the
+  cat through its fright.
+
+Fixed — measured on the 14 trial scenes and examples of 0.72.0 (rebuilt): 198 of 198 pass (with the new measurements), 0
+medium shots kept as the full shot
+- **Two people at two depths reach for one pet**: the pet now stands in the plane of whoever reaches for it — first the
+  first one, then, 0.45 s before each later reacher's turn, it moves to theirs (`set.depth`, written by `tools/scene.py` for
+  a floor pet whose reachers stand more than 5 units apart in depth; added to the timeline before the camera is planned, so
+  shots are framed with the pet where it stands). Granny on the sofa (plane −848) strokes the cat, the boy (−780) kneels
+  to feed it: granny's hand 13 of 13 moments off the cat's head (least contact 0 %) → 0 of 13 (least 25 %, at most 3 %
+  sunk); the boy's treat 0.6 % → 0.5 % of height; the cat in view 99 % → 96 %.
+- **Gesturing hands leave the vertical frame**: a medium shot was kept across turns of the same person, framed on the
+  first turn (head and shirt), so a later wave or point went out at the edge. A beat with a gesture now tells `direct` the
+  moments (`hands`); the shot is kept only if both hands are inside it then (measured on the screen with a trial camera),
+  otherwise it glides to a new one. `frameOn({ hands })` takes in both hands (plus 15 % of a hand) at those moments — a hand
+  only has to fit the frame (92 % of the height, 94 % of the width), not the share of a person — up to the medium shot's
+  distance limit (80 % of the full shot); past it, it slides toward the hand as far as the head and shirt stay in. A hidden
+  host (out of the frame of the camera at the time of planning) is shown while its hands are measured. Street (boy): point
+  60 % out → in, medium shots 74 % / 80 % of the full shot; park: vet wave 2 % out → in, vet point 24 % out → in (80 %).
+- **The insert of the pet waits for its reaction**: when the beat right after the single shot holds only the pet(s) of the
+  insert, the insert lasts until that beat ends and is framed at both moments (and nudged off the furniture at the edges,
+  like the main shot — framed wider for the cat's startled jump, the sofa showed 16 % at the left edge). Vertical power cut:
+  the cat's fright 7.7–10.05 s now plays in the insert cut at 5.97 s (before: a cut to a close shot of the cat at 7.7 s).
+
+Known
+- A two-handed cheer of a child in a vertical medium shot does not fit within 80 % of the full shot: the medium shot keeps
+  80 % and the left hand shows 66 % of its width (34 % past the edge; the hands need about 1.02 × the full shot). The park
+  scene of the vet and the boy still fails this one measurement.
+- An adult pointing in a vertical medium shot fits only at the limit (80 % of the full shot, vet in the park); a longer arm
+  or a gesture away from the camera's side would leave the frame again.
+- A pet moved into another reacher's plane slides 0.45 s in view (68 units in the trial scene) — not yet timed to a cut or
+  to the pet's own walk.
+- The gesture and reaction measurements are new, so the 0.72.0 trial scenes have no "before" numbers for the scenes
+  without gestures or pet turns.
+
 ## 0.72.0
 
 Added — the machine follows the stroking hand, counts medium shots kept as full shots, and reaches the bottom-edge rule
