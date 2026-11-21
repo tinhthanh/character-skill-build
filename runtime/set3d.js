@@ -1717,7 +1717,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (host.parentNode !== view) view.appendChild(host);
     host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
     Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
-    if (height) { host.style.height = height + 'px'; host.style.width = ''; }
+    // `auto`, not '': an <img> stood with its file's width/height attributes (tools/scene.py writes them so it can be
+    // centred before it loads) would otherwise keep the attribute's width — a picture whose file is bigger or smaller
+    // than its scene size (a 2x PNG, an SVG scaled in the set) showed stretched sideways.
+    if (height) { host.style.height = height + 'px'; host.style.width = 'auto'; }
     const spot = { x, y, z };
     // BÓNG NẰM TRÊN SÀN: một hình elip mờ trên mặt phẳng nằm ngang của bối cảnh, nên nó dẹt lại và xoay đúng theo góc
     // máy. Bóng rig tự vẽ (một elip trong khung phẳng của nó) bị ẩn đi — nó đứng thẳng cùng tấm bìa.
