@@ -324,7 +324,7 @@ def shot_notes(shots):
     """Nhắc những góc TRUNG gần rộng bằng góc TOÀN của cùng các chủ thể (`set.shotLog`, ghi lúc `direct` đặt máy): cắt từ góc
     toàn sang đó người xem chỉ thấy khung giật nhẹ — hai chủ thể đứng xa nhau mà còn phải lấy trọn đồ đạc (đợt 30)."""
     return [f'{shot["t"]:.1f} s: the medium shot of {", ".join(shot["subjects"])} is {shot["ratio"] * 100:.0f} % as wide as their full shot — a cut to it barely changes the frame; '
-            f'stand them closer, or give that turn a "view" on one of them' for shot in shots if shot.get('ratio') and shot['ratio'] >= MEDIUM_WIDE and shot.get('how') != 'full'] \
+            f'stand them closer, or give that turn a "view" on one of them' for shot in shots if shot.get('ratio') and shot['ratio'] >= MEDIUM_WIDE and shot.get('how') not in ('full', 'gesture')] \
         + [f'{shot["t"]:.1f} s: no medium shot of {", ".join(shot["subjects"])} could be framed (it was {shot["first"] * 100:.0f} % as wide as their full shot) — the full shot is kept; '
            f'stand them closer, or give that turn a "view"' for shot in shots if shot.get('how') == 'full']      # đợt 32: góc trung bị giữ thành góc toàn
 
@@ -1835,9 +1835,10 @@ def main():
             if not pet or not person or not pet['_pet'] or person['_pet'] or pet.get('on'): continue
             pet_depths.setdefault(pet['name'], []).append((op['turn'], plane_of(person)))
         for name, hops in list(pet_depths.items()):
-            kept = [hops[0]]
-            for turn, z in hops[1:]:
-                if abs(z - kept[-1][1]) > 5: kept.append((turn, z))
+            # (lượt, z, lượt với tới ngay trước) — con vật dời được từ lúc lượt trước xong tới lúc lượt này bắt đầu.
+            kept = [(hops[0][0], hops[0][1], None)]
+            for n, (turn, z) in enumerate(hops[1:], 1):
+                if abs(z - kept[-1][1]) > 5: kept.append((turn, z, hops[n - 1][0]))
             if len(kept) > 1: pet_depths[name] = kept
             else: del pet_depths[name]
     for who in names.values():
@@ -2020,12 +2021,15 @@ def main():
     if shows: caption_code += "\n    // Content clips (title, bullets, image) fade in at their data-start, which tools/scene.py fills in.\n    document.querySelectorAll('.show').forEach((element) => { if (+element.dataset.start > 0) tl.from(element, { opacity: 0, y: 24, duration: 0.45, ease: 'power2.out' }, +element.dataset.start); });"
     # Bối cảnh 3D: máy quay áp sau mỗi lần timeline cập nhật; mỗi "view" là một tween (hoặc một lần cắt) đặt đúng lúc lượt ấy bắt đầu.
     timeline_hook, view_code, drive_code = '', '', ''
-    # CHIỀU SÂU CON VẬT THEO LƯỢT (đợt 33): dời nó sang mặt phẳng người kế với tới, xong ngay lúc lượt ấy bắt đầu (0,45 s) — thêm
-    # TRƯỚC khi máy quay tự đặt góc (`direct` tua timeline để đo khung).
-    depth_lines = [f"    tl.add(set.depth({name}, {z:g}, 0.45), Math.max(0, T0 + talk.turns[{turn}].start - 0.45));"
-                   for name, hops in pet_depths.items() for turn, z in hops[1:]]
+    # CHIỀU SÂU CON VẬT THEO LƯỢT (đợt 33): dời nó sang mặt phẳng người kế với tới — thêm TRƯỚC khi máy quay tự đặt góc (`direct` tua
+    # timeline để đo khung), tạm là 0,45 s ngay trước lượt ấy; sau `direct`, `settleDepths` dời nó vào lần CẮT CẢNH muộn nhất từ lúc
+    # lượt với tới trước xong tới lúc lượt này bắt đầu, hay vào bước đi của chính nó (lượt hai: trượt 0,45 s thấy trên hình).
+    depth_lines = [f"    tl.add(set.depth({name}, {z:g}, 0.45, 'sine.inOut', {{ between: [T0 + talk.turns[{prev}].end, T0 + talk.turns[{turn}].start] }}), Math.max(0, T0 + talk.turns[{turn}].start - 0.45));"
+                   for name, hops in pet_depths.items() for turn, z, prev in hops[1:]]
     depth_code = ('\n    // A pet two people at different depths reach for stands in the plane of whoever reaches for it now (a hand only reaches in its own plane).\n'
                   + '\n'.join(depth_lines) + '\n') if depth_lines else ''
+    settle_code = ("\n    // The pet changes depth on a cut (or during its own walk), never sliding while it stands still in view.\n"
+                   "    set.settleDepths(typeof CUTS === 'undefined' ? [] : CUTS, (rig) => talk.turns.filter((turn) => turn.rig === rig).flatMap((turn) => turn.steps.filter((step) => step.name === 'walk').map((step) => [T0 + step.start, T0 + step.start + step.duration])));\n") if depth_lines else ''
     if stage_set is not None:
         timeline_hook = ', onUpdate: set.update'
         # Máy quay áp ở MỌI khung kể cả khi bộ dựng tua bằng seek() (tắt onUpdate) — không có thì hình chớp lúc máy lia.
@@ -2126,7 +2130,7 @@ def main():
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
     const T0 = {intro_dur:g};                 // the conversation starts after the opening card (0 = none)
     talk.addTo(tl, T0);
-{depth_code}{view_code}{caption_code}{card_code}{drive_code}
+{depth_code}{view_code}{settle_code}{caption_code}{card_code}{drive_code}
 {framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.

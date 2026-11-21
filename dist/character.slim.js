@@ -6058,11 +6058,29 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       if (over) { actors.find((actor) => actor.rig === rig).over = over; set.update(); }
       return spot;
     },
-    depth(rig, z, duration = 0.45, ease = 'sine.inOut') {
+    depth(rig, z, duration = 0.45, ease = 'sine.inOut', { between = null } = {}) {
       const actor = actors.find((item) => item.rig === rig);
       if (!actor) throw new Error('[character] set.depth(rig, z): rig must be placed with set.place()');
       if (typeof z !== 'number' || !isFinite(z)) throw new Error(`[character] set.depth(rig, z): z must be a number — got ${z}`);
-      return gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+      const tween = gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+      set.depthLog.push({ rig, name: actor.host.dataset.name || actor.host.id || '', z, tween, between, how: 'tween' });
+      return tween;
+    },
+    settleDepths(cuts = [], walks = null) {
+      set.cutLog = cuts.slice();
+      for (const move of set.depthLog) {
+        if (!move.between) continue;
+        const [from, to] = move.between, eps = 1e-3;
+        const cut = cuts.filter((time) => time >= from - eps && time <= to + eps).sort((a, b) => b - a)[0];
+        if (cut !== undefined) { move.tween.duration(0); move.tween.startTime(cut); move.how = 'cut'; move.at = cut; continue; }
+        const walk = (walks ? walks(move.rig) : []).filter(([a, b]) => b > from && a < to).sort((x, y) => y[0] - x[0])[0];
+        if (walk) {
+          const a = Math.max(walk[0], from), b = Math.min(walk[1], to);
+          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a; continue;
+        }
+        move.how = 'slide'; move.at = move.tween.startTime();
+      }
+      return set;
     },
     stand(element, { x = 0, z = 0, y = 0, height = null, ground = null, shadow = true } = {}) {
       if (!element || !element.style) throw new Error('[character] set.stand(element, …): pass an element');
@@ -6532,7 +6550,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const deeper = (m) => { const r = regionOf(m), nearer = Math.max(0, m.z - zMean); return nearer > 40 ? { ...r, y0: r.y0 - nearer * 0.35 } : r; };
       let region = shots.map(deeper).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) }));
       let reach = null;
-      if (Array.isArray(hands) && hands.length && seek && size !== 'full') {
+      if (Array.isArray(hands) && hands.length && seek) {
         const people = wanted.filter((actor) => actor.rig && typeof actor.rig.seatY === 'function' && actor.rig.el);
         for (const time of hands) {
           seek(time);
@@ -6739,6 +6757,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       return { x: +cam.x.toFixed(1), y: +cam.y.toFixed(1), z: +z.toFixed(1), distance: +cam.distance.toFixed(1), lens, zoom };
     },
     shotLog: [],
+    depthLog: [],                                                                          // các lần dời chiều sâu (`depth`, đợt 33)
     ruleLog: [],                                                                           // luật khung hình đã chạy (đợt 32: con vật ở mép dưới)
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
       const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
@@ -6778,7 +6797,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!r || !r.width) continue;
               const x0 = (r.left - box.left) * W / box.width, x1 = (r.right - box.left) * W / box.width, y0 = (r.top - box.top) * H / box.height;
               if (y0 >= H) continue;
-              if (x0 < 2 || x1 > W - 2 || y0 < 2) inside = false;
+              const room = 0.06 * (x1 - x0);
+              if (x0 < room || x1 > W - room || y0 < room) inside = false;
             }
           }
         }
@@ -6815,10 +6835,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           let full = null, how = 'medium';
           const tries = {};                                                                  // các lần dựng lại (để soát: vì sao giữ góc toàn)
           const ratio = values.distance;
+          const cap = gesture ? 0.83 : 0.8;
           try { full = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek }); } catch (error) { full = null; }
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
-            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { loose = null; }
+            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * cap, hands: gesture }); } catch (error) { loose = null; }
             const usable = (v, sliver = false) => {
               if (!v) return false;
               const frame = set.lastFrame, cut = edgeCut(v).filter((p) => !(sliver && p.shown < 0.35)), ok = v.distance < MEDIUM_WIDE * full.distance && !cut.length && frame.whole;
@@ -6834,9 +6855,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if ((got = judged('loose', loose))) { values = got; how = 'loose'; }
             else {
               let moment = null;
-              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { moment = null; }
+              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * cap, hands: gesture }); } catch (error) { moment = null; }
               if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
-              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * cap, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
                 values = got; how = 'core';
                 const roomier = { ...got, distance: +Math.max(got.distance, full.distance * 0.75).toFixed(1) };
                 if (roomier.distance > got.distance) { const r = usable(roomier, true); if (r && r.ok) { values = roomier; tries.core.widened = r.ratio; } }
@@ -6860,6 +6881,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                 }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
               }
+            }
+          }
+          if (gesture && tallView && full && !handsInside(values, beat.subjects, gesture)) {
+            let wide = null;
+            try { wide = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek, hands: gesture }); } catch (error) { wide = null; }
+            if (wide) {
+              const w = nudge(wide, beat.subjects);
+              if (handsInside(w, beat.subjects, gesture)) { values = w; size = 'full'; how = 'gesture'; reaction = null; }
             }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };

@@ -40,16 +40,31 @@ medium shots kept as the full shot
   like the main shot — framed wider for the cat's startled jump, the sofa showed 16 % at the left edge). Vertical power cut:
   the cat's fright 7.7–10.05 s now plays in the insert cut at 5.97 s (before: a cut to a close shot of the cat at 7.7 s).
 
+Fixed (second pass — the three Known items of the first pass) — the 14 trial scenes and examples rebuilt: all pass, 0
+medium shots kept as the full shot
+- **A two-handed cheer in a vertical medium shot**: a child's V-shaped cheer needs about 1.02 × the full shot to hold both
+  hands, so no medium shot can. When the chosen medium shot of a beat with a gesture still does not hold the hands, the
+  camera now takes the full shot with both hands in it (`frameOn(…, 'full', { hands })`, `shotLog` `how: 'gesture'`;
+  `acting_check` reports it as a full shot chosen for the gesture, not as a medium shot kept as the full one; `scene.py`
+  does not warn about it). Park, vet and boy: the boy's left hand 33 % of its width past the edge → 58 % inside.
+- **Hands with room to spare**: `acting_check` now asks every gesturing hand to be at least 5 % of its width inside the
+  edge (was: 2 px), and `direct` keeps a shot only when the hands are 6 % inside. A beat with a gesture may back the medium
+  shot off to 83 % of the full shot (was 80 %; still under 85 %). The boy pointing in the street: 2 % → 17 % inside (medium
+  83 % of the full shot); the vet pointing in the park: 25 % → 34 % (83 %).
+- **The pet no longer slides in view when it changes depth**: `set.depth(…, { between })` records when the move may happen
+  (from the end of the previous reacher's turn to the start of the next one's); after `direct`, `set.settleDepths(cuts,
+  walks)` makes it instant on the latest cut in that span, or spreads it over the pet's own walk there; only with neither
+  does it keep the 0.45 s tween. `acting_check` steps every frame (1/30 s) around each move in `set.depthLog` and fails a
+  frame where the pet's depth changes while it stands still in view with no cut in between. Granny strokes, the boy feeds:
+  13 frames of sliding (18.35–18.8 s) → 0 (moved on the cut at 13.36 s).
+- `tools/check_scene.py`: the two-depth scene must move the cat unseen; a vertical park scene (the vet waves, the boy
+  cheers, the vet points) must hold every hand ≥ 5 % inside the frame.
+
 Known
-- A two-handed cheer of a child in a vertical medium shot does not fit within 80 % of the full shot: the medium shot keeps
-  80 % and the left hand shows 66 % of its width (34 % past the edge; the hands need about 1.02 × the full shot). The park
-  scene of the vet and the boy still fails this one measurement.
-- An adult pointing in a vertical medium shot fits only at the limit (80 % of the full shot, vet in the park); a longer arm
-  or a gesture away from the camera's side would leave the frame again.
-- A pet moved into another reacher's plane slides 0.45 s in view (68 units in the trial scene) — not yet timed to a cut or
-  to the pet's own walk.
-- The gesture and reaction measurements are new, so the 0.72.0 trial scenes have no "before" numbers for the scenes
-  without gestures or pet turns.
+- A full shot chosen for a gesture is a cut to a wider frame in the middle of a talk between medium shots (the boy's cheer
+  in the park); a narrower cheer drawn for vertical frames would keep the medium shot.
+- With neither a cut nor a walk of the pet between two reachers, the pet still slides 0.45 s in view (`how: 'slide'`,
+  `acting_check` fails it); none of the trial scenes has that case.
 
 ## 0.72.0
 

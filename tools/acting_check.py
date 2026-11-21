@@ -34,6 +34,8 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
     trọn trong khung — không lẹm mép trái / phải / trên (góc trung khung dọc theo đầu + thân áo để tay ra ngoài mép).
   • PHẢN ỨNG CON VẬT (đợt 33): lượt của con vật (sợ, giật mình…) — nó nằm trong khung ở lúc giữa lượt; theo ngay sau góc chèn con
     vật (sau góc đơn người làm) thì góc chèn giữ tới hết lượt ấy.
+  • CHIỀU SÂU CON VẬT (đợt 33, lượt hai): con vật dời sang mặt phẳng người khác với tới (`set.depthLog`) — không khung nào nó đổi
+    chiều sâu khi đứng yên trong khung hình mà không có lần cắt cảnh (dời lúc cắt, hay trong bước đi của chính nó).
   • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`). Đợt 32: góc trung
     bị giữ thành góc toàn cũng là hỏng; dòng cuối đếm số góc như thế.
 """
@@ -43,6 +45,36 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 KEEP = None            # --keep: giữ ảnh chụp của phép đo con vật thấy được
 REACH = 0.06            # tay cách đích ≤ 6 % chiều cao người
 FEET = 0.03             # chân lệch sàn ≤ 3 % chiều cao người
+
+
+# CON VẬT DỜI CHIỀU SÂU (đợt 33, lượt hai): mỗi lần dời trong `set.depthLog`, tua từng khung (1/30 s) quanh nó; khung nào z của nó
+# đổi mà giữa hai khung không có lần cắt cảnh (`set.cutLog`), nó không đi (`s.x` đứng yên) và nó đang trong khung hình — là nó
+# TRƯỢT trên hình. Bộ dựng cũ không có `depthLog` thì null.
+DEPTH_JS = """(tl) => { const set = window.__set; if (!set.depthLog) return null; const cuts = set.cutLog || [], step = 1 / 30, out = [];
+  const W = window.innerWidth, H = window.innerHeight;
+  for (const move of set.depthLog) {
+    const start = move.tween.startTime(), end = start + move.tween.duration(), rig = move.rig, host = rig.host || rig.svg.parentNode;
+    const look = (t) => { tl.seek(t, false); set.update(); const r = rig.svg.getBoundingClientRect(), b = rig.el && rig.el.than ? rig.el.than.getBoundingClientRect() : r;
+      return { z: set.depthLog.length && move.tween.targets()[0].z, x: rig.s.x || 0, seen: host.style.display !== 'none' && b.right > 0 && b.left < W && b.bottom > 0 && b.top < H }; };
+    let slid = 0, seenAny = false, prev = look(Math.max(0, start - step)), prevT = Math.max(0, start - step);
+    for (let t = start; t <= end + step + 1e-6; t += step) {
+      const now = look(t), cut = cuts.some((c) => c > prevT + 1e-4 && c <= t + 1e-4);
+      if (Math.abs(now.z - prev.z) > 0.5 && !cut && Math.abs(now.x - prev.x) < 0.05 && now.seen && prev.seen) slid++;
+      if (now.seen) seenAny = true;
+      prev = now; prevT = t;
+    }
+    out.push({ name: move.name, z: move.z, how: move.how || 'tween', at: +start.toFixed(2), duration: +(end - start).toFixed(2), slid });
+  }
+  tl.seek(0, false); set.update(); return out; }"""
+DEPTHS = None
+
+
+def check_depths(folder):
+    """CON VẬT KHÔNG TRƯỢT CHIỀU SÂU TRÊN HÌNH (đợt 33, lượt hai): mỗi lần dời chiều sâu, không khung nào nó đổi z khi đứng yên trong
+    khung hình mà không có lần cắt cảnh."""
+    return [{'scene': folder, 'what': f'{d["name"]} moves to depth {d["z"]:g} unseen', 'ok': d['slid'] == 0,
+             'note': (f'on the cut at {d["at"]:g} s' if d['how'] == 'cut' else f'during its own walk, {d["at"]:g}–{d["at"] + d["duration"]:g} s' if d['how'] == 'walk' else f'{d["at"]:g}–{d["at"] + d["duration"]:g} s')
+                     + (f' — slides in view, standing still, for {d["slid"]} frame{"" if d["slid"] == 1 else "s"}' if d['slid'] else '')} for d in (DEPTHS or [])]
 
 
 def probe(folder, times):
@@ -63,14 +95,16 @@ def probe(folder, times):
             time.sleep(0.1)
         # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; return out; })()"
-                  % (json.dumps(found.group(1)), json.dumps(sorted(set(times)))))
+                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+                  % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
                                '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--eval', script], capture_output=True, text=True)
         if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not probe {folder}:\n{done.stderr.strip()[-500:]}')
         found = json.loads(done.stdout)
         shots = found.pop('shots', None)
+        global DEPTHS
+        DEPTHS = found.pop('depths', None)
         return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
@@ -348,6 +382,12 @@ def check_shots(folder, log):
         # Đợt 32: góc trung bị GIỮ thành góc toàn là hỏng — máy phải dựng được một góc trung thật (dựng lại, đúng lúc động tác,
         # góc đơn của người làm). Đợt 31 chỉ ghi lại: 5 góc như thế trong cảnh thử (khung dọc — góc toàn dọc quá chặt; đồ đạc
         # "lẹm" theo ước lượng phẳng mà hình thật không lẹm).
+        # GÓC TOÀN CHO ĐỘNG TÁC TAY (đợt 33, lượt hai): lượt có động tác hai tay rộng (bé reo) mà góc trung nào cũng không chứa nổi
+        # hai bàn tay — `direct` chọn hẳn góc toàn có cả hai tay. Không phải góc trung bị giữ thành góc toàn: chấm tay trong khung.
+        if shot.get('how') == 'gesture':
+            results.append({'scene': folder, 'what': f'medium shot of {who} at {shot["t"]:g} s — full shot chosen for the gesture', 'ok': True,
+                            'note': f'no medium shot holds both hands (it would be {shot["first"] * 100:.0f} % as wide as the full shot); the full shot with the hands is {shot["ratio"] * 100:.0f} %'})
+            continue
         if shot.get('how') == 'full':
             tried = '; '.join(f'{name} {t["ratio"] * 100:.0f} %' + (f' cutting {", ".join(t["cut"])}' if t.get('cut') else '') + ('' if t.get('whole', True) else ', a pet cut')
                               for name, t in (shot.get('tries') or {}).items() if isinstance(t, dict) and 'ratio' in t)
@@ -361,7 +401,7 @@ def check_shots(folder, log):
     return results
 
 
-HAND_IN = 2           # bàn tay đang làm động tác: cách mép trái / phải / trên của khung ít nhất 2 px (đợt 33)
+HAND_IN = 0.05        # bàn tay đang làm động tác: cách mép trái / phải / trên của khung ít nhất 5 % bề rộng bàn tay (đợt 33)
 
 
 def frame_size(folder):
@@ -372,24 +412,27 @@ def frame_size(folder):
 
 
 def check_gesture(folder, c, frames):
-    """ĐỘNG TÁC TAY (đợt 33): ở lúc được hỏi (lúc giữa), hai bàn tay của người đang vẫy / chỉ / giơ ngón nằm trọn trong khung —
-    không lẹm mép trái, phải, trên. Bàn tay ở dưới mép dưới (góc trung cắt ngang hông, tay buông) thì thôi."""
+    """ĐỘNG TÁC TAY (đợt 33): ở lúc được hỏi (lúc giữa), hai bàn tay của người đang vẫy / chỉ / giơ ngón nằm trọn trong khung, cách
+    mép trái, phải, trên ít nhất 5 % bề rộng bàn tay (lượt hai: có dư, không sát mép). Bàn tay ở dưới mép dưới (góc trung cắt ngang
+    hông, tay buông) thì thôi."""
     W, H = frame_size(folder)
     t = c['times'][len(c['times']) // 2]
     who = frames[len(c['times']) // 2].get(c['who'])
-    if not who or not who.get('hands'): return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': None, 'note': 'not in the frame'}]
-    out = []
+    what = f'{c["who"]} {c["name"]} — hands in the frame'
+    if not who or not who.get('hands'): return [{'scene': folder, 'what': what, 'ok': None, 'note': 'not in the frame'}]
+    worst = None
     for hand in who['hands']:
         box = hand.get('box')
         if not box or box['y0'] >= H: continue
-        over = max(HAND_IN - box['x0'], box['x1'] - (W - HAND_IN), HAND_IN - box['y0'], 0)
-        if over > 0: out.append((hand['side'], over, 'left' if box['x0'] < HAND_IN else 'right' if box['x1'] > W - HAND_IN else 'top', box))
-    if not out:
-        return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': True, 'note': f'both hands inside the frame at {t:g} s, the moment asked about'}]
-    side, over, edge, box = max(out, key=lambda item: item[1])
-    width = max(1, box['x1'] - box['x0'])
-    return [{'scene': folder, 'what': f'{c["who"]} {c["name"]} — hands in the frame', 'ok': False, 'over': round(over / width, 3),
-             'note': f'the {"left" if side == "L" else "right"} hand reaches {over / width * 100:.0f} % of its width past the {edge} edge at {t:g} s, the moment asked about'}]
+        width = max(1, box['x1'] - box['x0'])
+        for edge, gap in (('left', box['x0']), ('right', W - box['x1']), ('top', box['y0'])):
+            if worst is None or gap / width < worst[0]: worst = (gap / width, edge, hand['side'])
+    if worst is None: return [{'scene': folder, 'what': what, 'ok': True, 'note': f'both hands below the frame at {t:g} s'}]
+    margin, edge, side = worst
+    hand = 'left' if side == 'L' else 'right'
+    note = (f'the {hand} hand is {margin * 100:.0f} % of its width inside the {edge} edge at {t:g} s, the moment asked about (least {HAND_IN * 100:g} %)' if margin >= 0
+            else f'the {hand} hand reaches {-margin * 100:.0f} % of its width past the {edge} edge at {t:g} s, the moment asked about')
+    return [{'scene': folder, 'what': what, 'ok': margin >= HAND_IN, 'margin': round(margin, 3), 'note': note}]
 
 
 INSERT_GAP = 3.0      # phản ứng bắt đầu trong 3 s sau lúc cắt sang góc chèn con vật: là phản ứng với động tác vừa rồi (đợt 33)
@@ -424,7 +467,7 @@ def check_scene(folder):
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
-    results = check_props(folder, moments, cuts) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
+    results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] == 'walk':

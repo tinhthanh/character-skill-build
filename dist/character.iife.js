@@ -9063,11 +9063,38 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * Rig 2D chỉ vươn tay trong mặt phẳng của mình: con vật mà hai người ở hai chiều sâu khác nhau cùng với tới thì đứng ở
      * mặt phẳng của người đang với tới nó, lượt nào người nấy (đợt 33).
      */
-    depth(rig, z, duration = 0.45, ease = 'sine.inOut') {
+    // `between: [from, to]` (đợt 33, lượt hai): dời được bất cứ lúc nào trong quãng ấy — `settleDepths` chọn lúc không ai thấy nó
+    // trượt (lúc cắt cảnh, hay trong bước đi của chính nó). Mọi lần dời ghi vào `set.depthLog` (acting_check đo).
+    depth(rig, z, duration = 0.45, ease = 'sine.inOut', { between = null } = {}) {
       const actor = actors.find((item) => item.rig === rig);
       if (!actor) throw new Error('[character] set.depth(rig, z): rig must be placed with set.place()');
       if (typeof z !== 'number' || !isFinite(z)) throw new Error(`[character] set.depth(rig, z): z must be a number — got ${z}`);
-      return gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+      const tween = gsap.to(actor.spot, { z, duration: Math.max(0, duration), ease, immediateRender: false });
+      set.depthLog.push({ rig, name: actor.host.dataset.name || actor.host.id || '', z, tween, between, how: 'tween' });
+      return tween;
+    },
+
+    /**
+     * ĐẶT LẠI LÚC DỜI CHIỀU SÂU (đợt 33, lượt hai) — gọi sau `direct`, với các lúc cắt cảnh: mỗi lần dời có `between` thành tức thì
+     * ở lần CẮT muộn nhất trong quãng ấy; không có lần cắt nào thì trải theo một bước ĐI của chính con vật trong quãng ấy
+     * (`walks(rig)` → [[t0, t1]…]). Không có cả hai thì để nguyên (trượt 0,45 s trên hình — `how: 'slide'`).
+     * Trượt 0,45 s trước lượt người kế với tới thì người xem thấy con mèo đứng yên mà trôi về phía máy.
+     */
+    settleDepths(cuts = [], walks = null) {
+      set.cutLog = cuts.slice();
+      for (const move of set.depthLog) {
+        if (!move.between) continue;
+        const [from, to] = move.between, eps = 1e-3;
+        const cut = cuts.filter((time) => time >= from - eps && time <= to + eps).sort((a, b) => b - a)[0];
+        if (cut !== undefined) { move.tween.duration(0); move.tween.startTime(cut); move.how = 'cut'; move.at = cut; continue; }
+        const walk = (walks ? walks(move.rig) : []).filter(([a, b]) => b > from && a < to).sort((x, y) => y[0] - x[0])[0];
+        if (walk) {
+          const a = Math.max(walk[0], from), b = Math.min(walk[1], to);
+          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a; continue;
+        }
+        move.how = 'slide'; move.at = move.tween.startTime();
+      }
+      return set;
     },
 
     /**
@@ -9759,7 +9786,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // BÀN TAY ĐANG LÀM ĐỘNG TÁC (đợt 33): `hands` — các lúc (giây) một người trong chủ thể vẫy / chỉ / giơ ngón: khung lấy cả hai
       // bàn tay ở các lúc ấy (thêm 15 % bàn tay mỗi bên). Góc trung khung dọc theo lõi (đầu, thân áo) để tay đang chỉ ra ngoài mép.
       let reach = null;
-      if (Array.isArray(hands) && hands.length && seek && size !== 'full') {
+      if (Array.isArray(hands) && hands.length && seek) {
         const people = wanted.filter((actor) => actor.rig && typeof actor.rig.seatY === 'function' && actor.rig.el);
         for (const time of hands) {
           seek(time);
@@ -10047,6 +10074,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * Góc của từng lần đổi là `frameOn` ở đúng lúc ấy (tua `tl` tới đó để đo). Trả về các thời điểm CẮT (cho phụ đề).
      */
     shotLog: [],
+    depthLog: [],                                                                          // các lần dời chiều sâu (`depth`, đợt 33)
     ruleLog: [],                                                                           // luật khung hình đã chạy (đợt 32: con vật ở mép dưới)
 
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
@@ -10097,7 +10125,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!r || !r.width) continue;
               const x0 = (r.left - box.left) * W / box.width, x1 = (r.right - box.left) * W / box.width, y0 = (r.top - box.top) * H / box.height;
               if (y0 >= H) continue;
-              if (x0 < 2 || x1 > W - 2 || y0 < 2) inside = false;
+              // Có dư: cách mép ít nhất 6 % bề rộng bàn tay (acting_check đòi 5 %).
+              const room = 0.06 * (x1 - x0);
+              if (x0 < room || x1 > W - room || y0 < room) inside = false;
             }
           }
         }
@@ -10150,10 +10180,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           let full = null, how = 'medium';
           const tries = {};                                                                  // các lần dựng lại (để soát: vì sao giữ góc toàn)
           const ratio = values.distance;
+          // Lượt có ĐỘNG TÁC TAY (đợt 33, lượt hai): góc trung được lùi tới 83 % góc toàn (không phải 80 %) để bàn tay chỉ của người lớn
+          // trong khung dọc có dư ở mép — vẫn hẹp hơn mốc 85 %.
+          const cap = gesture ? 0.83 : 0.8;
           try { full = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek }); } catch (error) { full = null; }
           if (full && values.distance >= MEDIUM_WIDE * full.distance) {
             let loose = null;
-            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { loose = null; }
+            try { loose = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * cap, hands: gesture }); } catch (error) { loose = null; }
             // Đồ đạc ở mép: `edgeCut` (phép chiếu thật) — góc trung bác sĩ phòng khám khung dọc ước phẳng 0,58 "lẹm" mà hình thật
             // không lẹm gì: góc trung bị bỏ, giữ góc toàn.
             // `sliver`: một mẩu đồ đạc lộ < 35 % ở mép được (góc trung lõi — như góc trung thường, vốn không soát đồ đạc).
@@ -10175,9 +10208,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               // (2) góc trung của người làm động tác + con vật, đo ĐÚNG LÚC động tác (giữa nhịp) — nhịp dài gộp mọi chỗ họ đứng
               // (bé bước tới, quỳ, đứng lên: khung rộng 89–92 % góc toàn). Người xem thấy động tác to hơn, không phải góc toàn.
               let moment = null;
-              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * 0.8, hands: gesture }); } catch (error) { moment = null; }
+              try { moment = set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: true, at: [(at + beat.end) / 2], seek, limit: full.distance * cap, hands: gesture }); } catch (error) { moment = null; }
               if ((got = judged('moment', moment))) { values = got; how = 'moment'; }
-              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * 0.8, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
+              else if (tallView && (got = judged('core', (() => { try { return set.frameOn(beat.subjects, 'medium', { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek, limit: full.distance * cap, core: true, hands: gesture }); } catch (error) { return null; } })()))) {
                 // (2b) KHUNG DỌC: bề ngang theo LÕI (đầu, thân áo) — hai tay đang múa được ra mép khung (đợt 32, lượt hai).
                 values = got; how = 'core';
                 // Lõi một người choán cả bề ngang (bác sĩ phòng khám: 0,57 góc toàn — thành góc cận mặt): nới ra tới 0,75 góc toàn nếu
@@ -10214,6 +10247,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                 }
                 else { values = full; size = 'full'; how = 'full'; }      // (4) vẫn không được: giữ góc toàn
               }
+            }
+          }
+          // GÓC TOÀN CHO ĐỘNG TÁC HAI TAY (đợt 33, lượt hai): khung dọc, góc trung đã chọn vẫn không chứa hai bàn tay lúc động tác (bé
+          // reo hai tay chữ V: cần ~1,02 góc toàn) — quay hẳn góc toàn có cả hai tay. Một góc trung rộng hơn góc toàn không còn là góc trung.
+          if (gesture && tallView && full && !handsInside(values, beat.subjects, gesture)) {
+            let wide = null;
+            try { wide = set.frameOn(beat.subjects, 'full', { lamps: !!beat.lamp, at: times, seek, hands: gesture }); } catch (error) { wide = null; }
+            if (wide) {
+              const w = nudge(wide, beat.subjects);
+              if (handsInside(w, beat.subjects, gesture)) { values = w; size = 'full'; how = 'gesture'; reaction = null; }
             }
           }
           const nameOf = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.dataset.name || actor.host.id || '' : ''; };
