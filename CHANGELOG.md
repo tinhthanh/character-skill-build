@@ -25,15 +25,24 @@ Fixed
   the cut at 12.96 s). Side effect in the still scene: the boy's hand on the cat 43 % in view → passes (the cat stands
   40 units nearer him).
 
+Fixed (second pass — the Known item of the first pass)
+- **A small stroking hand "sank" because of its antialiased edge, not the drawing.** Still camera, very wide room shot:
+  granny's hand on the cat measured 8–12 % sunk past its outline (limit 10 %). Captured again at a device pixel ratio of 2
+  and 3, the same 13 moments: at most 6.2 % (2×) and 7.2 % (3×); zoomed, the hand lies on top of the cat's head. The hand
+  is ~459 px there (about 21 × 21), so its 1–2 px antialiased rim is a large share of it; in a medium shot (living-room
+  CI scene) the two scales agree (at most 3.4 % / 2.3 %). `acting_check` now measures a hand smaller than 1000 px again at
+  2× (`tools/chrome_run.py --scale`; the probe's coordinates and the px thresholds — the 3 px contact band, the 80 px gap
+  search, the 30-pixel minimum — scale with it) and says so in the note ("measured at 2× — the hand is 432 px"). Still
+  scene: 12 % → 6 %, 19 of 19 pass. `tools/check_scene.py`: the still-camera scene must now pass `acting_check` in full,
+  with the stroke measured at 2×. No runtime change.
+
 Checked — the 20 3D scenes (`examples/scene-3d`, the three `examples/lighting` scripts, the 11 distinct trial scenes of
-dot29–33, the 4 lighting trials of dot31, and the still-camera scene above), rebuilt on this code: `acting_check` 292 of
-293 pass, 0 medium shots kept as the full shot; `light_side` 24 of 24 judged pass (4 more — backlit, or at night without a lamp —
-reported, not judged).
+dot29–33, the 4 lighting trials of dot31, and the still-camera scene above), rebuilt on this code: `acting_check` 293 of
+293 pass (only the still scene needed the 2× capture), 0 medium shots kept as the full shot; `light_side` 24 of 24 judged
+pass (4 more — backlit, or at night without a lamp — reported, not judged).
 
 Known
-- Still camera, very wide room shot: granny's stroking hand sinks up to 12 % past the cat's outline (8–12 % over the 13
-  moments; limit 10 %) while contact stays 50–59 %; the same stroke in a medium shot is ≤ 5 %. The hand is a few dozen
-  pixels there, so antialiased edge pixels weigh much more — not yet shown whether it is the drawing or the measurement.
+- Nothing open from this round.
 
 ## 0.73.0
 

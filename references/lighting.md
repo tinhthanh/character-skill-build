@@ -110,7 +110,9 @@ on or against the pet (a hand in view that hovers beside it is not a touch). A s
 25° to reach a pet on the floor. Every medium shot the automatic camera chose (`set.shotLog`) must be narrower than
 85 % of the full shot of the same subjects — a cut to it would barely change the frame — and none may be kept as the full
 shot (the last line counts them). A stroke is followed every 0.1 s over the strokes (`track` in `moments.json`): the hand
-stays on or against the pet at every moment and no more than 25 % of it sinks past the pet's outline.
+stays on or against the pet at every moment (≥ 15 % of it) and no more than 10 % of it sinks past the pet's outline. A
+hand smaller than 1000 px in the capture (a very wide shot) is measured again at twice the resolution — at 1× its
+antialiased rim alone reads as several per cent sunk.
 A hand gesture (wave, point, thumbs up, cheer, call out…) is measured at the moment asked about: both hands of the person
 must lie inside the frame, at least 5 % of the hand's width from its left, right and top edges ( a hand below the bottom edge, hanging at the hip under a
 medium shot, is left out). A pet's own turn (scared, startled…) is measured in the frame at its middle, and when it follows
