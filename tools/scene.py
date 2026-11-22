@@ -390,6 +390,13 @@ def place_sounds(html, timings, sounds, base, out, copied):
     return html.replace(marker, '\n  <!-- "sounds": one clip each time the action plays -->\n' + '\n'.join(clips) + marker, 1), len(clips)
 
 
+def care_window(kind, length):
+    """Đợt 35: các giây (tính từ đầu bước) hai tay đang ở trên con vật — `bandage`: các vòng quấn (0,6 s … trước khi khép),
+    `putCone`: loa đã sang con vật → cài khoá dưới cằm (1,8 … 2,3 s, trước cái gật; trước đó vòng còn trong tay — `holds the cone` đo)."""
+    a, b = (0.6, length - 1.2) if kind == 'bandage' else (1.8, min(2.3, length - 0.5))
+    return [round(a + 0.15 * n, 2) for n in range(int((b - a) / 0.15) + 1)]
+
+
 def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, names):
     """NHỮNG KHOẢNH KHẮC ÁNH SÁNG của cảnh, kèm câu hỏi có / không mà câu trả lời đúng là "có" — cho tools/light_audit.py
     chụp ảnh tĩnh đúng lúc ấy và hỏi từng điều cụ thể (chấm cả video thì người / máy chấm nói ngược với hình: đợt 21)."""
@@ -463,7 +470,12 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                             'check': dict({'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times},
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
-                                          **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
+                                          **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}),
+                                          # ĐEO ĐỒ (đợt 35, lượt hai): dải mốc mỗi 0,15 s suốt lúc HAI tay ở trên con vật (quấn băng / đưa vòng quanh cổ,
+                                          # cài khoá) — tay áp sát ở mọi mốc, cả hai tay tới nó; `appear`: mỗi 0,1 s quanh lúc đồ hiện / dời sang
+                                          # con vật — chỉ khi tay đang ở đó (Gemini: "vòng tự bay lên đầu mèo, hai tay vẫn chắp ở bụng").
+                                          **({'track': [round(t0 + a, 2) for a in care_window(op['kind'], t1 - t0)], 'appear': [round(t0 + 0.1 * n, 2) for n in range(int((t1 - t0) * 10)) if 0.1 * n <= t1 - t0 - 0.8],
+                                              'by': op['who']} if op['kind'] in CARE_ACTIONS and pet else {}))})
             # ĐỒ ĐEO CÒN LẠI (đợt 35): sau `bandage` / `putCone`, băng vẫn trên chân trước / loa vẫn quanh đầu con vật, thấy được trong khung.
             if op['kind'] in CARE_ACTIONS and pet:
                 end = float(timings.get('duration') or t1 + 1.2)
@@ -482,7 +494,12 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.3, 0.45, 0.6) if op['kind'] == 'readChart' else (0.4, 0.55, 0.7))]
             ask = ([f'Is {op["who"]} holding a clipboard up in front of the chest and looking down to read it?'] if op['kind'] == 'readChart'
                    else [f'Is {op["who"]} pointing at a spot on the X-ray film of the viewer beside them?', 'Is the X-ray film (bones on a dark film) in the frame?'])
-            moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]}', 'ask': ask, 'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'times': times}})
+            check = {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'times': times}
+            # HƯỚNG NHÌN SAU KHI CHỈ PHIM (đợt 35, lượt hai): 0,3 s sau bước, người chỉ quay về phía người nghe.
+            if op['kind'] == 'showXray' and op.get('listener'):
+                check.update(listener=op['listener'], after=[round(min(t1 + 0.3, float(timings.get('duration') or t1 + 1) - 0.05), 2)])
+                ask = ask + [f'After pointing, does {op["who"]} turn toward {op["listener"]} (not to the camera)?']
+            moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]}', 'ask': ask, 'check': check})
             continue
         if op['kind'] == 'reaction':
             # PHẢN ỨNG CỦA CON VẬT (đợt 33): ở 30 / 50 / 70 % lượt nó thấy được trong khung; `start` / `end` để `acting_check` xét góc chèn
@@ -986,6 +1003,13 @@ def main():
     if not isinstance(script, list) or not script: fail('"script" must be a non-empty list of turns')
     voices = []                                             # { key, file, text }
 
+    def showxray_listener(actor):
+        """Người nghe của `showXray` (đợt 35): người (không phải con vật) gần `actor` nhất theo x, hay người `actor` "faces"."""
+        me = names.get(actor) or {}
+        if me.get('faces') in names and not names[me['faces']]['_pet']: return me['faces']
+        others = [w for w in names.values() if w['name'] != actor and not w['_pet']]
+        return min(others, key=lambda w: abs(float(w.get('x', 0)) - float(me.get('x', 0))))['name'] if others else None
+
     def step_code(step, where, actor=None):
         if isinstance(step, (int, float)): return js(step)
         # REO trong KHUNG DỌC (đợt 34): chữ V dang rộng cần ~1,02 × bề rộng góc toàn — không góc trung nào giữ được cả hai tay,
@@ -1016,7 +1040,13 @@ def main():
                 unit = float(viewer.get('height', round(person_default * 0.74))) / 470
                 if abs(float(viewer['z']) - float(names[actor].get('z', -300))) > 120: reach_notes.append(f'{where}: "{actor}" points at the X-ray viewer "{step[1]}", which stands {abs(float(viewer["z"]) - float(names[actor].get("z", -300))):g} units nearer or further — the hand points in its own plane: give it about the same z')
                 spot = f"set.targetPoint({actor}, [{float(viewer['x']):g} + (cutout{index + 1}Prop.spot.x - 200) * {unit:.5f}, {float(viewer.get('y', 0)):g} + (458 - cutout{index + 1}Prop.spot.y) * {unit:.5f}, {float(viewer['z']):g}])"
-                return '[' + ', '.join(["'showXray'", spot] + [js(item) for item in step[2:]]) + ']'
+                # NGƯỜI NGHE (đợt 35, lượt hai): chỉ xong thì quay về phía người khác gần nhất trong cảnh, không quay ra máy quay
+                # (Gemini: "xong quay ra nhìn máy quay thay vì quay về phía bà"). Người viết tự cho { "to": … } thì giữ của họ.
+                listener = showxray_listener(actor)
+                extra = [js(item) for item in step[2:3]] or (['1.6'] if listener else [])
+                if listener and not (len(step) > 3 and isinstance(step[3], dict) and 'to' in step[3]): extra.append(f'{{ to: {listener} }}')
+                elif len(step) > 3: extra.append(js(step[3]).replace('"@', '').replace('"', '') if isinstance(step[3], dict) and str(step[3].get('to', '')).startswith('@') else js(step[3]))
+                return '[' + ', '.join(["'showXray'", spot] + extra) + ']'
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
         parts = []
@@ -1399,6 +1429,11 @@ def main():
                 # (đo bằng tools/acting_check.py, đợt 28).
                 wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'bandage': 0.16, 'putCone': 0.16}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
+                # BĂNG CHÂN (đợt 35, lượt hai): đứng ngang CHÂN TRƯỚC con vật (về phía đầu nó, ~0,2 × chiều cao host của nó), không ngang
+                # giữa thân — tay phía xa của người chibi không với tới chân trước, bàn tay giữ dừng ở bụng con chó (đo trên ảnh).
+                if step[0] == 'bandage' and target['_pet']:
+                    head = -1 if target.get('faces') in names and float(names[target['faces']]['x']) < float(target['x']) else 1
+                    gap += head * 0.2 * target['_host_height']
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
                 if step[0] in ('stroke', 'brush') and target['_pet'] and target.get('on') and not who.get('seated'): wanted = 0.16 * who['_host_height']
@@ -1461,7 +1496,9 @@ def main():
                 who['x'] = float(who['x']) + move
                 # Soi đèn / đưa bánh: người đứng SÁT con vật (0,16) — xong thì LÙI về chỗ cũ, không thì người (vẽ trước con
                 # vật đứng cạnh mình) che mất mặt nó suốt phần sau của cảnh (cảnh thử đợt 12: góc cận chó chỉ thấy tay bác sĩ).
-                if step[0] in ('examine', 'giveTreat') + CARE_ACTIONS: backs.append((who, -move))
+                # Băng chân / đeo loa (đợt 35, lượt hai): KHÔNG lùi lại — người làm ở lại cạnh con vật nói tiếp; bước lùi giữa góc trung
+                # đưa người ra khỏi mép khung (Gemini: bác sĩ lẹm mép trái lúc đi ra, 00:42).
+                if step[0] in ('examine', 'giveTreat'): backs.append((who, -move))
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -1522,7 +1559,8 @@ def main():
                     gear_ops.append({'turn': emitted[0], 'kind': 'gesture', 'name': name, 'who': turn.get('who'), 'target': None})
                 # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ trước ngực, trong khung; tay chỉ trúng điểm trên phim (acting_check).
                 if name in CHART_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
-                    gear_ops.append({'turn': emitted[0], 'kind': name, 'name': name, 'who': turn.get('who'), 'target': step[1] if name == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None})
+                    gear_ops.append({'turn': emitted[0], 'kind': name, 'name': name, 'who': turn.get('who'), 'target': step[1] if name == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None,
+                                     'listener': showxray_listener(turn.get('who')) if name == 'showXray' and stage_set is not None else None})
                 if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
                     # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người

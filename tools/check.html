@@ -1761,9 +1761,16 @@ try {
         wrap.progress(0); if (pup.el.bang.style.display !== 'none') hong('bandage', 'seeking back before the bandage still shows it');
         wrap.progress(1);
         // Đeo loa: vành loa trong tay rồi loa nở ra quanh đầu con vật và còn lại.
-        const kit = L.createPet(spot('left:115px;top:118px;width:100px;height:82px'), { species: 'cat' }).rig, helper = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
+        const kit = L.createPet(spot('left:75px;top:118px;width:100px;height:82px'), { species: 'cat' }).rig, helper = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
         const cone = L.sequence(helper, [['putCone', kit]], { breathe: false });
-        cone.time(0.4); if (helper.el.gadgetR.style.display === 'none') hong('putCone', 'no cone in the hand on the way to the pet');
+        // Vòng loa trong tay (hình riêng `ring`) thấy rõ trước khi chuyển; lúc ở quanh đầu, TÂM vòng trùng đầu con vật; hai bàn tay ở mép vòng.
+        cone.time(0.6); if (helper.el.ring.style.display === 'none') hong('putCone', 'no cone held up in the hands before it goes on the pet');
+        if (kit.el.cone.style.display !== 'none') hong('putCone', 'the cone is already on the pet while it is still in the hands');
+        cone.time(1.6);
+        { const r = helper.el.ring.getBoundingClientRect(), h = kit.el.dau.getBoundingClientRect(), off = Math.hypot(r.left + r.width / 2 - h.left - h.width / 2, r.top + r.height / 2 - h.top - h.height / 2);
+          if (off > h.width * 0.35) hong('putCone', `the cone in the hands is ${off.toFixed(0)} px off the pet's head just before it goes on`);
+          for (const side of ['L', 'R']) { const [x, y] = at(helper.el['coTay' + side]); const d = Math.hypot(x - r.left - r.width / 2, y - r.top - r.height / 2);
+            if (d > r.width * 0.8) hong('putCone', `the ${side} hand is not on the rim of the cone (${(d / r.width * 2).toFixed(2)} radii from its centre)`); } }
         cone.progress(1);
         if (kit.el.cone.style.display === 'none' || kit.careLevel('petCone') !== 1) hong('putCone', 'the cone is not left on the pet');
         let twice = ''; try { L.sequence(helper, [['putCone', pup]]); } catch (error) { twice = error.message; }
@@ -1791,7 +1798,12 @@ try {
         if (!(nurse.s.huong > 0.4)) hong('showXray', `the body does not turn toward the film (facing ${nurse.s.huong.toFixed(2)})`);
         if (off > 15) hong('showXray', `the arm points ${off.toFixed(0)}° off the spot on the film`);
         show.progress(1); if (Math.abs(nurse.s.huong) > 0.01) hong('showXray', 'the character does not turn back after pointing');
-        show.kill(); nurse.svg.remove(); film.svg.remove();
+        show.kill(); nurse.datNghi();
+        // { to }: xong thì quay về phía người nghe (ở bên trái) và giữ hướng ấy — không quay ra máy quay.
+        const listener = L.createCharacter(spot('left:-150px;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
+        const told = L.sequence(nurse, [['showXray', mark, 1.2, { to: listener }]], { breathe: false }); told.progress(1);
+        if (!(nurse.s.huong < -0.4)) hong('showXray', `after pointing the character does not turn to the listener on the left (facing ${nurse.s.huong.toFixed(2)})`);
+        told.kill(); listener.svg.remove(); nurse.svg.remove(); film.svg.remove();
       }
       // Đợt 7 — thông báo trên điện thoại: thẻ bật ra trên bàn tay cầm máy, có chữ, tắt khi xong; không cầm máy thì báo lỗi.
       {

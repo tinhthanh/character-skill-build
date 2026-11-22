@@ -210,6 +210,8 @@ const NGHI = Object.freeze({
   onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   petWrap: 0,                   // 0…1 BĂNG đã quấn lên chân trước con vật (`bandage`, đợt 35) — con vật đọc lại (RigThu.careLevel); giữ sau động tác
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
+  gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
+  ring: 0, ringX: 0, ringY: 0, ringR: 40,   // VÒNG LOA đang cầm (`putCone`, đợt 35 lượt hai): hiện / tâm / bán kính, khung của `#aimOf`
   pageL: 0, pageR: 0,           // 0…1 tờ trên cùng của bìa kẹp hồ sơ đang LẬT lên (`readChart`, đợt 35)
   tayL: 'mo', tayR: 'mo',
 });
@@ -310,6 +312,7 @@ const RIDE_THIGH = 84;                    // cầm lái: đùi gần (độ) xoa
 const RIDE_KNEE = 76;                     // …ống chân gập lại gần thẳng đứng, bàn chân hơi ra trước (sàn để chân)
 const RIDE_LEAN = 7;                      // …lưng hơi đổ về trước
 const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, về phía mặt): bắp tay ra trước–xuống, cẳng tay ngang hơn tới tay lái
+const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
@@ -882,6 +885,11 @@ class RigSVG {
     <clipPath id="${p}-lowHairClip"><rect id="${p}-lowHairClipR" x="-200" width="400" height="300"/></clipPath>
     <clipPath id="${p}-matClip"><path id="${p}-matClipP" d="${this.nv.dau(this.mau, this.nv)}"/></clipPath>
   </defs>
+  <!-- VÒNG LOA CHỐNG LIẾM đang cầm (\`putCone\`, đợt 35 lượt hai): ở GỐC SVG, SAU người (hai bàn tay vẽ trên mép vòng), đặt theo \`ringX/ringY\` (khung của \`#aimOf\`) và cỡ \`ringR\` —
+       vòng luôn đúng chỗ, hai bàn tay đặt lên mép nó. -->
+  <g id="${p}-ring" style="display:none"><ellipse rx="40" ry="36" fill="#e6f3fa" fill-opacity=".72" stroke="#8fb8cf" stroke-width="3"/>
+    <ellipse rx="28" ry="25" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".6"/>
+    <path d="M -36 14 Q -32 -14 -12 -30" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
   <g id="${p}-goc">
     <ellipse id="${p}-bong" cx="200" cy="428" rx="62" ry="8" fill="#000" opacity=".28"/>
     <g id="${p}-sauChan"></g>
@@ -980,7 +988,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), ring: q('ring'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1343,6 +1351,8 @@ class RigSVG {
       const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
       if (!box) continue;
       box.style.display = kind > 0 ? '' : 'none';
+      const spin = +(s['gadgetTurn' + side] || 0);
+      if (spin) box.setAttribute('transform', `rotate(${(side === 'L' ? -spin : spin).toFixed(2)} 0 10)`); else box.removeAttribute('transform');
       for (const child of box.children) child.style.display = +child.getAttribute('data-gadget') === kind ? '' : 'none';
     }
     const gripping = { L: false, R: false };
@@ -1360,7 +1370,7 @@ class RigSVG {
       const sheet = e['item' + side].querySelector('[data-page]');
       if (sheet) {
         const flip = clamp(s['page' + side] || 0, 0, 1), top = +(sheet.dataset.page || 0);
-        sheet.setAttribute('transform', flip ? `translate(0 ${top}) scale(1 ${(1 - 1.55 * flip).toFixed(3)}) translate(0 ${-top})` : '');
+        sheet.setAttribute('transform', flip ? `translate(0 ${top}) scale(1 ${(1 - 1.9 * flip).toFixed(3)}) translate(0 ${-top})` : '');
         for (const ink of sheet.querySelectorAll('[data-ink]')) ink.style.display = flip > 0.5 ? 'none' : '';
       }
       for (const face of e['item' + side].querySelectorAll('[data-back]')) face.style.display = back ? '' : 'none';
@@ -1418,6 +1428,10 @@ class RigSVG {
     this.#drawLeash();
     this.#drawBall();
     this.#drawNote();
+    if (e.ring) {
+      e.ring.style.display = s.ring >= 0.5 ? '' : 'none';
+      if (s.ring >= 0.5) e.ring.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
+    }
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
     for (const pet of this.caring || []) if (pet.el) pet.apDung();
   }
@@ -2864,9 +2878,9 @@ class RigSVG {
     return rig && typeof rig.careLevel === 'function' && rig.careBy ? rig : null;
   }
   #careHand(t, target, part) {
-    const s = this.s, k = this.#reachLow(target, null, part).tx < HONG.x ? 'L' : 'R', busy = this.holds[k] && s['item' + k] > 0.5;
-    if (busy) t.to(s, { ['item' + k]: 0, ['carry' + k]: 0, duration: 0.15 }, 0);
-    return { reach: this.#reachLow(target, k, part), keep: busy ? { ['item' + k]: 1 } : {} };
+    const s = this.s, k = this.#reachLow(target, null, part).tx < HONG.x ? 'L' : 'R', keep = {};
+    for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) { t.to(s, { ['item' + side]: 0, ['carry' + side]: 0, duration: 0.15 }, 0); keep['item' + side] = 1; }
+    return { reach: this.#reachLow(target, k, part), keep };
   }
   #careFor(pet, key, name) {
     if (!pet) return;
@@ -2875,29 +2889,52 @@ class RigSVG {
     (this.caring || (this.caring = new Set())).add(pet);
     pet.careBy.add(this);
   }
+  #armTo(k, x, y, sx = this.#shoulderX(k), sy = this.#shoulderY()) {
+    const a = DAI.canhTay * this.nv.daiCanhTay, b = DAI.cangTay * this.nv.daiCangTay, deg = 180 / Math.PI;
+    const d = clamp(Math.hypot(x - sx, y - sy), Math.abs(a - b) + 1, a + b - 0.5), phi = Math.atan2(y - sy, x - sx) * deg;
+    const alpha = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1)) * deg;
+    const [u1, u2] = [phi + alpha, phi - alpha], low = (u) => sy + a * Math.sin(u / deg);
+    const phiU = low(u1) >= low(u2) ? u1 : u2, ex = sx + a * Math.cos(phiU / deg), ey = sy + a * Math.sin(phiU / deg);
+    const phiF = Math.hypot(x - sx, y - sy) > a + b - 0.5 ? phiU : Math.atan2(y - ey, x - ex) * deg;
+    const bat = k === 'R' ? 90 - phiU : phiU - 90, cang = k === 'R' ? phiU - phiF : phiF - phiU;
+    return { bat: clamp(chuanHoaGoc(bat), -60, 172), cang: chuanHoaGoc(cang), dir: phiF };
+  }
+  #stoopFor(t, reach, min) {
+    const s = this.s, low = s.seat > 0.5 || s.kneel > 0.5, crouch = low ? 0 : Math.max(reach.crouch || 0, min);
+    const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch, sy = this.#shoulderY() + drop;
+    if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { aimL: 1, aimR: 1, duration: 0.3, ease: 'sine.inOut' }, 0);
+    return (k, x, y) => this.#armTo(k, x, y, this.#shoulderX(k), sy);
+  }
   bandage(target = null, wraps = 3) {
     const pet = this.#petOf(target);
     if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] bandage(pet): the target must be a pet rig (createPet(...).rig)');
     if (!(Number.isFinite(wraps) && wraps >= 1)) throw new Error(`[character] bandage: wraps must be a number ≥ 1, got ${JSON.stringify(wraps)}`);
     this.#careFor(pet, 'petWrap', 'bandage');
-    const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, upper, fore, tx, ty } = reach;
-    this.#leanTo(t, reach, 'nam');
-    t.set(s, { ['gadget' + k]: 6 }, 0.1);
-    const loop = 0.52, start = 0.5, R = 7, n = Math.round(wraps);
-    for (let w = 0; w < n; w++) {
-      for (let q = 1; q <= 4; q++) {
-        const a = q * Math.PI / 2, drop = (w + q / 4) / n * 10 - 5;
-        const { upper: u, fore: f } = reach.solve(tx + Math.cos(a) * R, ty + drop + Math.sin(a) * R * 0.6);
-        t.to(s, { ['bat' + k]: u, ['cang' + k]: f, duration: loop / 4, ease: 'sine.inOut' }, start + w * loop + (q - 1) * loop / 4);
-      }
+    const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, tx, ty } = reach;
+    const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, reach, 0.4);
+    const holdLeg = arm(o, tx - side * 2, ty + 12), R = BANDAGE_LOOP, loop = 0.55, start = 0.55, n = Math.round(wraps);
+    const wrapAt = (w, q) => { const a = -Math.PI / 2 + q * Math.PI / 2; return arm(k, tx + Math.cos(a) * R, ty + 2 + ((w + q / 4) / n) * 9 - 3 + Math.sin(a) * R * 0.75); };
+    const first = wrapAt(0, 0);
+    t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'nam' }, 0.02);
+    t.to(s, { ['bat' + k]: first.bat, ['cang' + k]: first.cang, ['bat' + o]: holdLeg.bat, ['cang' + o]: holdLeg.cang, than: N.than - side * 3, dau: N.dau + side * 4,
+              dauY: 11, nhinY: 3, nhinX: side * 1.4, matY: 0.25, cuoi: 0.5, chum: 0.25, mayL: 0.2, mayR: 0.2, duration: 0.5, ease: 'power2.out' }, 0);
+    t.set(s, { ['gadget' + k]: 6 }, 0.15);
+    if (pet) t.to(s, { onTopL: 1, onTopR: 1, duration: 0.02 }, 0.05);          // ngay đầu động tác: con vật lên trước người (set3d) khi hai tay còn đang vươn tới
+    for (let w = 0; w < n; w++) for (let q = 1; q <= 4; q++) {
+      const p = wrapAt(w, q);
+      t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: loop / 4, ease: 'sine.inOut' }, start + w * loop + (q - 1) * loop / 4);
     }
+    t.to(s, { ['cang' + o]: holdLeg.cang + side * 3, duration: loop / 2, ease: 'sine.inOut', yoyo: true, repeat: n * 2 - 1 }, start);
     t.to(s, { petWrap: 1, duration: n * loop, ease: 'none' }, start);
-    if (pet) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.4).to(s, { ['onTop' + k]: 0, duration: 0.02 }, start + n * loop + 0.6);
-    t.to(s, { nhinY: 2.8, dauY: 9, chum: 0.25, mayL: 0.2, mayR: 0.2, cuoi: 0.5, duration: 0.3 }, 0.45);
-    const done = start + n * loop;
+    const done = start + n * loop, pat = arm(k, tx, ty + 3), patUp = arm(k, tx, ty - 3);
     t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo' }, done);
-    t.to(s, { ['bat' + k]: upper - 3, ['cang' + k]: fore + 5, duration: 0.14, ease: 'sine.out', yoyo: true, repeat: 3 }, done + 0.02);
-    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, dauY: 6, duration: 0.25 }, done + 0.1);
+    t.to(s, { ['bat' + k]: patUp.bat, ['cang' + k]: patUp.cang, duration: 0.14, ease: 'sine.out' }, done)
+     .to(s, { ['bat' + k]: pat.bat, ['cang' + k]: pat.cang, duration: 0.14, ease: 'sine.in' }, done + 0.14)
+     .to(s, { ['bat' + k]: patUp.bat, ['cang' + k]: patUp.cang, duration: 0.14, ease: 'sine.out' }, done + 0.28)
+     .to(s, { ['bat' + k]: pat.bat, ['cang' + k]: pat.cang, duration: 0.14, ease: 'sine.in' }, done + 0.42);
+    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, matY: 0, dauY: 6, duration: 0.25 }, done + 0.1);
+    if (pet) t.to(s, { onTopL: 0, onTopR: 0, duration: 0.02 }, done + 0.6);
     this.#khep(t, 0.5, done + 0.62, { ...keep, ...(pet ? { petWrap: 1 } : {}) });
     return t;
   }
@@ -2905,23 +2942,29 @@ class RigSVG {
     const pet = this.#petOf(target);
     if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] putCone(pet): the target must be a pet rig (createPet(...).rig)');
     this.#careFor(pet, 'petCone', 'putCone');
-    const t = this.tl(), s = this.s, N = this.NGHI, { reach: head, keep } = this.#careHand(t, target, 'eyes');
-    const R = Math.max(CONE_GRIP, (head.span || 0) * 70 / 132 + 15);
-    const side = head.tx >= head.shoulderX ? 1 : -1, hx = head.tx - side * R, hy = head.ty;
-    const grip = head.solve(hx, hy), reach = { ...head, upper: grip.upper, fore: grip.fore }, { k } = reach;
-    const ring = this.el['gadget' + k] && this.el['gadget' + k].querySelector('[data-gadget="7"]'), turn = (side > 0 ? 0 : 180) - grip.dir;
-    if (ring) ring.setAttribute('transform', `rotate(${(chuanHoaGoc(k === 'L' ? -turn : turn)).toFixed(1)} 0 10) translate(0 10) scale(${(R / CONE_GRIP).toFixed(3)}) translate(0 -10)`);
-    this.#leanTo(t, reach, 'nam');
-    t.set(s, { ['gadget' + k]: 7 }, 0.05);
-    t.to(s, { petCone: 1, duration: 0.3, ease: 'power1.out' }, 0.55);
-    if (pet) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.4).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 1.6);
-    t.set(s, { ['gadget' + k]: 0 }, 0.7);
-    const fasten = head.solve(head.tx - side * R * 0.78, head.ty + R * 0.12);
-    t.to(s, { ['bat' + k]: fasten.upper, ['cang' + k]: fasten.fore, chum: 0.3, mayL: 0.15, mayR: 0.15, duration: 0.25, ease: 'sine.inOut' }, 0.8);
-    t.to(s, { ['bat' + k]: fasten.upper + 2, ['cang' + k]: fasten.fore - 3, duration: 0.12, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 1.05);
-    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.25 }, 1.3);
-    t.to(s, { dauY: 11, duration: 0.16, ease: 'sine.out', yoyo: true, repeat: 1 }, 1.35);
-    this.#khep(t, 0.5, 1.7, { ...keep, ...(pet ? { petCone: 1 } : {}) });
+    const t = this.tl(), s = this.s, N = this.NGHI, { reach: head, keep } = this.#careHand(t, target, 'eyes'), { k, tx, ty } = head;
+    const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, head, 0.15), deg = Math.PI / 180;
+    const R = Math.max(CONE_GRIP, (head.span || 0) * 70 / 132 + 4);
+    const rimK = side > 0 ? 205 : -25, rimO = side > 0 ? 150 : 30;
+    const pose = (cx, cy, angK = rimK, angO = rimO) => {
+      const a = arm(k, cx + Math.cos(angK * deg) * R, cy + Math.sin(angK * deg) * R), b = arm(o, cx + Math.cos(angO * deg) * R, cy + Math.sin(angO * deg) * R);
+      return { ['bat' + k]: a.bat, ['cang' + k]: a.cang, ['bat' + o]: b.bat, ['cang' + o]: b.cang, ringX: cx, ringY: cy };
+    };
+    const chestX = HONG.x + side * 50, chestY = this.#shoulderY() + 62;      // lệch về phía con vật: vành không che mặt
+    t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'nam', ring: 1, ringR: R, ringX: chestX, ringY: chestY }, 0.02);
+    t.to(s, { ...pose(chestX, chestY), cuoi: 0.8, mayL: 0.5, mayR: 0.5, nhinX: side * 1.2, nhinY: 1.5, duration: 0.5, ease: 'power2.out' }, 0);
+    t.to(s, { dauY: 4, duration: 0.2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
+    t.to(s, { ...pose(tx, ty), than: N.than - side * 3, dau: N.dau + side * 4, dauY: 9, nhinY: 2.6, cuoi: 0.5, chum: 0.25, duration: 0.55, ease: 'power2.inOut' }, 0.85);
+    if (pet) t.to(s, { onTopL: 1, onTopR: 1, duration: 0.02 }, 0.85);
+    t.to(s, { ...pose(tx, ty + R * 0.12), duration: 0.25, ease: 'sine.inOut' }, 1.45);
+    t.set(s, { petCone: 1, ring: 0 }, 1.72);
+    const lock = pose(tx, ty, 90 + side * 22, 90 + side * 48);
+    t.to(s, { ['bat' + k]: lock['bat' + k], ['cang' + k]: lock['cang' + k], ['bat' + o]: lock['bat' + o], ['cang' + o]: lock['cang' + o], duration: 0.3, ease: 'sine.inOut' }, 1.75);
+    t.to(s, { ['cang' + k]: lock['cang' + k] + 4, ['cang' + o]: lock['cang' + o] + 4, duration: 0.12, ease: 'sine.inOut', yoyo: true, repeat: 3 }, 2.08);
+    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.25 }, 2.4);
+    if (pet) t.to(s, { onTopL: 0, onTopR: 0, duration: 0.02 }, 2.7);
+    t.to(s, { dauY: 14, duration: 0.15, ease: 'sine.out', yoyo: true, repeat: 1 }, 2.3);          // gật: "xong rồi"
+    this.#khep(t, 0.5, 2.62, { ...keep, ...(pet ? { petCone: 1 } : {}) });
     return t;
   }
   readChart(hold = 2, { side = 'auto' } = {}) {
@@ -2940,19 +2983,30 @@ class RigSVG {
     read(0.5, flip - 0.35);
     t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.4);
     t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.35, ease: 'power2.out' }, flip - 0.4);
-    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 6, ['cang' + pen]: CHART_POSE.flip[1] - 6, duration: 0.4, ease: 'power1.inOut' }, flip);
-    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 0.45);
-    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 0.85);
-    read(flip + 0.5, 0.45 + hold + 0.3);
-    const up = 0.45 + hold + 0.35;
+    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, nhinY: LOOK_DOWN.eyes - 2, duration: 0.6, ease: 'power1.inOut' }, flip);
+    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], nhinY: LOOK_DOWN.eyes, duration: 0.4, ease: 'power2.inOut' }, flip + 0.7);
+    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.1);
+    const up = flip + 1.2 + Math.max(0.4, hold * 0.25);
+    read(flip + 0.8, up - 0.05);
     t.to(s, { dauY: 0, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.3, ease: 'power2.out' }, up);
-    t.to(s, { dauY: 7, duration: 0.15, ease: 'sine.inOut', yoyo: true, repeat: 3 }, up + 0.32);
-    this.#khep(t, 0.5, up + 0.95, stowed ? { ['item' + k]: 0 } : {});
+    for (let i = 0; i < 2; i++) {
+      t.to(s, { dauY: 15, nhinY: 2, vai: N.vai + 2.5, duration: 0.2, ease: 'power2.out' }, up + 0.4 + i * 0.5)
+       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, duration: 0.3, ease: 'power2.inOut' }, up + 0.6 + i * 0.5);
+    }
+    this.#khep(t, 0.5, up + 1.45, stowed ? { ['item' + k]: 0 } : {});
     return t;
   }
-  showXray(target = null, hold = 1.6) {
+  showXray(target = null, hold = 1.6, { to = null } = {}) {
     if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] showXray: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
-    const t = this.tl(), s = this.s, before = s.huong;
+    const t = this.tl(), s = this.s;
+    let before = s.huong;
+    if (to && typeof to === 'object') {
+      const box = to.getBoundingClientRect ? to.getBoundingClientRect() : null;
+      const dx = (typeof to.centerX === 'function' ? to.centerX() : box ? box.left + box.width / 2 : this.centerX()) - this.centerX();
+      if (Math.abs(dx) >= 1) before = (dx < 0 ? -1 : 1) * 0.55;
+    } else if (to === 'left' || to === 'right') before = (to === 'left' ? -1 : 1) * 0.55;
+    else if (to !== null && to !== 'front') throw new Error(`[character] showXray: { to } is the listener — a rig, an element, 'left', 'right' or 'front', got ${JSON.stringify(to)}`);
+    else if (to === 'front') before = 0;
     const side = this.#aimOf(target).ben, turn = (side === 'L' ? -1 : 1) * XRAY_TURN;
     s.huong = turn; const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(target); s.huong = before;
     t.to(s, { huong: turn, nhinX, duration: 0.4, ease: 'sine.inOut' }, 0);
@@ -2961,9 +3015,9 @@ class RigSVG {
     t.to(s, { ['bat' + ben]: bat, ['cang' + ben]: 0, dau, nhinY, cuoi: 0.4, chum: 0.2, mayL: 0.45, mayR: 0.45, duration: 0.45, ease: 'back.out(1.2)' }, 0.15);
     t.set(s, { ['tay' + ben]: 'chi' }, 0.35);
     for (const at of [0.75, 0.75 + hold * 0.5]) t.to(s, { ['cang' + ben]: 5, ['bat' + ben]: bat + 1.5, dauY: 2.5, duration: 0.14, ease: 'power2.out', yoyo: true, repeat: 1 }, at);
-    const back = 0.6 + hold;
-    t.to(s, { nhinX: 0, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
-    this.#khep(t, 0.55, back + 0.1);
+    const back = 0.6 + hold, look = Math.sign(before) * 1.6;
+    t.to(s, { nhinX: look, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
+    this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look });
     return t;
   }
   #placeCarried() {
@@ -6558,6 +6612,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const from = shown.indexOf(item), to = shown.findIndex((entry) => entry.actor.rig === item.actor.over);
         if (to > from && together(item.actor, shown[to].actor)) { shown.splice(from, 1); shown.splice(to, 0, item); }
       }
+      for (const item of shown.filter((entry) => isPerson(entry.actor) && entry.actor.rig && entry.actor.rig.caring && entry.actor.rig.s
+          && (entry.actor.rig.s.onTopL > 0.5 || entry.actor.rig.s.onTopR > 0.5))) {
+        for (const pet of shown.filter((entry) => entry.actor.rig && item.actor.rig.caring.has(entry.actor.rig))) {
+          const from = shown.indexOf(pet), to = shown.indexOf(item);
+          if (from < to && together(item.actor, pet.actor)) { shown.splice(from, 1); shown.splice(shown.indexOf(item) + 1, 0, pet); }
+        }
+      }
       if (lighting) { findTorches(); for (const torch of lighting.torches) aimTorch(torch); if (lighting.torches.some((t) => t.kind === 5)) findTorches(); torchPools(); for (const actor of actors) squint(actor); }
       for (let index = 0; index <= shown.length; index++) {
         const element = layer(index);
@@ -6741,42 +6802,53 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       for (const pet of actors) {
         if (!pet.rig) continue;
         const caring = !pet.over && actors.find((item) => item.rig && item.rig.caring && item.rig.caring.has(pet.rig) && item.rig.s && (item.rig.s.onTopL > 0.5 || item.rig.s.onTopR > 0.5));
-        if (!pet.over && !caring) { if (pet.ghost) pet.ghost.style.display = 'none'; continue; }
+        const ghosts = pet.ghosts || (pet.ghosts = []);
+        const hide = (from) => { for (let n = from; n < ghosts.length; n++) if (ghosts[n]) ghosts[n].style.display = 'none'; };
+        if (!pet.over && !caring) { hide(0); continue; }
         const person = caring || actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
-        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
-        let ghost = pet.ghost;
-        const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
-        if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
-        if (!ghost) {
-          ghost = pet.ghost = document.createElement('div');
-          ghost.dataset.ghost = '1';
-          const mask = `ghost${++ghostCount}`;
-          ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use/></g>
-            <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
-              <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
-            <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+        const sides = !s ? [] : caring ? ['L', 'R'].filter((side) => s['onTop' + side] > 0.5) : [s.onTopR > 0.5 ? 'R' : s.onTopL > 0.5 ? 'L' : null].filter(Boolean);
+        let slot = 0;
+        for (const k of sides) {
+          const hand = person.rig.el && person.rig.el['coTay' + k];
+          const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
+          if (!usable) continue;
+          let ghost = ghosts[slot];
+          if (!ghost) {
+            ghost = ghosts[slot] = document.createElement('div');
+            ghost.dataset.ghost = '1';
+            const mask = `ghost${++ghostCount}`;
+            ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use data-outline="1"/><use/></g>
+              <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+                <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
+              <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+          }
+          slot++;
+          if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
+          ghost.className = person.host.className;
+          ghost.style.cssText = person.host.style.cssText;
+          ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
+          ghost.style.pointerEvents = 'none';
+          const svg = ghost.firstChild, outline = svg.firstChild.firstChild, use = outline.nextSibling;
+          const ring = person.rig.svg.querySelector('#' + person.rig.id + '-vienTay');
+          if (outline.getAttribute('href') !== '#' + hand.id) outline.setAttribute('href', '#' + hand.id);
+          if (ring) outline.setAttribute('filter', `url(#${ring.id})`); else outline.removeAttribute('filter');
+          const box = person.rig.svg.getAttribute('viewBox');
+          if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
+          const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
+          for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
+          for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
+            const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
+            if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
+          }
+          let chain = new DOMMatrix();
+          for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
+            chain = localMatrix(node).multiply(chain);
+          }
+          const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
+          svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
+          ghost.style.display = '';
         }
-        if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
-        ghost.className = person.host.className;
-        ghost.style.cssText = person.host.style.cssText;
-        ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
-        ghost.style.pointerEvents = 'none';
-        const svg = ghost.firstChild, use = svg.firstChild.firstChild;
-        const box = person.rig.svg.getAttribute('viewBox');
-        if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
-        const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
-        for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
-        for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
-          const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
-          if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
-        }
-        let chain = new DOMMatrix();
-        for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
-          chain = localMatrix(node).multiply(chain);
-        }
-        const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
-        svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
-        ghost.style.display = '';
+        hide(slot);
       }
       return frame;
     },
@@ -7233,6 +7305,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
+          facing: person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
+          gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
+            return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
+            .concat(e.ring && e.ring.style.display !== 'none' ? [{ side: 'ring', kind: 7, box: rect(drawnRect(e.ring)) }] : []) : [],
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];

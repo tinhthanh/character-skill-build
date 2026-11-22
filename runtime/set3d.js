@@ -699,6 +699,15 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const from = shown.indexOf(item), to = shown.findIndex((entry) => entry.actor.rig === item.actor.over);
         if (to > from && together(item.actor, shown[to].actor)) { shown.splice(from, 1); shown.splice(to, 0, item); }
       }
+      // ĐANG BĂNG CHÂN / ĐEO LOA (đợt 35, lượt hai: `rig.caring` + `onTop`): con vật lên TRƯỚC người ấy — hai cánh tay vươn qua
+      // thân nó nằm sau nó, chỉ hai bàn tay (bản chép, ở dưới) vẽ trên nó. Người trước con vật thì hai cánh tay che 33 % con chó.
+      for (const item of shown.filter((entry) => isPerson(entry.actor) && entry.actor.rig && entry.actor.rig.caring && entry.actor.rig.s
+          && (entry.actor.rig.s.onTopL > 0.5 || entry.actor.rig.s.onTopR > 0.5))) {
+        for (const pet of shown.filter((entry) => entry.actor.rig && item.actor.rig.caring.has(entry.actor.rig))) {
+          const from = shown.indexOf(pet), to = shown.indexOf(item);
+          if (from < to && together(item.actor, pet.actor)) { shown.splice(from, 1); shown.splice(shown.indexOf(item) + 1, 0, pet); }
+        }
+      }
       // Đèn trong tay (đèn soi, đèn pin): tìm trước khi chiếu sáng từng nhân vật.
       if (lighting) { findTorches(); for (const torch of lighting.torches) aimTorch(torch); if (lighting.torches.some((t) => t.kind === 5)) findTorches(); torchPools(); for (const actor of actors) squint(actor); }
       for (let index = 0; index <= shown.length; index++) {
@@ -958,47 +967,62 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // ở một lớp ngay TRÊN con vật: một host chép đúng chỗ, cỡ, ánh sáng (`filter`) của host người, trong đó một SVG cùng khung
       // chỉ có `<use>` của nhóm cổ tay, đặt bằng các lớp transform của tay người — trùng từng điểm với bàn tay thật.
       // Đợt 35: cả người đang BĂNG CHÂN / ĐEO LOA cho con vật (`rig.caring`) — bàn tay quấn băng, cầm vành loa vẽ trên nó.
+      // Đợt 35 (lượt hai): HAI bàn tay (băng chân, đeo loa bằng hai tay) — mỗi tay đang `onTop` một bản chép (`pet.ghosts[0 | 1]`).
       for (const pet of actors) {
         if (!pet.rig) continue;
         const caring = !pet.over && actors.find((item) => item.rig && item.rig.caring && item.rig.caring.has(pet.rig) && item.rig.s && (item.rig.s.onTopL > 0.5 || item.rig.s.onTopR > 0.5));
-        if (!pet.over && !caring) { if (pet.ghost) pet.ghost.style.display = 'none'; continue; }
+        const ghosts = pet.ghosts || (pet.ghosts = []);
+        const hide = (from) => { for (let n = from; n < ghosts.length; n++) if (ghosts[n]) ghosts[n].style.display = 'none'; };
+        if (!pet.over && !caring) { hide(0); continue; }
         const person = caring || actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
-        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
-        let ghost = pet.ghost;
-        const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
-        if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
-        if (!ghost) {
-          ghost = pet.ghost = document.createElement('div');
-          ghost.dataset.ghost = '1';
-          // bàn tay, rồi hai lớp đổ bóng / hắt sáng của người (`shading.js`) cắt theo đúng hình bàn tay — thiếu chúng thì bản chép
-          // sáng hơn bàn tay thật (người ngồi trong nửa tối của chuyển sắc)
-          const mask = `ghost${++ghostCount}`;
-          ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use/></g>
-            <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
-              <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
-            <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+        // Người ngồi vuốt (`over`): một tay như đợt 32; người đeo đồ: mọi tay đang `onTop`.
+        const sides = !s ? [] : caring ? ['L', 'R'].filter((side) => s['onTop' + side] > 0.5) : [s.onTopR > 0.5 ? 'R' : s.onTopL > 0.5 ? 'L' : null].filter(Boolean);
+        let slot = 0;
+        for (const k of sides) {
+          const hand = person.rig.el && person.rig.el['coTay' + k];
+          const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
+          if (!usable) continue;
+          let ghost = ghosts[slot];
+          if (!ghost) {
+            ghost = ghosts[slot] = document.createElement('div');
+            ghost.dataset.ghost = '1';
+            // bàn tay, rồi hai lớp đổ bóng / hắt sáng của người (`shading.js`) cắt theo đúng hình bàn tay — thiếu chúng thì bản chép
+            // sáng hơn bàn tay thật (người ngồi trong nửa tối của chuyển sắc)
+            const mask = `ghost${++ghostCount}`;
+            // `data-outline` (đợt 35, lượt hai): VIỀN của bàn tay — rig vẽ viền tay bằng một bộ lọc ở cả cánh tay (`-vienTay`), ngoài
+            // nhóm cổ tay; thiếu nó thì bản chép không viền, 20 % điểm ảnh bàn tay (mép) khác bàn tay thật.
+            ghost.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block;overflow:visible"><g><use data-outline="1"/><use/></g>
+              <defs><filter id="${mask}-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+                <mask id="${mask}" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4400" height="4400"><g><use filter="url(#${mask}-white)"/></g></mask></defs>
+              <g mask="url(#${mask})"><use data-layer="up"/><use data-layer="cover"/></g></svg>`;
+          }
+          slot++;
+          if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
+          ghost.className = person.host.className;
+          ghost.style.cssText = person.host.style.cssText;
+          ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
+          ghost.style.pointerEvents = 'none';
+          const svg = ghost.firstChild, outline = svg.firstChild.firstChild, use = outline.nextSibling;
+          const ring = person.rig.svg.querySelector('#' + person.rig.id + '-vienTay');
+          if (outline.getAttribute('href') !== '#' + hand.id) outline.setAttribute('href', '#' + hand.id);
+          if (ring) outline.setAttribute('filter', `url(#${ring.id})`); else outline.removeAttribute('filter');
+          const box = person.rig.svg.getAttribute('viewBox');
+          if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
+          const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
+          for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
+          for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
+            const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
+            if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
+          }
+          let chain = new DOMMatrix();
+          for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
+            chain = localMatrix(node).multiply(chain);
+          }
+          const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
+          svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
+          ghost.style.display = '';
         }
-        if (ghost.parentNode !== person.host.parentNode) person.host.parentNode.appendChild(ghost);
-        ghost.className = person.host.className;
-        ghost.style.cssText = person.host.style.cssText;
-        ghost.style.zIndex = +(pet.host.style.zIndex || 0) + 1;
-        ghost.style.pointerEvents = 'none';
-        const svg = ghost.firstChild, use = svg.firstChild.firstChild;
-        const box = person.rig.svg.getAttribute('viewBox');
-        if (box && svg.getAttribute('viewBox') !== box) svg.setAttribute('viewBox', box);
-        const clip = svg.querySelector('mask > g'), clipUse = clip.firstChild;
-        for (const item of [use, clipUse]) if (item.getAttribute('href') !== '#' + hand.id) item.setAttribute('href', '#' + hand.id);
-        for (const [key, selector] of [['up', '[data-bounce]'], ['cover', '[data-shade]']]) {
-          const layerEl = person.rig.svg.querySelector(':scope > ' + selector), item = svg.querySelector('use[data-layer="' + key + '"]');
-          if (layerEl && layerEl.id && item.getAttribute('href') !== '#' + layerEl.id) item.setAttribute('href', '#' + layerEl.id);
-        }
-        let chain = new DOMMatrix();
-        for (let node = hand.parentNode; node && node !== person.rig.svg; node = node.parentNode) {
-          chain = localMatrix(node).multiply(chain);
-        }
-        const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
-        svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
-        ghost.style.display = '';
+        hide(slot);
       }
       return frame;
     },
@@ -1658,6 +1682,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
+          // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
+          facing: person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
+          gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
+            return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
+            // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 7 như vành loa
+            .concat(e.ring && e.ring.style.display !== 'none' ? [{ side: 'ring', kind: 7, box: rect(drawnRect(e.ring)) }] : []) : [],
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];
