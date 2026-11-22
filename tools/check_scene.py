@@ -962,11 +962,11 @@ with tempfile.TemporaryDirectory() as work:
     # mèo nhào, thỏ gặm cà rốt, chó chạy nấp sau bé. acting_check đo từng động tác: trong khung, chân / lưng trên sàn, chân chổng
     # trời khi lăn, mõm tới tay / mặt, đầu ló ra mà thân khuất một phần.
     pets = {'id': 'pets35', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [
-        {'name': 'be', 'id': 'boy', 'x': 120, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -10, 'z': -530, 'faces': 'be'},
-        {'name': 'meo', 'species': 'cat', 'x': 330, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': -380, 'z': -600}],
-        'script': [{'who': 'cho', 'do': ['rollOver']}, {'who': 'cho', 'do': [['chaseTail', 2]]}, {'who': 'cho', 'do': [['lick', '@be', 3]]},
-                   {'who': 'be', 'say': 'Mèo ơi lên đây.', 'do': [['carry', '@meo']], 'view': {'on': ['be', 'meo'], 'size': 'medium'}},
-                   {'who': 'meo', 'do': [['lick', '@be', 3]]}, {'who': 'be', 'say': 'Xuống chơi nhé.', 'do': ['putDown']},
+        {'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500, 'faces': 'be'},
+        {'name': 'meo', 'species': 'cat', 'x': -10, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}],
+        'script': [{'who': 'cho', 'do': ['rollOver']}, {'who': 'cho', 'do': [['chaseTail', 2]]}, {'who': 'cho', 'do': [['lick', '@be', 4]]},
+                   {'who': 'be', 'say': 'Mèo ơi lên đây.', 'do': [['carry', '@meo']], 'view': {'on': ['be', 'meo'], 'size': 'full'}},
+                   {'who': 'meo', 'do': [['lick', '@be', 3]]}, {'who': 'be', 'say': 'Xuống chơi nhé.', 'do': ['putDown'], 'view': {'on': ['be', 'meo'], 'size': 'full'}},
                    {'who': 'meo', 'do': [['knead', 4]]}, {'who': 'tho', 'do': [['eatCarrot', 4]]}, {'who': 'tho', 'do': [['hide', '@be']], 'view': {'on': ['tho', 'be'], 'size': 'full'}}]}
     path = os.path.join(os.path.dirname(stage), '_check_pets35.json')
     try:
@@ -980,6 +980,7 @@ with tempfile.TemporaryDirectory() as work:
         if '"offerHand", set.target(be, cho, \'tongue\')' not in html: problems.append('pets35: the boy does not hold out a hand to the dog\'s tongue')
         if '{"face": true}' not in html or "['offerCheek'," not in html: problems.append('pets35: the carried cat is not told to lick the face, or the boy does not bend his cheek to it')
         if "'kneel', [\"offerHand\"" in html: problems.append('pets35: the boy kneels to be licked (the kneel reads as shins sunk into the floor)')
+        if 'avoid: [], span:' not in html: problems.append('pets35: the pet actions are not given their own close-up (frameAt … avoid: [], span)')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pets35')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('pets35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         else:
@@ -987,7 +988,10 @@ with tempfile.TemporaryDirectory() as work:
                            'meo knead — paws on the floor', 'tho eatCarrot — paws on the floor', 'tho hide — hides, head peeking out', 'be offerHand cho — hand reaches',
                            # đợt 35, lượt hai: vòng chạy đuổi đuôi, biên độ nhào, lưỡi chạm tay / má nhiều nhịp, người đứng chìa tay, không chạy xuyên chân
                            'cho chaseTail — runs round, turn after turn', 'meo knead — both front paws press up and down', 'cho lick be — tongue reaches the hand, lick after lick',
-                           'meo lick be — tongue reaches the face, lick after lick', 'be holds out a hand standing', 'tho hide — goes behind, not through, anyone'):
+                           'meo lick be — tongue reaches the face, lick after lick', 'be holds out a hand standing', 'tho hide — goes behind, not through, anyone',
+                           # đợt 35, lượt ba: góc cận con vật ≥ 35 % khung, con vật trong khung suốt lúc bế / đặt xuống
+                           'cho rollOver — big enough in the frame', 'cho chaseTail — big enough in the frame', 'meo knead — big enough in the frame',
+                           'tho eatCarrot — big enough in the frame', 'tho eatCarrot — the carrot gets shorter bite by bite', 'be carry meo — the pet stays in the frame', 'be putDown meo — the pet stays in the frame'):
                 if needle not in done.stdout: problems.append(f'pets35: acting_check did not measure {needle!r}')
 
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung

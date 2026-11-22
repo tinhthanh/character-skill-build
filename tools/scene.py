@@ -110,7 +110,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                Pets at play: "rollOver" (dogs, cats: on its back, paws in the air), ["chaseTail", 3] (dogs; then dizzy),
                ["knead", 8] (cats), ["lick", "@boy"] (dogs, cats: the boy holds out a hand at the same time — added for you;
                a pet the boy carries licks his face — he bends his cheek to it, "offerCheek"), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet
-               a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 6] (the rabbit).
+               a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 4] (the rabbit).
+               In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot or lick (and no "view") cuts to a close
+               shot of the pet for that turn — the pet ≥ 35 % of the frame height, others may be cropped — then back.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -294,7 +296,11 @@ CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur'
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
 CAMERA_SPEED = {'x': 220, 'y': 160, 'z': 220, 'yaw': 18, 'pitch': 8, 'distance': 420, 'zoom': 0.4}
 CAMERA_START = {'yaw': 0, 'pitch': 6, 'distance': 1700, 'x': 0, 'y': 300, 'z': -350, 'zoom': 1}   # máy mặc định của createSet (runtime/set3d.js, `base`)
-VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide', 'on', 'size', 'back')
+VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide', 'on', 'size', 'back', 'alone', 'fill')
+# GÓC CẬN TỰ ĐỘNG cho động tác riêng của thú (đợt 35, lượt ba): con vật ≥ 35 % chiều cao khung — ở góc toàn phòng khách nó chỉ cao ~1/12
+# khung, lưỡi và chân trước chỉ vài điểm ảnh. `alone`: được lẹm người khác; `fill`: phần chiều cao khung con vật chiếm.
+PET_CLOSE = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick')
+PET_CLOSE_FILL = 0.62
 VIEW_SIZES = ('close', 'medium', 'full')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
 # vòng xa hơn thì không có mặt sau để xoay tới.
@@ -500,7 +506,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                      else [round(t0 + (t1 - t0) * f, 2) for f in ((0.25, 0.4, 0.5) if op['name'] == 'chaseTail' else (0.4, 0.55, 0.7))])
             # DẢI MỐC (đợt 35, lượt hai): đuổi đuôi — mỗi 1/15 s suốt quãng chạy vòng (đếm số lần đổi hướng); nhào — mỗi 0,06 s (biên độ
             # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
-            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 0.05)}.get(op['name'])
+            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 0.05), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2)}.get(op['name'])
             samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
                             'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},
@@ -1202,7 +1208,8 @@ def main():
             extra = {key: view[key] for key in ('yaw', 'pitch') if key in view}
             if any(not isinstance(value, (int, float)) for value in extra.values()): fail(f'{where}: every camera value in "view" must be a number')
             check_camera(extra, f'{where}.view')
-            views.append({'turn': emitted[0], 'auto': {'on': subjects, 'size': view.get('size', 'medium')}, 'values': extra, 'wide': False,
+            if 'fill' in view and not (isinstance(view['fill'], (int, float)) and 0.1 <= view['fill'] <= 0.95): fail(f'{where}: "view.fill" is the share of the frame height the subjects take, 0.1–0.95 — got {js(view["fill"])}')
+            views.append({'turn': emitted[0], 'auto': {'on': subjects, 'size': view.get('size', 'medium'), 'alone': bool(view.get('alone')), 'fill': view.get('fill')}, 'values': extra, 'wide': False,
                           'cut': view.get('cut', True) is not False, 'dur': float(view.get('dur', 1.5)), 'ease': view.get('ease', 'sine.inOut'), 'where': where, 'back': bool(view.get('back'))})
             camera_now.clear(); camera_now.update({key: float(value) for key, value in extra.items()})       # giá trị thật chỉ biết lúc dựng
             return
@@ -1526,6 +1533,13 @@ def main():
             turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
         else:
             code = turn_code(entry, where)
+            # GÓC CẬN CON VẬT tự động (đợt 35, lượt ba): lượt riêng của con vật làm một động tác của nó (lăn ngửa, đuổi đuôi, nhào, gặm,
+            # liếm) mà kịch bản không cho "view": cắt sang góc cận nó suốt lượt rồi trở lại. Liếm mặt người đang bế: góc cận người ấy.
+            acts = [step if isinstance(step, str) else step[0] for step in entry.get('do') or [] if isinstance(step, (str, list)) and step]
+            if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
+                licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
+                entry['view'] = ({'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
+                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.74 if 'rollOver' in acts else 0.7 if 'chaseTail' in acts else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
             view_of(entry, where)
             if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
@@ -2224,7 +2238,10 @@ def main():
                 # Góc tự động: tính lúc dựng, ở đúng lúc lượt (gốc) của nó bắt đầu — vị trí của mọi người lúc ấy.
                 autos = True
                 first = next(v for v in views if v.get('auto') is view['auto'] and not v.get('returned')) if view.get('returned') else view
-                aim = f"{{ ...frameAt(T0 + talk.turns[{first['turn']}].start, [{', '.join(view['auto']['on'])}], {js(view['auto']['size'])})" + (f", {values}" if values else '') + ' }'
+                auto = view['auto']
+                # `alone` (đợt 35, lượt ba): góc cận riêng chủ thể — không né người khác (`avoid: []`), đo suốt lượt (con chó chạy vòng).
+                opts = (f", {{ avoid: [], span: [T0 + talk.turns[{first['turn']}].start, T0 + talk.turns[{first['turn']}].end]" + (f", fill: {auto['fill']:g}" if auto.get('fill') else '') + ' }') if auto.get('alone') else (f", {{ fill: {auto['fill']:g} }}" if auto.get('fill') else '')
+                aim = f"{{ ...frameAt(T0 + talk.turns[{first['turn']}].start, [{', '.join(auto['on'])}], {js(auto['size'])}{opts})" + (f", {values}" if values else '') + ' }'
             else: aim = f'{{ {values} }}'
             call = f"set.cut({aim})" if view['cut'] else f"set.move({aim}, {view['dur']:g}, {js(view['ease'])})"
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
@@ -2269,7 +2286,8 @@ def main():
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
             moves.insert(0, "    // Automatic views (\"view\": \"close\", { \"on\": … }): measured at build time, at the moment of their turn.\n"
-                            "    const frameAt = (time, subjects, size) => { tl.seek(time, false); set.update(); return set.frameOn(subjects, size); };")
+                            "    const frameAt = (time, subjects, size, { span, ...opts } = {}) => { tl.seek(time, false); set.update();\n"
+                            "      return set.frameOn(subjects, size, span ? { ...opts, at: [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => span[0] + (span[1] - span[0]) * f), seek: (t) => { tl.seek(t, false); set.update(); } } : opts); };")
             moves.append("    tl.seek(0, false); set.update();")
         if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
     # SOÁT GÓC MÁY (bối cảnh 3D): tua cả cảnh, mỗi 0,25 s hỏi set.framing() ai đang bị mép khung cắt dở. tools/scene.py gọi
