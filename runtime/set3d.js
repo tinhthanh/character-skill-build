@@ -388,7 +388,24 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const walk = (walks ? walks(move.rig) : []).filter(([a, b]) => b > from && a < to).sort((x, y) => y[0] - x[0])[0];
         if (walk) {
           const a = Math.max(walk[0], from), b = Math.min(walk[1], to);
-          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a; continue;
+          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a;
+          // THEO BƯỚC CHÂN (đợt 34): bước `walk` có quãng quay đầu, đứng lấy đà, khép chân — x đứng yên ở đó; trải đều z theo thời
+          // gian thì con vật vẫn trôi về phía máy lúc chân chưa bước (15 khung). Lấy mẫu x của chính nó suốt bước đi (tua timeline),
+          // rồi cho z đi theo đúng phần x đã đi: chân đứng thì z đứng.
+          const tl = move.tween.parent, actor = actors.find((item) => item.rig === move.rig);
+          if (tl && actor && typeof tl.seek === 'function') {
+            const n = Math.max(2, Math.ceil((b - a) * 30)), xs = [], back = tl.time();
+            for (let i = 0; i <= n; i++) { tl.seek(a + (b - a) * i / n, false); xs.push(move.rig.s.x || 0); }
+            tl.seek(back, false);
+            const x0 = xs[0], x1 = xs[n];
+            if (Math.abs(x1 - x0) > 1e-3) {
+              const ease = (p) => { const f = Math.min(n, Math.max(0, p * n)), k = Math.min(n - 1, Math.floor(f)), x = xs[k] + (xs[k + 1] - xs[k]) * (f - k);
+                return Math.min(1, Math.max(0, (x - x0) / (x1 - x0))); };
+              const tween = gsap.to(actor.spot, { z: move.z, duration: Math.max(0.05, b - a), ease, immediateRender: false });
+              tl.remove(move.tween); tl.add(tween, a); move.tween = tween;
+            }
+          }
+          continue;
         }
         move.how = 'slide'; move.at = move.tween.startTime();
       }
@@ -1717,7 +1734,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (host.parentNode !== view) view.appendChild(host);
     host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
     Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
-    if (height) { host.style.height = height + 'px'; host.style.width = ''; }
+    // `auto`, not '': an <img> stood with its file's width/height attributes (tools/scene.py writes them so it can be
+    // centred before it loads) would otherwise keep the attribute's width — a picture whose file is bigger or smaller
+    // than its scene size (a 2x PNG, an SVG scaled in the set) showed stretched sideways.
+    if (height) { host.style.height = height + 'px'; host.style.width = 'auto'; }
     const spot = { x, y, z };
     // BÓNG NẰM TRÊN SÀN: một hình elip mờ trên mặt phẳng nằm ngang của bối cảnh, nên nó dẹt lại và xoay đúng theo góc
     // máy. Bóng rig tự vẽ (một elip trong khung phẳng của nó) bị ẩn đi — nó đứng thẳng cùng tấm bìa.

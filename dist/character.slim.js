@@ -1,4 +1,4 @@
-/* VGCharacter v0.74.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.75.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -1900,20 +1900,21 @@ class RigSVG {
     this.#khep(t, 0.35, 1.15);
     return t;
   }
-  cheer() {
+  cheer({ narrow = false } = {}) {
     const t = this.tl(), s = this.s;
     this.#openUp(t);
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
     const up = {};
-    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = 122; up['cang' + side] = 6; }
-    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, 'xoe'])), 0);
+    const [upper, fore, pump] = narrow ? [70, 108, 14] : [122, 6, 26];
+    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = upper; up['cang' + side] = fore; }
+    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, narrow ? 'nam' : 'xoe'])), 0);
     t.to(s, { ...Object.fromEntries(Object.keys(up).map((key) => [key, key.startsWith('bat') ? -4 : 24])), dauY: 3, duration: 0.14, ease: 'power1.in' }, 0);     // lấy đà
     t.to(s, { ...up, vai: -5, dau: -3, dauY: 0, cuoi: 1, mieng: 0.55, mayL: 0.9, mayR: 0.9, duration: 0.36, ease: 'back.out(1.6)' }, 0.14);
     const hop = s.seat > 0.5 ? 0 : -16;                                            // y âm là lên
     for (let i = 0; i < 2; i++) {
       t.to(s, { y: hop, duiL: 0, duiR: 0, duration: 0.17, ease: 'power2.out' }, 0.42 + i * 0.42)
        .to(s, { y: 0, duration: 0.2, ease: 'power2.in' }, 0.59 + i * 0.42);
-      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: 26, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
+      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: narrow ? fore + pump : pump, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
     }
     this.#chop(t, 0.9);
     this.#khep(t, 0.5, 1.4, { y: 0 });
@@ -6149,7 +6150,21 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const walk = (walks ? walks(move.rig) : []).filter(([a, b]) => b > from && a < to).sort((x, y) => y[0] - x[0])[0];
         if (walk) {
           const a = Math.max(walk[0], from), b = Math.min(walk[1], to);
-          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a; continue;
+          move.tween.duration(Math.max(0.05, b - a)); move.tween.startTime(a); move.how = 'walk'; move.at = a;
+          const tl = move.tween.parent, actor = actors.find((item) => item.rig === move.rig);
+          if (tl && actor && typeof tl.seek === 'function') {
+            const n = Math.max(2, Math.ceil((b - a) * 30)), xs = [], back = tl.time();
+            for (let i = 0; i <= n; i++) { tl.seek(a + (b - a) * i / n, false); xs.push(move.rig.s.x || 0); }
+            tl.seek(back, false);
+            const x0 = xs[0], x1 = xs[n];
+            if (Math.abs(x1 - x0) > 1e-3) {
+              const ease = (p) => { const f = Math.min(n, Math.max(0, p * n)), k = Math.min(n - 1, Math.floor(f)), x = xs[k] + (xs[k + 1] - xs[k]) * (f - k);
+                return Math.min(1, Math.max(0, (x - x0) / (x1 - x0))); };
+              const tween = gsap.to(actor.spot, { z: move.z, duration: Math.max(0.05, b - a), ease, immediateRender: false });
+              tl.remove(move.tween); tl.add(tween, a); move.tween = tween;
+            }
+          }
+          continue;
         }
         move.how = 'slide'; move.at = move.tween.startTime();
       }
@@ -7081,7 +7096,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     if (host.parentNode !== view) view.appendChild(host);
     host.setAttribute('data-set3d', '');            // để `captions({ follow })` biết host này do máy quay 3D đặt, không theo bố cục
     Object.assign(host.style, { position: 'absolute', left: '0', top: '0', right: 'auto', bottom: 'auto', transformOrigin: '0 0' });
-    if (height) { host.style.height = height + 'px'; host.style.width = ''; }
+    if (height) { host.style.height = height + 'px'; host.style.width = 'auto'; }
     const spot = { x, y, z };
     let shadow = null;
     if (withShadow) {
@@ -7363,7 +7378,7 @@ const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard,
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.74.0';
+const VERSION = '0.75.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

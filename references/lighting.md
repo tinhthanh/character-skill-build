@@ -110,14 +110,18 @@ on or against the pet (a hand in view that hovers beside it is not a touch). A s
 25° to reach a pet on the floor. Every medium shot the automatic camera chose (`set.shotLog`) must be narrower than
 85 % of the full shot of the same subjects — a cut to it would barely change the frame — and none may be kept as the full
 shot (the last line counts them). A stroke is followed every 0.1 s over the strokes (`track` in `moments.json`): the hand
-stays on or against the pet at every moment and no more than 25 % of it sinks past the pet's outline.
+stays on or against the pet at every moment (≥ 15 % of it) and no more than 10 % of it sinks past the pet's outline. A
+hand smaller than 1000 px in the capture (a very wide shot) is measured again at twice the resolution — at 1× its
+antialiased rim alone reads as several per cent sunk.
 A hand gesture (wave, point, thumbs up, cheer, call out…) is measured at the moment asked about: both hands of the person
 must lie inside the frame, at least 5 % of the hand's width from its left, right and top edges ( a hand below the bottom edge, hanging at the hip under a
 medium shot, is left out). A pet's own turn (scared, startled…) is measured in the frame at its middle, and when it follows
 an insert of that pet (after a single shot of the person acting) the insert must hold until the turn ends. A pet moved
 into another person's plane (`set.depthLog`) must never change depth while it stands still in view with no cut.
 It exits 1 on a miss — `tools/check_scene.py` runs it on a small clinic scene, a park scene, a living-room scene, a vertical
-power-cut scene, granny and a boy at two depths reaching for one cat, and a boy waving and pointing in a vertical frame.
+power-cut scene, granny and a boy at two depths reaching for one cat (with the automatic camera, and with a still camera,
+where the cat must change depth during its own walk), a boy waving and pointing in a vertical frame, and the vet and a
+boy in a vertical park (the boy's narrow cheer must keep the medium shot, no cut to the full shot).
 
 What the scene tool now does for the acting, so the measurements pass without extra script lines:
 
@@ -143,11 +147,14 @@ What the scene tool now does for the acting, so the measurements pass without ex
   get a single shot of the person acting instead; medium shots of a person are framed on the upper body (a seated
   person's knees do not widen them), and the vertical full shot leaves room around the person (66 % of the height).
 - A pet that two people at different depths reach for (granny on the sofa strokes the cat, then the boy kneels to feed
-  it) moves into the plane of whoever reaches for it before their turn — on a cut, or during its own walk
+  it) moves into the plane of whoever reaches for it before their turn — on a cut, or during its own walk: the scene tool
+  gives the pet a short walk toward the next person (a few steps), and its depth follows its steps (it never slides
+  while its feet stand still, even with no cut)
   (`set.depth` + `set.settleDepths`).
 - A medium or close shot of a turn with a hand gesture takes in both hands at the moment of the gesture, staying within
-  83 % of the full shot (sliding toward the gesturing hand); a shot that already shows the hands is kept. When no medium
-  shot can hold them (a child's two-handed cheer in a vertical frame), that beat gets the full shot with both hands.
+  83 % of the full shot (sliding toward the gesturing hand); a shot that already shows the hands is kept. In a vertical
+  frame a person cheers narrow (`cheer({ narrow: true })`: fists pumped beside the shoulders), so the medium shot holds
+  both hands; when no medium shot can hold a gesture's hands, that beat gets the full shot with both hands.
 - The insert of the pet after a single shot of the person acting holds through the pet's reaction on the next turn,
   framed for both moments, instead of cutting to a new shot of the same pet.
 - A stroke glides: the hand slides along the top of the pet's head, its underside on one line, instead of rocking up

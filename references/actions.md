@@ -26,7 +26,7 @@ the demo steps from `tools/action-catalog.json`.
 | `nod` | — | nod twice | 1.4 |
 | `shake` | — | shake the head | 1.5 |
 | `shrug` | — | shrug with open palms | 1.7 |
-| `cheer` | — | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down) | 1.9 |
+| `cheer` | `{ narrow }` | both arms up and two little hops, beaming — the one whole-body "happy" (seated: arms only; a hand holding an item stays down). `{ narrow: true }`: two fists pumped beside the shoulders instead of the wide V — about as wide as the head, for vertical frames (`tools/scene.py` uses it there) | 1.9 |
 | `drink` | `(side = 'auto')` | raise the held item (a cup) to the mouth, tilt it, eyes closed, then lower it with a smile; a turned character faces the viewer to drink. With empty hands it mimes the sip | 1.85 |
 | `clap` | `(times = 4)` | both hands clap in front of the chest, beaming | 0.8 + 0.32 × `times` |
 | `countFingers` | `(count = 3, { hand })` | raise a hand beside the chest and count one, two, three fingers, a beat each — listing benefits | 0.9 + 0.8 × `count` |

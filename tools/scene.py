@@ -669,9 +669,28 @@ PRESETS = {
 }
 
 
+def svg_size(head):
+    """(width, height) of an SVG from its root <svg> tag: the width / height attributes when they are plain numbers
+    (or px), else the viewBox; None when neither says. `head` is the start of the file as bytes."""
+    text = head.decode('utf-8', 'ignore')
+    tag = re.search(r'<svg\b[^>]*>', re.sub(r'<!--.*?-->', '', text, flags=re.S))
+    if not tag: return None
+    attr = lambda name: (re.search(rf'\s{name}\s*=\s*["\']([^"\']*)["\']', tag.group(0)) or [None, None])[1]
+    number = lambda value: float(value[:-2] if value.endswith('px') else value) if value and re.fullmatch(r'\s*[\d.]+(px)?\s*', value) else None
+    width, height = number(attr('width')), number(attr('height'))
+    box = [float(v) for v in re.split(r'[\s,]+', (attr('viewBox') or '').strip()) if v] if attr('viewBox') else []
+    if len(box) == 4 and box[2] > 0 and box[3] > 0:
+        if width and not height: height = width * box[3] / box[2]
+        if height and not width: width = height * box[2] / box[3]
+        if not width and not height: width, height = box[2], box[3]
+    return (round(width), round(height)) if width and height else None
+
+
 def image_size(path):
-    """(width, height) in px read from the file's header — PNG, JPEG, GIF or WebP; None for anything else."""
+    """(width, height) in px read from the file's header — PNG, JPEG, GIF, WebP, or SVG (its width / height or viewBox);
+    None for anything else."""
     with open(path, 'rb') as fh: head = fh.read(64 * 1024)
+    if b'<svg' in head[:4096] or path.lower().endswith('.svg'): return svg_size(head)
     if head[:8] == b'\x89PNG\r\n\x1a\n': return int.from_bytes(head[16:20], 'big'), int.from_bytes(head[20:24], 'big')
     if head[:6] in (b'GIF87a', b'GIF89a'): return int.from_bytes(head[6:8], 'little'), int.from_bytes(head[8:10], 'little')
     if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
@@ -939,6 +958,10 @@ def main():
 
     def step_code(step, where, actor=None):
         if isinstance(step, (int, float)): return js(step)
+        # REO trong KHUNG DỌC (đợt 34): chữ V dang rộng cần ~1,02 × bề rộng góc toàn — không góc trung nào giữ được cả hai tay,
+        # máy phải cắt sang góc toàn giữa chuỗi góc trung. Người (không phải con vật) reo ở khung dọc thì reo hẹp
+        # (`cheer({ narrow: true })`: nắm tay giơ cạnh vai). Người viết tự cho tham số thì giữ của họ.
+        if step in ('cheer', ['cheer']) and height > width * 1.2 and actor in names and not names[actor]['_pet']: return "['cheer', { narrow: true }]"
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
         parts = []
@@ -1115,6 +1138,13 @@ def main():
     toasts = []                                             # { turn: chỉ số lượt trong conversation, title, text } — thẻ thông báo trên khung
     lamp_ops = []                                           # { turn, name, on, dur } — bật / tắt đèn của bối cảnh 3D
     power_ops, sky_ops = [], []                             # mất điện / có điện · trời chuyển giờ
+    box_names = [box.get('name') for box in (stage_set or {}).get('boxes', [])]
+
+    def plane_of(person):
+        """Chiều sâu (z) mà bàn tay người này vươn trong đó: người ngồi trên một hộp ngồi ngay trước mặt hộp (+12)."""
+        if person.get('on') and person.get('seated') and person['on'] in box_names:
+            return float(stage_set['boxes'][box_names.index(person['on'])]['z']) + 12
+        return float(person.get('z', -300))
     gear_ops = []                                           # đèn trong tay (rọi đèn pin, soi đèn khám) — cho moments.json
     holding = {}                                            # ai đang bế con vật nào (bế, trao) — để đo lúc `putDown` (đợt 30)
     arms = {}                                               # ai đang bế con vật nào — để `takePet` biết con vật ĐANG ở đâu (đợt 30)
@@ -1280,6 +1310,21 @@ def main():
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
+                # CON VẬT TỰ ĐI SANG MẶT PHẲNG NGƯỜI KẾ (đợt 34): người trước với tới nó ở chiều sâu khác (> 5 đơn vị) — nó sẽ dời chiều
+                # sâu trước lượt này (`set.depth`, xem `pet_depths`). Không có lần cắt cảnh nào ở giữa thì nó TRƯỢT 0,45 s trên hình
+                # (đứng yên mà trôi về phía máy). Chèn một bước đi ngắn của chính nó về phía người kế: `settleDepths` trải lần dời
+                # theo bước đi ấy. Người kế ngồi thì nó vốn đi tới họ ("comes over") — chỉ ép bước ấy có, dù quãng ngắn.
+                hop_pet = names[step[1][1:]]
+                hop = None
+                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'):
+                    plane = plane_of(who)
+                    if hop_pet.get('_plane') is not None and abs(plane - hop_pet['_plane']) > 5: hop = hop_pet
+                    hop_pet['_plane'] = plane
+                if hop is not None and not who.get('seated'):
+                    toward = 1 if float(who['x']) >= float(hop['x']) + hop.get('_drop', 0) else -1
+                    turns.append((f'  // {hop["name"]} walks over into {who["name"]}\'s plane for "{step[0]}" (it changes depth on the way)', f"[{hop['name']}, ['walk', 4, {toward * 40}]]"))
+                    emitted[0] += 1
+                    hop['x'] = float(hop['x']) + toward * 40 * hop['_unit']
                 # Người đang NGỒI (ghế đá, ghế phòng chờ) không đứng dậy đi tới: con vật ĐI TỚI người (bế, vuốt ve…). Đích là
                 # người thì thôi — người ngồi chỉ với tới chỗ mình.
                 if who.get('seated') and not names[step[1][1:]]['_pet']: continue
@@ -1318,7 +1363,7 @@ def main():
                     else: target['_back'] = who
                     pet = target
                     move = float(pet['x']) + pet.get('_drop', 0) - (float(who['x']) + side * wanted)
-                    if abs(move) > 0.05 * who['_host_height']:
+                    if abs(move) > 0.05 * who['_host_height'] or hop is pet:
                         turns.append((f'  // {pet["name"]} comes over to {who["name"]} (seated) for "{step[0]}"', f"[{pet['name']}, ['walk', 4, {round(-move / pet['_unit'])}]]"))
                         emitted[0] += 1
                         pet['x'] = float(pet['x']) - move
@@ -1692,7 +1737,7 @@ def main():
                 # hình chụp lúc ấy lệch nửa bề ngang (trình render chụp ngay, không đợi khung sau).
                 size = image_size(os.path.join(out, name))
                 dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
-                if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
+                if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF, WebP or an SVG with width / height or a viewBox, or it may be placed off by half its width until it loads')
                 setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} {spot}set.stand(cutout{n + 1}, {{ {where_} }});")
         # ÁNH SÁNG: giờ trong ngày + đèn. Cây đèn đường / đèn cây có trong bối cảnh (cutout "lamp") tự là một nguồn sáng ở
         # chỗ bóng đèn của nó (554 / 470 chiều cao khung); "lamps" thêm đèn tuỳ ý (đèn trần: "kind": "ceiling").
@@ -1868,13 +1913,6 @@ def main():
         track[0] += 1
     # Bối cảnh 3D: host của nhân vật do createSet đặt — mang tên trong kịch bản (data-name) để `set.framing()` nhắc đúng người.
     if stage_set is not None: setup.append("    const host = (name) => { const element = document.createElement('div'); element.dataset.name = name; return element; };")
-    box_names = [box.get('name') for box in (stage_set or {}).get('boxes', [])]
-
-    def plane_of(person):
-        """Chiều sâu (z) mà bàn tay người này vươn trong đó: người ngồi trên một hộp ngồi ngay trước mặt hộp (+12)."""
-        if person.get('on') and person.get('seated') and person['on'] in box_names:
-            return float(stage_set['boxes'][box_names.index(person['on'])]['z']) + 12
-        return float(person.get('z', -300))
     # Con vật dưới sàn mà NHIỀU NGƯỜI ở các chiều sâu khác nhau với tới (đợt 33): [(lượt, z của người với tới)], chỉ giữ chỗ đổi.
     pet_depths = {}
     if stage_set is not None:
