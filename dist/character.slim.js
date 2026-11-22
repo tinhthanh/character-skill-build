@@ -807,9 +807,8 @@ class RigSVG {
                 <rect x="-2.9" y="0" width="5.8" height="9" rx="1" fill="#1d2b33"/><path d="M -1.6 2.4 h 3.2 M -1.6 4.6 h 3.2 M -1.6 6.8 h 2" stroke="#7dffb0" stroke-width="1"/>
                 <circle cx="0" cy="14" r="2" fill="#2f9e8f"/><path d="M -2 22 L -1 36 Q 0 38.5 1 36 L 2 22 Z" fill="#c9d1d9" stroke="#3d4b58" stroke-width="1"/></g>
               <!-- VIÊN THUỐC TO (\`givePill\`, đợt 35): trắng, viền đậm, kẹp giữa ngón cái và ngón trỏ ở đầu bàn tay — đủ to để thấy ở góc trung. -->
-              <g data-gadget="7" transform="translate(0 27) rotate(90)"><rect data-pill x="-15" y="-8" width="30" height="16" rx="8" fill="#ffffff" stroke="#1f2a33" stroke-width="2"/>
-                <path d="M 0 -8 H 7 A 8 8 0 0 1 7 8 H 0 Z" fill="#e8553f" stroke="#1f2a33" stroke-width="2"/>
-                <path d="M -9 -3.5 H -3" stroke="#d5dde3" stroke-width="2" stroke-linecap="round"/></g>
+              <g data-gadget="7" transform="translate(0 24) rotate(90)"><rect data-pill x="-8" y="-4.5" width="16" height="9" rx="4.5" fill="#ffffff" stroke="#1f2a33" stroke-width="1.8"/>
+                <path d="M -4.5 -1.5 H -1" stroke="#c9d1d9" stroke-width="1.5" stroke-linecap="round"/></g>
             </g></g>
         </g>
       </g>`;
@@ -2876,8 +2875,11 @@ class RigSVG {
     return t;
   }
   static TEMP_POSE = [40, 145];            // giơ nhiệt kế lên SÁT MẶT, ngang cằm (khuỷu hạ sát sườn, cẳng tay gập dựng): đầu đo chĩa lên, thẻ số bên đầu
+  static TEMP_SIDE = 0.75;                 // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
+  static TEMP_ZOOM = 2.0;                  // nhiệt kế phóng to lúc đọc
+  static TEMP_TIP = 34;                    // đầu đo cách cổ tay (đơn vị khung) theo hướng bàn tay
   static TEMP_READ = 1.6;                  // giữ dáng đọc nhiệt kế bấy nhiêu giây (đợt 35, lượt ba: ≥ 1,2 s)
-  static TEMP_TURN = 0.45;                 // lúc đọc: QUAY người / mặt 3/4 về phía nhiệt kế (chỉ liếc mắt thì ở góc trung không đọc ra)
+  static TEMP_TURN = 0.3;                  // lúc đọc: QUAY người / mặt 3/4 về phía nhiệt kế (chỉ liếc mắt thì ở góc trung không đọc ra)
   static WEIGH_READING = '4.2 kg';         // số cân khi không ai cho (`reading`), và cân không ghi số
   static zeroReading(text) { return String(text).replace(/\d+(?:([.,])\d+)?/, (all, mark) => (mark ? '0' + mark + '0' : '0')); }
   #drawScales() {
@@ -2967,15 +2969,30 @@ class RigSVG {
   takeTemp(target = null, hold = 1.5, { reading = '38.5°C' } = {}) {
     if (typeof reading !== 'string') throw new Error(`[character] takeTemp: reading must be a string such as '38.5°C', got ${JSON.stringify(reading)}`);
     if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] takeTemp: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
-    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'rear'), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
-    this.#leanTo(t, reach, 'nam');
+    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'rear'), m = reach.k === 'L' ? -1 : 1, k = reach.k;
+    let tipPose = reach.solve(reach.tx, reach.ty);
+    for (let n = 0; n < 5; n++) { const a = tipPose.dir * Math.PI / 180; tipPose = reach.solve(reach.tx - Math.cos(a) * RigSVG.TEMP_TIP, reach.ty - Math.sin(a) * RigSVG.TEMP_TIP); }
+    const upper = tipPose.upper, fore = tipPose.fore;
+    this.#leanTo(t, { ...reach, upper, fore }, 'nam');
     t.set(s, { ['gadget' + k]: 6 }, 0.1);
-    t.to(s, { ['bat' + k]: upper + 4, ['cang' + k]: fore - 7, duration: 0.2, ease: 'sine.out' }, 0.45);
+    t.to(s, { ['bat' + k]: upper + 2, ['cang' + k]: fore - 3, duration: 0.2, ease: 'sine.out' }, 0.45);
     t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
     const up = 0.6 + hold;
-    t.to(s, { ['ovBat' + k]: RigSVG.TEMP_POSE[0], ['ovCang' + k]: RigSVG.TEMP_POSE[1], duration: 0.02 }, up);
+    const facingTo = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
+    const box = (el) => { const b = el.getBBox(), q = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM()); const a = new DOMPoint(b.x, b.y).matrixTransform(q), c = new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(q); return { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
+    let readPose = RigSVG.TEMP_POSE;
+    try {
+      const head = box(this.el.dau), eyes = [box(this.el.matL), box(this.el.matR)], eyeY = (eyes[0].y + eyes[1].y) / 2;
+      for (let side = RigSVG.TEMP_SIDE; side >= 0.55 - 1e-6; side -= 0.05) {
+        const tx = head.x + m * side * head.w, ty = eyeY - 0.06 * head.h + 17 * RigSVG.TEMP_ZOOM;      // cổ tay (hệ gốc); mô hình đặt nhiệt kế thấp hơn hình vẽ ~12 % đầu — bù 6 %
+        const pose = this.#armTo(k, tx - s.x, ty - (s.y || 0) - DOI_Y, facingTo, 0);
+        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) readPose = [pose.bat, pose.cang];
+        if (!(pose.short > 0)) break;
+      }
+    } catch (error) { /* chưa vẽ: dáng mặc định */ }
+    t.to(s, { ['ovBat' + k]: readPose[0], ['ovCang' + k]: readPose[1], duration: 0.02 }, up);
     const R = RigSVG.TEMP_READ, facing = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
-    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: 1.7, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than, dau: N.dau + m * 10, dauY: 10, nhinX: m * 2.8, nhinY: 4.6, matY: 0.3,
+    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: RigSVG.TEMP_ZOOM, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than - m * 4, dau: N.dau + m * 3, dauY: 4, nhinX: m * 4.2, nhinY: 0.4, matY: 0.15,
               cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
     t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
     t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, up + 0.32);
@@ -2997,7 +3014,7 @@ class RigSVG {
     if (toward < 0) return { bat: chuanHoaGoc(toward + alpha), cang: -(180 - beta), short: 0 };
     return { bat: chuanHoaGoc(toward - alpha), cang: 180 - beta, short: 0 };
   }
-  static PILL_TURN = 0.35;                 // quay 3/4 về phía con vật lúc cho thuốc
+  static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
@@ -3007,18 +3024,29 @@ class RigSVG {
     const chinAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * 0.18 } : this.#reachLow(target, k, 'chin');
     const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * lips.crouch;
     const turn = clamp(s.huong + dir * RigSVG.PILL_TURN, -1, 1);
-    const chin = this.#armTo(other, chinAt.tx - dir * 16, chinAt.ty + 6, turn, drop);
-    const tipAt = (x, y, reachIn) => {
-      let pose = lips.solve(x, y);
-      for (let n = 0; n < 5; n++) { const a = pose.dir * Math.PI / 180; pose = lips.solve(x - Math.cos(a) * reachIn, y - Math.sin(a) * reachIn); }
-      return pose;
+    const tipAt = (side, x, y, reachIn) => {
+      const was = s.huong; s.huong = turn;
+      const shoulder = { x: this.#shoulderX(side), y: this.#shoulderY() + drop };
+      s.huong = was;
+      const upperLen = DAI.canhTay * this.nv.daiCanhTay, foreLen = DAI.cangTay * this.nv.daiCangTay;
+      let wx = x, wy = y;
+      for (let n = 0; n < 6; n++) {
+        const dx = wx - shoulder.x, dy = wy - shoulder.y, d = Math.min(Math.hypot(dx, dy), (upperLen + foreLen) * 0.98) || 1, base = Math.atan2(dy, dx);
+        const alpha = Math.acos(clamp((upperLen * upperLen + d * d - foreLen * foreLen) / (2 * upperLen * d), -1, 1));
+        const e = [base + alpha, base - alpha].map((ang) => ({ x: shoulder.x + upperLen * Math.cos(ang), y: shoulder.y + upperLen * Math.sin(ang) })).sort((p, q) => q.y - p.y)[0];
+        const ux = wx - e.x, uy = wy - e.y, ul = Math.hypot(ux, uy) || 1;
+        wx = x - ux / ul * reachIn; wy = y - uy / ul * reachIn;
+      }
+      return this.#armTo(side, wx, wy, turn, drop);
     };
-    const ready = tipAt(lips.tx - dir * 22, lips.ty + 6, 25), inside = tipAt(lips.tx - dir * 6, lips.ty + 1, 25);
-    this.pillReach = 0;
+    const chin = tipAt(other, chinAt.tx, chinAt.ty + 4, 16);
+    const readyP = tipAt(k, lips.tx - dir * 18, lips.ty + 4, 24), insideP = tipAt(k, lips.tx - dir * 4, lips.ty, 24);
+    const ready = { upper: readyP.bat, fore: readyP.cang }, inside = { upper: insideP.bat, fore: insideP.cang };
+    this.pillReach = Math.max(readyP.short, insideP.short, chin.short);
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     const pet = target && (target.pet || (target.el && target.svg ? target : null) || (target.live && target.live.el ? target.live : null));
     if (pet) { this.onTopPet = pet; t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.45).to(s, { ['onTop' + k]: 0, duration: 0.02 }, RigSVG.PILL_IN + 0.4); }
-    t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, duration: 0.3, ease: 'sine.inOut' }, 0);
+    t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
     t.set(s, { ['gadget' + k]: 7 }, 0.05);
     t.to(s, { ['bat' + other]: chin.bat, ['cang' + other]: chin.cang, duration: 0.5, ease: 'power2.out' }, 0.05);
@@ -6816,6 +6844,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
+        if (size === 'close' && mixedClose && m.head) return { x0: across.x0, x1: across.x1, y0: m.base + 0.62 * h, y1: m.head.top - 0.22 * (m.head.top - m.head.base) };
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
@@ -6832,7 +6861,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
-      const fill = (size === 'close' && mixedClose && !tall ? 0.8 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      const fill = (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
@@ -6924,7 +6953,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             region = wider; cam = test;
           }
         }
-        if (size !== 'close') {
+        if (size !== 'close' || mixedClose) {
           const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
           const backed = spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ ...span, weight: limit === Infinity || importantProp(span) ? 1 : 0.25 }));
           let vital = 0;
@@ -7240,7 +7269,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     careProbe() {
       set.update();
       const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
-      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx } : null; };
+      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx, h: r.height * sy } : null; };
       const out = {};
       for (const actor of actors) {
         const rig = actor.rig, e = rig && rig.el;
@@ -7252,11 +7281,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const gadgets = ['L', 'R'].map((side) => { const kind = Math.round(rig.s['gadget' + side] || 0), g = e['gadget' + side];
             const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown);
             const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
-          const head = centre(e.dau);
-          out[name] = { person: true, eyes, gadgets, head, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+          const head = centre(e.dau), mouthP = centre(e.mieng);
+          out[name] = { person: true, eyes, gadgets, head, mouthP, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
         } else {
           const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
-          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, faceW: f ? f.width * sx : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
         }
       }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);

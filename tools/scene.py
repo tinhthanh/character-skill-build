@@ -1430,7 +1430,7 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.24}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
@@ -1494,7 +1494,9 @@ def main():
                 who['x'] = float(who['x']) + move
                 # Soi đèn / đưa bánh: người đứng SÁT con vật (0,16) — xong thì LÙI về chỗ cũ, không thì người (vẽ trước con
                 # vật đứng cạnh mình) che mất mặt nó suốt phần sau của cảnh (cảnh thử đợt 12: góc cận chó chỉ thấy tay bác sĩ).
-                if step[0] in ('examine', 'giveTreat', 'givePill'): backs.append((who, -move))
+                # Cho thuốc (đợt 35, lượt bốn): KHÔNG lùi — bước lùi nằm trong nhịp máy của lượt ấy, góc cận phải chứa người ở cả hai chỗ
+                # đứng thành gần góc toàn (mặt con mèo 13 % khung).
+                if step[0] in ('examine', 'giveTreat'): backs.append((who, -move))
             # ĐO NHIỆT ĐỘ (đợt 35): con vật QUAY ĐUÔI về phía người đo trước lượt ấy (nhiệt kế vào thân sau), quay lại sau lượt.
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] == 'takeTemp' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']): continue

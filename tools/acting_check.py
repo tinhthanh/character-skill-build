@@ -306,6 +306,7 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
+    probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
     jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
@@ -318,7 +319,8 @@ def check_seen(folder, checks, keep=None):
         ok = part['all'] >= SEEN and (head is None or head >= SEEN_HEAD)
         results.append({'scene': folder, 'what': f'{name} in view at {t:g} s', 'ok': ok, 'seen': round(part['all'], 3), 'head': None if head is None else round(head, 3),
                         'note': f'{part["all"] * 100:.0f} % of {name} shows' + (f', head {head * 100:.0f} %' if head is not None else '') + f' (least {SEEN * 100:g} %, head {SEEN_HEAD * 100:g} %)'})
-        if part.get('hand') is not None:
+        # Đo nhiệt (lượt bốn): cái chạm thân là ĐẦU ĐO — bàn tay cách thân cả chiều dài nhiệt kế; đo riêng ("the thermometer touches it").
+        if part.get('hand') is not None and (t, name) not in probe_jobs:
             results.append({'scene': folder, 'what': f'{toucher}\'s hand on {name} in view at {t:g} s', 'ok': part['hand'] >= HAND_SHOWN, 'hand': round(part['hand'], 3),
                             'note': f'{part["hand"] * 100:.0f} % of the hand shows (least {HAND_SHOWN * 100:g} %)'})
             results.append({'scene': folder, 'what': f'{toucher}\'s hand rests on {name} at {t:g} s', 'ok': part['contact'] >= CONTACT, 'contact': round(part['contact'], 3),
@@ -597,7 +599,7 @@ def check_look(folder, c, scales):
             'note': f'pupils turned {worst[1]:.0f}° off the thermometer, shifted {worst[2] * 100:.0f} % of the eye width at {worst[0]:g} s (limit {LOOK}°, least {LOOK_SHIFT * 100:g} %)'}]
     # Lượt ba: QUAY mặt về phía nhiệt kế (|huong| ≥ 0,3, cùng phía) và nhiệt kế SÁT MẶT (tâm nó cách tâm đầu ≤ 0,8 bề ngang đầu), ở cả
     # ba lúc — trải ≥ 1,2 s.
-    bad, seen = [], []
+    bad, seen, placed = [], [], []
     for t in c['times']:
         who = (scales.get(('care', float(t))) or {}).get(c['who']) or {}
         tool = next((g for g in who.get('gadgets', []) if g['kind'] == c['gadget']), None)
@@ -613,23 +615,38 @@ def check_look(folder, c, scales):
         if who.get('turn', 0) * side < TURN_TO: bad.append(f'{t:g} s: turned {who.get("turn", 0):+.2f}')
         if near > NEAR_FACE: bad.append(f'{t:g} s: thermometer {near:.2f} head widths from the face')
         if tilt < HEAD_TILT or drop < HEAD_DROP: bad.append(f'{t:g} s: head tilted {tilt:+.0f}°, lowered {drop:+.1f} toward it')
+        # Lượt bốn: NGANG MẮT (tâm nhiệt kế ± 10 % chiều cao đầu quanh tầm mắt), LỆCH SANG BÊN (≥ 0,5 bề ngang đầu từ tâm mặt) và KHÔNG
+        # CHỒNG LÊN MIỆNG (khung nhiệt kế không chạm khung miệng) — lượt ba giơ sát cằm, nhìn như ngậm nhiệt kế.
+        eyes = who.get('eyes') or []
+        if eyes and head.get('h'):
+            eye_y = sum(e['eye']['y'] for e in eyes) / len(eyes)
+            level, aside = abs(tool['y'] - eye_y) / head['h'], abs(tool['x'] - head['x']) / max(1, head['w'])
+            mouth = who.get('mouthP')
+            over = bool(mouth) and abs(tool['x'] - mouth['x']) < (tool.get('w', 0) + mouth.get('w', 0)) / 2 and abs(tool['y'] - mouth['y']) < (tool.get('h', 0) + mouth.get('h', 0)) / 2
+            placed.append((level, aside, over))
+            if level > EYE_LEVEL or aside < ASIDE or over: bad.append(f'{t:g} s: thermometer {level * 100:.0f} % of the head height off eye level, {aside:.2f} head widths aside' + (', over the mouth' if over else ''))
     span = c['times'][-1] - c['times'][0]
     out.append({'scene': folder, 'what': f'{c["who"]} turns to the thermometer held by the face', 'ok': not bad and span >= READ_HOLD - 1e-6,
                 'note': ('; '.join(bad) if bad else f'face turned and head bent to it, the thermometer by the face at all {len(c["times"])} moments') + f' over {span:.1f} s'
                         + (f' — farthest {max(x[0] for x in seen):.2f} head widths, least tilt {min(x[1] for x in seen):+.0f}°, least lowering {min(x[2] for x in seen):+.1f}, face ≥ {min(x[3] for x in seen) * 100:.0f} %, thermometer ≥ {min(x[4] for x in seen) * 100:.1f} % of the frame height' if seen else '')
-                        + f' (least {READ_HOLD:g} s; turn ≥ {TURN_TO:g}, within {NEAR_FACE:g} head widths, tilt ≥ {HEAD_TILT:g}°, lowered ≥ {HEAD_DROP:g}, face ≥ {FACE_FRAME * 100:g} %, thermometer ≥ {TOOL_FRAME * 100:g} %)'})
+                        + (f'; eye level within {max(x[0] for x in placed) * 100:.0f} % of the head height, ≥ {min(x[1] for x in placed):.2f} head widths aside, over the mouth {sum(x[2] for x in placed)} times' if placed else '')
+                        + f' (least {READ_HOLD:g} s; turn ≥ {TURN_TO:g}, within {NEAR_FACE:g} head widths, tilt ≥ {HEAD_TILT:g}°, lowered ≥ {HEAD_DROP:g}, face ≥ {FACE_FRAME * 100:g} %, thermometer ≥ {TOOL_FRAME * 100:g} %, eye level ±{EYE_LEVEL * 100:g} %, aside ≥ {ASIDE:g})'})
     return out
 
 
 TURN_TO = 0.3         # đọc nhiệt kế: người quay 3/4 về phía nó (`huong`)
 NEAR_FACE = 0.8       # … nhiệt kế cách tâm đầu ≤ 0,8 bề ngang đầu
 READ_HOLD = 1.2       # … giữ ≥ 1,2 s
-HEAD_TILT = 8         # … đầu nghiêng về phía nó ≥ 8°
-HEAD_DROP = 8         # … và cúi xuống ≥ 8 đơn vị khung (`dauY`) — lượt hai: 6
-FACE_FRAME = 0.44     # … góc cận: mặt người (bề ngang đầu) ≥ 44 % chiều cao khung — lượt hai (góc trung): 35 % / 42 %, Gemini không đọc ra
+EYE_LEVEL = 0.10      # lượt bốn: tâm nhiệt kế cao ngang mắt ± 10 % chiều cao đầu
+ASIDE = 0.5           # … cách tâm mặt ≥ 0,5 bề ngang đầu (sang bên), không chồng lên miệng
+HEAD_TILT = 0         # … đầu không nghiêng ra xa nó (lượt bốn: nghiêng 8° về phía nhiệt kế kéo tâm đầu sang đó — nhiệt kế hết lệch sang bên)
+HEAD_DROP = 2         # … và cúi xuống ≥ 2 đơn vị khung (`dauY`) — lượt bốn: nhiệt kế ngang mắt, nhìn ngang sang nó (lượt ba: cúi 10, nhiệt kế ở cằm)
+FACE_FRAME = 0.36     # … góc cận: mặt người (bề ngang đầu) ≥ 36 % chiều cao khung (lượt bốn: góc cận giữ trọn bàn khám — 38 %; lượt ba đặt 44 % theo số đo)
 TOOL_FRAME = 0.085    # … và nhiệt kế (cạnh dài) ≥ 8,5 % chiều cao khung — lượt hai: 7,2 % / 8,2 %
 
 
+TOUCH = 0.01          # lượt bốn: bàn tay cách khung hình đầu con vật ≤ 1 % chiều cao người (khung bao — lỏng, xem Known)
+TIP_TOUCH = 0.004     # … đầu đo nhiệt kế cách khung hình thân con vật ≤ 0,4 % (lượt ba: mèo 0,5 % — lơ lửng sau đuôi)
 PILL_AT = 0.02        # viên thuốc (mép gần nhất) cách môi con vật ≤ 2 % chiều cao người …
 MOUTH_OPEN = 0.5      # … và miệng con vật há ≥ 0,5 lúc viên thuốc ở môi
 
@@ -741,6 +758,27 @@ def check_scene(folder):
         judged = asked or best
         results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand reaches', 'ok': judged[1] <= REACH,
                         'note': f'{judged[1] * 100:.1f} % of height at {judged[0]:g} s, the moment asked about (closest {best[1] * 100:.1f} % at {best[0]:g} s; limit {REACH * 100:g} %)'})
+        # Lượt bốn — CHẠM THẬT ở lúc được hỏi (lúc giữa): đo nhiệt — ĐẦU ĐO (khung nhiệt kế) sát hình đầu / thân con vật; cho thuốc — CẢ HAI
+        # bàn tay sát hình đầu nó (một tay ở mõm, một tay đỡ cằm). Lượt ba: nhiệt kế lơ lửng sau đuôi con mèo, tay đỡ buông ở eo.
+        if c['kind'] in ('takeTemp', 'givePill') and asked:
+            t = asked[0]; frame = frames[c['times'].index(t)] if t in c['times'] else {}
+            who, pet = frame.get(c['who']), frame.get(c['target'])
+            drawn = list(((pet or {}).get('parts') or {}).items())
+            if who and who.get('tall') and drawn:
+                if c['kind'] == 'takeTemp':
+                    tool = next((g for g in ((scales.get(('care', float(t))) or {}).get(c['who']) or {}).get('gadgets', []) if g['kind'] == 6), None)
+                    if tool:
+                        tb = {'x0': tool['x'] - tool['w'] / 2, 'x1': tool['x'] + tool['w'] / 2, 'y0': tool['y'] - tool['h'] / 2, 'y1': tool['y'] + tool['h'] / 2}
+                        g = min(max(0, b['x0'] - tb['x1'], tb['x0'] - b['x1']) ** 2 + max(0, b['y0'] - tb['y1'], tb['y0'] - b['y1']) ** 2 for _, b in drawn) ** 0.5 / who['tall']
+                        results.append({'scene': folder, 'what': f'{c["who"]} takeTemp {c["target"]} — the thermometer touches it', 'ok': g <= TIP_TOUCH,
+                                        'note': f'the thermometer is {g * 100:.1f} % of height from {c["target"]}\'s body at {t:g} s (limit {TIP_TOUCH * 100:g} %)'})
+                    else: results.append({'scene': folder, 'what': f'{c["who"]} takeTemp {c["target"]} — the thermometer touches it', 'ok': False, 'note': f'no thermometer in the hand at {t:g} s'})
+                else:
+                    head = dict(drawn).get('head') or drawn[0][1]
+                    gaps = sorted(max(0, head['x0'] - h['box']['x1'], h['box']['x0'] - head['x1'], head['y0'] - h['box']['y1'], h['box']['y0'] - head['y1']) / who['tall'] for h in who['hands'] if h.get('box'))
+                    ok = len(gaps) == 2 and gaps[-1] <= TOUCH
+                    results.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — both hands on its head', 'ok': ok,
+                                    'note': f'hands {", ".join(f"{x * 100:.1f} %" for x in gaps)} of height from {c["target"]}\'s head at {t:g} s (limit {TOUCH * 100:g} % each)'})
         if bent is not None:
             results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — leans no more than {SEATED_LEAN:g}°', 'ok': bent[1] <= SEATED_LEAN + 0.5,
                             'note': f'the body leans {bent[1]:.0f}° at {bent[0]:g} s, the moment asked about (limit {SEATED_LEAN:g}°)'})

@@ -790,7 +790,9 @@ with tempfile.TemporaryDirectory() as work:
             for needle in ('bac_si weighs cho — cho on the scale', 'bac_si carry cho — hand reaches', 'bac_si takeTemp cho — hand reaches', 'bac_si givePill cho — hand reaches', 'cho in view at',
                            'bac_si weighs cho — cho never jumps', 'bac_si looks at the thermometer', 'bac_si givePill cho — pill at the mouth', 'bac_si givePill cho — mouth open for the pill',
                            # lượt ba: màn hình cân đồng bộ, đọc nhiệt kế ở góc cận (mặt quay, cúi, nhiệt kế sát mặt), viên thuốc / mặt / miệng đủ to trên khung
-                           'the scale shows the weight only while cho is on it', 'bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen'):
+                           'the scale shows the weight only while cho is on it', 'bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen',
+                           # lượt bốn: đầu đo chạm thân sau; hai tay trên đầu con vật
+                           'bac_si takeTemp cho — the thermometer touches it', 'bac_si givePill cho — both hands on its head'):
                 if needle not in done.stdout: problems.append(f'care35: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
 
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %

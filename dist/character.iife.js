@@ -1266,9 +1266,8 @@ class RigSVG {
                 <rect x="-2.9" y="0" width="5.8" height="9" rx="1" fill="#1d2b33"/><path d="M -1.6 2.4 h 3.2 M -1.6 4.6 h 3.2 M -1.6 6.8 h 2" stroke="#7dffb0" stroke-width="1"/>
                 <circle cx="0" cy="14" r="2" fill="#2f9e8f"/><path d="M -2 22 L -1 36 Q 0 38.5 1 36 L 2 22 Z" fill="#c9d1d9" stroke="#3d4b58" stroke-width="1"/></g>
               <!-- VIÊN THUỐC TO (\`givePill\`, đợt 35): trắng, viền đậm, kẹp giữa ngón cái và ngón trỏ ở đầu bàn tay — đủ to để thấy ở góc trung. -->
-              <g data-gadget="7" transform="translate(0 27) rotate(90)"><rect data-pill x="-15" y="-8" width="30" height="16" rx="8" fill="#ffffff" stroke="#1f2a33" stroke-width="2"/>
-                <path d="M 0 -8 H 7 A 8 8 0 0 1 7 8 H 0 Z" fill="#e8553f" stroke="#1f2a33" stroke-width="2"/>
-                <path d="M -9 -3.5 H -3" stroke="#d5dde3" stroke-width="2" stroke-linecap="round"/></g>
+              <g data-gadget="7" transform="translate(0 24) rotate(90)"><rect data-pill x="-8" y="-4.5" width="16" height="9" rx="4.5" fill="#ffffff" stroke="#1f2a33" stroke-width="1.8"/>
+                <path d="M -4.5 -1.5 H -1" stroke="#c9d1d9" stroke-width="1.5" stroke-linecap="round"/></g>
             </g></g>
         </g>
       </g>`;
@@ -4421,8 +4420,11 @@ class RigSVG {
    * trên màn hình nhỏ của cân / nhiệt kế không đọc được ở cỡ trung cảnh.
    */
   static TEMP_POSE = [40, 145];            // giơ nhiệt kế lên SÁT MẶT, ngang cằm (khuỷu hạ sát sườn, cẳng tay gập dựng): đầu đo chĩa lên, thẻ số bên đầu
+  static TEMP_SIDE = 0.75;                 // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
+  static TEMP_ZOOM = 2.0;                  // nhiệt kế phóng to lúc đọc
+  static TEMP_TIP = 34;                    // đầu đo cách cổ tay (đơn vị khung) theo hướng bàn tay
   static TEMP_READ = 1.6;                  // giữ dáng đọc nhiệt kế bấy nhiêu giây (đợt 35, lượt ba: ≥ 1,2 s)
-  static TEMP_TURN = 0.45;                 // lúc đọc: QUAY người / mặt 3/4 về phía nhiệt kế (chỉ liếc mắt thì ở góc trung không đọc ra)
+  static TEMP_TURN = 0.3;                  // lúc đọc: QUAY người / mặt 3/4 về phía nhiệt kế (chỉ liếc mắt thì ở góc trung không đọc ra)
   static WEIGH_READING = '4.2 kg';         // số cân khi không ai cho (`reading`), và cân không ghi số
   /** Số cân về không, giữ đơn vị và cách viết: '9.6 kg' → '0.0 kg', '12 kg' → '0 kg'. */
   static zeroReading(text) { return String(text).replace(/\d+(?:([.,])\d+)?/, (all, mark) => (mark ? '0' + mark + '0' : '0')); }
@@ -4548,21 +4550,42 @@ class RigSVG {
   takeTemp(target = null, hold = 1.5, { reading = '38.5°C' } = {}) {
     if (typeof reading !== 'string') throw new Error(`[character] takeTemp: reading must be a string such as '38.5°C', got ${JSON.stringify(reading)}`);
     if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] takeTemp: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
-    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'rear'), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
-    this.#leanTo(t, reach, 'nam');
+    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'rear'), m = reach.k === 'L' ? -1 : 1, k = reach.k;
+    // ĐẦU ĐO (không phải cổ tay) chạm thân sau (lượt bốn): đầu nhiệt kế ở ~34 đơn vị khung theo hướng bàn tay — giải lặp cổ tay lùi về
+    // theo hướng cẳng tay (`solve` trả `dir`). Đặt cổ tay ở đích thì đầu đo chọc quá, hay (tay duỗi hết) lơ lửng sau đuôi con mèo.
+    let tipPose = reach.solve(reach.tx, reach.ty);
+    for (let n = 0; n < 5; n++) { const a = tipPose.dir * Math.PI / 180; tipPose = reach.solve(reach.tx - Math.cos(a) * RigSVG.TEMP_TIP, reach.ty - Math.sin(a) * RigSVG.TEMP_TIP); }
+    const upper = tipPose.upper, fore = tipPose.fore;
+    this.#leanTo(t, { ...reach, upper, fore }, 'nam');
     t.set(s, { ['gadget' + k]: 6 }, 0.1);
     // Ấn đầu đo vào (bàn tay áp vào thân — đo: ấn ±2° / 3° thì bàn tay chỉ 4 % sát con vật ở cảnh CI), rồi đứng yên chờ: đầu
     // nghiêng, mắt nhìn chỗ đo, môi mím.
-    t.to(s, { ['bat' + k]: upper + 4, ['cang' + k]: fore - 7, duration: 0.2, ease: 'sine.out' }, 0.45);
+    t.to(s, { ['bat' + k]: upper + 2, ['cang' + k]: fore - 3, duration: 0.2, ease: 'sine.out' }, 0.45);
     t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
     // Rút ra, đứng thẳng, giơ nhiệt kế lên đọc (kênh `ov`: góc cuối cùng trên màn hình, đè lên dáng cúi).
     const up = 0.6 + hold;
-    t.to(s, { ['ovBat' + k]: RigSVG.TEMP_POSE[0], ['ovCang' + k]: RigSVG.TEMP_POSE[1], duration: 0.02 }, up);
+    // NHIỆT KẾ NGANG MẮT, LỆCH HẲN SANG BÊN (lượt bốn — lượt ba giơ sát cằm, nhìn như ngậm nhiệt kế): tâm nhiệt kế cao ngang mắt, cách tâm
+    // mặt `TEMP_SIDE` bề ngang đầu về phía con vật. Đo mắt và đầu trên hình lúc dựng (hệ gốc SVG), tâm nhiệt kế ở ~17 đơn vị khung
+    // trên cổ tay × `handZoom` (cẳng tay dựng) — giải hai đốt tay tới cổ tay ấy, khi người đã quay `TEMP_TURN`.
+    const facingTo = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
+    const box = (el) => { const b = el.getBBox(), q = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM()); const a = new DOMPoint(b.x, b.y).matrixTransform(q), c = new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(q); return { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
+    let readPose = RigSVG.TEMP_POSE;
+    try {
+      const head = box(this.el.dau), eyes = [box(this.el.matL), box(this.el.matR)], eyeY = (eyes[0].y + eyes[1].y) / 2;
+      // Ngoài tầm tay (người thấp, tay ngắn: tay duỗi thẳng thì nhiệt kế tụt dưới tầm mắt) — thu độ lệch dần, không dưới 0,55 bề ngang đầu.
+      for (let side = RigSVG.TEMP_SIDE; side >= 0.55 - 1e-6; side -= 0.05) {
+        const tx = head.x + m * side * head.w, ty = eyeY - 0.06 * head.h + 17 * RigSVG.TEMP_ZOOM;      // cổ tay (hệ gốc); mô hình đặt nhiệt kế thấp hơn hình vẽ ~12 % đầu — bù 6 %
+        const pose = this.#armTo(k, tx - s.x, ty - (s.y || 0) - DOI_Y, facingTo, 0);
+        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) readPose = [pose.bat, pose.cang];
+        if (!(pose.short > 0)) break;
+      }
+    } catch (error) { /* chưa vẽ: dáng mặc định */ }
+    t.to(s, { ['ovBat' + k]: readPose[0], ['ovCang' + k]: readPose[1], duration: 0.02 }, up);
     // ĐỌC: QUAY người / mặt 3/4 về phía nhiệt kế (`TEMP_TURN`), CÚI và nghiêng đầu sang nó, con ngươi dồn hẳn sang bên và xuống;
     // nhiệt kế giơ sát mặt, phóng 1,7×; giữ `TEMP_READ` giây. Đợt 35 lượt hai chỉ liếc mắt — ở góc trung hai người mặt chỉ ~1/6 khung,
     // không đọc ra là đang nhìn nhiệt kế (Gemini, lượt ba).
     const R = RigSVG.TEMP_READ, facing = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
-    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: 1.7, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than, dau: N.dau + m * 10, dauY: 10, nhinX: m * 2.8, nhinY: 4.6, matY: 0.3,
+    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: RigSVG.TEMP_ZOOM, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than - m * 4, dau: N.dau + m * 3, dauY: 4, nhinX: m * 4.2, nhinY: 0.4, matY: 0.15,
               cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
     t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
     t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, up + 0.32);
@@ -4597,7 +4620,7 @@ class RigSVG {
    * đỡ vuốt cằm hai nhịp cho nó nuốt. Tay đỡ ở dưới cằm, tay thuốc ở môi — không tay nào vắt ngang mặt con vật. Cần cả hai tay rảnh. Con vật đứng sát
    * (đầu ngang bụng người — trên bàn khám): cho nó `openMouth` từ ~0,55 s rồi `chew` (`tools/scene.py` tự thêm, đúng nhịp).
    */
-  static PILL_TURN = 0.35;                 // quay 3/4 về phía con vật lúc cho thuốc
+  static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
@@ -4608,25 +4631,36 @@ class RigSVG {
     const point = !(target && (target.el || target.getBoundingClientRect)) && !(target && target.live && target.live.el);
     const chinAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * 0.18 } : this.#reachLow(target, k, 'chin');
     const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * lips.crouch;
-    // Tay ĐỠ CẰM (phía xa) vắt ngang dưới thấp: cổ tay ngay dưới cằm, lùi về phía người — bàn tay (nối dài theo cẳng tay) đỡ dưới cằm.
-    // Thân quay 3/4 về phía con vật (`PILL_TURN`): vai phía xa xích lại gần.
+    // QUAY GẦN NGHIÊNG HẲN về phía con vật (`PILL_TURN`, lượt bốn): hai vai gần như một chỗ, HAI TAY cùng vươn ra trước — tay xa đặt
+    // dưới cằm, tay gần đưa viên thuốc tới mép miệng. (Lượt ba quay 0,35: tay xa vắt ngang không tới, buông ở eo.)
     const turn = clamp(s.huong + dir * RigSVG.PILL_TURN, -1, 1);
-    const chin = this.#armTo(other, chinAt.tx - dir * 16, chinAt.ty + 6, turn, drop);
-    // Tay VIÊN THUỐC (phía gần): viên thuốc ở ĐẦU bàn tay, ~25 đơn vị khung theo cẳng tay — đặt cổ tay sao cho đầu bàn tay tới môi:
-    // giải lặp theo hướng cẳng tay của lời giải trước (`solve` trả `dir`).
-    const tipAt = (x, y, reachIn) => {
-      let pose = lips.solve(x, y);
-      for (let n = 0; n < 5; n++) { const a = pose.dir * Math.PI / 180; pose = lips.solve(x - Math.cos(a) * reachIn, y - Math.sin(a) * reachIn); }
-      return pose;
+    // ĐẦU BÀN TAY (hay vật cầm ở đó) tới (x, y): giải lặp cổ tay lùi về theo hướng cẳng tay — vai thật khi đã quay, khuỷu chúc xuống.
+    const tipAt = (side, x, y, reachIn) => {
+      const was = s.huong; s.huong = turn;
+      const shoulder = { x: this.#shoulderX(side), y: this.#shoulderY() + drop };
+      s.huong = was;
+      const upperLen = DAI.canhTay * this.nv.daiCanhTay, foreLen = DAI.cangTay * this.nv.daiCangTay;
+      let wx = x, wy = y;
+      for (let n = 0; n < 6; n++) {
+        const dx = wx - shoulder.x, dy = wy - shoulder.y, d = Math.min(Math.hypot(dx, dy), (upperLen + foreLen) * 0.98) || 1, base = Math.atan2(dy, dx);
+        const alpha = Math.acos(clamp((upperLen * upperLen + d * d - foreLen * foreLen) / (2 * upperLen * d), -1, 1));
+        const e = [base + alpha, base - alpha].map((ang) => ({ x: shoulder.x + upperLen * Math.cos(ang), y: shoulder.y + upperLen * Math.sin(ang) })).sort((p, q) => q.y - p.y)[0];
+        const ux = wx - e.x, uy = wy - e.y, ul = Math.hypot(ux, uy) || 1;
+        wx = x - ux / ul * reachIn; wy = y - uy / ul * reachIn;
+      }
+      return this.#armTo(side, wx, wy, turn, drop);
     };
-    // Đầu viên thuốc dừng ở MÉP MÔI phía người, không giữa môi: viên nang to che mất cái miệng đang há (lượt ba).
-    const ready = tipAt(lips.tx - dir * 22, lips.ty + 6, 25), inside = tipAt(lips.tx - dir * 6, lips.ty + 1, 25);
-    this.pillReach = 0;
+    // Tay XA: lòng bàn tay (~16 đơn vị theo bàn tay) dưới cằm. Tay GẦN: viên thuốc (~24) ở mép miệng phía người.
+    const chin = tipAt(other, chinAt.tx, chinAt.ty + 4, 16);
+    const readyP = tipAt(k, lips.tx - dir * 18, lips.ty + 4, 24), insideP = tipAt(k, lips.tx - dir * 4, lips.ty, 24);
+    const ready = { upper: readyP.bat, fore: readyP.cang }, inside = { upper: insideP.bat, fore: insideP.cang };
+    this.pillReach = Math.max(readyP.short, insideP.short, chin.short);
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     // Bối cảnh 3D: con vật đứng trước người thì đầu nó che tay ở môi — vẽ bàn tay cầm thuốc TRÊN nó lúc đưa thuốc.
     const pet = target && (target.pet || (target.el && target.svg ? target : null) || (target.live && target.live.el ? target.live : null));
     if (pet) { this.onTopPet = pet; t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.45).to(s, { ['onTop' + k]: 0, duration: 0.02 }, RigSVG.PILL_IN + 0.4); }
-    t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, duration: 0.3, ease: 'sine.inOut' }, 0);
+    // 0,45 s: dài hơn tween `#openUp` (trong `#leanTo`, 0,4 s về GESTURE_TURN) — ngắn hơn thì nó ghi đè hướng quay về 0,3.
+    t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
     t.set(s, { ['gadget' + k]: 7 }, 0.05);
     // 1. Tay đỡ vắt qua đỡ dưới cằm; tay viên thuốc dừng trước môi (dáng `#leanTo`).
@@ -10158,6 +10192,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
+        // Góc cận người + con vật (đợt 35, lượt bốn): mép trên khung cắt qua TÓC (dưới đỉnh đầu 22 % chiều cao đầu) — con mèo nhỏ cạnh người
+        // thì khung từ đỉnh tóc xuống tới đầu nó cao quá, mặt nó chỉ 13 % khung.
+        if (size === 'close' && mixedClose && m.head) return { x0: across.x0, x1: across.x1, y0: m.base + 0.62 * h, y1: m.head.top - 0.22 * (m.head.top - m.head.base) };
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
@@ -10185,7 +10222,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       // Góc cận người + con vật (đợt 35, lượt ba): vùng (mặt người … đầu con vật) chiếm 80 % chiều cao khung — 55 % thì mặt con corgi
       // chỉ 13,9 % khung, viên thuốc / miệng nó vài chục px (Gemini đọc ~1 khung / giây).
-      const fill = (size === 'close' && mixedClose && !tall ? 0.8 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      const fill = (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
@@ -10315,7 +10352,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // CÒN ĐỒ VẬT LẸM MÉP (đợt 30): sửa từng cái một thì cái này đẩy cái kia vào mép — góc mở đầu phòng khách khung ngang để
         // TV lộ 49 % ở mép phải; góc trung lúc rọi đèn (khung dọc) cắt đôi TV và bàn nước. Thử một lượt các chỗ đặt máy (dời
         // ngang, góc toàn / trung lùi thêm chút) mà chủ thể vẫn trọn, lấy chỗ ít lẹm nhất: lẹm dở nặng hơn chạm mép.
-        if (size !== 'close') {
+        // Góc cận người + con vật (đợt 35, lượt bốn) cũng né đồ đạc lẹm mép: bàn khám con vật đứng trên bị mép phải cắt dở (87 %).
+        if (size !== 'close' || mixedClose) {
           const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
           // `limit`: đồ đạc phụ được lẹm mép — chỉ TV và đồ đang được dùng phải trọn trong khung hay ra hẳn ngoài; đồ phụ lẹm
           // vẫn tính, nhẹ hơn bốn lần (đẩy được nó ra hẳn trong giới hạn thì tốt hơn). `vital`: phần do đồ quan trọng.
@@ -10759,7 +10797,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     careProbe() {
       set.update();
       const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
-      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx } : null; };
+      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx, h: r.height * sy } : null; };
       const out = {};
       for (const actor of actors) {
         const rig = actor.rig, e = rig && rig.el;
@@ -10771,12 +10809,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const gadgets = ['L', 'R'].map((side) => { const kind = Math.round(rig.s['gadget' + side] || 0), g = e['gadget' + side];
             const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown);
             const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
-          const head = centre(e.dau);
-          out[name] = { person: true, eyes, gadgets, head, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+          const head = centre(e.dau), mouthP = centre(e.mieng);
+          out[name] = { person: true, eyes, gadgets, head, mouthP, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
         } else {
           // Đợt 35, lượt ba: cỡ TRÊN KHUNG — chiều cao đầu (`face`), bề ngang nét môi (`lipsW`), độ mở hàm (`jaw`, px).
           const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
-          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, faceW: f ? f.width * sx : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
         }
       }
       // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
