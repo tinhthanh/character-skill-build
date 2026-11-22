@@ -1702,7 +1702,13 @@ try {
         else if (gap(nurse.el['gadget' + k], cat.el.than) > 6) hong('takeTemp', `the thermometer does not reach the pet's body (${gap(nurse.el['gadget' + k], cat.el.than).toFixed(0)} px off)`);
         temp.time(2.9);
         if (nurse.el.readout.style.display === 'none' || nurse.el.readout.querySelector('text').textContent !== '38.9°C') hong('takeTemp', 'no reading shown over the thermometer');
-        else if (nurse.el.readout.getBoundingClientRect().bottom > nurse.el['coTay' + k].getBoundingClientRect().top + 4) hong('takeTemp', 'the reading is not above the hand');
+        else {
+          // Lượt bốn: thẻ số cạnh nhiệt kế (ngang mắt), về phía bàn tay cầm nó, không che mặt.
+          const card = nurse.el.readout.getBoundingClientRect(), face = nurse.el.dau.getBoundingClientRect(), hand = nurse.el['coTay' + k].getBoundingClientRect();
+          const overlap = Math.max(0, Math.min(card.right, face.right) - Math.max(card.left, face.left)) * Math.max(0, Math.min(card.bottom, face.bottom) - Math.max(card.top, face.top));
+          if (overlap > card.width * card.height * 0.1) hong('takeTemp', 'the reading covers the face');
+          if ((card.left + card.right) / 2 < (face.left + face.right) / 2 === (k === 'R')) hong('takeTemp', 'the reading is not on the side of the hand holding the thermometer');
+        }
         temp.progress(1); if (nurse.s.gadgetL || nurse.s.gadgetR || nurse.el.readout.style.display !== 'none') hong('takeTemp', 'the thermometer or the reading stays afterwards'); temp.kill();
         // Cho thuốc: con vật đứng sát như trong cảnh (tools/scene.py đưa người tới cách nó 0,2 chiều cao) — tay quay 3/4 ngắn hơn.
         cat.svg.parentNode.style.left = '985px'; cat.apDung();

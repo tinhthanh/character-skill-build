@@ -2285,7 +2285,7 @@ class RigSVG {
       const hand = e['coTay' + r.side], ctm = hand && hand.getScreenCTM(), root = this.svg.getScreenCTM();
       if (!ctm || !root) { e.readout.style.display = 'none'; return; }
       const p = new DOMPoint(0, 0).matrixTransform(ctm).matrixTransform(root.inverse());
-      x = p.x + (r.side === 'L' ? -1 : 1) * 105; y = p.y - 62;          // cạnh bàn tay, lệch hẳn ra ngoài: không che mặt
+      x = p.x + (r.side === 'L' ? -1 : 1) * 118; y = p.y - 8;           // cạnh bàn tay, lệch hẳn ra ngoài: không che mặt
     }
     const text = e.readout.querySelector('[data-readout]');
     if (text.textContent !== r.text) text.textContent = r.text;
