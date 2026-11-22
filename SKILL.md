@@ -12,8 +12,9 @@ cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, s
 the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
 clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
-or mouth, give it a treat or a pill, brush it, walk it on a leash, kneel to it, hand it to someone, throw it a ball
-get a notification on the phone (76 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
+or mouth, give it a treat or a pill, brush it, walk it on a leash, kneel to it, hand it to someone, throw it a ball,
+weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
+get a notification on the phone (79 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, and wear a recovery

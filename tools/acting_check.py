@@ -67,6 +67,7 @@ DEPTH_JS = """(tl) => { const set = window.__set; if (!set.depthLog) return null
   }
   tl.seek(0, false); set.update(); return out; }"""
 DEPTHS = None
+SCALES = {}            # đợt 35: { lúc: [bệ cân trên màn hình] }, { ('paws', lúc): {con vật: đáy chân} }
 
 
 def check_depths(folder):
@@ -95,7 +96,9 @@ def probe(folder, times):
             time.sleep(0.1)
         # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
+                  "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
+                  "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
                   % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
@@ -105,7 +108,10 @@ def probe(folder, times):
         shots = found.pop('shots', None)
         global DEPTHS
         DEPTHS = found.pop('depths', None)
-        return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
+        global SCALES
+        SCALES = {float(k[7:]): v for k, v in found.items() if k.startswith('scales@')}
+        SCALES.update({('paws', float(k[5:])): v for k, v in found.items() if k.startswith('paws@')})
+        return {float(k): v for k, v in found.items() if '@' not in k}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
 
@@ -299,7 +305,7 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -492,11 +498,41 @@ def check_reaction(folder, c, frames, log):
     return out
 
 
+ON_SCALE = 0.03       # cân (đợt 35): chân con vật cách mặt bệ cân ≤ 3 % chiều cao người cân
+
+
+def check_weigh(folder, c, frames, scales):
+    """CÂN (đợt 35): ở ba lúc đọc số, con vật (đang nằm trong hình người cân) đứng TRÊN BỆ CÂN — đáy chân nó cách mặt bệ ≤ 3 %
+    chiều cao người, giữa thân nó trong bề ngang cân — và ≥ 70 % khung thân nó nằm trong khung hình."""
+    W, H = frame_size(folder)
+    out, worst, seen_least = [], None, None
+    for t, frame in zip(c['times'], frames):
+        who, pet = frame.get(c['who']), frame.get(c['target'])
+        paws = (scales.get(('paws', float(t))) or {}).get(c['target'])
+        box = pet and pet.get('body')
+        if not who or not who.get('tall') or not box or paws is None: continue
+        cx = (box['x0'] + box['x1']) / 2
+        under = [s for s in scales.get(float(t)) or [] if s['x0'] <= cx <= s['x1']]
+        off = min((abs(paws - s['top']) for s in under), default=None)
+        off = None if off is None else off / who['tall']
+        if worst is None or off is None or (worst[1] is not None and off > worst[1]): worst = (t, off)
+        area = max(1, (box['x1'] - box['x0']) * (box['y1'] - box['y0']))
+        seen = max(0, min(box['x1'], W) - max(box['x0'], 0)) * max(0, min(box['y1'], H) - max(box['y0'], 0)) / area
+        if seen_least is None or seen < seen_least[1]: seen_least = (t, seen)
+    if worst is None: return [{'scene': folder, 'what': f'{c["who"]} weighs {c["target"]}', 'ok': None, 'note': 'not in the frame'}]
+    out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} on the scale', 'ok': worst[1] is not None and worst[1] <= ON_SCALE,
+                'note': (f'paws {worst[1] * 100:.1f} % of height off the top of the scale at {worst[0]:g} s (limit {ON_SCALE * 100:g} %)' if worst[1] is not None else f'{c["target"]} is not over a scale at {worst[0]:g} s')})
+    out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} in the frame', 'ok': seen_least[1] >= 0.7,
+                'note': f'{seen_least[1] * 100:.0f} % of {c["target"]} in the frame at {seen_least[0]:g} s (least 70 %)'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    scales = SCALES
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
@@ -519,6 +555,9 @@ def check_scene(folder):
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
+            continue
+        if c['kind'] == 'weigh':
+            results.extend(check_weigh(folder, c, frames, scales))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):
@@ -561,7 +600,7 @@ def check_scene(folder):
         if lap is not None:
             results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand off the own lap', 'ok': False,
                             'note': f'the hand rests on {c["who"]}\'s own thigh / knee at {lap:g} s, the moment asked about'})
-        if c['kind'] == 'carry':
+        if c['kind'] == 'carry' and c.get('only') != 'reach':
             # BẾ: ở lúc đo cuối, con vật nằm TRONG VÒNG TAY — hình nó trong hình người bế, giữa thân nằm trong khung thân người
             # ấy. Chỉ đo tay thì con mèo bay ra mép khung (đợt 29, người ngồi sofa bế mèo) vẫn "đạt": tay chạm khung con mèo lúc
             # nhấc nó lên.

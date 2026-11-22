@@ -449,12 +449,15 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const head = () => {
         // `part`: 'head' (mặt — chỉ tay, vuốt ve), 'crown' (đỉnh đầu) hay 'body' (giữa thân — nghe tim phổi, tiêm): khung toàn thân, dưới
         // tâm một chút (con vật nằm ngang: phần dưới khung là thân, phần trên là đầu).
-        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
+        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' || part === 'rear' ? 'full' : 'face') : null;
         // 'crown' (đợt 31): ĐỈNH ĐẦU — con vật đứng TRƯỚC người vuốt (lớp vẽ trên): nhắm giữa mặt thì bàn tay khuất sau đầu nó.
         // 'crown' (con vật vẽ trên người): ngay trên mép đỉnh đầu — tay đè mép, không khuất sau tai. 'top' (người vẽ trước con
         // vật): trong đỉnh đầu, 15 % — tay đặt lên đầu mà không che mặt nó.
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        // 'rear' (đợt 35, đo nhiệt độ): THÂN SAU — từ giữa khung toàn thân dời về phía NGƯỜI ĐO một phần tư bề ngang. Con vật quay đuôi
+        // về phía người đo trước lượt ấy (tools/scene.py); hướng nó lúc đích được đọc có thể còn là hướng cũ — không suy từ cái đầu.
+        if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
@@ -465,6 +468,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         // BỀ NGANG ĐẦU con vật trong khung của `from` (đợt 32): quãng bàn tay trượt khi vuốt (`stroke`).
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
+        pet: to,                                          // rig được nhắm tới (đợt 35: `givePill` vẽ bàn tay trên nó)
         // ĐIỂM (x, y) trong khung của `from`, gắn vào đầu `to` lúc đầu chưa gật / nghiêng: chỗ nó đang ở bây giờ (đợt 32) — bàn tay
         // vuốt bám theo đầu con vật đang dụi, tính lại mỗi khung hình (`stroke`).
         // `time`: giây trong chuỗi (`sequence`) của `to` — đang lấy mẫu chuỗi của `from` thì con vật chưa ở đúng giây ấy: tua chuỗi
@@ -955,8 +959,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // ở một lớp ngay TRÊN con vật: một host chép đúng chỗ, cỡ, ánh sáng (`filter`) của host người, trong đó một SVG cùng khung
       // chỉ có `<use>` của nhóm cổ tay, đặt bằng các lớp transform của tay người — trùng từng điểm với bàn tay thật.
       for (const pet of actors) {
-        if (!pet.over || !pet.rig) continue;
-        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        // Đợt 35: cả bàn tay ĐƯA THUỐC vào mõm con vật đứng trước người (`givePill` ghi con vật ấy ở `onTopPet` của người).
+        const owner = pet.over || (pet.rig && (actors.find((item) => item.rig && item.rig !== pet.rig && item.rig.onTopPet === pet.rig) || {}).rig);
+        if (!owner || !pet.rig) continue;
+        const person = actors.find((item) => item.rig === owner), s = person && person.rig.s;
         const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
         let ghost = pet.ghost;
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
@@ -1645,6 +1651,22 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
       });
+    },
+
+    /**
+     * ĐÁY CHÂN CON VẬT trên màn hình (px trong `view`), kể cả khi nó nằm trong hình người khác (bế, đặt lên cân): { tên: y }
+     * — tools/acting_check.py đo con vật đứng trên bệ cân (`weigh`, đợt 35). Gọi sau khi tua tới lúc cần đo.
+     */
+    paws() {
+      set.update();
+      const box = view.getBoundingClientRect(), sy = view.clientHeight / (box.height || 1), out = {};
+      for (const actor of actors) {
+        const rig = actor.rig, e = rig && rig.el;
+        if (!e || typeof rig.seatY === 'function' || !rig.svg.isConnected) continue;
+        const feet = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+        if (feet.length) out[actor.host.dataset.name || actor.host.id || ''] = (Math.max(...feet.map((r) => r.bottom)) - box.top) * sy;
+      }
+      return out;
     },
 
     /**

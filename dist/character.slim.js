@@ -189,7 +189,7 @@ const NGHI = Object.freeze({
   itemBackL: 0, itemBackR: 0,
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
-  gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`), 5 = đèn pin (`shine`)
+  gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`), 5 = đèn pin (`shine`), 6 = nhiệt kế (`takeTemp`)
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
@@ -209,6 +209,9 @@ const NGHI = Object.freeze({
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
   onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   tayL: 'mo', tayR: 'mo',
+  readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
+  readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
+  omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
 });
 const MAU_MAC_DINH = {
   da: '#f1c3a0', daToi: '#d9a583', toc: '#2c2a33', ao: '#4a8ed6', aoToi: '#3a74b3',
@@ -599,11 +602,11 @@ class RigSVG {
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
-                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall'];
+                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'takeTemp'];
   static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   static SIDESTEP = 70;                  // quãng `walk` ngắn hơn chừng này (đơn vị khung) thì bước nhích, không quay ngang
   static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff'];
-  static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet'];
+  static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet', 'weigh', 'givePill'];       // `givePill`: cần con vật và hai tay rảnh
   static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -799,6 +802,10 @@ class RigSVG {
               <g data-gadget="4"><rect x="-3" y="2" width="6" height="18" rx="3" fill="#a0683a" stroke="#6b4223" stroke-width="1"/>
                 <rect x="-9" y="19" width="18" height="9" rx="3" fill="#c98a52" stroke="#6b4223" stroke-width="1"/>
                 <path d="M -7 28 v 5 M -3.5 28 v 5 M 0 28 v 5 M 3.5 28 v 5 M 7 28 v 5" stroke="#4a3a2c" stroke-width="1.4" stroke-linecap="round"/></g>
+              <!-- NHIỆT KẾ ĐIỆN TỬ (\`takeTemp\`, đợt 35): thân trắng dẹt, ô số xanh, nút xanh, đầu đo bạc thon dài chĩa ra như đèn soi. -->
+              <g data-gadget="6"><rect x="-4.2" y="-4" width="8.4" height="26" rx="3.6" fill="#f4f7fa" stroke="#3d4b58" stroke-width="1.1"/>
+                <rect x="-2.9" y="0" width="5.8" height="9" rx="1" fill="#1d2b33"/><path d="M -1.6 2.4 h 3.2 M -1.6 4.6 h 3.2 M -1.6 6.8 h 2" stroke="#7dffb0" stroke-width="1"/>
+                <circle cx="0" cy="14" r="2" fill="#2f9e8f"/><path d="M -2 22 L -1 36 Q 0 38.5 1 36 L 2 22 Z" fill="#c9d1d9" stroke="#3d4b58" stroke-width="1"/></g>
             </g></g>
         </g>
       </g>`;
@@ -956,6 +963,12 @@ class RigSVG {
     <text data-note="1" x="-56" y="-27" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
     <text data-note="2" x="-56" y="-10" font-family="Arial, sans-serif" font-size="13" fill="#3b5560" data-layout-ignore=""></text>
   </g>
+  <!-- THẺ SỐ ĐO (đợt 35): màn hình số lớn bật lên trên cân (\`weigh\`) hay trên nhiệt kế (\`takeTemp\`), đuôi chỉ xuống chỗ đo. -->
+  <g id="${p}-readout" style="display:none">
+    <path d="M -58 -50 H 58 Q 66 -50 66 -42 V -12 Q 66 -4 58 -4 H 9 L 0 8 L -9 -4 H -58 Q -66 -4 -66 -12 V -42 Q -66 -50 -58 -50 Z" fill="#ffffff" stroke="#9fb0bc" stroke-width="1.6"/>
+    <rect x="-58" y="-44" width="116" height="34" rx="5" fill="#16232b"/>
+    <text data-readout="1" x="0" y="-19" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore=""></text>
+  </g>
   <g id="${p}-ball" style="display:none"><circle r="11" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.5"/>
     <path d="M -10 -3 Q 0 5 10 -3 M -10 4 Q 0 -4 10 4" stroke="#ffffff" stroke-width="1.8" fill="none" opacity=".9"/></g>
 </svg>`;
@@ -966,7 +979,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), note: q('note'), readout: q('readout'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1398,6 +1411,7 @@ class RigSVG {
     this.#drawLeash();
     this.#drawBall();
     this.#drawNote();
+    this.#drawReadout();
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
   }
   mark(kind = null) {
@@ -1422,6 +1436,24 @@ class RigSVG {
     e.note.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${(0.4 + 0.6 * k).toFixed(3)})`);
     e.note.style.opacity = Math.min(1, k * 1.6).toFixed(2);
     e.note.style.display = '';
+  }
+  #drawReadout() {
+    const e = this.el, s = this.s;
+    if (!e || !e.readout) return;
+    const k = clamp(s.readout, 0, 1), r = (this.readings || [])[Math.round(s.readoutN) - 1];
+    if (!r || k < 0.02) { e.readout.style.display = 'none'; return; }
+    let x = r.x, y = r.y;
+    if (r.side) {
+      const hand = e['coTay' + r.side], ctm = hand && hand.getScreenCTM(), root = this.svg.getScreenCTM();
+      if (!ctm || !root) { e.readout.style.display = 'none'; return; }
+      const p = new DOMPoint(0, 0).matrixTransform(ctm).matrixTransform(root.inverse());
+      x = p.x + (r.side === 'L' ? -1 : 1) * 72; y = p.y - 50;          // cạnh bàn tay, lệch hẳn ra ngoài: không che mặt
+    }
+    const text = e.readout.querySelector('[data-readout]');
+    if (text.textContent !== r.text) text.textContent = r.text;
+    e.readout.setAttribute('transform', `translate(${(r.side ? x : clamp(x, 70, KHUNG.w - 70)).toFixed(1)} ${(y - 6 * k).toFixed(1)}) scale(${(0.45 + 0.55 * k).toFixed(3)})`);
+    e.readout.style.opacity = Math.min(1, k * 1.6).toFixed(2);
+    e.readout.style.display = '';
   }
   #drawBall() {
     const e = this.el, s = this.s, b = this.thrown;
@@ -2270,7 +2302,7 @@ class RigSVG {
     const live = target && target.live ? target.live : target;
     if (live && typeof live.x === 'number' && typeof live.y === 'number' && !live.el) { tx = live.x - s.x; ty = live.y - s.y - DOI_Y; span = typeof live.span === 'number' ? live.span : 0; }
     else if (live) {
-      const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
+      const body = (part === 'body' || part === 'rear') && live.el && (live.el.thanE || live.el.nguc);
       const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7 }[part] ?? 0.2;
       const node = body || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
       const anchored = target !== live && typeof target.centerX === 'function' && typeof live.centerX === 'function' && typeof live.apDung === 'function';
@@ -2280,6 +2312,7 @@ class RigSVG {
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
         const shift = anchored ? (target.centerX() - live.centerX()) / unit : 0;
         tx = (r.left + r.width / 2 - ox) / unit - s.x + shift; ty = (r.top + r.height * (body ? 0.35 : headAt) - oy) / unit - s.y - DOI_Y;
+        if (part === 'rear' && body && live.el.dau) { const h = live.el.dau.getBoundingClientRect(); tx += Math.sign(r.left + r.width / 2 - (h.left + h.width / 2)) * r.width * 0.25 / unit; }
         span = r.width / unit;
       }
     }
@@ -2836,6 +2869,126 @@ class RigSVG {
     this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0, ...(stowed ? { ['item' + k]: 0 } : {}) });
     return t;
   }
+  static TEMP_POSE = [35, 135];            // giơ nhiệt kế lên cạnh vai (khuỷu hạ, cẳng tay dựng — như đếm ngón): đầu đo chĩa lên, thẻ số bên đầu
+  static WEIGH_READING = '4.2 kg';         // số cân khi không ai cho (`reading`), và cân không ghi số
+  #reading(entry) {
+    this.readings = this.readings || [];
+    const key = JSON.stringify(entry), found = this.readings.findIndex((item) => JSON.stringify(item) === key);
+    if (found >= 0) return found + 1;
+    this.readings.push(entry);
+    return this.readings.length;
+  }
+  #scaleSpot(scale, petSide) {
+    if (scale === null || scale === undefined) return { x: HONG.x - petSide * 125 + this.s.x, y: KHUNG.h - 12 - 17, text: null };
+    if (typeof scale.x === 'number' && typeof scale.y === 'number' && !scale.nodeType) return { x: scale.x, y: scale.y, text: null };
+    const svg = scale.svg || (scale.querySelector ? (scale.matches && scale.matches('svg[data-prop]') ? scale : scale.querySelector('svg[data-prop]')) : null);
+    if (!svg || svg.getAttribute('data-prop') !== 'scale') throw new Error('[character] weigh(pet, scale): scale must be a "scale" prop (createProp(host, "scale")), the element holding it, or a point { x, y } in the 400 × 470 frame (the top of its platform)');
+    const r = svg.getBoundingClientRect(), inv = this.svg.getScreenCTM().inverse();
+    const top = new DOMPoint(r.left + r.width / 2, r.top + r.height * (458 - 17) / 470).matrixTransform(inv);
+    const label = svg.querySelector('text');
+    return { x: top.x, y: top.y, text: label ? label.textContent : null };
+  }
+  weigh(pet, scale = null, { reading = null, hold = 1.6 } = {}) {
+    if (!pet || !pet.svg || typeof pet.apDung !== 'function' || !pet.el || !pet.el.dau || pet instanceof RigSVG) throw new Error('[character] weigh(pet, scale): pet must be a pet rig (createPet(...).rig)');
+    if (this.s.om >= 0.5) throw new Error('[character] weigh: already carrying a pet — putDown() first, or weigh it before picking it up');
+    if (reading !== null && typeof reading !== 'string') throw new Error(`[character] weigh: reading must be a string such as '4.2 kg', got ${JSON.stringify(reading)}`);
+    if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] weigh: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.carry(pet), s = this.s, N = this.NGHI, c = this.carried, home = c.reach;
+    const inv = this.svg.getScreenCTM().inverse(), root = (x, y) => new DOMPoint(x, y).matrixTransform(inv);
+    const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => pet.el[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+    const frame = pet.svg.getBoundingClientRect(), bodyR = (pet.el.than || pet.svg).getBoundingClientRect(), headR = pet.el.dau.getBoundingClientRect();
+    const feetY = root(0, paws.length ? Math.max(...paws.map((r) => r.bottom)) : frame.bottom).y, middle = root(bodyR.left + bodyR.width / 2, 0).x, crown = root(0, Math.min(headR.top, bodyR.top)).y;
+    const vb = pet.svg.viewBox && pet.svg.viewBox.baseVal;
+    const offX = vb && vb.width ? ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * c.from.w / vb.width : 0, offY = vb && vb.height ? (pet.s.y || 0) * c.from.h / vb.height : 0;
+    const side = home.tx >= HONG.x ? 1 : -1, spot = this.#scaleSpot(scale, side);
+    c.scale = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
+    const n = this.#reading({ text: reading || spot.text || RigSVG.WEIGH_READING, x: spot.x, y: c.scale.y + (crown - offY - c.from.y) - 8 });
+    const onScale = this.#reachLow({ x: spot.x, y: spot.y - (feetY - crown) * 0.4 }, null, 'body'), other = onScale.k === 'L' ? 'R' : 'L';
+    const T1 = 1.6;
+    t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: onScale.upper * 0.6, ['cang' + other]: -40, omScale: 1, duration: 0.02 }, T1);
+    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, T1 + 0.02);
+    if (onScale.crouch) t.to(s, { seat: onScale.crouch, duration: 0.5, ease: 'power2.inOut' }, T1);
+    t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, nhinX: clamp((onScale.tx - HONG.x) * 0.02, -3, 3), duration: 0.6, ease: 'power2.inOut' }, T1);
+    const R = T1 + 0.65, m = side;
+    t.to(s, { ['bat' + onScale.k]: N['bat' + onScale.k], ['cang' + onScale.k]: N['cang' + onScale.k], ['bat' + other]: N['bat' + other], ['cang' + other]: N['cang' + other],
+              seat: N.seat, than: N.than, dau: N.dau + (spot.x > HONG.x + s.x ? 4 : -4), dauY: 8, nhinX: clamp((spot.x - s.x - HONG.x) * 0.02, -3, 3), nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids, cuoi: 0.7,
+              duration: 0.45, ease: 'power2.inOut' }, R);
+    t.set(s, { tayL: N.tayL, tayR: N.tayR }, R + 0.2);
+    t.to(s, { readoutN: n, duration: 0.02 }, R + 0.25);
+    t.to(s, { readout: 1, mayL: 0.7, mayR: 0.7, duration: 0.35, ease: 'back.out(1.8)' }, R + 0.27);
+    t.to(s, { dauY: 11, cuoi: 1, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, R + 0.4 + hold * 0.6);
+    const B = R + 0.45 + hold;
+    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, B - 0.1);
+    t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: onScale.upper * 0.6, ['cang' + other]: -40, seat: onScale.crouch || N.seat,
+              matY: 0, nhinY: 2.4, dauY: 7, duration: 0.45, ease: 'power2.inOut' }, B);
+    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, B + 0.2);
+    t.to(s, { omRise: 1, seat: N.seat, dauY: 3, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, B + 0.5);
+    const D = B + 1.15, back = home.k === 'L' ? 'R' : 'L';
+    t.to(s, { omScale: 0, ['bat' + home.k]: home.upper, ['cang' + home.k]: home.fore, ['bat' + back]: home.bend ? -home.bend : home.upper * 0.6, ['cang' + back]: -40, duration: 0.02 }, D);
+    if (home.crouch) t.to(s, { seat: home.crouch, duration: 0.5, ease: 'power2.inOut' }, D);
+    t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'power2.inOut' }, D);
+    t.to(s, { huong: c.facing, duration: 0.5, ease: 'sine.inOut' }, D);
+    t.set(s, { om: 0 }, D + 0.6);
+    this.#khep(t, 0.45, D + 0.65, { om: 0, omRise: 0, omScale: 0, huong: c.facing });
+    return t;
+  }
+  takeTemp(target = null, hold = 1.5, { reading = '38.5°C' } = {}) {
+    if (typeof reading !== 'string') throw new Error(`[character] takeTemp: reading must be a string such as '38.5°C', got ${JSON.stringify(reading)}`);
+    if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] takeTemp: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, 'rear'), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
+    this.#leanTo(t, reach, 'nam');
+    t.set(s, { ['gadget' + k]: 6 }, 0.1);
+    t.to(s, { ['bat' + k]: upper + 4, ['cang' + k]: fore - 7, duration: 0.2, ease: 'sine.out' }, 0.45);
+    t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
+    const up = 0.6 + hold;
+    t.to(s, { ['ovBat' + k]: RigSVG.TEMP_POSE[0], ['ovCang' + k]: RigSVG.TEMP_POSE[1], duration: 0.02 }, up);
+    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: 1.5, seat: reach.crouch ? N.seat : s.seat, than: N.than, dau: N.dau + m * 6, dauY: 3, nhinX: m * 2.4, nhinY: -0.4, matY: 0,
+              cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
+    t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
+    t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, up + 0.32);
+    t.to(s, { dauY: 11, cuoi: 0.95, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, up + 1.15);
+    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, up + 1.55);
+    this.#khep(t, 0.45, up + 1.75);
+    return t;
+  }
+  #armTo(k, x, y, huong, drop = 0) {
+    const was = this.s.huong;
+    this.s.huong = huong;
+    const sx = this.#shoulderX(k), sy = this.#shoulderY() + drop;
+    this.s.huong = was;
+    const upper = DAI.canhTay * this.nv.daiCanhTay, fore = DAI.cangTay * this.nv.daiCangTay;
+    const dx = x - sx, dy = y - sy, d = Math.max(1, Math.hypot(dx, dy)), phi = Math.atan2(dy, dx) * 180 / Math.PI, toward = k === 'L' ? phi - 90 : 90 - phi;
+    if (d >= (upper + fore) * 0.98) return { bat: chuanHoaGoc(toward), cang: 4, short: d - (upper + fore) };
+    const alpha = Math.acos(clamp((upper * upper + d * d - fore * fore) / (2 * upper * d), -1, 1)) * 180 / Math.PI;
+    const beta = Math.acos(clamp((upper * upper + fore * fore - d * d) / (2 * upper * fore), -1, 1)) * 180 / Math.PI;
+    return { bat: chuanHoaGoc(toward - alpha), cang: 180 - beta, short: 0 };
+  }
+  givePill(target = null) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) throw new Error(`[character] givePill: needs both hands free (one holds the head, the other gives the pill) — the ${side === 'L' ? 'left' : 'right'} hand is holding something; put it away first (hideItem)`);
+    const reach = this.#reachLow(target, null, 'mouth'), { k, upper, fore } = reach, other = k === 'L' ? 'R' : 'L', dir = k === 'R' ? 1 : -1;
+    const low = reach.span && Math.abs(reach.ty - this.#reachLow(target, k, 'head').ty) < 1 ? reach.span * 0.2 : 0;
+    const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * reach.crouch;
+    const chin = this.#armTo(other, reach.tx - dir * 8, reach.ty + low + 12, s.huong, drop);
+    const pill = low ? reach.solve(reach.tx, reach.ty + low) : { upper, fore };
+    this.#leanTo(t, { ...reach, upper: pill.upper, fore: pill.fore }, 'nam');
+    const pet = target && (target.pet || (target.el && target.svg ? target : null));
+    if (pet) { this.onTopPet = pet; t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.55).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 1.45); }
+    t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, duration: 0.3, ease: 'sine.inOut' }, 0);
+    t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
+    t.set(s, { ['gadget' + k]: 3 }, 0.1);
+    t.to(s, { ['bat' + other]: chin.bat, ['cang' + other]: chin.cang, duration: 0.45, ease: 'power2.out' }, 0.05);
+    t.to(s, { ['bat' + k]: pill.upper - 4, ['cang' + k]: pill.fore + 6, duration: 0.2, ease: 'sine.out' }, 0.45);
+    t.to(s, { ['bat' + k]: pill.upper + 3, ['cang' + k]: pill.fore - 4, mieng: 0.2, duration: 0.3, ease: 'sine.inOut' }, 0.8);
+    t.set(s, { ['gadget' + k]: 0 }, 1.15);
+    t.to(s, { ['bat' + k]: pill.upper - 6, ['cang' + k]: pill.fore + 10, mieng: 0, cuoi: 1, mayL: 0.6, mayR: 0.6, duration: 0.25, ease: 'power2.out' }, 1.2);
+    for (let i = 0; i < 2; i++) {
+      t.to(s, { ['bat' + other]: chin.bat - 3, ['cang' + other]: chin.cang + 5, duration: 0.18, ease: 'sine.inOut' }, 1.25 + i * 0.36)
+       .to(s, { ['bat' + other]: chin.bat, ['cang' + other]: chin.cang, duration: 0.18, ease: 'sine.inOut' }, 1.43 + i * 0.36);
+    }
+    this.#khep(t, 0.5, 2.0);
+    return t;
+  }
   #placeCarried() {
     const c = this.carried, e = this.el, s = this.s;
     if (!c || !e.om) return;
@@ -2855,6 +3008,7 @@ class RigSVG {
     let fromX = c.from.x, fromY = c.from.y;
     const box = pet.svg.viewBox && pet.svg.viewBox.baseVal, offX = box && box.width ? ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * w / box.width : 0, offY = box && box.height ? (pet.s.y || 0) * h / box.height : 0;
     fromX += offX; fromY += offY;
+    if (c.scale && (s.omScale || 0) >= 0.5) { fromX = c.scale.x; fromY = c.scale.y; }
     const toMine = (p) => p && new DOMPoint(p.x, p.y).matrixTransform(this.svg.getScreenCTM().inverse());
     if (c.giver && !down) {
       const q = toMine(RigSVG.#meetPoint(c.giver, this));
@@ -6186,9 +6340,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { size, unit, ground, x: actor.spot.x + ((actor.rig === to && typeof at === 'number' ? at : actor.rig.s.x || 0) + (typeof actor.rig.dropX === 'function' ? actor.rig.dropX() : 0)) * unit };
       };
       const head = () => {
-        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
+        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' || part === 'rear' ? 'full' : 'face') : null;
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       let pose = null, seen = null;
@@ -6197,6 +6352,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         get x() { mark(); const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
         get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
+        pet: to,                                          // rig được nhắm tới (đợt 35: `givePill` vẽ bàn tay trên nó)
         follow(xp, yp, time = null) {
           if (typeof to.follow !== 'function') return { x: xp, y: yp };
           const reel = typeof time === 'number' && to.lastSequence ? to.lastSequence : null, before = reel ? reel.totalTime() : 0;
@@ -6542,8 +6698,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
       }
       for (const pet of actors) {
-        if (!pet.over || !pet.rig) continue;
-        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        const owner = pet.over || (pet.rig && (actors.find((item) => item.rig && item.rig !== pet.rig && item.rig.onTopPet === pet.rig) || {}).rig);
+        if (!owner || !pet.rig) continue;
+        const person = actors.find((item) => item.rig === owner), s = person && person.rig.s;
         const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
         let ghost = pet.ghost;
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
@@ -7030,6 +7187,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
       });
+    },
+    paws() {
+      set.update();
+      const box = view.getBoundingClientRect(), sy = view.clientHeight / (box.height || 1), out = {};
+      for (const actor of actors) {
+        const rig = actor.rig, e = rig && rig.el;
+        if (!e || typeof rig.seatY === 'function' || !rig.svg.isConnected) continue;
+        const feet = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+        if (feet.length) out[actor.host.dataset.name || actor.host.id || ''] = (Math.max(...feet.map((r) => r.bottom)) - box.top) * sy;
+      }
+      return out;
     },
     propFraming() {
       set.update();

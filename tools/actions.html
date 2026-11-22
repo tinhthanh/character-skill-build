@@ -10,7 +10,7 @@
 <body style="margin:0;background:#1d3a4b;font:12px system-ui;color:#cfe">
 <div id="sheet"></div>
 <script type="module">
-import { RigThu, createCharacter, createPet, sequence, seed } from '../runtime/index.js';
+import { RigThu, createCharacter, createPet, createProp, sequence, seed } from '../runtime/index.js';
 const query = new URLSearchParams(location.search);
 const id = query.get('nv') || 'vet', isPet = id in RigThu.LOAI, turned = query.get('stance') === 'turned';
 const only = (query.get('only') || '').split(',').map((label) => label.trim()).filter(Boolean);
@@ -47,7 +47,13 @@ for (const entry of entries) {
       const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
         : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg)) : step));
+      // "scale": một cái cân trên sàn, bên trái người (phía không có con vật) — `@scale` trong các bước (đợt 35: `weigh`).
+      let scale = null;
+      if (entry.scale) {
+        const scaleHost = document.createElement('div'); scaleHost.style.cssText = `position:absolute;left:${(5 - 62) * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
+        cell.insertBefore(scaleHost, cell.firstChild); scale = createProp(scaleHost, 'scale', { reading: entry.scale === true ? '4.2 kg' : String(entry.scale) });
+      }
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg)) : step));
       const line = sequence(rig, steps);
       const at = line.duration() * (column + 0.5) / cols;
       line.time(at); rig.render();

@@ -765,6 +765,30 @@ with tempfile.TemporaryDirectory() as work:
         elif done.returncode != 0: problems.append('still: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         elif 'measured at 2×' not in done.stdout: problems.append('still: acting_check did not measure the small stroking hand at 2×:\n' + done.stdout[-400:])
 
+    # Đợt 35: PHÒNG KHÁM — bác sĩ cân con chó (đặt lên cái cân "can" rồi bế về), đo nhiệt độ (con chó quay đuôi lại), cho uống thuốc
+    # (con chó há miệng rồi nhai). acting_check: con chó đứng trên bệ cân lúc đọc số, tay tới nó lúc bế, lúc đo nhiệt, lúc đưa thuốc.
+    care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},
+            'characters': [{'name': 'bac_si', 'id': 'vet', 'x': 40, 'z': -560, 'faces': 'cho'}, {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'}],
+            'script': [{'who': 'bac_si', 'do': [['weigh', '@cho', 'can']]}, {'who': 'bac_si', 'do': [['takeTemp', '@cho', 1.5, {'reading': '39.4°C'}]]},
+                       {'who': 'bac_si', 'do': [['givePill', '@cho']]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_care35.json')
+    try:
+        json.dump(care, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'care35'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('care35: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'care35', 'index.html'), encoding='utf-8').read()
+        for needle in ("['weigh', cho, set.targetPoint(bac_si, [-120, 27.3, -560]), {\"reading\": \"9.6 kg\"}]", "set.target(bac_si, cho, 'rear')", "[cho, ['face', \"right\"]]",
+                       "['openMouth', 0.5], ['chew', 3]"):
+            if needle not in html: problems.append(f'care35: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'care35')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('care35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('bac_si weighs cho — cho on the scale', 'bac_si carry cho — hand reaches', 'bac_si takeTemp cho — hand reaches', 'bac_si givePill cho — hand reaches', 'cho in view at'):
+                if needle not in done.stdout: problems.append(f'care35: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
+
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %
     # bàn tay ở 0.72.0). Góc trung nới theo bàn tay ở lượt có động tác tay, vẫn hẹp hơn 85 % góc toàn.
     gesture = {'id': 'gesture', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],
@@ -945,6 +969,13 @@ with tempfile.TemporaryDirectory() as work:
         ('a drive without "from"', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300, 'drive': {'dur': 3}}), '"from"'),
         ('a pet that rides', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300}) or s['characters'][2].update({'rides': 'moto'}), 'cannot ride'),
         ('a scooter facing up', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'x': 0, 'z': -300, 'facing': 'up'}), 'facing'),
+        # Đợt 35: cân, đo nhiệt độ, cho uống thuốc.
+        ('weighing on a scale that is not there', lambda s: s['script'].append({'who': 'vet', 'do': [['weigh', '@cat', 'nope']]}), '"kind": "scale"'),
+        ('weighing a person', lambda s: s['set']['cutouts'].append({'kind': 'scale', 'name': 'can', 'x': 0, 'z': -330}) or s['script'].append({'who': 'vet', 'do': [['weigh', '@boy', 'can']]}), 'the pet'),
+        ('a scale far behind the person', lambda s: s['set']['cutouts'].append({'kind': 'scale', 'name': 'can', 'x': 0, 'z': -900}) or s['script'].append({'who': 'vet', 'do': [['weigh', '@cat', 'can']]}), 'same z'),
+        ('a pet that weighs', lambda s: s['set']['cutouts'].append({'kind': 'scale', 'name': 'can', 'x': 0, 'z': -330}) or s['script'].append({'who': 'cat', 'do': [['weigh', '@cat', 'can']]}), 'by a person'),
+        ('a temperature held for a minute', lambda s: s['script'].append({'who': 'vet', 'do': [['takeTemp', '@cat', 60]]}), 'hold'),
+        ('a pill with extra words', lambda s: s['script'].append({'who': 'vet', 'do': [['givePill', '@cat', 'twice']]}), 'just the pet'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:
