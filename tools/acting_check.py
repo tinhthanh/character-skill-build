@@ -630,7 +630,7 @@ FACE_FRAME = 0.44     # … góc cận: mặt người (bề ngang đầu) ≥ 4
 TOOL_FRAME = 0.085    # … và nhiệt kế (cạnh dài) ≥ 8,5 % chiều cao khung — lượt hai: 7,2 % / 8,2 %
 
 
-PILL_AT = 0.05        # viên thuốc cách môi con vật ≤ 5 % chiều cao người …
+PILL_AT = 0.02        # viên thuốc (mép gần nhất) cách môi con vật ≤ 2 % chiều cao người …
 MOUTH_OPEN = 0.5      # … và miệng con vật há ≥ 0,5 lúc viên thuốc ở môi
 
 
@@ -642,7 +642,10 @@ def check_pill(folder, c, scales):
     who, pet = care.get(c['who']), care.get(c['target'])
     pill = next((g for g in (who or {}).get('gadgets', []) if g['kind'] == 7), None)
     if who and pet and pill and pet.get('lips'):
-        d = ((pill['x'] - pet['lips']['x']) ** 2 + (pill['y'] - pet['lips']['y']) ** 2) ** 0.5 / max(1, who['tall'])
+        # Tới HÌNH viên nang (mép gần nhất), không tới tâm nó: lượt ba viên nang dừng ở mép môi để không che cái miệng đang há.
+        half_w, half_h = pill.get('w', 0) / 2, pill.get('h', 0) / 2
+        dx, dy = max(0, abs(pill['x'] - pet['lips']['x']) - half_w), max(0, abs(pill['y'] - pet['lips']['y']) - half_h)
+        d = (dx * dx + dy * dy) ** 0.5 / max(1, who['tall'])
         out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': d <= PILL_AT, 'note': f'the pill is {d * 100:.1f} % of height from the lips at {mid:g} s (limit {PILL_AT * 100:g} %)'})
     else:
         out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': False, 'note': f'no pill in the hand (or no lips) at {mid:g} s'})

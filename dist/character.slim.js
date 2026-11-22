@@ -3013,7 +3013,7 @@ class RigSVG {
       for (let n = 0; n < 5; n++) { const a = pose.dir * Math.PI / 180; pose = lips.solve(x - Math.cos(a) * reachIn, y - Math.sin(a) * reachIn); }
       return pose;
     };
-    const ready = tipAt(lips.tx - dir * 14, lips.ty + 6, 25), inside = tipAt(lips.tx, lips.ty, 25);
+    const ready = tipAt(lips.tx - dir * 22, lips.ty + 6, 25), inside = tipAt(lips.tx - dir * 6, lips.ty + 1, 25);
     this.pillReach = 0;
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     const pet = target && (target.pet || (target.el && target.svg ? target : null) || (target.live && target.live.el ? target.live : null));

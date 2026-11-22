@@ -4382,7 +4382,8 @@ export class RigSVG {
       for (let n = 0; n < 5; n++) { const a = pose.dir * Math.PI / 180; pose = lips.solve(x - Math.cos(a) * reachIn, y - Math.sin(a) * reachIn); }
       return pose;
     };
-    const ready = tipAt(lips.tx - dir * 14, lips.ty + 6, 25), inside = tipAt(lips.tx, lips.ty, 25);
+    // Đầu viên thuốc dừng ở MÉP MÔI phía người, không giữa môi: viên nang to che mất cái miệng đang há (lượt ba).
+    const ready = tipAt(lips.tx - dir * 22, lips.ty + 6, 25), inside = tipAt(lips.tx - dir * 6, lips.ty + 1, 25);
     this.pillReach = 0;
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     // Bối cảnh 3D: con vật đứng trước người thì đầu nó che tay ở môi — vẽ bàn tay cầm thuốc TRÊN nó lúc đưa thuốc.
