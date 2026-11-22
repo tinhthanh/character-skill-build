@@ -2797,23 +2797,27 @@ export class RigSVG {
    * REO MỪNG: hai tay giơ cao, nhún lên hai lần, mặt rạng rỡ. Động tác toàn thân duy nhất để tỏ ra
    * vui — nét mặt và ngón cái thì quá nhỏ trong cảnh toàn. Đang ngồi thì chỉ giơ tay, không nhún.
    * Tay nào đang cầm đồ thì giữ nguyên, chỉ tay kia giơ lên.
+   * `{ narrow: true }` — REO HẸP cho khung dọc (đợt 34): hai nắm tay giơ lên cạnh vai, khuỷu sát thân, đấm nhẹ lên hai
+   * nhịp ("yes!"), thay cho chữ V dang rộng — bề ngang chỉ cỡ cái đầu, nên góc trung khung dọc giữ được cả hai tay.
    */
-  cheer() {
+  cheer({ narrow = false } = {}) {
     const t = this.tl(), s = this.s;
     this.#openUp(t);
     const busy = (side) => this.holds[side] && s['item' + side] > 0.5;
     const up = {};
     // Giơ thành chữ V mở rộng, không giơ thẳng đứng: đầu chibi to hơn tầm với của tay (nhất là trẻ em),
-    // giơ thẳng thì hai tay khuất sau đầu hoặc trông như đang bịt tai.
-    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = 122; up['cang' + side] = 6; }
-    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, 'xoe'])), 0);
+    // giơ thẳng thì hai tay khuất sau đầu hoặc trông như đang bịt tai. Bản hẹp: cánh tay 70° ra ngoài, cẳng tay gập
+    // thêm 108° — cẳng tay gần thẳng đứng, nắm tay ngang cằm, không che mặt.
+    const [upper, fore, pump] = narrow ? [70, 108, 14] : [122, 6, 26];
+    for (const side of ['L', 'R']) if (!busy(side)) { up['bat' + side] = upper; up['cang' + side] = fore; }
+    t.set(s, Object.fromEntries(['L', 'R'].filter((side) => !busy(side)).map((side) => ['tay' + side, narrow ? 'nam' : 'xoe'])), 0);
     t.to(s, { ...Object.fromEntries(Object.keys(up).map((key) => [key, key.startsWith('bat') ? -4 : 24])), dauY: 3, duration: 0.14, ease: 'power1.in' }, 0);     // lấy đà
     t.to(s, { ...up, vai: -5, dau: -3, dauY: 0, cuoi: 1, mieng: 0.55, mayL: 0.9, mayR: 0.9, duration: 0.36, ease: 'back.out(1.6)' }, 0.14);
     const hop = s.seat > 0.5 ? 0 : -16;                                            // y âm là lên
     for (let i = 0; i < 2; i++) {
       t.to(s, { y: hop, duiL: 0, duiR: 0, duration: 0.17, ease: 'power2.out' }, 0.42 + i * 0.42)
        .to(s, { y: 0, duration: 0.2, ease: 'power2.in' }, 0.59 + i * 0.42);
-      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: 26, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
+      for (const key of Object.keys(up).filter((name) => name.startsWith('cang'))) t.to(s, { [key]: narrow ? fore + pump : pump, duration: 0.17, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.42 + i * 0.42);
     }
     this.#chop(t, 0.9);
     this.#khep(t, 0.5, 1.4, { y: 0 });

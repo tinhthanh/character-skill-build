@@ -154,7 +154,7 @@ SEEN = 0.70            # con vật được chạm: thấy ≥ 70 % hình nó (�
 SEEN_HEAD = 0.60       # … và ≥ 60 % cái đầu
 
 
-def pet_pixels(folder, jobs, keep=None):
+def pet_pixels(folder, jobs, keep=None, scale=None):
     """CON VẬT THẤY ĐƯỢC BAO NHIÊU (đợt 31), đo bằng pixel. `jobs`: [(lúc, tên con vật, tên người chạm)]. Ở mỗi lúc chụp năm
     ảnh: a — như thường; b — ẩn host con vật; c — host con vật lên lớp trên cùng (z-index; nhân vật nằm trên các lớp phẳng
     xếp theo z-index, set3d.js); d — host người chạm lên lớp trên cùng; e — như d, hai bàn tay tô hồng sẫm. Trả về {(lúc, tên): {'all',
@@ -203,9 +203,17 @@ def pet_pixels(folder, jobs, keep=None):
         plan = os.path.join(out, 'pet-steps.json')
         json.dump(steps, open(plan, 'w', encoding='utf-8'))
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
-                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan], capture_output=True, text=True)
+                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan, '--scale', str(scale or 1)], capture_output=True, text=True)
         if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not capture {folder}:\n{done.stderr.strip()[-500:]}')
         probes = json.loads(done.stdout.strip().splitlines()[-1])[0::6]
+        zoom = float(scale or 1)
+        # Ảnh chụp ở tỉ lệ zoom (đợt 34): mọi toạ độ của actingProbe (px CSS) nhân zoom; ngưỡng tính bằng px (dải sát 3 px, tìm khe 80 px,
+        # tối thiểu 30 điểm) cũng tính theo px CSS.
+        def grow(value, key=None):
+            if isinstance(value, dict): return {name: grow(item, name) for name, item in value.items()}
+            if isinstance(value, list): return [grow(item, key) for item in value]
+            return value * zoom if isinstance(value, (int, float)) and not isinstance(value, bool) and key in ('x', 'y', 'x0', 'x1', 'y0', 'y1', 'tall') else value
+        probes = [[grow(actor) for actor in probe] if isinstance(probe, list) else probe for probe in probes]
         result = {}
         for (t, name, toucher), base, probe in zip(jobs, bases, probes):
             pet = next((a for a in probe if a['name'] == name), None)
@@ -225,7 +233,7 @@ def pet_pixels(folder, jobs, keep=None):
                     seen = differ(pa[x, y], pb[x, y])
                     for k in ['all'] + inside:
                         total, shown = counts.get(k, (0, 0)); counts[k] = (total + 1, shown + seen)
-            result[(t, name)] = {k: shown / total for k, (total, shown) in counts.items() if total >= 30}
+            result[(t, name)] = {part: shown / total for part, (total, shown) in counts.items() if total >= 30 * zoom * zoom}
             who = next((a for a in probe if a['name'] == toucher), None)
             if who and who.get('hands') and who.get('tall') and 'all' in result[(t, name)]:
                 d, e = (Image.open(base + k).convert('RGB') for k in ('-d.png', '-e.png'))
@@ -245,19 +253,22 @@ def pet_pixels(folder, jobs, keep=None):
                     for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
                         if not differ(pd[x, y], pe[x, y]): continue
                         mine += 1; seen_px = not differ(pa[x, y], pd[x, y]); shown += seen_px
-                        near += any(pet_px(x + dx, y + dy) for dx in (-3, 0, 3) for dy in (-3, 0, 3))
+                        band = round(3 * zoom)
+                        near += any(pet_px(x + dx, y + dy) for dx in (-band, 0, band) for dy in (-band, 0, band))
                         # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
                         # lưng (con vật vẽ trước người), không phải đặt lên đó.
                         sunk += (not seen_px) and pet_px(x, y)
                         hand_px.append((x, y))
-                if mine >= 30:
+                if mine >= 30 * zoom * zoom:
+                    result[(t, name)]['px'] = mine / (zoom * zoom)
                     result[(t, name)]['hand'] = shown / mine; result[(t, name)]['contact'] = near / mine; result[(t, name)]['sunk'] = sunk / mine
                     # KHE HỞ (đợt 32): tay không sát con vật thì cách nó bao nhiêu px (tìm tới 80 px quanh khung bàn tay).
                     gap_px = 0.0
                     if not near:
-                        pets = [(x, y) for y in range(max(0, int(hb['y0']) - 80), min(H, int(hb['y1']) + 81), 2)
-                                for x in range(max(0, int(hb['x0']) - 80), min(W, int(hb['x1']) + 81), 2) if pet_px(x, y)]
-                        gap_px = min((min((hx - x) ** 2 + (hy - y) ** 2 for x, y in pets) ** 0.5 for hx, hy in hand_px[::3]), default=81.0) if pets else 81.0
+                        reach, stride = int(80 * zoom), max(2, int(2 * zoom))
+                        pets = [(x, y) for y in range(max(0, int(hb['y0']) - reach), min(H, int(hb['y1']) + reach + 1), stride)
+                                for x in range(max(0, int(hb['x0']) - reach), min(W, int(hb['x1']) + reach + 1), stride) if pet_px(x, y)]
+                        gap_px = min((min((hx - x) ** 2 + (hy - y) ** 2 for x, y in pets) ** 0.5 for hx, hy in hand_px[::max(3, int(3 * zoom * zoom))]), default=81.0 * zoom) if pets else 81.0 * zoom
                     result[(t, name)]['gap'] = gap_px / who['tall']
         return result
     finally:
@@ -267,12 +278,30 @@ def pet_pixels(folder, jobs, keep=None):
             os.rmdir(out)
 
 
+SMALL_HAND = 1000      # bàn tay < 1000 px (CSS) trong ảnh — cỡ 30 × 30 — thì đo lại ở 2× (đợt 34)
+
+
+def pet_pixels_sharp(folder, jobs, keep=None):
+    """Như `pet_pixels`, nhưng lúc nào bàn tay chỉ vài trăm px (góc rất rộng, máy đứng yên) thì chụp lại lúc ấy ở tỉ lệ 2 (đợt 34).
+    Viền bàn tay khử răng cưa — một hai px — là phần lớn của một bàn tay nhỏ: ở 1× tay bà đặt trên đầu mèo (cảnh máy đứng yên,
+    tay 459 px) "lún" tới 12,4 % (8–12 % qua 13 mốc); cùng các mốc ấy ở 2× tối đa 6,2 %, ở 3× 7,2 % — ảnh phóng to cho thấy bàn tay
+    nằm trên đỉnh đầu mèo, chỉ có phép đo đổi. Ở góc trung (tay lớn hơn nhiều) hai tỉ lệ gần nhau (tối đa 3,4 % / 2,3 %)."""
+    found = pet_pixels(folder, jobs, keep)
+    if not found: return found
+    small = [job for job in jobs if (found.get((job[0], job[1])) or {}).get('px', SMALL_HAND) < SMALL_HAND]
+    if small:
+        sharp = pet_pixels(folder, small, keep and os.path.join(keep, 'x2'), 2) or {}
+        for t, name, _ in small:
+            if (t, name) in sharp: found[(t, name)] = dict(sharp[(t, name)], zoom=2)
+    return found
+
+
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
     if not jobs: return []
-    found = pet_pixels(folder, jobs, keep)
+    found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
     results = []
     for t, name, toucher in jobs:
@@ -303,7 +332,7 @@ def check_track(folder, checks, keep=None):
     tracks = [c for c in checks if c.get('track')]
     jobs = [(t, c['target'], c['who']) for c in tracks for t in c['track']]
     if not jobs: return []
-    found = pet_pixels(folder, jobs, keep)
+    found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return []
     results = []
     for c in tracks:
@@ -320,7 +349,8 @@ def check_track(folder, checks, keep=None):
         deep = max(rows, key=lambda tr: tr[1].get('sunk', 0))
         results.append({'scene': folder, 'what': f'{c["who"]} strokes {c["target"]} — hand not sunk past its outline', 'ok': deep[1].get('sunk', 0) <= TRACK_SUNK,
                         'sunk': [round(r.get('sunk', 0), 3) for _, r in rows],
-                        'note': f'at most {deep[1].get("sunk", 0) * 100:.0f} % of the hand behind {c["target"]}\'s outline, at {deep[0]:g} s (limit {TRACK_SUNK * 100:g} %)'})
+                        'note': f'at most {deep[1].get("sunk", 0) * 100:.0f} % of the hand behind {c["target"]}\'s outline, at {deep[0]:g} s (limit {TRACK_SUNK * 100:g} %)'
+                                + (f'; measured at 2× — the hand is {deep[1].get("px", 0):.0f} px' if deep[1].get('zoom') else '')})
     return results
 
 

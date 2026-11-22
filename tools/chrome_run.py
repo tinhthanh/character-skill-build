@@ -91,6 +91,7 @@ def main():
     parser.add_argument('--dump', help='write the final DOM here ("-" for stdout)')
     parser.add_argument('--screenshot', help='write a PNG here')
     parser.add_argument('--size', default='1280x800', help='viewport, WxH')
+    parser.add_argument('--scale', type=float, default=1, help='device pixel ratio of the screenshots (2: twice as many pixels each way)')
     parser.add_argument('--size-js', help='JavaScript evaluated after the page is finished; returns "W,H" for the screenshot')
     parser.add_argument('--log', help='write page errors here')
     parser.add_argument('--steps', help='a JSON file: a list of {"eval": "JS"} and {"screenshot": "out.png"} run in order once the page is finished; '
@@ -124,7 +125,7 @@ def main():
             call = lambda method, params=None: tools.call(method, params, session)
             evaluate = lambda expression: call('Runtime.evaluate', {'expression': expression, 'returnByValue': True}).get('result', {}).get('value')
             call('Page.enable'); call('Runtime.enable')
-            call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+            call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': args.scale, 'mobile': False})
             call('Page.navigate', {'url': args.url})
             title, deadline, crashed = '', time.time() + args.timeout, False
             while time.time() < deadline:
@@ -168,7 +169,7 @@ def main():
                     wanted = evaluate(args.size_js)
                     if wanted:
                         width, height = (int(float(n)) for n in str(wanted).split(','))
-                        call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+                        call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': args.scale, 'mobile': False})
                 # Hai nhịp vẽ để bố cục mới (và SVG vừa đổi) lên hình trước khi chụp.
                 call('Runtime.evaluate', {'expression': 'new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))', 'awaitPromise': True})
                 image = call('Page.captureScreenshot', {'format': 'png'})['data']

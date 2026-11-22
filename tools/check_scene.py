@@ -745,6 +745,26 @@ with tempfile.TemporaryDirectory() as work:
         elif 'meo moves to depth -780 unseen' not in done.stdout:
             problems.append('pair: acting_check did not measure the cat changing depth:\n' + done.stdout[-400:])
 
+    # Đợt 34: cùng cảnh ấy với MÁY ĐỨNG YÊN (không có lần cắt nào): con mèo tự ĐI một đoạn ngắn sang mặt phẳng của bé, chiều sâu đổi
+    # theo bước chân của nó (0.73.0: không cắt, không đi — trượt 0,45 s trên hình, 13 khung).
+    still = dict(pair, id='still', camera=False)
+    path = os.path.join(os.path.dirname(stage), '_check_still.json')
+    try:
+        json.dump(still, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'still'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('still: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'still', 'index.html'), encoding='utf-8').read()
+        if "[meo, ['walk'" not in html: problems.append('still: the cat does not walk into the boy\'s plane before he feeds it')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'still')], capture_output=True, text=True)
+        line = next((row for row in done.stdout.splitlines() if 'meo moves to depth -780' in row), '')
+        if 'during its own walk' not in line or '✓' not in line: problems.append('still: the cat does not change depth during its own walk:\n' + (line or done.stdout[-400:]))
+        # Đợt 34, lượt hai: góc rất rộng, tay bà chỉ ~450 px — acting_check đo lại ở 2× (ở 1× viền răng cưa thành 12 % "lún").
+        elif done.returncode != 0: problems.append('still: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'measured at 2×' not in done.stdout: problems.append('still: acting_check did not measure the small stroking hand at 2×:\n' + done.stdout[-400:])
+
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %
     # bàn tay ở 0.72.0). Góc trung nới theo bàn tay ở lượt có động tác tay, vẫn hẹp hơn 85 % góc toàn.
     gesture = {'id': 'gesture', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],
@@ -780,6 +800,13 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode != 0: problems.append('cheer: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         elif 'be cheer — hands in the frame' not in done.stdout or 'vet point — hands in the frame' not in done.stdout:
             problems.append('cheer: acting_check did not measure the hands of the cheer and the point:\n' + done.stdout[-400:])
+        # Đợt 34: khung dọc thì bé REO HẸP (hai nắm tay cạnh vai) — lượt reo giữ GÓC TRUNG, không cắt sang góc toàn giữa chuỗi góc
+        # trung (0.73.0: `how: 'gesture'`, góc toàn 116 %).
+        else:
+            got = page_eval(os.path.join(work, 'cheer'), "(() => window.__set.shotLog.map((s) => ({ subjects: s.subjects, size: s.size, how: s.how || null, ratio: s.ratio })))()")
+            html = open(os.path.join(work, 'cheer', 'index.html'), encoding='utf-8').read()
+            if "['cheer', { narrow: true }]" not in html: problems.append('cheer: the boy\'s cheer in a vertical frame is not the narrow one (cheer({ narrow: true }))')
+            elif not got or any(shot.get('how') == 'gesture' for shot in got): problems.append(f'cheer: the cheer still cuts to the full shot in the middle of the medium shots ({got})')
 
     # Đợt 32, lượt hai: GÓC MỞ ĐẦU KHUNG DỌC một người đứng giữ cỡ 80 % chiều cao (lượt đầu đợt 32: 66 % cho mọi góc toàn dọc —
     # thừa sàn, thừa tường); góc trung của người ấy vẫn hẹp hơn 85 % góc toàn (bề ngang theo lõi khi hai tay múa chìa ngang).

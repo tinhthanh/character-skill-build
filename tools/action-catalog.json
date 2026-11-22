@@ -10,6 +10,7 @@
     { "label": "shake", "steps": ["shake"] },
     { "label": "shrug", "steps": ["shrug"] },
     { "label": "cheer", "steps": ["cheer"] },
+    { "label": "cheer narrow", "steps": [["cheer", { "narrow": true }]] },
     { "label": "worry", "steps": ["worry"] },
     { "label": "mark !", "steps": [["mark", "!"], ["idle", 1.2], ["mark", null]] },
     { "label": "mark ?", "steps": [["mark", "?"], ["idle", 1.2], ["mark", null]] },
