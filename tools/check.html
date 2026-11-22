@@ -1789,6 +1789,54 @@ try {
         into.progress(1); if (!(pup.s.nam < 0.1 && Math.abs(pup.s.x) < 1)) hong('comeOut', `the pet does not come back out standing (lying ${pup.s.nam.toFixed(2)}, x ${pup.s.x.toFixed(1)})`);
         into.kill(); pup.svg.remove();
       }
+      // Đợt 35 — thú: lăn ngửa, đuổi đuôi, nhào, liếm, nấp, gặm cà rốt (+ người chìa tay cho liếm); loài không hợp thì báo lỗi rõ.
+      {
+        const dog = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog' }).rig;
+        const roll = L.sequence(dog, ['rollOver'], { breathe: false });
+        roll.time(roll.duration() * 0.5);
+        const back = dog.el.than.getBoundingClientRect(), paw = dog.el.tnBan.getBoundingClientRect();
+        if (!(dog.s.lan > 0.95)) hong('rollOver', `the dog is not on its back half way through (lan ${dog.s.lan.toFixed(2)})`);
+        if (!(paw.top + paw.height / 2 < back.top + back.height / 2)) hong('rollOver', 'the front paws are not up in the air while on its back');
+        roll.progress(1); if (dog.s.lan !== 0 || dog.s.tnNhac !== 0) hong('rollOver', 'the dog does not get back on its feet'); roll.kill();
+        const spin = L.sequence(dog, [['chaseTail', 2]], { breathe: false });
+        let flips = 0, last = 1;
+        for (let time = 0; time <= spin.duration(); time += 1 / 30) { spin.time(time); const side = dog.s.huong < 0 ? -1 : 1; if (side !== last) flips++; last = side; }
+        if (flips < 4) hong('chaseTail', `two turns should face left and right again and again (${flips} changes of side)`);
+        if (!(Math.abs(dog.s.x) < 0.5 && dog.s.huong === 1)) hong('chaseTail', `the dog does not end where it started, facing the same way (x ${dog.s.x.toFixed(1)}, facing ${dog.s.huong})`);
+        spin.kill();
+        let wrong = ''; try { dog.knead(); } catch (error) { wrong = error.message; }
+        if (!wrong.includes('cats')) hong('knead', 'a dog kneading should be refused, naming cats');
+        const boy = L.createCharacter(spot('left:150px;top:0;width:200px;height:235px'), { id: 'boy' }).rig;
+        const offer = L.sequence(boy, [['offerHand', dog, 1.6]], { breathe: false }), licking = L.sequence(dog, [['lick', boy, 4]], { breathe: false });
+        offer.time(1.2); licking.time(1.2);
+        const muzzle = dog.el.dau.getBoundingClientRect();
+        const apart = Math.min(...[boy.el.coTayL, boy.el.coTayR].map((hand) => { const palm = hand.getBoundingClientRect(); return Math.max(0, palm.left - muzzle.right, muzzle.left - palm.right, palm.top - muzzle.bottom, muzzle.top - palm.bottom); }));
+        if (apart > 12) hong('offerHand', `the offered hand is ${apart.toFixed(0)} px from the dog's head`);
+        if (!(dog.s.luoi > 0.2)) hong('lick', 'the tongue is not out while licking');
+        offer.kill(); licking.kill(); dog.datNghi();
+        const run = L.sequence(dog, [['hide', boy]], { breathe: false });
+        run.progress(1);
+        const kid = boy.svg.getBoundingClientRect(), body = dog.el.than.getBoundingClientRect(), mid = (body.left + body.right) / 2;
+        if (Math.abs(mid - (kid.left + kid.width / 2)) > kid.width * 0.25) hong('hide', `the dog does not end behind the boy (body centre ${mid.toFixed(0)} px, boy centre ${(kid.left + kid.width / 2).toFixed(0)} px)`);
+        if (!(dog.s.huong < 0)) hong('hide', 'the dog does not turn back to peek the way it came');
+        run.kill(); boy.svg.remove(); dog.svg.remove();
+        const cat = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'cat' }).rig;
+        const press = L.sequence(cat, [['knead', 6]], { breathe: false });
+        let lifted = 0; for (let time = 0; time <= press.duration(); time += 0.05) { press.time(time); lifted = Math.max(lifted, cat.s.tnY, cat.s.txY); }
+        if (lifted < 10) hong('knead', `the front paws do not lift and press (highest ${lifted.toFixed(1)})`);
+        press.progress(1); if (!(cat.s.ngoi > 0.9)) hong('knead', 'the cat does not sit back down (its rest pose)'); press.kill(); cat.svg.remove();
+        const bun = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'rabbit' }).rig;
+        const munch = L.sequence(bun, [['eatCarrot', 6]], { breathe: false });
+        munch.time(0.7); const long = bun.s.carrot, shown = bun.el.carrot.style.display !== 'none';
+        munch.time(munch.duration() * 0.7); const short = bun.s.carrot;
+        if (!(shown && long > 0.8)) hong('eatCarrot', 'no whole carrot in the paws at the first bite');
+        if (!(short < long - 0.3)) hong('eatCarrot', `the carrot does not get shorter (${long.toFixed(2)} → ${short.toFixed(2)})`);
+        munch.progress(1); if (bun.s.carrot !== 0 || bun.el.carrot.style.display !== 'none') hong('eatCarrot', 'the carrot is still there after eating it');
+        munch.kill();
+        let nope = ''; try { bun.rollOver(); } catch (error) { nope = error.message; }
+        if (!nope.includes('not for a rabbit')) hong('rollOver', 'a rabbit rolling over should be refused');
+        bun.svg.remove();
+      }
       // Đợt 9 — thông báo trên màn hình đạo cụ: thẻ hiện khi giữ, chữ nằm gọn trong thẻ, tắt khi xong; laptop quay lưng thì báo lỗi.
       {
         const deskHost = spot('left:0;top:0;width:200px;height:235px'), screenProp = L.createProp(deskHost, 'monitor', {});

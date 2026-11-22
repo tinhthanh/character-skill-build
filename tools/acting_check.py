@@ -299,7 +299,7 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'petAct') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -465,6 +465,62 @@ def check_gesture(folder, c, frames):
     return [{'scene': folder, 'what': what, 'ok': margin >= HAND_IN, 'margin': round(margin, 3), 'note': note}]
 
 
+PAW_FLOOR = 0.04       # động tác thú (đợt 35): bàn chân thấp nhất (lăn ngửa: lưng) lệch đường sàn ≤ 4 % chiều cao con vật
+HIDE_HEAD = 0.60       # nấp: đầu thấy ≥ 60 % …
+HIDE_BODY = 0.90       # … mà con vật thấy ≤ 90 % — có phần khuất sau người ấy
+LICK_GAP = 0.06        # liếm (đợt 35): mõm cách bàn tay chìa ra / mặt người bế ≤ 6 % chiều cao người ấy
+
+
+def check_pet_act(folder, c, frames, seen=None):
+    """ĐỘNG TÁC THÚ (đợt 35) ở lúc được hỏi: (1) ≥ 70 % khung thân con vật trong khung hình; (2) bàn chân thấp nhất trên sàn (± 4 %
+    chiều cao con vật) — lăn ngửa: LƯNG trên sàn và cả bốn bàn chân cao hơn giữa thân (chổng trời); đang được bế thì thôi; (3) nấp: đầu
+    thấy ≥ 60 %, cả con ≤ 90 % (khuất sau người ấy một phần — đo bằng pixel); (4) liếm: khung mặt con vật cách bàn tay người ấy (hay mặt
+    người bế) ≤ 6 % chiều cao người."""
+    W, H = frame_size(folder)
+    mid = len(c['times']) // 2
+    t, frame = c['times'][mid], frames[mid]
+    pet, what = frame.get(c['who']), f'{c["who"]} {c["name"]}'
+    if not pet: return [{'scene': folder, 'what': what, 'ok': False, 'note': f'{c["who"]} not drawn at {t:g} s'}]
+    out = []
+    box = pet.get('body') or pet.get('face')
+    if box:
+        area = max(1, (box['x1'] - box['x0']) * (box['y1'] - box['y0']))
+        shown = max(0, min(box['x1'], W) - max(box['x0'], 0)) * max(0, min(box['y1'], H) - max(box['y0'], 0)) / area
+        out.append({'scene': folder, 'what': f'{what} — in the frame', 'ok': shown >= 0.7, 'note': f'{shown * 100:.0f} % of {c["who"]} in the frame at {t:g} s (least 70 %)'})
+    tall = pet.get('tall') or 1
+    paws, back = pet.get('paws') or [], (pet.get('parts') or {}).get('back')
+    if not pet.get('carried') and paws:
+        if c['name'] == 'rollOver' and back:
+            off = (back['y1'] - pet['ground']) / tall
+            up = all((p['y0'] + p['y1']) / 2 < (back['y0'] + back['y1']) / 2 for p in paws)
+            out.append({'scene': folder, 'what': f'{what} — back on the floor, paws up', 'ok': abs(off) <= PAW_FLOOR + 0.02 and up,
+                        'note': f'the back {off * 100:+.1f} % of its height off the floor (limit ±{(PAW_FLOOR + 0.02) * 100:g} %), ' + ('all four paws above the middle of the body' if up else 'a paw below the middle of the body') + f' at {t:g} s'})
+        else:
+            worst = None
+            for k, f in enumerate(frames):
+                a = f.get(c['who'])
+                if not a or not a.get('paws'): continue
+                off = (max(p['y1'] for p in a['paws']) - a['ground']) / (a.get('tall') or 1)
+                if worst is None or abs(off) > abs(worst[1]): worst = (c['times'][k], off)
+            if worst: out.append({'scene': folder, 'what': f'{what} — paws on the floor', 'ok': abs(worst[1]) <= PAW_FLOOR,
+                                  'note': f'lowest paw {worst[1] * 100:+.1f} % of its height off the floor at {worst[0]:g} s (limit ±{PAW_FLOOR * 100:g} %)'})
+    if c['name'] == 'hide' and seen is not None:
+        part = seen.get((t, c['who'])) or {}
+        if 'all' in part:
+            head = part.get('head', 0)
+            out.append({'scene': folder, 'what': f'{what} — hides, head peeking out', 'ok': head >= HIDE_HEAD and part['all'] <= HIDE_BODY,
+                        'note': f'{part["all"] * 100:.0f} % of {c["who"]} shows (at most {HIDE_BODY * 100:g} % — part of it behind {c["target"]}), head {head * 100:.0f} % (least {HIDE_HEAD * 100:g} %) at {t:g} s'})
+    if c['name'] == 'lick' and c.get('target'):
+        person, face = frame.get(c['target']), (pet.get('parts') or {}).get('head') or pet.get('face')
+        if person and face and person.get('tall'):
+            spots = [person['face']] if c.get('carried') and person.get('face') else [{'x0': h['x'], 'x1': h['x'], 'y0': h['y'], 'y1': h['y']} for h in person.get('hands') or []]
+            d = min(((max(0, a['x0'] - face['x1'], face['x0'] - a['x1'])) ** 2 + (max(0, a['y0'] - face['y1'], face['y0'] - a['y1'])) ** 2) ** 0.5 for a in spots) if spots else None
+            if d is not None:
+                out.append({'scene': folder, 'what': f'{what} {c["target"]} — muzzle at the {"face" if c.get("carried") else "hand"}', 'ok': d / person['tall'] <= LICK_GAP,
+                            'note': f'{d / person["tall"] * 100:.1f} % of {c["target"]}\'s height between {c["who"]}\'s face and {c["target"]}\'s {"face" if c.get("carried") else "nearest hand"} at {t:g} s (limit {LICK_GAP * 100:g} %)'})
+    return out
+
+
 INSERT_GAP = 3.0      # phản ứng bắt đầu trong 3 s sau lúc cắt sang góc chèn con vật: là phản ứng với động tác vừa rồi (đợt 33)
 
 
@@ -497,6 +553,9 @@ def check_scene(folder):
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
+    hide_jobs = [(c['times'][len(c['times']) // 2], c['who'], c.get('target') or c['who']) for c in checks if c['kind'] == 'petAct' and c['name'] == 'hide']
+    hidden = pet_pixels_sharp(folder, hide_jobs, KEEP and os.path.join(KEEP, 'hide')) if hide_jobs else None
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
@@ -519,6 +578,9 @@ def check_scene(folder):
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
+            continue
+        if c['kind'] == 'petAct':
+            results.extend(check_pet_act(folder, c, frames, hidden))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):

@@ -945,6 +945,8 @@ with tempfile.TemporaryDirectory() as work:
         ('a drive without "from"', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300, 'drive': {'dur': 3}}), '"from"'),
         ('a pet that rides', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300}) or s['characters'][2].update({'rides': 'moto'}), 'cannot ride'),
         ('a scooter facing up', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'x': 0, 'z': -300, 'facing': 'up'}), 'facing'),
+        ('a pet licking a pet', lambda s: s['script'].append({'who': 'cat', 'do': [['lick', '@cat']]}), 'licks a person'),
+        ('a cat chasing its tail', lambda s: s['script'].append({'who': 'cat', 'do': [['chaseTail', 2]]}), 'is for dogs'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:
@@ -955,6 +957,34 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif 'Traceback' in done.stderr: problems.append(f'{label}: the tool crashed instead of explaining — {done.stderr.strip().splitlines()[-1][:160]}')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
+
+    # Đợt 35: thú chơi đùa trong phòng khách — chó lăn ngửa, đuổi đuôi, liếm tay bé (bé tự chìa tay, quỳ xuống), mèo được bế liếm mặt bé,
+    # mèo nhào, thỏ gặm cà rốt, chó chạy nấp sau bé. acting_check đo từng động tác: trong khung, chân / lưng trên sàn, chân chổng
+    # trời khi lăn, mõm tới tay / mặt, đầu ló ra mà thân khuất một phần.
+    pets = {'id': 'pets35', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [
+        {'name': 'be', 'id': 'boy', 'x': 120, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -10, 'z': -530, 'faces': 'be'},
+        {'name': 'meo', 'species': 'cat', 'x': 330, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': -380, 'z': -500}],
+        'script': [{'who': 'cho', 'do': ['rollOver']}, {'who': 'cho', 'do': [['chaseTail', 2]]}, {'who': 'cho', 'do': [['lick', '@be', 3]]},
+                   {'who': 'be', 'say': 'Mèo ơi lên đây.', 'do': [['carry', '@meo']], 'view': {'on': ['be', 'meo'], 'size': 'medium'}},
+                   {'who': 'meo', 'do': [['lick', '@be', 3]]}, {'who': 'be', 'say': 'Xuống chơi nhé.', 'do': ['putDown']},
+                   {'who': 'meo', 'do': [['knead', 4]]}, {'who': 'tho', 'do': [['eatCarrot', 4]]}, {'who': 'cho', 'do': [['hide', '@be']]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_pets35.json')
+    try:
+        json.dump(pets, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'pets35'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('pets35: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'pets35', 'index.html'), encoding='utf-8').read()
+        if '"offerHand", set.target(be, cho, \'chin\')' not in html: problems.append('pets35: the boy does not hold out a hand for the dog to lick')
+        if '{"face": true}' not in html: problems.append('pets35: the carried cat is not told to lick the face')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pets35')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('pets35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('cho rollOver — back on the floor, paws up', 'cho chaseTail — paws on the floor', 'cho lick be — muzzle at the hand', 'meo lick be — muzzle at the face',
+                           'meo knead — paws on the floor', 'tho eatCarrot — paws on the floor', 'cho hide — hides, head peeking out', 'be offerHand cho — hand reaches'):
+                if needle not in done.stdout: problems.append(f'pets35: acting_check did not measure {needle!r}')
 
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
     # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.

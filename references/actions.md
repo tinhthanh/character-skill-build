@@ -55,6 +55,7 @@ the demo steps from `tools/action-catalog.json`.
 | `carry` / `putDown` | `(pet)` / — | **stance**: bend down, take the pet in both hands and hold it in front of the belly, curled up, a little enlarged (1.35×) so it reads; the following steps play while carrying, and the pet's own actions (purr, wagTail) keep playing in the arms. `putDown` puts it back where it was picked up — walking away first is refused. The pet must be within reach | 1.55 / 1.1 |
 | `examine` | `(target, part = 'ears', hold = 1.4)` | bend to the pet and shine a penlight (it appears in the hand) on `part`: `'ears'`, `'eyes'` or `'teeth'` (the muzzle — run the pet's `openMouth` `together`), look closely, move the light once, nod. Close targets (a pet on the exam table right beside the person) bend the elbow so the hand stops at the target | `hold` + 1.4 |
 | `giveTreat` | `(target, { kind = 'treat' })` | bend and hold out a bone-shaped treat (it appears in the hand) to the pet's mouth; it disappears as the pet takes it; smile, pull back. `kind: 'pill'` gives a pill instead. Pair with the pet's `beg`, `wagTail` or `eat` in a `together` | 1.9 |
+| `offerHand` | `(target, hold = 1.6)` | bend and hold an open hand out just under the pet's chin for `hold` seconds, smiling, the hand twitching as if licked — for the pet's `lick` (`tools/scene.py` adds it to a pet's `["lick", "@person"]`) | `hold` + 1.1 |
 | `shine` | `(target = null, hold = 2)` | take out a flashlight and shine it at `target` (a rig, an element, `{ x, y }`, or straight ahead), sweeping it a little, then put it away. In a 3D set the beam is a light: it lights the pet it reaches (the pet squints), and in a dark room it throws a pool of light on the floor or the wall. Script: `bà → mèo: rọi đèn` | 2.95 |
 | `brush` | `(target, strokes = 4)` | bend and brush along the pet's back with a brush that appears in the hand — grooming | 1.0 + 0.42 × `strokes` |
 | `leash` / `unleash` | `(pet)` / — | **stance**: clip a leash onto the pet; a line is drawn from the held leash handle (`items: { R: 'leash' }`) to the pet's collar and follows both of them — `walk` the person and the pet `together` to walk it. `unleash` removes the line. Throws without a leash in hand | 0.95 / 0.95 |
@@ -181,6 +182,10 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `play` | `(times = 2)` | a play bow (chest down, rump up, tail wagging) then hops side to side — run it for two pets facing each other in a `together` | about 2.3 |
 | `goIn` / `comeOut` | `(distance = 90)` / `(distance = 120)` | **stance**: walk `distance` units the way it faces into a pet `carrier` and lie down there; `comeOut` gets up, turns to the door and walks out. The carrier hides the pet when it is nearer the camera (3D set: a slightly larger `z`; 2D: its host after the pet's) | about 1.5 / 2.6 |
 | `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
+| `rollOver` | `(hold = 1.6)` | lie down and roll onto the back, belly up, all four paws curled in the air and pedalling, tail sweeping the floor, then roll back and get up (a cat sits again). The head is not upside down: it rests on the floor by the shoulder, face to the viewer | `hold` + 1.6 |
+| `chaseTail` | `(turns = 3)` | spin round after its own tail `turns` times (1–5) — facing left and right in turn, eyes on the tail, snapping — then stop, dizzy: swaying, eyes rolling, tongue out, a spinning `dizzy` mark; ends where it started, facing the same way | 2.1 + 0.72 × `turns` |
+| `lick` | `(target, times = 4, { face })` | lick the person `target`: on the floor, turn to them and lick the hand they hold out under the chin (their `offerHand(pet)` at the same time — `tools/scene.py` adds it, and kneels them first in a 3D set); carried by them, stretch up and lick their face (`{ face: true }` — `tools/scene.py` passes it). Tongue in and out, eyes half shut | 0.7 + 0.36 × `times` |
+| `hide` | `(target, { peeks = 2 })` | start (ears pinned, eyes wide, `!`), run behind `target` — a person rig, an element, or `{ x, y }` in its frame —, turn back, crouch and peek the head out `peeks` times, trembling; stays there. So that it is hidden: in a 3D set give the pet a z 20–40 further than the person; in 2D put the person's host after the pet's | about 1.3 + run + 1.5 × `peeks` |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down (front legs out); `sleep` lies down, head down, eyes closed, slow deep breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | trot on the spot, or `distance` frame units | 1.4 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -216,6 +221,10 @@ stand them up first:
 | `play` | `(times = 2)` | a play bow (chest down, rump up, tail wagging) then hops side to side — run it for two pets facing each other in a `together` | about 2.3 |
 | `goIn` / `comeOut` | `(distance = 90)` / `(distance = 120)` | **stance**: walk `distance` units the way it faces into a pet `carrier` and lie down there; `comeOut` gets up, turns to the door and walks out. The carrier hides the pet when it is nearer the camera (3D set: a slightly larger `z`; 2D: its host after the pet's) | about 1.5 / 2.6 |
 | `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
+| `rollOver` | `(hold = 1.6)` | lie down and roll onto the back, belly up, all four paws curled in the air and pedalling, tail sweeping the floor, then roll back and get up (a cat sits again). The head is not upside down: it rests on the floor by the shoulder, face to the viewer | `hold` + 1.6 |
+| `knead` | `(times = 8)` | stand and press the front paws down in turn, `times` presses, eyes half shut, purring (a fine tremble), tail up, a heart over the head — kneading a blanket or a lap | 0.7 + 0.34 × `times` |
+| `lick` | `(target, times = 4, { face })` | lick the person `target`: on the floor, turn to them and lick the hand they hold out under the chin (their `offerHand(pet)` at the same time — `tools/scene.py` adds it, and kneels them first in a 3D set); carried by them, stretch up and lick their face (`{ face: true }` — `tools/scene.py` passes it). Tongue in and out, eyes half shut | 0.7 + 0.36 × `times` |
+| `hide` | `(target, { peeks = 2 })` | start (ears pinned, eyes wide, `!`), run behind `target` — a person rig, an element, or `{ x, y }` in its frame —, turn back, crouch and peek the head out `peeks` times, trembling; stays there. So that it is hidden: in a 3D set give the pet a z 20–40 further than the person; in 2D put the person's host after the pet's | about 1.3 + run + 1.5 × `peeks` |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
 | `walk` | `(steps = 4, distance = 0)` | walk on the spot, or `distance` frame units | 1.7 on the spot |
 | `enter` | `(from = 'left', distance)` | run in from outside the frame on the `'left'` or the `'right'`, stop at its own spot | 2.6 |
@@ -234,12 +243,14 @@ and a scene file takes `"wears": "cone"` on a pet.
 
 **Rabbit** (`rabbit`) rests **sitting**, long ears up; it **hops** wherever a dog trots (`walk`, `enter`, `exit`), and
 does the shared actions (idle, sit / stand / lie down, sleep, unwell, eat, drink, scratchItch, tremble, cough, openMouth,
-shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `wear`) plus:
+shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `hide`, `wear`) plus:
 
 | Action | Arguments | What it does | ≈ seconds |
 |---|---|---|---|
 | `hop` | `(times = 2)` | hops on the spot: a crouch, a leap with the hind legs out and the ears swept back, a landing | 0.7 + 0.66 × `times` |
 | `thump` | `(times = 2)` | alert: ears straight up, eyes wide, the hind feet thump the ground | 0.85 + 0.4 × `times` |
+| `eatCarrot` | `(bites = 6)` | sit up, hold a carrot (it appears) to the mouth in both front paws and nibble it `bites` times (2–12), head bobbing; the carrot gets shorter at each bite and is gone after the last, then a lick of the lips | 1.25 + 0.42 × `bites` |
+| `hide` | `(target, { peeks = 2 })` | start (ears pinned, eyes wide, `!`), run behind `target` — a person rig, an element, or `{ x, y }` in its frame —, turn back, crouch and peek the head out `peeks` times, trembling; stays there. So that it is hidden: in a 3D set give the pet a z 20–40 further than the person; in 2D put the person's host after the pet's | about 1.3 + run + 1.5 × `peeks` |
 
 `chew(times = 4)`: munch what it was just given, eyes half shut, then lick the lips twice (≈ 0.8 + 0.24 ×
 `times` s). In a scene file a turn `["giveTreat", "@dog"]` on its own adds it for the pet by itself.
@@ -272,7 +283,7 @@ New face channels on `rig.s` (0…1): `lanh` (wet, shining eyes), `nhan` (eyes s
 
 **Emotion marks** (people and pets): `rig.mark(kind)` shows a comic mark over the head and keeps it
 through the actions that follow; `rig.mark(null)` takes it away. Kinds: `!` (alarm), `?` (puzzled),
-`heart`, `zzz`, `sweat` (drop — nervous, guilty), `anger` (vein), `music` (note). It follows the head as it
+`heart`, `zzz`, `sweat` (drop — nervous, guilty), `anger` (vein), `music` (note), `dizzy` (a spinning swirl with stars — `chaseTail` shows it). It follows the head as it
 tilts or droops. A pet's `express` shows a matching mark by itself (scared `!`, curious `?`, sleepy `zzz`,
 happy / excited heart, angry vein, guilty / pain sweat) — `express(name, hold, { mark: false })` or
 `RigThu.AUTO_MARKS = false` to leave it out, `{ mark: '?' }` to choose another. In a scene file: `"mark"`

@@ -36,7 +36,9 @@ Một tệp kịch bản:
     tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
     tên: [mất điện] / [có điện]        mọi đèn và màn hình tắt phụt / bật lại
     tên: [trời tối dần] / [hoàng hôn] / [trời sáng]   trời chuyển giờ trong 6 giây
-    tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin)
+    tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin);
+                                       con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
+    con vật: [lăn ngửa] [đuổi đuôi] [nhào] [gặm cà rốt]   chó / mèo lăn ngửa, chó đuổi đuôi, mèo nhào, thỏ gặm cà rốt
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
@@ -74,12 +76,15 @@ ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc �
            'nghiêng đầu': 'tiltHead', 'nằm': 'lieDown', 'ngủ': 'sleep', 'mệt': 'unwell', 'ốm': 'unwell', 'gãi': 'scratchItch', 'gãi ngứa': 'scratchItch',
            'đi khập khiễng': 'limp', 'khập khiễng': 'limp', 'run': 'tremble', 'ăn': 'eat', 'uống nước': 'drink', 'ho': 'cough', 'há miệng': 'openMouth',
            'rũ nước': 'shakeOff', 'hắt hơi': 'sneeze', 'thở hổn hển': 'pant', 'ngáp': 'yawn', 'dụi': 'rub', 'mừng': 'greet', 'rủ chơi': 'play', 'nhai': 'chew',
-           'nhảy cóc': 'hop', 'giậm chân': 'thump', 'đứng yên': 'idle', 'chờ': 'idle', 'rọi đèn pin': 'shine', 'bật đèn pin': 'shine'}
+           'nhảy cóc': 'hop', 'giậm chân': 'thump', 'đứng yên': 'idle', 'chờ': 'idle', 'rọi đèn pin': 'shine', 'bật đèn pin': 'shine',
+           'lăn ngửa': 'rollOver', 'lăn': 'rollOver', 'đuổi đuôi': 'chaseTail', 'nhào': 'knead', 'nhào bột': 'knead', 'nhồi': 'knead',
+           'gặm cà rốt': 'eatCarrot', 'ăn cà rốt': 'eatCarrot'}
 TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('giveTreat', {'kind': 'pill'}), 'cho bánh': ('giveTreat', None), 'cho ăn': ('giveTreat', None),
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
-            'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None)}
-MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music'}
+            'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None),
+            'liếm': ('lick', None), 'liếm tay': ('lick', None), 'liếm mặt': ('lick', None), 'nấp': ('hide', None), 'trốn': ('hide', None), 'nấp sau': ('hide', None)}
+MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music', 'chóng mặt': 'dizzy'}
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}

@@ -752,7 +752,7 @@ export class RigSVG {
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
-                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall'];
+                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'offerHand'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -3354,7 +3354,7 @@ export class RigSVG {
       // Vuốt ve nhắm vào ĐẦU (đỉnh đầu); nghe tim phổi và tiêm nhắm vào THÂN (giữa ngực con vật).
       const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
       // Trên đầu con vật: đỉnh đầu (vuốt ve, soi tai), ngang mắt, hay MÕM (soi răng, đưa bánh thưởng).
-      const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7 }[part] ?? 0.2;
+      const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7, chin: 0.98 }[part] ?? 0.2;      // chin (đợt 35): ngay dưới cằm — bàn tay chìa cho liếm
       const node = body || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
       // Đích là MỎ NEO của conversation (`{ centerX, live }`): con vật ở lượt này đứng ở `centerX()`, còn hình nó lúc dựng
       // vẽ ở một trạng thái cũ (trước khi nó đi tới). Vẽ lại nó theo trạng thái hiện có, rồi dời đích ngang đúng chừng chênh
@@ -4039,6 +4039,19 @@ export class RigSVG {
     t.set(s, { ['gadget' + k]: 0 }, 1.05);
     t.to(s, { ['bat' + k]: upper - 4, ['cang' + k]: fore + 6, dauY: N.dauY + 3, duration: 0.18, ease: 'power2.out' }, 1.05);
     this.#khep(t, 0.5, 1.4);
+    return t;
+  }
+
+  /**
+   * CHÌA TAY cho con vật (đợt 35): cúi xuống, đưa bàn tay mở ra ngay DƯỚI CẰM `target` (lưỡi thè xuống là chạm lòng bàn tay) và giữ `hold` giây — cho nó
+   * ngửi, liếm (`lick` của rig thú, tools/scene.py tự ghép), cười; bàn tay nhích nhẹ như bị liếm nhột. Rồi rụt về.
+   */
+  offerHand(target = null, hold = 1.6) {
+    const t = this.tl(), s = this.s, reach = this.#reachLow(target, null, 'chin'), { k, upper, fore } = reach;
+    this.#leanTo(t, reach, 'xoe');
+    t.to(s, { cuoi: 1, mieng: 0.3, mayL: 0.6, mayR: 0.6, duration: 0.3 }, 0.4);
+    for (let a = 0.6, i = 0; a + 0.3 <= 0.6 + hold; a += 0.3, i++) t.to(s, { ['bat' + k]: upper + (i % 2 ? -1.5 : 1.5), ['cang' + k]: fore + (i % 2 ? 2 : -2), duration: 0.3, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.5, 0.6 + hold);
     return t;
   }
 

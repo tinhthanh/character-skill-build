@@ -3,7 +3,7 @@
 // viền trắng dày (paint-order) nên nổi trên mọi nền. Trạng thái nằm ngoài `rig.s` (`rig.m = { kind, a, p }`) — các động
 // tác khác khép về tư thế nghỉ không xoá mất dấu đang hiện.
 
-export const MARKS = ['!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music'];
+export const MARKS = ['!', '?', 'heart', 'zzz', 'sweat', 'anger', 'music', 'dizzy'];
 
 const OUT = 'stroke="#ffffff" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round"';
 const ART = {
@@ -22,6 +22,10 @@ const ART = {
         <path d="M -6 -30 L 10 -35 L 10 -8 M -6 -30 L -6 -3" fill="none" stroke="#7e57c2" stroke-width="3.400" stroke-linejoin="round"/>
         <ellipse cx="-10" cy="-2" rx="5.600" ry="4.400" fill="#7e57c2" ${OUT} transform="rotate(-20 -10 -2)"/>
         <ellipse cx="6" cy="-7" rx="5.600" ry="4.400" fill="#7e57c2" ${OUT} transform="rotate(-20 6 -7)"/>`,
+  // CHÓNG MẶT (đợt 35, `chaseTail`): vòng xoáy và ba ngôi sao quay quanh — `drawMark` xoay cả dấu theo pha.
+  dizzy: `<path d="M 0 0 m -15 0 a 15 9 0 1 0 30 0 a 11 6.5 0 1 0 -22 0 a 7 4 0 1 0 14 0" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+        <path d="M 0 0 m -15 0 a 15 9 0 1 0 30 0 a 11 6.5 0 1 0 -22 0 a 7 4 0 1 0 14 0" fill="none" stroke="#8e44ad" stroke-width="3.200" stroke-linecap="round"/>
+        ${[[-19, -10], [17, -13], [2, 14]].map(([x, y]) => `<path transform="translate(${x} ${y}) scale(0.9)" d="M 0 -7 L 2 -2 L 7 -2 L 3 1.500 L 4.500 7 L 0 3.800 L -4.500 7 L -3 1.500 L -7 -2 L -2 -2 Z" fill="#fbc02d" ${OUT}/>`).join('')}`,
 };
 
 /** Trạng thái dấu mới cho một rig. */
@@ -52,6 +56,7 @@ export function drawMark(g, m) {
   else if (kind === 'zzz') { dy = -8 * p; dx = 3 * p; }
   else if (kind === 'sweat') { dy = 6 * p; }
   else if (kind === '!' || kind === 'anger' || kind === '?') { size *= 1 + 0.07 * Math.max(0, wave); }
+  else if (kind === 'dizzy') { dy = -16; turn = 360 * p; }
   g.setAttribute('opacity', a.toFixed(3));
   g.setAttribute('transform', `translate(${(+g.dataset.x + dx).toFixed(2)} ${(+g.dataset.y + dy).toFixed(2)}) rotate(${turn.toFixed(2)}) scale(${size.toFixed(3)})`);
   if (kind === 'zzz') g.querySelectorAll('[class^="z"]').forEach((el) => { const n = +el.getAttribute('class').slice(1); el.setAttribute('opacity', (p > 0 ? Math.min(1, Math.max(0, p * 3 - n * 0.6 + 0.4)) : 1).toFixed(3)); });      // giữ tĩnh (p = 0): cả ba chữ
