@@ -1650,14 +1650,14 @@ export class RigThu {
   }
 
   /**
-   * NẤP (mọi loài): giật mình (tai cụp, mắt trợn, dấu "!"), chạy tới nấp SAU `target` — một người (rig), một phần tử, hay { x }
+   * NẤP (mọi loài): giật mình (tai cụp, mắt trợn, dấu "!"), chạy tới nấp SAU `target` (bỏ trống: nấp tại chỗ — đã đứng sau đồ đạc) — một người (rig), một phần tử, hay { x }
    * trong khung của nó — rồi quay lại thụp xuống và LÓ ĐẦU ra nhìn `peeks` lần, run run; ở lại chỗ nấp. Để nó khuất sau
    * người ấy: bối cảnh 3D — đặt con vật xa máy hơn một chút (z nhỏ hơn 20–40); cảnh 2D — host của người ấy SAU host con vật.
    */
   hide(target = null, { peeks = 2 } = {}) {
-    if (!target) throw new Error('[character] hide(target): pass the person (a rig), an element or { x, y } to hide behind');
     const t = this.tl(), s = this.s, x0 = s.x, held = s.huong < 0 ? -1 : 1, dog = this.nv.loai === 'dog', rabbit = this.nv.loai === 'rabbit';
-    const goal = this.#behind(target), dist = goal - x0, dir = Math.abs(dist) < 1 ? held : dist < 0 ? -1 : 1;
+    // Không có đích: nấp TẠI CHỖ (đã đứng sau đồ đạc) — giật mình, quay lại, thụp xuống, ló đầu ra.
+    const goal = target ? this.#behind(target) : x0, dist = goal - x0, dir = Math.abs(dist) < 1 ? held : dist < 0 ? -1 : 1, back = target ? -dir : held;
     const scared = { taiL: -1.6, taiR: -1.6, dongTu: 1.8, matY: -0.1, cuoi: -0.6, mieng: 0, ...(rabbit ? {} : { duoi: dog ? -112 : -84, duoiCong: dog ? -1.1 : 0.45 }) };
     let at = this.#dung(t, 0);
     t.to(s, { ...scared, truocY: 7, sauY: 9, dauY: 6, duration: 0.18, ease: 'back.out(2)' }, at);
@@ -1670,7 +1670,7 @@ export class RigThu {
       t.to(s, { ...scared, duration: 0.1 }, at - 0.1);
     }
     // Quay mặt ra phía vừa chạy tới (cái làm nó sợ), thụp người sau chân người kia, đầu rụt lại.
-    t.to(s, { huong: -dir, x: goal, duration: 0.25, ease: 'power1.inOut' }, at); at += 0.25;
+    t.to(s, { huong: back, x: goal, duration: 0.25, ease: 'power1.inOut' }, at); at += 0.25;
     t.to(s, { truocY: 12, sauY: 13, dauX: -12, dauY: 10, dau: 4, duration: 0.3, ease: 'power2.out' }, at); at += 0.3;
     const from = at;
     for (let i = 0; i < Math.max(1, peeks); i++) {
@@ -1679,7 +1679,7 @@ export class RigThu {
       at += 1.5;
     }
     for (let a = from, i = 0; a < at; a += 0.045, i++) t.to(s, { sauX: i % 2 ? -1.2 : 1.2, duration: 0.045, ease: 'none' }, a);     // run
-    this.#khep(t, 0.45, at - 0.2, { x: goal, huong: -dir });
+    this.#khep(t, 0.45, at - 0.2, { x: goal, huong: back });
     return t;
   }
 

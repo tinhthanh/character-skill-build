@@ -1568,7 +1568,7 @@ try {
         const rig = id in RigThu.LOAI ? L.createPet(host, { species: id, wear: entry.wear || [] }).rig
           : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg)) };
+        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg === '@person' ? null : arg)) };      // '@person' (đợt 35): không đặt người — nấp tại chỗ, liếm không đích
       };
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
