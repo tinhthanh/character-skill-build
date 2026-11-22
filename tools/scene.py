@@ -43,7 +43,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
                       bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left"), tree, lamp,
-                      scooter ("facing": "right" | "left"); any cutout may "drive": { "from": -1500, "dur": 3.2, "ease" } in
+                      scooter ("facing": "right" | "left"), xray (an X-ray viewer, "spot", "screen"); any cutout may "drive": { "from": -1500, "dur": 3.2, "ease" } in
                       at the start (the conversation waits until it stops; a scooter's wheels turn)
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "preset": "reception" | "exam" | "pharmacy" | "living-room" | "park" | "street" — a ready-made room or an
@@ -107,6 +107,11 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "rides": "<scooter cutout name>" on the character — seated on it from the first frame, "getOff" in
                one of its turns steps it down beside the scooter (examples/scene-ride/scene.json).
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
+               Clinic care: ["bandage", "@pet"] (wraps the near front leg; the bandage stays on), ["putCone", "@pet"] (a
+               recovery cone that stays on), ["readChart", 2] (needs "holds": "clipboard": reads, flips a page, looks up,
+               nods), ["showXray", "<xray cutout name>"] (turns to an "xray" viewer cutout — a lightbox on a stand,
+               "spot": [0.675, 0.74] on the film, "screen": "film.png" for your own film — points at the spot, turns back).
+               A person on the floor with the pet kneels for "bandage" / "putCone" as for "stroke".
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -183,7 +188,10 @@ PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front
 # Động tác mà bàn tay phải TỚI được đích: tới đầu / thân con vật, hay tới tay người kia (đợt 28: soát diễn xuất).
 # Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
 REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
-                 'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body'}
+                 'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body', 'bandage': 'body', 'putCone': 'face'}
+# ĐỢT 35 — dụng cụ & hồ sơ: đeo đồ cho con vật (băng / loa, còn lại trên nó), đọc bệnh án, chỉ phim X-quang.
+CARE_ACTIONS = ('bandage', 'putCone')                    # tay tới con vật + đồ đeo còn trên nó sau động tác (acting_check `worn`)
+CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ sơ trước ngực / tay chỉ trúng điểm trên phim
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
             'introduce', 'shrug', 'throwBall')
@@ -271,9 +279,9 @@ SET_PRESETS = {
 ROOM_KEYS = ('width', 'depth', 'height', 'front', 'floor', 'floor2', 'tile', 'wall', 'sideWall', 'gloss', 'skyline')
 BOX_KEYS = ('name', 'x', 'z', 'width', 'depth', 'height', 'y', 'color', 'top', 'side')
 PANEL_KEYS = ('wall', 'at', 'y', 'width', 'height', 'color', 'border', 'image', 'window')
-CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on', 'drive')
+CUTOUT_KEYS = ('kind', 'image', 'x', 'z', 'y', 'height', 'color', 'shadow', 'screen', 'facing', 'fill', 'reading', 'door', 'name', 'on', 'drive', 'spot')
 DRIVE_KEYS = ('from', 'dur', 'ease')               # một cutout CHẠY VÀO đầu cảnh: từ x `from` tới x của nó trong `dur` giây
-CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')
+CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter', 'xray')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
 FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
@@ -456,7 +464,26 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
+            # ĐỒ ĐEO CÒN LẠI (đợt 35): sau `bandage` / `putCone`, băng vẫn trên chân trước / loa vẫn quanh đầu con vật, thấy được trong khung.
+            if op['kind'] in CARE_ACTIONS and pet:
+                end = float(timings.get('duration') or t1 + 1.2)
+                after = [round(min(t1 + d, end - 0.05), 2) for d in (0.3, 1.0)]
+                item = 'bandage' if op['kind'] == 'bandage' else 'cone'
+                moments.append({'t': after[0], 'what': f'{op["target"]} wears the {item}', 'ask': [f'Does the animal ({op["target"]}) now wear ' + ('a bandage wrapped round its front leg?' if item == 'bandage' else 'a clear recovery cone (a cone collar) round its head?')],
+                                'check': {'kind': 'worn', 'who': op['target'], 'by': op['who'], 'item': item, 'times': after}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] in CHART_ACTIONS:
+            # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ giơ trước ngực, trong khung (`readChart`); tay chỉ TRÚNG điểm trên phim và
+            # nằm trong khung (`showXray`) — đo ở giữa phần đọc / phần chỉ của bước.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['kind']), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.3, 0.45, 0.6) if op['kind'] == 'readChart' else (0.4, 0.55, 0.7))]
+            ask = ([f'Is {op["who"]} holding a clipboard up in front of the chest and looking down to read it?'] if op['kind'] == 'readChart'
+                   else [f'Is {op["who"]} pointing at a spot on the X-ray film of the viewer beside them?', 'Is the X-ray film (bones on a dark film) in the frame?'])
+            moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]}', 'ask': ask, 'check': {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'times': times}})
+            continue
         if op['kind'] == 'reaction':
             # PHẢN ỨNG CỦA CON VẬT (đợt 33): ở 30 / 50 / 70 % lượt nó thấy được trong khung; `start` / `end` để `acting_check` xét góc chèn
             # con vật ngay trước có giữ tới hết lượt không.
@@ -792,7 +819,10 @@ def main():
             if item.get('image') and not os.path.isfile(os.path.join(folder, item['image'])): fail(f'set.cutouts[{n}].image not found: {item["image"]} (looked in {folder})')
             for key in ('x', 'z'):
                 if not isinstance(item.get(key), (int, float)): fail(f'set.cutouts[{n}] needs a number "{key}"')
-            if 'screen' in item and item.get('kind') not in SCREEN_KINDS: fail(f'set.cutouts[{n}]: "screen" is for "laptop" and "monitor" only')
+            if 'screen' in item and item.get('kind') not in SCREEN_KINDS + ('xray',): fail(f'set.cutouts[{n}]: "screen" is for "laptop", "monitor" and "xray" (the film) only')
+            if 'screen' in item and item.get('kind') == 'xray' and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]}')
+            if 'spot' in item and not (item.get('kind') == 'xray' and isinstance(item['spot'], list) and len(item['spot']) == 2 and all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in item['spot'])):
+                fail(f'set.cutouts[{n}].spot is for an "xray" viewer: [x, y], both between 0 and 1 (a point on the film from its top left) — got {js(item["spot"])}')
             if 'facing' in item and item.get('kind') == 'scooter':
                 if item['facing'] not in ('right', 'left'): fail(f'set.cutouts[{n}].facing must be "right" or "left" (the way the scooter points)')
             elif 'facing' in item and (item.get('kind') != 'laptop' or item['facing'] not in ('away', 'viewer')): fail(f'set.cutouts[{n}].facing must be "away" or "viewer" (laptop) or "right" / "left" (scooter)')
@@ -962,6 +992,31 @@ def main():
         # máy phải cắt sang góc toàn giữa chuỗi góc trung. Người (không phải con vật) reo ở khung dọc thì reo hẹp
         # (`cheer({ narrow: true })`: nắm tay giơ cạnh vai). Người viết tự cho tham số thì giữ của họ.
         if step in ('cheer', ['cheer']) and height > width * 1.2 and actor in names and not names[actor]['_pet']: return "['cheer', { narrow: true }]"
+        # ĐỢT 35 — dụng cụ & hồ sơ: kiểm tra đối số ngay ở đây (lỗi rõ ràng thay cho lỗi của trình duyệt lúc dựng).
+        care = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+        if care in CARE_ACTIONS + CHART_ACTIONS and actor in names:
+            if names[actor]['_pet']: fail(f'{where}: "{care}" is done by a person (the vet) — a pet cannot {care}')
+            if care in CARE_ACTIONS and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and names[step[1][1:]]['_pet']):
+                fail(f'{where}: "{care}" needs the pet: ["{care}", "@<pet name>"] — got {js(step)}')
+            if care == 'bandage' and len(step) > 2 and not (isinstance(step[2], (int, float)) and step[2] >= 1): fail(f'{where}: ["bandage", "@pet", wraps] — wraps is a number ≥ 1, got {js(step[2])}')
+            if care == 'readChart':
+                if not any((item if isinstance(item, str) else (item or {}).get('kind')) == 'clipboard' for item in (names[actor].get('holds') or {}).values()):
+                    fail(f'{where}: "readChart" needs a clipboard in hand — give "{actor}" "holds": "clipboard" (or "holdsHidden": true to keep it put away until then)')
+                if isinstance(step, list) and len(step) > 1 and not (isinstance(step[1], (int, float)) and step[1] > 0): fail(f'{where}: ["readChart", seconds] — seconds is a number > 0, got {js(step[1])}')
+            if care == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str):
+                if stage_set is None: fail(f'{where}: ["showXray", "{step[1]}"] names an "xray" cutout of a 3D set — in a 2D scene give a point in the frame: ["showXray", {{"x": 380, "y": 150}}]')
+                cutouts = stage_set.get('cutouts', [])
+                index = next((n for n, item in enumerate(cutouts) if item.get('name') == step[1]), None)
+                if index is None: fail(f'{where}: ["showXray", "{step[1]}"] — no set.cutouts entry has "name": "{step[1]}" (add {{ "kind": "xray", "name": "{step[1]}", "x": …, "z": … }} beside the person)')
+                viewer = cutouts[index]
+                if viewer.get('kind') != 'xray': fail(f'{where}: ["showXray", "{step[1]}"] — "{step[1]}" is a "{viewer.get("kind") or "picture"}" cutout; it must be an "xray" viewer')
+                if len(step) > 2 and not (isinstance(step[2], (int, float)) and step[2] > 0): fail(f'{where}: ["showXray", "{step[1]}", seconds] — seconds is a number > 0, got {js(step[2])}')
+                # Điểm chỉ trên phim (`prop.spot`, khung 400 × 470 của đạo cụ, sàn khung ở 458) đổi ra toạ độ phòng; tay vươn trong mặt
+                # phẳng của người — đặt đèn đọc phim cùng chiều sâu (z) với người chỉ.
+                unit = float(viewer.get('height', round(person_default * 0.74))) / 470
+                if abs(float(viewer['z']) - float(names[actor].get('z', -300))) > 120: reach_notes.append(f'{where}: "{actor}" points at the X-ray viewer "{step[1]}", which stands {abs(float(viewer["z"]) - float(names[actor].get("z", -300))):g} units nearer or further — the hand points in its own plane: give it about the same z')
+                spot = f"set.targetPoint({actor}, [{float(viewer['x']):g} + (cutout{index + 1}Prop.spot.x - 200) * {unit:.5f}, {float(viewer.get('y', 0)):g} + (458 - cutout{index + 1}Prop.spot.y) * {unit:.5f}, {float(viewer['z']):g}])"
+                return '[' + ', '.join(["'showXray'", spot] + [js(item) for item in step[2:]]) + ']'
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
         parts = []
@@ -978,7 +1033,8 @@ def main():
                 if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_front') is not None and other['_front'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'crown'{at})")
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_back') is not None and other['_back'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'top'{at})")
-                elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
+                elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat', 'putCone'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
+                elif stage_set is not None and actor and step[0] == 'bandage': parts.append(f"set.target({actor}, {item[1:]}, 'leg'{at})")
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
                 else: parts.append(item[1:])
             else:
@@ -1303,12 +1359,12 @@ def main():
             # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
             # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
             steps = turn.get('do') if isinstance(turn.get('do'), list) else []
-            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush')
+            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush') + CARE_ACTIONS
                    and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') + CARE_ACTIONS and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
                 # CON VẬT TỰ ĐI SANG MẶT PHẲNG NGƯỜI KẾ (đợt 34): người trước với tới nó ở chiều sâu khác (> 5 đơn vị) — nó sẽ dời chiều
                 # sâu trước lượt này (`set.depth`, xem `pet_depths`). Không có lần cắt cảnh nào ở giữa thì nó TRƯỢT 0,45 s trên hình
@@ -1316,7 +1372,7 @@ def main():
                 # theo bước đi ấy. Người kế ngồi thì nó vốn đi tới họ ("comes over") — chỉ ép bước ấy có, dù quãng ngắn.
                 hop_pet = names[step[1][1:]]
                 hop = None
-                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'):
+                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_ACTIONS:
                     plane = plane_of(who)
                     if hop_pet.get('_plane') is not None and abs(plane - hop_pet['_plane']) > 5: hop = hop_pet
                     hop_pet['_plane'] = plane
@@ -1341,7 +1397,7 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'bandage': 0.16, 'putCone': 0.16}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
@@ -1405,7 +1461,7 @@ def main():
                 who['x'] = float(who['x']) + move
                 # Soi đèn / đưa bánh: người đứng SÁT con vật (0,16) — xong thì LÙI về chỗ cũ, không thì người (vẽ trước con
                 # vật đứng cạnh mình) che mất mặt nó suốt phần sau của cảnh (cảnh thử đợt 12: góc cận chó chỉ thấy tay bác sĩ).
-                if step[0] in ('examine', 'giveTreat'): backs.append((who, -move))
+                if step[0] in ('examine', 'giveTreat') + CARE_ACTIONS: backs.append((who, -move))
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -1464,6 +1520,9 @@ def main():
                 name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
                 if name in GESTURES and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': 'gesture', 'name': name, 'who': turn.get('who'), 'target': None})
+                # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ trước ngực, trong khung; tay chỉ trúng điểm trên phim (acting_check).
+                if name in CHART_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
+                    gear_ops.append({'turn': emitted[0], 'kind': name, 'name': name, 'who': turn.get('who'), 'target': step[1] if name == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None})
                 if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
                     # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người
@@ -1725,8 +1784,9 @@ def main():
                     if item.get('screen'):
                         name = copy_asset(base, out, item['screen'], copied)
                         options['image'] = name
-                for key in ('fill', 'reading', 'door'):
+                for key in ('fill', 'reading', 'door', 'spot'):
                     if key in item: options[key] = item[key]
+                if item['kind'] == 'xray' and item.get('screen'): options['image'] = copy_asset(base, out, item['screen'], copied)
                 if item['kind'] == 'scooter' and item.get('facing'): options['facing'] = item['facing']
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
@@ -1917,7 +1977,7 @@ def main():
     pet_depths = {}
     if stage_set is not None:
         for op in gear_ops:
-            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'): continue
+            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_ACTIONS: continue
             pet, person = names.get(op.get('target') or ''), names.get(op.get('who') or '')
             if not pet or not person or not pet['_pet'] or person['_pet'] or pet.get('on'): continue
             pet_depths.setdefault(pet['name'], []).append((op['turn'], plane_of(person)))
@@ -2259,7 +2319,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'} | set(GESTURES)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'} | set(GESTURES) | set(CHART_ACTIONS)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

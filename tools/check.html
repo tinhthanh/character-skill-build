@@ -1741,6 +1741,58 @@ try {
         run.progress(1); if (Math.abs(runner.s.x) > 0.5 || runner.s.ballMouth) hong('fetch', `the dog does not end back where it started without the ball (x ${runner.s.x.toFixed(1)})`);
         run.kill(); runner.svg.remove();
       }
+      // Đợt 35 — băng chân, đeo loa (còn lại trên con vật), đọc bệnh án (lật trang), chỉ phim X-quang.
+      {
+        const nurse = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'vet', items: { R: 'clipboard' } }).rig;
+        const pup = L.createPet(spot('left:75px;top:118px;width:100px;height:82px'), { species: 'dog' }).rig;          // chân trước trong tầm tay (tay chibi ngắn)
+        const centre = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+        const tall = nurse.svg.getBoundingClientRect().height;
+        // Băng: tay phía con vật cầm bìa hồ sơ thì cất bìa; tay tới ống chân trước; băng dài dần và CÒN LẠI; bìa lấy ra lại.
+        const wrap = L.sequence(nurse, [['bandage', pup], 'nod'], { breathe: false }), mid = wrap.data.steps[0].start + 1.2;
+        wrap.time(mid);
+        const [hx, hy] = at(nurse.el.coTayR), leg = pup.el.tn.getBoundingClientRect(), shown = pup.careLevel('petWrap');
+        const away = Math.hypot(Math.max(leg.left - hx, 0, hx - leg.right), Math.max(leg.top - hy, 0, hy - leg.bottom));
+        if (away > tall * 0.06) hong('bandage', `the hand is ${(away / tall * 100).toFixed(1)} % of the height from the front leg (want ≤ 6 %)`);
+        if (!(shown > 0.2 && shown < 1) || pup.el.bang.style.display === 'none') hong('bandage', `the bandage does not grow while wrapping (level ${shown.toFixed(2)})`);
+        if (nurse.s.itemR > 0.5) hong('bandage', 'the clipboard stays in the hand that wraps the leg');
+        wrap.progress(1);
+        if (pup.el.bang.style.display === 'none' || pup.careLevel('petWrap') !== 1) hong('bandage', 'the bandage is not left on the leg');
+        if (nurse.s.itemR !== 1) hong('bandage', 'the clipboard is not taken out again after the bandage');
+        wrap.progress(0); if (pup.el.bang.style.display !== 'none') hong('bandage', 'seeking back before the bandage still shows it');
+        wrap.progress(1);
+        // Đeo loa: vành loa trong tay rồi loa nở ra quanh đầu con vật và còn lại.
+        const kit = L.createPet(spot('left:115px;top:118px;width:100px;height:82px'), { species: 'cat' }).rig, helper = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
+        const cone = L.sequence(helper, [['putCone', kit]], { breathe: false });
+        cone.time(0.4); if (helper.el.gadgetR.style.display === 'none') hong('putCone', 'no cone in the hand on the way to the pet');
+        cone.progress(1);
+        if (kit.el.cone.style.display === 'none' || kit.careLevel('petCone') !== 1) hong('putCone', 'the cone is not left on the pet');
+        let twice = ''; try { L.sequence(helper, [['putCone', pup]]); } catch (error) { twice = error.message; }
+        if (!twice.includes('one pet per person')) hong('putCone', 'a second pet for the same person should be refused clearly');
+        let notPet = ''; try { helper.bandage(nurse); } catch (error) { notPet = error.message; }
+        if (!notPet.includes('must be a pet')) hong('bandage', 'a person as the target should be refused clearly');
+        cone.kill(); wrap.kill(); kit.svg.remove(); helper.svg.remove(); pup.svg.remove();
+        // Đọc bệnh án: bìa lên trước ngực (phóng to), cúi đọc, tờ trên lật lên rồi về; không cầm bìa thì báo lỗi.
+        const read = L.sequence(nurse, [['readChart', 2]], { breathe: false });
+        read.time(0.9);
+        const board = nurse.el.itemR.getBoundingClientRect(), chest = nurse.el.ao.getBoundingClientRect();
+        if (!(board.top + board.height / 2 < chest.top + chest.height * 0.75)) hong('readChart', 'the clipboard is not held up in front of the chest');
+        if (!(nurse.s.itemZoomR > 1.3) || !(nurse.s.dauY > 6)) hong('readChart', 'the clipboard is not enlarged, or the head is not bent down to read');
+        read.time(0.45 + 2 * 0.5 + 0.4); if (!(nurse.s.pageR > 0.6)) hong('readChart', `the top page is not flipped (page ${nurse.s.pageR.toFixed(2)})`);
+        read.progress(1); if (nurse.s.pageR !== 0 || nurse.s.itemZoomR !== 1) hong('readChart', 'the page or the clipboard size does not come back after reading');
+        read.kill(); nurse.datNghi();
+        let noBoard = ''; try { actor.readChart(); } catch (error) { noBoard = error.message; }
+        if (!noBoard.includes('not holding a clipboard')) hong('readChart', 'reading without a clipboard should be refused with a clear message');
+        // Chỉ phim: quay 3/4 về phía tấm phim, cánh tay hướng đúng điểm, rồi quay lại hướng cũ.
+        const film = L.createProp(spot('left:150px;top:0;width:200px;height:235px'), 'xray'), mark = film.svg.querySelector('[data-xray-spot]');
+        const show = L.sequence(nurse, [['showXray', mark, 1.6]], { breathe: false });
+        show.time(1.3);
+        const [sx, sy] = centre(mark), [px, py] = at(nurse.el.coTayR), [ox, oy] = centre(nurse.el.vaiR || nurse.el.ao);
+        const off = Math.abs(((Math.atan2(py - oy, px - ox) - Math.atan2(sy - oy, sx - ox)) * 180 / Math.PI + 540) % 360 - 180);
+        if (!(nurse.s.huong > 0.4)) hong('showXray', `the body does not turn toward the film (facing ${nurse.s.huong.toFixed(2)})`);
+        if (off > 15) hong('showXray', `the arm points ${off.toFixed(0)}° off the spot on the film`);
+        show.progress(1); if (Math.abs(nurse.s.huong) > 0.01) hong('showXray', 'the character does not turn back after pointing');
+        show.kill(); nurse.svg.remove(); film.svg.remove();
+      }
       // Đợt 7 — thông báo trên điện thoại: thẻ bật ra trên bàn tay cầm máy, có chữ, tắt khi xong; không cầm máy thì báo lỗi.
       {
         const caller = L.createCharacter(spot('left:500px;top:0;width:200px;height:235px'), { id: 'granny', items: { R: 'phone' } }).rig;

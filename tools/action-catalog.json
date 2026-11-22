@@ -94,7 +94,12 @@
     { "label": "kneel → stroke → standUp (pet)", "steps": ["kneel", ["stroke", "@pet"], "standUp"], "pet": "cat", "petOnFloor": true },
     { "label": "kneel (hold)", "steps": ["kneel", ["idle", 1.2], "standUp"] },
     { "label": "throwBall", "steps": [["throwBall", "right", 300]] },
-    { "label": "leash → nod → unleash (pet)", "steps": [["leash", "@pet"], "nod", "unleash"], "pet": "dog", "items": { "R": "leash" } }
+    { "label": "leash → nod → unleash (pet)", "steps": [["leash", "@pet"], "nod", "unleash"], "pet": "dog", "items": { "R": "leash" } },
+    { "label": "bandage (pet)", "steps": [["bandage", "@pet"], "nod"], "pet": "dog" },
+    { "label": "kneel → bandage → standUp (pet)", "steps": ["kneel", ["bandage", "@pet"], "standUp"], "pet": "dog", "petOnFloor": true },
+    { "label": "putCone (pet)", "steps": [["putCone", "@pet"], "nod"], "pet": "cat" },
+    { "label": "readChart", "steps": [["readChart", 2]], "items": { "R": "clipboard" } },
+    { "label": "showXray", "steps": [["showXray", { "x": 385, "y": 150 }, 1.6]] }
   ],
   "pets": [
     { "label": "idle", "steps": [["idle", 1.6]] },

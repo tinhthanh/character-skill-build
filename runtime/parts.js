@@ -111,10 +111,13 @@ export function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f',
 export function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
   const line = lineOf(c);
   return `
-        <g transform="translate(2 10) rotate(90)">
+        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
           <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
           <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
-          <path d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
+          <g data-page="-29"><rect x="-12" y="-29" width="24" height="32" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
+            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
           <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
         </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }

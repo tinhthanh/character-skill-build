@@ -454,13 +454,16 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // 'crown' (con vật vẽ trên người): ngay trên mép đỉnh đầu — tay đè mép, không khuất sau tai. 'top' (người vẽ trước con
         // vật): trong đỉnh đầu, 15 % — tay đặt lên đầu mà không che mặt nó.
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        // 'leg' (đợt 35): giữa ống chân trước phía người xem — chỗ quấn băng (`bandage`).
+        if (part === 'leg' && typeof to.legPoint === 'function') { const q = to.legPoint(); hx = q.x; hy = q.y; }
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
       let pose = null, seen = null;
       const mark = () => { if (typeof to.headPose === 'function') pose = to.headPose(); };
       return {
+        rig: to,                                            // con vật / người được nhắm (đợt 35: `bandage`, `putCone` đeo đồ cho nó)
         get x() { mark(); const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
         get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         // BỀ NGANG ĐẦU con vật trong khung của `from` (đợt 32): quãng bàn tay trượt khi vuốt (`stroke`).
@@ -954,9 +957,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // không có độ cao bàn tay nào vừa chạm ≥ 15 % vừa lún ≤ 10 %). Trong lúc vuốt (`onTopL/R` của người ấy), vẽ thêm bàn tay ấy
       // ở một lớp ngay TRÊN con vật: một host chép đúng chỗ, cỡ, ánh sáng (`filter`) của host người, trong đó một SVG cùng khung
       // chỉ có `<use>` của nhóm cổ tay, đặt bằng các lớp transform của tay người — trùng từng điểm với bàn tay thật.
+      // Đợt 35: cả người đang BĂNG CHÂN / ĐEO LOA cho con vật (`rig.caring`) — bàn tay quấn băng, cầm vành loa vẽ trên nó.
       for (const pet of actors) {
-        if (!pet.over || !pet.rig) continue;
-        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        if (!pet.rig) continue;
+        const caring = !pet.over && actors.find((item) => item.rig && item.rig.caring && item.rig.caring.has(pet.rig) && item.rig.s && (item.rig.s.onTopL > 0.5 || item.rig.s.onTopR > 0.5));
+        if (!pet.over && !caring) { if (pet.ghost) pet.ghost.style.display = 'none'; continue; }
+        const person = caring || actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
         const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
         let ghost = pet.ghost;
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
@@ -1599,6 +1605,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      * (`ground`, y trên màn hình của điểm đứng), đáy bàn chân (`feet`), lòng hai bàn tay (`hands`), khung mặt (`face`) và khung
      * thân (`body`), cao bao nhiêu trên màn hình (`tall`), có đang ngồi không. Toạ độ px trong `view`. Gọi sau khi tua tới lúc cần đo.
      */
+    /** ĐIỂM CHỈ trên phim X-quang (đạo cụ `xray`, phần tử `data-xray-spot`) ở khung vừa vẽ, cùng hệ toạ độ với `actingProbe` (đợt 35). */
+    spotProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      return [...view.querySelectorAll('[data-xray-spot]')].map((el) => { const r = el.getBoundingClientRect(); return { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy }; });
+    },
+
     actingProbe() {
       set.update();
       const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
@@ -1643,7 +1656,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           // `lean` (đợt 31): thân người nghiêng bao nhiêu độ so với dáng nghỉ — người ngồi cúi qua đầu gối tới con vật.
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
-          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
+          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
+          // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
+          items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
+            const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
+          worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];
+            const r = drawnRect(el); return [key, r.width > 0 ? rect(r) : null]; })) : null };
       });
     },
 

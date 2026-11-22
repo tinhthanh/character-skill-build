@@ -354,6 +354,7 @@ export class RigThu {
     this.NGHI = Object.freeze({ ...NGHI, ...(nv.nghi || {}) });
     this.id = `thu${++RigThu.#dem}`;
     this.wearing = new Set();
+    this.careBy = new Set();                      // rig người đang đeo băng / loa cho nó (đợt 35, xem careLevel)
     this.s = this.#theoDoi({ ...this.NGHI });
     this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
@@ -552,11 +553,18 @@ export class RigThu {
       });
     }
     // Phụ kiện: loa quanh đầu, băng quấn ống chân trước (từ 25% tới 80% đoạn khuỷu → bàn chân).
-    if (e.cone) e.cone.style.display = this.wearing.has('cone') ? '' : 'none';
+    // Người ĐANG ĐEO cho nó (`bandage` / `putCone` của rig người, đợt 35): mức 0…1 đọc từ trạng thái của người ấy — băng dài dần
+    // theo từng vòng quấn, loa nở ra quanh đầu. Đeo sẵn (`wear`) là 1.
+    const coneOn = this.wearing.has('cone') ? 1 : this.careLevel('petCone'), wrapOn = this.wearing.has('bandage') ? 1 : this.careLevel('petWrap');
+    if (e.cone) {
+      e.cone.style.display = coneOn > 0.01 ? '' : 'none';
+      if (coneOn < 1) { e.cone.setAttribute('transform', `scale(${fx(0.55 + 0.45 * coneOn)})`); e.cone.setAttribute('opacity', fx(clamp(coneOn * 1.6, 0, 1))); }
+      else { e.cone.removeAttribute('transform'); e.cone.removeAttribute('opacity'); }
+    }
     if (e.bang) {
-      e.bang.style.display = this.wearing.has('bandage') ? '' : 'none';
-      if (this.wearing.has('bandage') && this.#legNear) {
-        const { J, ban } = this.#legNear, at = (k) => ({ x: pha(J.x, ban.x, k), y: pha(J.y, ban.y, k) }), a = at(0.22), b = at(0.8);
+      e.bang.style.display = wrapOn > 0.01 ? '' : 'none';
+      if (wrapOn > 0.01 && this.#legNear) {
+        const { J, ban } = this.#legNear, at = (k) => ({ x: pha(J.x, ban.x, k), y: pha(J.y, ban.y, k) }), a = at(0.22), b = at(0.22 + 0.58 * clamp(wrapOn, 0, 1));
         e.bangP.setAttribute('d', `M ${fx(a.x)} ${fx(a.y)} L ${fx(b.x)} ${fx(b.y)}`);
         const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len * (nv.chanT.rong * 0.55), ny = dx / len * (nv.chanT.rong * 0.55);
         e.bangNet.setAttribute('d', [0.35, 0.65].map((k) => { const c = { x: pha(a.x, b.x, k), y: pha(a.y, b.y, k) }; return `M ${fx(c.x - nx)} ${fx(c.y - ny + 2)} L ${fx(c.x + nx)} ${fx(c.y + ny - 2)}`; }).join(' '));
@@ -874,6 +882,32 @@ export class RigThu {
     return outlinePoints(this.svg, head, (el) => !!(this.markEl && this.markEl.contains(el))).map((q) => ({ x: q.x, y: q.y - q.edge }));
   }
 
+
+  /**
+   * MỨC ĐEO do người khác đang đeo cho con vật này (đợt 35): lớn nhất của `rig.s[key]` qua các rig người đã `bandage` /
+   * `putCone` nó (`careBy`). Trạng thái ấy nằm ở NGƯỜI (chuỗi của người được lấy mẫu sẵn — `sequence`), con vật chỉ đọc lại.
+   */
+  careLevel(key) {
+    let level = 0;
+    for (const rig of this.careBy || []) level = Math.max(level, clamp(+(rig.s && rig.s[key]) || 0, 0, 1));
+    return level;
+  }
+
+  /**
+   * GIỮA ỐNG CHÂN TRƯỚC phía người xem (chỗ quấn băng), trong khung 400 × 330 của con vật: { x, y } — ghép phép biến đổi
+   * từ nhóm chân lên SVG gốc, không qua màn hình (bối cảnh 3D chiếu nghiêng). `k`: 0 = khuỷu, 1 = bàn chân.
+   */
+  legPoint(k = 0.5) {
+    if (!this.#legNear) this.apDung();
+    const { J, ban } = this.#legNear, x = pha(J.x, ban.x, k), y = pha(J.y, ban.y, k);
+    let m = new DOMMatrix();
+    for (let node = this.el.tn; node && node !== this.svg; node = node.parentNode) {
+      const list = node.transform && node.transform.baseVal, one = list && list.numberOfItems ? list.consolidate() : null;
+      if (one) m = new DOMMatrix([one.matrix.a, one.matrix.b, one.matrix.c, one.matrix.d, one.matrix.e, one.matrix.f]).multiply(m);
+    }
+    const q = new DOMPoint(x, y).matrixTransform(m);
+    return { x: q.x, y: q.y };
+  }
 
   /** Đang được bế: hình nằm trong tay một người khác (không trong host của nó). */
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }

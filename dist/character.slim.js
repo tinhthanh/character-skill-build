@@ -208,6 +208,9 @@ const NGHI = Object.freeze({
   carryL: 1, carryR: 1,         // 1 = tay cầm đồ giữ dáng BƯNG khi quay nghiêng; động tác dùng tay ấy (uống, đưa, cất) hạ về 0
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
   onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
+  petWrap: 0,                   // 0…1 BĂNG đã quấn lên chân trước con vật (`bandage`, đợt 35) — con vật đọc lại (RigThu.careLevel); giữ sau động tác
+  petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
+  pageL: 0, pageR: 0,           // 0…1 tờ trên cùng của bìa kẹp hồ sơ đang LẬT lên (`readChart`, đợt 35)
   tayL: 'mo', tayR: 'mo',
 });
 const MAU_MAC_DINH = {
@@ -307,6 +310,9 @@ const RIDE_THIGH = 84;                    // cầm lái: đùi gần (độ) xoa
 const RIDE_KNEE = 76;                     // …ống chân gập lại gần thẳng đứng, bàn chân hơi ra trước (sàn để chân)
 const RIDE_LEAN = 7;                      // …lưng hơi đổ về trước
 const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, về phía mặt): bắp tay ra trước–xuống, cẳng tay ngang hơn tới tay lái
+const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
+const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
+const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
 const COUNT_POSE = [35, 135];             // khuỷu HẠ, cẳng tay dựng lên: bàn tay giơ cạnh vai (khuỷu cao, cẳng tay chúc xuống thì bàn tay nằm dưới cẳng tay, ngón chĩa ngược vào tay áo)
 const WATCH_POSE = [24, -120];            // cẳng tay NGANG trước ngực, mặt đồng hồ hướng ra (sát cằm thì ở cảnh cận chỉ còn mẩu tay áo cạnh cằm)
 const SHAKE_POSE = [40, 50];
@@ -599,12 +605,13 @@ class RigSVG {
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
-                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall'];
+                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall',
+                     'bandage', 'putCone', 'showXray'];
   static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   static SIDESTEP = 70;                  // quãng `walk` ngắn hơn chừng này (đơn vị khung) thì bước nhích, không quay ngang
   static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff'];
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet'];
-  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify', 'readChart'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
   static traNgau(state) { if (state !== null && hatHienTai !== null) hatHienTai = state; }
@@ -799,6 +806,13 @@ class RigSVG {
               <g data-gadget="4"><rect x="-3" y="2" width="6" height="18" rx="3" fill="#a0683a" stroke="#6b4223" stroke-width="1"/>
                 <rect x="-9" y="19" width="18" height="9" rx="3" fill="#c98a52" stroke="#6b4223" stroke-width="1"/>
                 <path d="M -7 28 v 5 M -3.5 28 v 5 M 0 28 v 5 M 3.5 28 v 5 M 7 28 v 5" stroke="#4a3a2c" stroke-width="1.4" stroke-linecap="round"/></g>
+              <!-- CUỘN BĂNG (\`bandage\`, đợt 35): cuộn băng thú y xanh nhạt như băng trên chân con vật, một dải thả ra. -->
+              <g data-gadget="6"><path d="M 0 16 q 6 8 2 16" stroke="#7cc4e6" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+                <rect x="-8" y="8" width="16" height="13" rx="4" fill="#7cc4e6" stroke="#3f86a8" stroke-width="1.2"/><path d="M -8 12.5 h 16 M -8 16.5 h 16" stroke="#ffffff" stroke-width="1.2" opacity=".8"/></g>
+              <!-- LOA CHỐNG LIẾM cầm ở mép (\`putCone\`, đợt 35): cùng vành trong mờ như loa trên đầu con vật, tâm cách lòng bàn tay CONE_GRIP. -->
+              <g data-gadget="7"><ellipse cx="0" cy="${10 + CONE_GRIP}" rx="${CONE_GRIP}" ry="${CONE_GRIP * 0.9}" fill="#e6f3fa" fill-opacity=".72" stroke="#8fb8cf" stroke-width="2.4"/>
+                <ellipse cx="0" cy="${10 + CONE_GRIP}" rx="${CONE_GRIP * 0.68}" ry="${CONE_GRIP * 0.62}" fill="none" stroke="#8fb8cf" stroke-width="1.3" opacity=".6"/>
+                <path d="M ${-CONE_GRIP * 0.9} ${10 + CONE_GRIP * 0.6} Q ${-CONE_GRIP * 0.7} ${10 + CONE_GRIP * 0.1} ${-CONE_GRIP * 0.3} ${10 + CONE_GRIP * 0.05}" stroke="#ffffff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/></g>
             </g></g>
         </g>
       </g>`;
@@ -1343,6 +1357,12 @@ class RigSVG {
       const back = s['itemBack' + side] >= 0.5 || phone >= 0.5;
       const plunger = e['item' + side].querySelector('[data-plunger]');
       if (plunger) plunger.setAttribute('transform', `translate(0 ${(clamp(s['plunger' + side], 0, 1) * +(plunger.dataset.plunger || 10)).toFixed(2)})`);
+      const sheet = e['item' + side].querySelector('[data-page]');
+      if (sheet) {
+        const flip = clamp(s['page' + side] || 0, 0, 1), top = +(sheet.dataset.page || 0);
+        sheet.setAttribute('transform', flip ? `translate(0 ${top}) scale(1 ${(1 - 1.55 * flip).toFixed(3)}) translate(0 ${-top})` : '');
+        for (const ink of sheet.querySelectorAll('[data-ink]')) ink.style.display = flip > 0.5 ? 'none' : '';
+      }
       for (const face of e['item' + side].querySelectorAll('[data-back]')) face.style.display = back ? '' : 'none';
       for (const face of e['item' + side].querySelectorAll('[data-front]')) face.style.display = back ? 'none' : '';
       const groups = e['item' + side].querySelectorAll('[data-grip]'), fingers = groups[0];
@@ -1399,6 +1419,7 @@ class RigSVG {
     this.#drawBall();
     this.#drawNote();
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
+    for (const pet of this.caring || []) if (pet.el) pet.apDung();
   }
   mark(kind = null) {
     if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);
@@ -1606,6 +1627,7 @@ class RigSVG {
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
+    so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
     for (const side of ['L', 'R']) {
       if (!this.holds[side] || target['item' + side] > 0.5) continue;
@@ -2271,8 +2293,9 @@ class RigSVG {
     if (live && typeof live.x === 'number' && typeof live.y === 'number' && !live.el) { tx = live.x - s.x; ty = live.y - s.y - DOI_Y; span = typeof live.span === 'number' ? live.span : 0; }
     else if (live) {
       const body = part === 'body' && live.el && (live.el.thanE || live.el.nguc);
-      const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7 }[part] ?? 0.2;
-      const node = body || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
+      const headAt = { head: 0.2, eyes: 0.45, mouth: 0.7, leg: 0.5 }[part] ?? 0.2;
+      const leg = part === 'leg' && live.el && live.el.tn;
+      const node = body || leg || (live.el && live.el.dau ? live.el.dau : live.getBoundingClientRect ? live : null);
       const anchored = target !== live && typeof target.centerX === 'function' && typeof live.centerX === 'function' && typeof live.apDung === 'function';
       if (anchored && node) live.apDung();
       if (node) {
@@ -2834,6 +2857,113 @@ class RigSVG {
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.2, ease: 'power2.in' }, 1.55);
     t.to(s, { cuoi: 0.95, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.25 }, 1.6);                 // xong rồi
     this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0, ...(stowed ? { ['item' + k]: 0 } : {}) });
+    return t;
+  }
+  #petOf(target) {
+    const rig = target && (target.el ? target : target.rig || (target.live && target.live.el ? target.live : null));
+    return rig && typeof rig.careLevel === 'function' && rig.careBy ? rig : null;
+  }
+  #careHand(t, target, part) {
+    const s = this.s, k = this.#reachLow(target, null, part).tx < HONG.x ? 'L' : 'R', busy = this.holds[k] && s['item' + k] > 0.5;
+    if (busy) t.to(s, { ['item' + k]: 0, ['carry' + k]: 0, duration: 0.15 }, 0);
+    return { reach: this.#reachLow(target, k, part), keep: busy ? { ['item' + k]: 1 } : {} };
+  }
+  #careFor(pet, key, name) {
+    if (!pet) return;
+    const other = [...(this.caring || [])].find((rig) => rig !== pet && rig.careBy && rig.careBy.has(this) && this.s[key] > 0.5);
+    if (other) throw new Error(`[character] ${name}: this person already put one on another pet — one pet per person (use another person for the second pet)`);
+    (this.caring || (this.caring = new Set())).add(pet);
+    pet.careBy.add(this);
+  }
+  bandage(target = null, wraps = 3) {
+    const pet = this.#petOf(target);
+    if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] bandage(pet): the target must be a pet rig (createPet(...).rig)');
+    if (!(Number.isFinite(wraps) && wraps >= 1)) throw new Error(`[character] bandage: wraps must be a number ≥ 1, got ${JSON.stringify(wraps)}`);
+    this.#careFor(pet, 'petWrap', 'bandage');
+    const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, upper, fore, tx, ty } = reach;
+    this.#leanTo(t, reach, 'nam');
+    t.set(s, { ['gadget' + k]: 6 }, 0.1);
+    const loop = 0.52, start = 0.5, R = 7, n = Math.round(wraps);
+    for (let w = 0; w < n; w++) {
+      for (let q = 1; q <= 4; q++) {
+        const a = q * Math.PI / 2, drop = (w + q / 4) / n * 10 - 5;
+        const { upper: u, fore: f } = reach.solve(tx + Math.cos(a) * R, ty + drop + Math.sin(a) * R * 0.6);
+        t.to(s, { ['bat' + k]: u, ['cang' + k]: f, duration: loop / 4, ease: 'sine.inOut' }, start + w * loop + (q - 1) * loop / 4);
+      }
+    }
+    t.to(s, { petWrap: 1, duration: n * loop, ease: 'none' }, start);
+    if (pet) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.4).to(s, { ['onTop' + k]: 0, duration: 0.02 }, start + n * loop + 0.6);
+    t.to(s, { nhinY: 2.8, dauY: 9, chum: 0.25, mayL: 0.2, mayR: 0.2, cuoi: 0.5, duration: 0.3 }, 0.45);
+    const done = start + n * loop;
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo' }, done);
+    t.to(s, { ['bat' + k]: upper - 3, ['cang' + k]: fore + 5, duration: 0.14, ease: 'sine.out', yoyo: true, repeat: 3 }, done + 0.02);
+    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, dauY: 6, duration: 0.25 }, done + 0.1);
+    this.#khep(t, 0.5, done + 0.62, { ...keep, ...(pet ? { petWrap: 1 } : {}) });
+    return t;
+  }
+  putCone(target = null) {
+    const pet = this.#petOf(target);
+    if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] putCone(pet): the target must be a pet rig (createPet(...).rig)');
+    this.#careFor(pet, 'petCone', 'putCone');
+    const t = this.tl(), s = this.s, N = this.NGHI, { reach: head, keep } = this.#careHand(t, target, 'eyes');
+    const R = Math.max(CONE_GRIP, (head.span || 0) * 70 / 132 + 15);
+    const side = head.tx >= head.shoulderX ? 1 : -1, hx = head.tx - side * R, hy = head.ty;
+    const grip = head.solve(hx, hy), reach = { ...head, upper: grip.upper, fore: grip.fore }, { k } = reach;
+    const ring = this.el['gadget' + k] && this.el['gadget' + k].querySelector('[data-gadget="7"]'), turn = (side > 0 ? 0 : 180) - grip.dir;
+    if (ring) ring.setAttribute('transform', `rotate(${(chuanHoaGoc(k === 'L' ? -turn : turn)).toFixed(1)} 0 10) translate(0 10) scale(${(R / CONE_GRIP).toFixed(3)}) translate(0 -10)`);
+    this.#leanTo(t, reach, 'nam');
+    t.set(s, { ['gadget' + k]: 7 }, 0.05);
+    t.to(s, { petCone: 1, duration: 0.3, ease: 'power1.out' }, 0.55);
+    if (pet) t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.4).to(s, { ['onTop' + k]: 0, duration: 0.02 }, 1.6);
+    t.set(s, { ['gadget' + k]: 0 }, 0.7);
+    const fasten = head.solve(head.tx - side * R * 0.78, head.ty + R * 0.12);
+    t.to(s, { ['bat' + k]: fasten.upper, ['cang' + k]: fasten.fore, chum: 0.3, mayL: 0.15, mayR: 0.15, duration: 0.25, ease: 'sine.inOut' }, 0.8);
+    t.to(s, { ['bat' + k]: fasten.upper + 2, ['cang' + k]: fasten.fore - 3, duration: 0.12, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 1.05);
+    t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.25 }, 1.3);
+    t.to(s, { dauY: 11, duration: 0.16, ease: 'sine.out', yoyo: true, repeat: 1 }, 1.35);
+    this.#khep(t, 0.5, 1.7, { ...keep, ...(pet ? { petCone: 1 } : {}) });
+    return t;
+  }
+  readChart(hold = 2, { side = 'auto' } = {}) {
+    const s = this.s, N = this.NGHI, board = (k) => this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-clipboard]');
+    const k = side === 'L' || side === 'R' ? side : ['R', 'L'].find(board);
+    if (!k || !board(k)) throw new Error('[character] readChart: the character is not holding a clipboard' + (side === 'L' || side === 'R' ? ` in hand ${side}` : '') + ' — give it one: createCharacter(host, { id, items: { R: "clipboard" } })');
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] readChart: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), pen = k === 'L' ? 'R' : 'L', m = k === 'L' ? -1 : 1, stowed = s['item' + k] < 0.5;
+    this.#openUp(t);
+    if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
+    t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
+    t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, dauY: LOOK_DOWN.head, dau: N.dau + m * 3, nhinY: LOOK_DOWN.eyes,
+              matY: LOOK_DOWN.lids, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.45, ease: 'power2.out' }, 0);
+    const read = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
+    const flip = 0.45 + hold * 0.5;
+    read(0.5, flip - 0.35);
+    t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.4);
+    t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.35, ease: 'power2.out' }, flip - 0.4);
+    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 6, ['cang' + pen]: CHART_POSE.flip[1] - 6, duration: 0.4, ease: 'power1.inOut' }, flip);
+    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 0.45);
+    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 0.85);
+    read(flip + 0.5, 0.45 + hold + 0.3);
+    const up = 0.45 + hold + 0.35;
+    t.to(s, { dauY: 0, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.3, ease: 'power2.out' }, up);
+    t.to(s, { dauY: 7, duration: 0.15, ease: 'sine.inOut', yoyo: true, repeat: 3 }, up + 0.32);
+    this.#khep(t, 0.5, up + 0.95, stowed ? { ['item' + k]: 0 } : {});
+    return t;
+  }
+  showXray(target = null, hold = 1.6) {
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] showXray: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, before = s.huong;
+    const side = this.#aimOf(target).ben, turn = (side === 'L' ? -1 : 1) * XRAY_TURN;
+    s.huong = turn; const { ben, bat, dau, nhinX, nhinY } = this.#aimOf(target); s.huong = before;
+    t.to(s, { huong: turn, nhinX, duration: 0.4, ease: 'sine.inOut' }, 0);
+    t.set(s, { ['tay' + ben]: 'nam' }, 0.1);
+    t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
+    t.to(s, { ['bat' + ben]: bat, ['cang' + ben]: 0, dau, nhinY, cuoi: 0.4, chum: 0.2, mayL: 0.45, mayR: 0.45, duration: 0.45, ease: 'back.out(1.2)' }, 0.15);
+    t.set(s, { ['tay' + ben]: 'chi' }, 0.35);
+    for (const at of [0.75, 0.75 + hold * 0.5]) t.to(s, { ['cang' + ben]: 5, ['bat' + ben]: bat + 1.5, dauY: 2.5, duration: 0.14, ease: 'power2.out', yoyo: true, repeat: 1 }, at);
+    const back = 0.6 + hold;
+    t.to(s, { nhinX: 0, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
+    this.#khep(t, 0.55, back + 0.1);
     return t;
   }
   #placeCarried() {
@@ -3640,6 +3770,7 @@ class RigThu {
     this.NGHI = Object.freeze({ ...NGHI, ...(nv.nghi || {}) });
     this.id = `thu${++RigThu.#dem}`;
     this.wearing = new Set();
+    this.careBy = new Set();                      // rig người đang đeo băng / loa cho nó (đợt 35, xem careLevel)
     this.s = this.#theoDoi({ ...this.NGHI });
     this.m = freshMark();                 // dấu cảm xúc trên đầu (marks.js) — ngoài `s`: động tác khác không xoá nó
     this.#dungLai();
@@ -3798,11 +3929,16 @@ class RigThu {
         drop.style.opacity = Math.sin(Math.PI * w).toFixed(2);
       });
     }
-    if (e.cone) e.cone.style.display = this.wearing.has('cone') ? '' : 'none';
+    const coneOn = this.wearing.has('cone') ? 1 : this.careLevel('petCone'), wrapOn = this.wearing.has('bandage') ? 1 : this.careLevel('petWrap');
+    if (e.cone) {
+      e.cone.style.display = coneOn > 0.01 ? '' : 'none';
+      if (coneOn < 1) { e.cone.setAttribute('transform', `scale(${fx(0.55 + 0.45 * coneOn)})`); e.cone.setAttribute('opacity', fx(clamp(coneOn * 1.6, 0, 1))); }
+      else { e.cone.removeAttribute('transform'); e.cone.removeAttribute('opacity'); }
+    }
     if (e.bang) {
-      e.bang.style.display = this.wearing.has('bandage') ? '' : 'none';
-      if (this.wearing.has('bandage') && this.#legNear) {
-        const { J, ban } = this.#legNear, at = (k) => ({ x: pha(J.x, ban.x, k), y: pha(J.y, ban.y, k) }), a = at(0.22), b = at(0.8);
+      e.bang.style.display = wrapOn > 0.01 ? '' : 'none';
+      if (wrapOn > 0.01 && this.#legNear) {
+        const { J, ban } = this.#legNear, at = (k) => ({ x: pha(J.x, ban.x, k), y: pha(J.y, ban.y, k) }), a = at(0.22), b = at(0.22 + 0.58 * clamp(wrapOn, 0, 1));
         e.bangP.setAttribute('d', `M ${fx(a.x)} ${fx(a.y)} L ${fx(b.x)} ${fx(b.y)}`);
         const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len * (nv.chanT.rong * 0.55), ny = dx / len * (nv.chanT.rong * 0.55);
         e.bangNet.setAttribute('d', [0.35, 0.65].map((k) => { const c = { x: pha(a.x, b.x, k), y: pha(a.y, b.y, k) }; return `M ${fx(c.x - nx)} ${fx(c.y - ny + 2)} L ${fx(c.x + nx)} ${fx(c.y + ny - 2)}`; }).join(' '));
@@ -4015,6 +4151,22 @@ class RigThu {
     const head = this.el && this.el.dau;
     if (!head) return [];
     return outlinePoints(this.svg, head, (el) => !!(this.markEl && this.markEl.contains(el))).map((q) => ({ x: q.x, y: q.y - q.edge }));
+  }
+  careLevel(key) {
+    let level = 0;
+    for (const rig of this.careBy || []) level = Math.max(level, clamp(+(rig.s && rig.s[key]) || 0, 0, 1));
+    return level;
+  }
+  legPoint(k = 0.5) {
+    if (!this.#legNear) this.apDung();
+    const { J, ban } = this.#legNear, x = pha(J.x, ban.x, k), y = pha(J.y, ban.y, k);
+    let m = new DOMMatrix();
+    for (let node = this.el.tn; node && node !== this.svg; node = node.parentNode) {
+      const list = node.transform && node.transform.baseVal, one = list && list.numberOfItems ? list.consolidate() : null;
+      if (one) m = new DOMMatrix([one.matrix.a, one.matrix.b, one.matrix.c, one.matrix.d, one.matrix.e, one.matrix.f]).multiply(m);
+    }
+    const q = new DOMPoint(x, y).matrixTransform(m);
+    return { x: q.x, y: q.y };
   }
   isCarried() { return !!(this.host && this.svg && this.svg.parentNode && this.svg.parentNode !== this.host && this.svg.ownerSVGElement); }
   shotBox(kind = 'full') {
@@ -5020,7 +5172,40 @@ const DRAW = {
       <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
     </g>`;
   },
+  xray: ({ w = XRAY_W, image, spot = XRAY_SPOT, color, dark, line }) => {
+    const F = PROP_FRAME.floor, g = xrayFrame(w), { x0, y0, h, fx, fy, fw, fh } = g, px = (u) => (fx + u * fw).toFixed(1), py = (v) => (fy + v * fh).toFixed(1);
+    const bone = (d, wide = 3.4) => `<path d="${d}" stroke="#9fb6cc" stroke-width="${(wide * 2.2).toFixed(1)}" fill="none" stroke-linecap="round" opacity=".28"/><path d="${d}" stroke="#e9f2fa" stroke-width="${wide}" fill="none" stroke-linecap="round"/>`;
+    const sx = fx + spot[0] * fw, sy = fy + spot[1] * fh;
+    const film = image ? `<clipPath id="vgXray${xrayCount}"><rect x="${fx}" y="${fy}" width="${fw}" height="${fh}"/></clipPath>
+      <image href="${String(image).replace(/"/g, '&quot;')}" x="${fx}" y="${fy}" width="${fw}" height="${fh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#vgXray${xrayCount++})"/>` : `
+      <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="#0d1f33"/>
+      <ellipse cx="${px(0.45)}" cy="${py(0.5)}" rx="${(fw * 0.46).toFixed(1)}" ry="${(fh * 0.38).toFixed(1)}" fill="#1d3854" opacity=".75"/>
+      ${bone(`M ${px(0.1)} ${py(0.34)} Q ${px(0.42)} ${py(0.22)} ${px(0.74)} ${py(0.3)}`, 4)}
+      ${[0.16, 0.24, 0.32, 0.4, 0.48, 0.56, 0.64].map((u) => `<rect x="${(fx + u * fw - 3).toFixed(1)}" y="${(fy + (0.27 - 0.06 * Math.sin(u * 4)) * fh - 4).toFixed(1)}" width="6" height="8" rx="2" fill="#f4f8fc"/>`).join('')}
+      <ellipse cx="${px(0.85)}" cy="${py(0.3)}" rx="${(fw * 0.1).toFixed(1)}" ry="${(fh * 0.12).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
+      ${bone(`M ${px(0.79)} ${py(0.4)} L ${px(0.95)} ${py(0.42)}`, 2.6)}
+      ${[0.36, 0.42, 0.48, 0.54, 0.6].map((u) => bone(`M ${px(u)} ${py(0.3)} Q ${px(u + 0.05)} ${py(0.48)} ${px(u - 0.01)} ${py(0.62)}`, 2)).join('')}
+      <ellipse cx="${px(0.13)}" cy="${py(0.4)}" rx="${(fw * 0.07).toFixed(1)}" ry="${(fh * 0.08).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
+      ${bone(`M ${px(0.14)} ${py(0.46)} L ${px(0.2)} ${py(0.66)} L ${px(0.14)} ${py(0.9)}`)}
+      ${bone(`M ${px(0.66)} ${py(0.38)} L ${px(0.67)} ${py(0.64)}`)}${bone(`M ${px(0.67)} ${py(0.66)} L ${px(0.69)} ${py(0.92)}`)}
+      <path d="M ${(sx - 5).toFixed(1)} ${(sy - 2).toFixed(1)} l 3 2.5 l 2.5 -2 l 2.5 2.5 l 2.5 -2" stroke="#0d1f33" stroke-width="1.8" fill="none" stroke-linejoin="round"/>`;
+    return `
+    <path d="M 200 ${y0 + h} V ${F - 12} M 160 ${F - 10} H 240" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="164" cy="${F - 5}" r="5" fill="#3b4450"/><circle cx="236" cy="${F - 5}" r="5" fill="#3b4450"/>
+    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <rect x="${fx - 3}" y="${fy - 3}" width="${fw + 6}" height="${fh + 6}" rx="2" fill="#f4fbff"/>
+    ${film}
+    <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="none" stroke="#f4fbff" stroke-width="1.2" opacity=".6"/>
+    <rect x="${fx + 6}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/><rect x="${fx + fw - 24}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/>
+    <circle data-xray-spot="1" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="0.6" fill="none"/>`;
+  },
 };
+const XRAY_W = 176, XRAY_SPOT = [0.675, 0.74];
+let xrayCount = 0;
+function xrayFrame(w) {
+  const h = Math.round(w * 0.7), x0 = 200 - w / 2, y0 = 118;
+  return { x0, y0, h, fx: x0 + 9, fy: y0 + 9, fw: w - 18, fh: h - 18 };
+}
 const SCOOTER_WHEELS = [[76, 228], [276, 228]];
 const SCOOTER_SEAT_TOP = 130, SCOOTER_K = 1.22, SCOOTER_WHEEL_R = 40;
 const SCOOTER_SEAT = PROP_FRAME.floor - (270 - SCOOTER_SEAT_TOP) * SCOOTER_K;   // y khung của mặt yên
@@ -5042,11 +5227,13 @@ function screen(x, y, w, h, image) {
   return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
     <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
 }
-const DEFAULT_COLOR = { scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+const DEFAULT_COLOR = { xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 const PROP_KINDS = Object.keys(DRAW);
 function createProp(host, kind, options = {}) {
   if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
-  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading, door } = options;
+  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading, door, spot } = options;
+  if (spot !== undefined && !(kind === 'xray' && Array.isArray(spot) && spot.length === 2 && spot.every((v) => typeof v === 'number' && v >= 0 && v <= 1)))
+    throw new Error(`[character] prop "${kind}": spot is for the "xray" viewer, [x, y] with both between 0 and 1 (a point on the film), got ${JSON.stringify(spot)}`);
   if (door !== undefined && door !== 'left' && door !== 'right') throw new Error(`[character] prop "${kind}": door must be 'left' or 'right', got ${JSON.stringify(door)}`);
   if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
   if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
@@ -5071,11 +5258,16 @@ function createProp(host, kind, options = {}) {
   if (fill !== undefined) o.fill = fill;
   if (reading !== undefined) o.reading = reading;
   if (door !== undefined) o.door = door;
+  if (spot !== undefined) o.spot = spot;
   host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
   host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
   </svg>`;
   const svg = host.firstElementChild;
   const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  if (kind === 'xray') {
+    const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;
+    prop.spot = { x: +(g.fx + at[0] * g.fw).toFixed(1), y: +(g.fy + at[1] * g.fh).toFixed(1) };
+  }
   if (kind === 'scooter') {
     prop.rideLift = (rig) => {
       if (typeof (rig && rig.rideSeatY) !== 'function') throw new Error('[character] prop "scooter": rideLift(rig) needs a person rig');
@@ -5281,10 +5473,13 @@ function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size =
 function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
   const line = lineOf(c);
   return `
-        <g transform="translate(2 10) rotate(90)">
+        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
           <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
           <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
-          <path d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
+          <g data-page="-29"><rect x="-12" y="-29" width="24" height="32" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
+            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
           <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
         </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
@@ -6188,12 +6383,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const head = () => {
         const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        if (part === 'leg' && typeof to.legPoint === 'function') { const q = to.legPoint(); hx = q.x; hy = q.y; }
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       let pose = null, seen = null;
       const mark = () => { if (typeof to.headPose === 'function') pose = to.headPose(); };
       return {
+        rig: to,                                            // con vật / người được nhắm (đợt 35: `bandage`, `putCone` đeo đồ cho nó)
         get x() { mark(); const actor = of(from), f = facts(actor); return f.size.w / 2 + (head().x - actor.spot.x) / f.unit; },
         get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
@@ -6542,8 +6739,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
       }
       for (const pet of actors) {
-        if (!pet.over || !pet.rig) continue;
-        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
+        if (!pet.rig) continue;
+        const caring = !pet.over && actors.find((item) => item.rig && item.rig.caring && item.rig.caring.has(pet.rig) && item.rig.s && (item.rig.s.onTopL > 0.5 || item.rig.s.onTopR > 0.5));
+        if (!pet.over && !caring) { if (pet.ghost) pet.ghost.style.display = 'none'; continue; }
+        const person = caring || actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
         const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
         let ghost = pet.ghost;
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
@@ -6996,6 +7195,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       tl.seek(0, false); set.update();
       return cuts;
     },
+    spotProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      return [...view.querySelectorAll('[data-xray-spot]')].map((el) => { const r = el.getBoundingClientRect(); return { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy }; });
+    },
     actingProbe() {
       set.update();
       const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
@@ -7028,7 +7232,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
-          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
+          legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
+          items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
+            const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
+          worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];
+            const r = drawnRect(el); return [key, r.width > 0 ? rect(r) : null]; })) : null };
       });
     },
     propFraming() {

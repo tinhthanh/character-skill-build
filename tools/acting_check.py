@@ -67,6 +67,7 @@ DEPTH_JS = """(tl) => { const set = window.__set; if (!set.depthLog) return null
   }
   tl.seek(0, false); set.update(); return out; }"""
 DEPTHS = None
+SPOTS = {}             # đợt 35: chỗ các điểm chỉ trên phim X-quang (`data-xray-spot`) ở từng lúc đo, px trong khung
 
 
 def check_depths(folder):
@@ -95,7 +96,9 @@ def probe(folder, times):
             time.sleep(0.1)
         # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
+                  
+                  "out['spots@' + t] = window.__set.spotProbe ? window.__set.spotProbe() : []; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
                   % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
@@ -105,7 +108,9 @@ def probe(folder, times):
         shots = found.pop('shots', None)
         global DEPTHS
         DEPTHS = found.pop('depths', None)
-        return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
+        global SPOTS
+        SPOTS = {float(k[6:]): v for k, v in found.items() if k.startswith('spots@')}
+        return {float(k): v for k, v in found.items() if not k.startswith(('props@', 'spots@'))}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
 
@@ -238,6 +243,10 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
             if who and who.get('hands') and who.get('tall') and 'all' in result[(t, name)]:
                 d, e = (Image.open(base + k).convert('RGB') for k in ('-d.png', '-e.png'))
                 pd, pe = d.load(), e.load()
+                # BÀN TAY THẤY ĐƯỢC (đợt 35): ảnh thường khác ảnh "người trên cùng" quá HAZE mới là bị che. Lớp nắng / sương mờ của bối cảnh
+                # (vệt nắng cửa sổ phòng khám) phủ cả bàn tay lẫn con vật, đổi màu đều 17–22 — bàn tay vẽ trên con vật vẫn rõ mà đếm là
+                # "khuất" (băng chân corgi trên bàn khám: 5 % thấy được). Thân con vật / vành loa che thì khác xa hơn nhiều.
+                veiled = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > HAZE
                 centre = lambda bx: ((bx['x0'] + bx['x1']) / 2, (bx['y0'] + bx['y1']) / 2)
                 spots = [centre(bx) for bx in boxes.values()]
                 hand = min(who['hands'], key=lambda h: min((h['x'] - x) ** 2 + (h['y'] - y) ** 2 for x, y in spots))
@@ -252,7 +261,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
                 for y in range(max(0, int(hb['y0'])), min(H, int(hb['y1']) + 1)):
                     for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
                         if not differ(pd[x, y], pe[x, y]): continue
-                        mine += 1; seen_px = not differ(pa[x, y], pd[x, y]); shown += seen_px
+                        mine += 1; seen_px = not veiled(pa[x, y], pd[x, y]); shown += seen_px
                         band = round(3 * zoom)
                         near += any(pet_px(x + dx, y + dy) for dx in (-band, 0, band) for dy in (-band, 0, band))
                         # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
@@ -278,6 +287,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
             os.rmdir(out)
 
 
+HAZE = 30             # đợt 35: một lớp mờ của bối cảnh đổi màu bàn tay ≤ 30 — vẫn là thấy được (xem pet_pixels)
 SMALL_HAND = 1000      # bàn tay < 1000 px (CSS) trong ảnh — cỡ 30 × 30 — thì đo lại ở 2× (đợt 34)
 
 
@@ -299,7 +309,7 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'worn', 'readChart', 'showXray') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -492,6 +502,78 @@ def check_reaction(folder, c, frames, log):
     return out
 
 
+WORN_TALL = 0.02      # đồ con vật đeo (băng, loa): đường chéo khung ≥ 2 % chiều cao người đeo cho nó — thấy được, không phải một chấm (đợt 35)
+WORN_IN = 0.8         # … và ≥ 80 % khung của nó nằm trong khung hình
+CHART_UP = 0.6        # bìa hồ sơ đang đọc: giữa bìa ở 60 % trên của khung thân người (trước ngực, không buông bên hông)
+POINT_AIM = 12        # chỉ phim: hướng vai → bàn tay lệch hướng vai → điểm trên phim ≤ 12°
+POINT_NEAR = 0.25     # … và bàn tay cách điểm ấy ≤ 25 % chiều cao người (tay chibi ngắn: chỉ về phía phim, không chạm)
+
+
+def in_frame(box, W, H):
+    """Phần diện tích của khung `box` nằm trong khung hình W × H."""
+    area = max(1e-6, (box['x1'] - box['x0']) * (box['y1'] - box['y0']))
+    return max(0, min(box['x1'], W) - max(box['x0'], 0)) * max(0, min(box['y1'], H) - max(box['y0'], 0)) / area
+
+
+def check_worn(folder, c, frames):
+    """ĐỒ ĐEO CÒN LẠI (đợt 35): sau `bandage` / `putCone`, ở cả hai lúc đo băng / loa vẫn vẽ trên con vật, đủ lớn và trong khung."""
+    W, H = frame_size(folder)
+    out = []
+    for t, frame in zip(c['times'], frames):
+        pet, by = frame.get(c['who']), frame.get(c.get('by'))
+        tall = (by or {}).get('tall') or max(((a.get('tall') or 0) for a in frame.values() if a.get('person')), default=0)
+        box = pet and (pet.get('worn') or {}).get(c['item'])
+        what = f'{c["who"]} still wears the {c["item"]} at {t:g} s'
+        if not pet: out.append({'scene': folder, 'what': what, 'ok': None, 'note': f'{c["who"]} not in the frame'}); continue
+        if not box: out.append({'scene': folder, 'what': what, 'ok': False, 'note': f'no {c["item"]} drawn on {c["who"]}'}); continue
+        high, seen = ((box['x1'] - box['x0']) ** 2 + (box['y1'] - box['y0']) ** 2) ** 0.5 / (tall or 1), in_frame(box, W, H)
+        out.append({'scene': folder, 'what': what, 'ok': high >= WORN_TALL and seen >= WORN_IN,
+                    'note': f'{c["item"]} {high * 100:.1f} % of the person\'s height across (least {WORN_TALL * 100:g} %), {seen * 100:.0f} % in the frame (least {WORN_IN * 100:g} %)'})
+    return out
+
+
+def check_chart(folder, c, frames):
+    """ĐỌC BỆNH ÁN (đợt 35): ở lúc được hỏi, bìa hồ sơ trọn trong khung, giữa nó ở 60 % trên của khung thân người đọc."""
+    W, H = frame_size(folder)
+    t, who = c['times'][len(c['times']) // 2], frames[len(c['times']) // 2].get(c['who'])
+    what = f'{c["who"]} readChart — clipboard up in front of the chest'
+    if not who: return [{'scene': folder, 'what': what, 'ok': None, 'note': 'not in the frame'}]
+    board = next((item for item in who.get('items') or [] if item['kind'] == 'clipboard'), None)
+    if not board: return [{'scene': folder, 'what': what, 'ok': False, 'note': f'no clipboard in hand at {t:g} s'}]
+    b, body = board['box'], who.get('body')
+    cy, seen = (b['y0'] + b['y1']) / 2, in_frame(b, W, H)
+    line = body['y0'] + (body['y1'] - body['y0']) * CHART_UP if body else H
+    return [{'scene': folder, 'what': what, 'ok': seen >= 0.95 and cy <= line,
+             'note': f'{seen * 100:.0f} % of the clipboard in the frame (least 95 %), its middle {(cy - line) / (who.get("tall") or 1) * 100:+.1f} % of height from the chest line at {t:g} s (≤ 0)'}]
+
+
+def check_xray(folder, c, frames):
+    """CHỈ PHIM (đợt 35): ở lúc được hỏi, điểm trên phim trong khung, bàn tay chỉ trong khung, hướng vai → bàn tay lệch hướng vai →
+    điểm ≤ 12° và bàn tay cách điểm ≤ 25 % chiều cao người."""
+    import math
+    W, H = frame_size(folder)
+    n = len(c['times']) // 2
+    t, who = c['times'][n], frames[n].get(c['who'])
+    what = f'{c["who"]} showXray — points at the spot on the film'
+    spots = SPOTS.get(float(t)) or []
+    if not who or not who.get('hands') or not spots: return [{'scene': folder, 'what': what, 'ok': None, 'note': 'not in the frame' if not who else 'no X-ray viewer drawn'}]
+    best = None
+    for hand in who['hands']:
+        shoulder = next((p for p in who.get('shoulders') or [] if p['side'] == hand['side']), None)
+        if not shoulder: continue
+        for spot in spots:
+            a = math.atan2(hand['y'] - shoulder['y'], hand['x'] - shoulder['x']); b = math.atan2(spot['y'] - shoulder['y'], spot['x'] - shoulder['x'])
+            off = abs((math.degrees(a - b) + 180) % 360 - 180)
+            far = math.hypot(hand['x'] - spot['x'], hand['y'] - spot['y']) / (who.get('tall') or 1)
+            if best is None or off < best[0]: best = (off, far, hand, spot)
+    if best is None: return [{'scene': folder, 'what': what, 'ok': None, 'note': 'no shoulder measured'}]
+    off, far, hand, spot = best
+    inside = 0 <= spot['x'] <= W and 0 <= spot['y'] <= H and (not hand.get('box') or in_frame(hand['box'], W, H) >= 0.95)
+    return [{'scene': folder, 'what': what, 'ok': off <= POINT_AIM and far <= POINT_NEAR and inside,
+             'note': f'the arm points {off:.1f}° off the spot (limit {POINT_AIM:g}°), the hand {far * 100:.1f} % of height from it (limit {POINT_NEAR * 100:g} %), '
+                     + ('spot and hand in the frame' if inside else 'the spot or the hand is out of the frame') + f' at {t:g} s'}]
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
@@ -519,6 +601,15 @@ def check_scene(folder):
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
+            continue
+        if c['kind'] == 'worn':
+            results.extend(check_worn(folder, c, frames))
+            continue
+        if c['kind'] == 'readChart':
+            results.extend(check_chart(folder, c, frames))
+            continue
+        if c['kind'] == 'showXray':
+            results.extend(check_xray(folder, c, frames))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):

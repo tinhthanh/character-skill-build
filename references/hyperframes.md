@@ -552,7 +552,7 @@ character facing right is seen more from the front as the camera moves to the ri
   or wall screen showing the app, a poster, an X-ray, the clinic's sign).
 - **`set.cutouts`** — flat upright pictures that stand in the room like the characters (always
   facing the lens, sharp, stacked by depth with them): `kind` (a ready-made prop: `plant`,
-  `chair`, `stool`, `table`, `counter`, `laptop`, `monitor`, `scooter`…) or `image` (a picture file), `x`, `z`, optional `y`,
+  `chair`, `stool`, `table`, `counter`, `laptop`, `monitor`, `scooter`, `xray`…) or `image` (a picture file), `x`, `z`, optional `y`,
   `height`, `color`, `shadow: false`. `laptop` and `monitor` take `screen` (a picture on the
   screen) and the laptop `facing` (`"away"`, the default, or `"viewer"`); stand them on a box
   with `y` = the box's height, and leave `height` out so they keep a person's scale. A laptop
@@ -588,6 +588,16 @@ character facing right is seen more from the front as the camera moves to the ri
                                               "drive": { "from": -1500, "dur": 3.2 } } ] },
   "characters": [ { "name": "vet", "id": "vet", "rides": "scooter" }, … ],
   "script": [ { "who": "vet", "do": ["getOff", "wave"] }, … ]
+  ```
+- **X-ray viewer** (`"kind": "xray"`): a lightbox on a stand with a dog's X-ray film (`"screen": "film.png"` for your
+  own, `"spot": [0.675, 0.74]` — where to point, from the film's top left). Stand it beside the person at the same `z`
+  (the arm points in its own plane) and give it a `"name"`: `["showXray", "<name>", 1.6]` turns to it, points at the spot,
+  turns back. `tools/script.py` places one by itself for `[chỉ phim]`.
+  ```json
+  "set": { "preset": "exam", "cutouts": [ { "kind": "xray", "name": "film", "x": -330, "z": -560 } ] },
+  "characters": [ { "name": "vet", "id": "vet", "x": -120, "z": -560, "holds": "clipboard", "holdsHidden": true }, … ],
+  "script": [ { "who": "vet", "do": [["readChart", 2]] }, { "who": "vet", "do": [["showXray", "film"]] },
+              { "who": "vet", "do": [["bandage", "@dog"]] }, { "who": "vet", "do": [["putCone", "@dog"]] } ]
   ```
 - **Vertical frames** (`"width": 1080, "height": 1920`): the camera starts closer and aims at
   62 % of the frame height; captions sit at the top of the safe area.
