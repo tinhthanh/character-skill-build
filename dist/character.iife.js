@@ -4658,7 +4658,11 @@ class RigSVG {
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     // Bối cảnh 3D: con vật đứng trước người thì đầu nó che tay ở môi — vẽ bàn tay cầm thuốc TRÊN nó lúc đưa thuốc.
     const pet = target && (target.pet || (target.el && target.svg ? target : null) || (target.live && target.live.el ? target.live : null));
-    if (pet) { this.onTopPet = pet; t.to(s, { ['onTop' + k]: 1, duration: 0.02 }, 0.45).to(s, { ['onTop' + k]: 0, duration: 0.02 }, RigSVG.PILL_IN + 0.4); }
+    if (pet) {
+      this.onTopPet = pet;
+      t.to(s, { ['onTop' + k]: 1, ['onTop' + other]: 1, duration: 0.02 }, 0.45).to(s, { ['onTop' + k]: 0, duration: 0.02 }, RigSVG.PILL_IN + 0.4)
+       .to(s, { ['onTop' + other]: 0, duration: 0.02 }, RigSVG.PILL_IN + 1.05);                 // tay đỡ cằm: tới hết hai nhịp vuốt cằm
+    }
     // 0,45 s: dài hơn tween `#openUp` (trong `#leanTo`, 0,4 s về GESTURE_TURN) — ngắn hơn thì nó ghi đè hướng quay về 0,3.
     t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
@@ -10090,12 +10094,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const owner = pet.over || (pet.rig && (actors.find((item) => item.rig && item.rig !== pet.rig && item.rig.onTopPet === pet.rig) || {}).rig);
         if (!owner || !pet.rig) continue;
         const person = actors.find((item) => item.rig === owner), s = person && person.rig.s;
-        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
-        let ghost = pet.ghost;
+        // Mỗi bàn tay một bản chép (đợt 35, lượt bốn: cho thuốc — tay đưa thuốc ở mõm VÀ tay đỡ dưới cằm đều vẽ trên con vật).
+        for (const side of ['R', 'L']) {
+        const k = s && s['onTop' + side] > 0.5 ? side : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
+        let ghost = (pet.ghosts = pet.ghosts || {})[side];
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
         if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
         if (!ghost) {
-          ghost = pet.ghost = document.createElement('div');
+          ghost = pet.ghosts[side] = document.createElement('div');
           ghost.dataset.ghost = '1';
           // bàn tay, rồi hai lớp đổ bóng / hắt sáng của người (`shading.js`) cắt theo đúng hình bàn tay — thiếu chúng thì bản chép
           // sáng hơn bàn tay thật (người ngồi trong nửa tối của chuyển sắc)
@@ -10126,6 +10132,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
         svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
         ghost.style.display = '';
+        }
       }
       return frame;
     },
@@ -10194,7 +10201,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
         // Góc cận người + con vật (đợt 35, lượt bốn): mép trên khung cắt qua TÓC (dưới đỉnh đầu 22 % chiều cao đầu) — con mèo nhỏ cạnh người
         // thì khung từ đỉnh tóc xuống tới đầu nó cao quá, mặt nó chỉ 13 % khung.
-        if (size === 'close' && mixedClose && m.head) return { x0: across.x0, x1: across.x1, y0: m.base + 0.62 * h, y1: m.head.top - 0.22 * (m.head.top - m.head.base) };
+        // … và chừa phía con vật 1,0 bề ngang đầu: nhiệt kế giơ ngang mắt bên mặt, thẻ số cạnh nó (lượt bốn: thẻ lẹm mép phải).
+        if (size === 'close' && mixedClose && m.head) {
+          const hw = m.head.x1 - m.head.x0, pets = shots.filter((q) => !q.person), side = pets.length && (pets[0].x0 + pets[0].x1) / 2 > (m.head.x0 + m.head.x1) / 2 ? 1 : -1;
+          return { x0: side < 0 ? Math.min(across.x0, m.head.x0 - 1.0 * hw) : across.x0, x1: side > 0 ? Math.max(across.x1, m.head.x1 + 1.0 * hw) : across.x1, y0: m.base + 0.62 * h, y1: m.head.top - 0.22 * (m.head.top - m.head.base) };
+        }
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
