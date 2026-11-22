@@ -1704,8 +1704,10 @@ try {
         if (nurse.el.readout.style.display === 'none' || nurse.el.readout.querySelector('text').textContent !== '38.9°C') hong('takeTemp', 'no reading shown over the thermometer');
         else if (nurse.el.readout.getBoundingClientRect().bottom > nurse.el['coTay' + k].getBoundingClientRect().top + 4) hong('takeTemp', 'the reading is not above the hand');
         temp.progress(1); if (nurse.s.gadgetL || nurse.s.gadgetR || nurse.el.readout.style.display !== 'none') hong('takeTemp', 'the thermometer or the reading stays afterwards'); temp.kill();
+        // Cho thuốc: con vật đứng sát như trong cảnh (tools/scene.py đưa người tới cách nó 0,2 chiều cao) — tay quay 3/4 ngắn hơn.
+        cat.svg.parentNode.style.left = '985px'; cat.apDung();
         const pill = nurse.givePill(cat); pill.time(0.95);
-        const p = ['L', 'R'].find((side) => Math.round(nurse.s['gadget' + side]) === 3);
+        const p = ['L', 'R'].find((side) => Math.round(nurse.s['gadget' + side]) === 7);
         if (!p) hong('givePill', 'no pill in the hand');
         else {
           const other = p === 'L' ? 'R' : 'L';

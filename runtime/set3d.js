@@ -457,6 +457,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         // 'rear' (đợt 35, đo nhiệt độ): THÂN SAU — từ giữa khung toàn thân dời về phía NGƯỜI ĐO một phần tư bề ngang. Con vật quay đuôi
         // về phía người đo trước lượt ấy (tools/scene.py); hướng nó lúc đích được đọc có thể còn là hướng cũ — không suy từ cái đầu.
+        // 'chin' / 'lips' (đợt 35, cho uống thuốc): cằm — đáy khung mặt; môi — giữa nét môi THẬT của con vật (`moi`) trong khung của nó.
+        if (part === 'chin' && box) hy = box.y + box.height * 0.92;
+        const lips = part === 'lips' && to.el && to.el.moi ? lipsOf(to) : null;
+        if (lips) { hx = lips.x; hy = lips.y; }
         if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
@@ -1654,6 +1658,30 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     },
 
     /**
+     * SỐ ĐO CHĂM SÓC (đợt 35, tools/acting_check.py) ở khung vừa vẽ, px trong `view`: người — mắt (giữa tròng, giữa con ngươi, bề
+     * ngang mắt) và dụng cụ đang hiện trong tay (`gadget`: số, tâm); con vật — độ há miệng (`mieng`) và tâm nét môi. Gọi sau khi tua.
+     */
+    careProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx } : null; };
+      const out = {};
+      for (const actor of actors) {
+        const rig = actor.rig, e = rig && rig.el;
+        if (!e || actor.host.style.display === 'none') continue;
+        const name = actor.host.dataset.name || actor.host.id || '';
+        if (typeof rig.seatY === 'function') {
+          const eyes = ['L', 'R'].map((side) => { const eye = e['mat' + side], pupil = e['nguoi' + side];               // tròng mắt, con ngươi (rig-svg: `mat`, `nguoi`)
+            const a = centre(eye), b = centre(pupil); return a && b ? { side, eye: a, pupil: b } : null; }).filter(Boolean);
+          const gadgets = ['L', 'R'].map((side) => { const kind = Math.round(rig.s['gadget' + side] || 0), g = e['gadget' + side];
+            const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown); return c ? { side, kind, ...c } : null; }).filter(Boolean);
+          out[name] = { person: true, eyes, gadgets, tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+        } else out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi) };
+      }
+      return out;
+    },
+
+    /**
      * ĐÁY CHÂN CON VẬT trên màn hình (px trong `view`), kể cả khi nó nằm trong hình người khác (bế, đặt lên cân): { tên: y }
      * — tools/acting_check.py đo con vật đứng trên bệ cân (`weigh`, đợt 35). Gọi sau khi tua tới lúc cần đo.
      */
@@ -1802,6 +1830,18 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
   // nhân vật lơ lửng — và cũng không phải tâm cái bóng rig tự vẽ: với nhân vật chân dài (bác sĩ thú y) bàn chân thấp hơn
   // tâm bóng tới 45 đơn vị, đo được trên bản thử. Đo ĐẾ GIÀY thật: đáy thấp nhất của hai bàn chân đang hiện, trừ hai đơn
   // vị cho bề dày đế. Thú (không có phần tử bàn chân riêng) đứng trên mặt nền của khung, chỗ tâm bóng của nó.
+  // Giữa nét môi của con vật trong khung SVG của nó (đợt 35): ghép transform từng lớp tới SVG gốc — không qua màn hình.
+  function lipsOf(rig) {
+    try {
+      const b = rig.el.moi.getBBox();
+      if (!b.width && !b.height) return null;
+      let m = new DOMMatrix();
+      for (let node = rig.el.moi; node && node !== rig.svg; node = node.parentNode) m = localMatrix(node).multiply(m);
+      const p = new DOMPoint(b.x + b.width / 2, b.y + b.height / 2).matrixTransform(m);
+      return { x: p.x, y: p.y };
+    } catch (error) { return null; }
+  }
+
   function groundOf(rig) {
     if (!rig) return 1;
     const frame = rig.svg && rig.svg.getBoundingClientRect();

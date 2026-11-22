@@ -98,7 +98,7 @@ def probe(folder, times):
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
                   "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
                   "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
-                  "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+                  "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); if (window.__set.careProbe) out['care@' + t] = window.__set.careProbe(); } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
                   % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
@@ -111,6 +111,7 @@ def probe(folder, times):
         global SCALES
         SCALES = {float(k[7:]): v for k, v in found.items() if k.startswith('scales@')}
         SCALES.update({('paws', float(k[5:])): v for k, v in found.items() if k.startswith('paws@')})
+        SCALES.update({('care', float(k[5:])): v for k, v in found.items() if k.startswith('care@')})
         return {float(k): v for k, v in found.items() if '@' not in k}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
@@ -305,7 +306,7 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -527,11 +528,93 @@ def check_weigh(folder, c, frames, scales):
     return out
 
 
+JUMP = 0.015          # con vật dời > 1,5 % chiều cao người trong một khung (1/30 s) …
+FREE = 0.02           # … khi không bàn tay nào của người làm cách hình nó (đầu, thân) ≤ 2 % chiều cao: nó tự nhảy chỗ (đợt 35)
+
+
+def check_jumps(folder, c, frames):
+    """CON VẬT KHÔNG NHẢY CHỖ (đợt 35, cân): theo từng khung (1/30 s) của bước `weigh`, con vật dời bao nhiêu so với BÀN TAY GẦN NÓ
+    NHẤT của người cân (cùng bàn tay ở hai khung) — cả hai tính so với chỗ đứng của người, theo chiều cao người, nên máy cắt / đẩy
+    không thành "nhảy". Nó dời > 1,5 % một khung, lệch khỏi bàn tay ấy > 1,5 %, mà bàn tay ấy không chạm hình nó (đầu, thân; ≤ 2 %) là nó tự bay — bản đầu:
+    từ bệ cân về trước bụng trong 0,6 s, hai tay buông bên hông (10 / 13 khung, tới 7 % một khung)."""
+    worst, jumps, prev = None, 0, None
+    for t, frame in zip(c['frames'], frames):
+        who, pet = frame.get(c['who']), frame.get(c['target'])
+        box = pet and pet.get('body')
+        if not who or not who.get('tall') or not box or not who.get('hands'): prev = None; continue
+        # So với CHỖ ĐỨNG của người cân (điểm sàn dưới chân, không theo thân — người quỳ / đứng dậy thì thân dời).
+        rel = lambda x, y: ((x - who['x']) / who['tall'], (y - who['ground']) / who['tall'])
+        centre = rel((box['x0'] + box['x1']) / 2, (box['y0'] + box['y1']) / 2)
+        drawn = list((pet.get('parts') or {}).values()) or [box]
+        hands = {h['side']: (rel(h['x'], h['y']), min(gap(h, b) for b in drawn) / who['tall']) for h in who['hands']}
+        if prev:
+            side = min(prev['hands'], key=lambda k: prev['hands'][k][1])
+            if side in hands:
+                moved = (centre[0] - prev['centre'][0] - (hands[side][0][0] - prev['hands'][side][0][0]), centre[1] - prev['centre'][1] - (hands[side][0][1] - prev['hands'][side][0][1]))
+                step, near = (moved[0] ** 2 + moved[1] ** 2) ** 0.5, min(hands[side][1], prev['hands'][side][1])
+                own = ((centre[0] - prev['centre'][0]) ** 2 + (centre[1] - prev['centre'][1]) ** 2) ** 0.5     # con vật TỰ dời (tay rời đi thì không tính)
+                # Khung con vật vào / rời vòng tay (`carried` đổi): hình nó đổi dáng (cuộn trong tay ↔ đứng), khung thân đổi — không phải dời chỗ.
+                if own > JUMP and step > JUMP and near > FREE and bool(pet.get('carried')) == prev['carried']:
+                    jumps += 1
+                    if worst is None or step > worst[1]: worst = (t, step, near)
+        prev = {'centre': centre, 'hands': hands, 'carried': bool(pet.get('carried'))}
+    note = (f'{jumps} frame{"" if jumps == 1 else "s"} where {c["target"]} moves away from the hand nearest it, which is not on it — {worst[1] * 100:.1f} % of height in one frame at {worst[0]:g} s, the hand {worst[2] * 100:.0f} % away'
+            if jumps else f'{c["target"]} moves only with a hand, {len(c["frames"])} frames (limit {JUMP * 100:g} % a frame apart from the nearest hand when it is more than {FREE * 100:g} % off)')
+    return [{'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} never jumps', 'ok': jumps == 0, 'note': note}]
+
+
+LOOK = 50             # đọc nhiệt kế: hướng con ngươi lệch hướng từ mắt tới nhiệt kế ≤ 50° …
+LOOK_SHIFT = 0.1      # … và con ngươi lệch khỏi giữa tròng ≥ 10 % bề ngang mắt (không nhìn thẳng ra trước)
+
+
+def check_look(folder, c, scales):
+    """NHÌN VÀO DỤNG CỤ (đợt 35, đọc nhiệt kế): ở ba lúc đọc, con ngươi hai mắt lệch về phía dụng cụ đang giơ (`gadget`) — góc giữa hướng
+    lệch và hướng mắt → dụng cụ ≤ 50°, lệch ≥ 10 % bề ngang mắt."""
+    import math
+    worst = None
+    for t in c['times']:
+        who = (scales.get(('care', float(t))) or {}).get(c['who'])
+        tool = next((g for g in (who or {}).get('gadgets', []) if g['kind'] == c['gadget']), None)
+        if not who or not tool or not who.get('eyes'): continue
+        for eye in who['eyes']:
+            ox, oy = eye['pupil']['x'] - eye['eye']['x'], eye['pupil']['y'] - eye['eye']['y']
+            tx, ty = tool['x'] - eye['eye']['x'], tool['y'] - eye['eye']['y']
+            shift = (ox * ox + oy * oy) ** 0.5 / max(1, eye['eye']['w'])
+            angle = abs(math.degrees(math.atan2(ox * ty - oy * tx, ox * tx + oy * ty))) if shift > 0 else 180
+            bad = angle > LOOK or shift < LOOK_SHIFT
+            if worst is None or (bad and not worst[3]) or (bad == worst[3] and angle > worst[1]): worst = (t, angle, shift, bad)
+    if worst is None: return [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': None, 'note': 'no thermometer in the hand at the moments asked'}]
+    return [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': not worst[3],
+             'note': f'pupils turned {worst[1]:.0f}° off the thermometer, shifted {worst[2] * 100:.0f} % of the eye width at {worst[0]:g} s (limit {LOOK}°, least {LOOK_SHIFT * 100:g} %)'}]
+
+
+PILL_AT = 0.05        # viên thuốc cách môi con vật ≤ 5 % chiều cao người …
+MOUTH_OPEN = 0.5      # … và miệng con vật há ≥ 0,5 lúc viên thuốc ở môi
+
+
+def check_pill(folder, c, scales):
+    """VIÊN THUỐC VÀO MÕM (đợt 35): ở lúc giữa viên thuốc (dụng cụ 7) cách môi con vật ≤ 5 % chiều cao người; ở cả ba lúc miệng con vật
+    há ≥ 0,5 (bản đầu: nó chỉ há lúc viên thuốc đã mất)."""
+    out, mid = [], c['times'][len(c['times']) // 2]
+    care = scales.get(('care', float(mid))) or {}
+    who, pet = care.get(c['who']), care.get(c['target'])
+    pill = next((g for g in (who or {}).get('gadgets', []) if g['kind'] == 7), None)
+    if who and pet and pill and pet.get('lips'):
+        d = ((pill['x'] - pet['lips']['x']) ** 2 + (pill['y'] - pet['lips']['y']) ** 2) ** 0.5 / max(1, who['tall'])
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': d <= PILL_AT, 'note': f'the pill is {d * 100:.1f} % of height from the lips at {mid:g} s (limit {PILL_AT * 100:g} %)'})
+    else:
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': False, 'note': f'no pill in the hand (or no lips) at {mid:g} s'})
+    opens = [((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('mouth', 0) for t in c['times']]
+    out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — mouth open for the pill', 'ok': min(opens) >= MOUTH_OPEN,
+                'note': f'mouth open {min(opens):.2f} at least over {c["times"][0]:g}–{c["times"][-1]:g} s (least {MOUTH_OPEN:g})'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
-    shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('frames', [])] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
@@ -558,6 +641,13 @@ def check_scene(folder):
             continue
         if c['kind'] == 'weigh':
             results.extend(check_weigh(folder, c, frames, scales))
+            if c.get('frames'): results.extend(check_jumps(folder, c, [{a['name']: a for a in shots.get(float(t), [])} for t in c['frames']]))
+            continue
+        if c['kind'] == 'look':
+            results.extend(check_look(folder, c, scales))
+            continue
+        if c['kind'] == 'pill':
+            results.extend(check_pill(folder, c, scales))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):
