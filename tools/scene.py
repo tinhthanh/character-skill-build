@@ -662,9 +662,28 @@ PRESETS = {
 }
 
 
+def svg_size(head):
+    """(width, height) of an SVG from its root <svg> tag: the width / height attributes when they are plain numbers
+    (or px), else the viewBox; None when neither says. `head` is the start of the file as bytes."""
+    text = head.decode('utf-8', 'ignore')
+    tag = re.search(r'<svg\b[^>]*>', re.sub(r'<!--.*?-->', '', text, flags=re.S))
+    if not tag: return None
+    attr = lambda name: (re.search(rf'\s{name}\s*=\s*["\']([^"\']*)["\']', tag.group(0)) or [None, None])[1]
+    number = lambda value: float(value[:-2] if value.endswith('px') else value) if value and re.fullmatch(r'\s*[\d.]+(px)?\s*', value) else None
+    width, height = number(attr('width')), number(attr('height'))
+    box = [float(v) for v in re.split(r'[\s,]+', (attr('viewBox') or '').strip()) if v] if attr('viewBox') else []
+    if len(box) == 4 and box[2] > 0 and box[3] > 0:
+        if width and not height: height = width * box[3] / box[2]
+        if height and not width: width = height * box[2] / box[3]
+        if not width and not height: width, height = box[2], box[3]
+    return (round(width), round(height)) if width and height else None
+
+
 def image_size(path):
-    """(width, height) in px read from the file's header — PNG, JPEG, GIF or WebP; None for anything else."""
+    """(width, height) in px read from the file's header — PNG, JPEG, GIF, WebP, or SVG (its width / height or viewBox);
+    None for anything else."""
     with open(path, 'rb') as fh: head = fh.read(64 * 1024)
+    if b'<svg' in head[:4096] or path.lower().endswith('.svg'): return svg_size(head)
     if head[:8] == b'\x89PNG\r\n\x1a\n': return int.from_bytes(head[16:20], 'big'), int.from_bytes(head[20:24], 'big')
     if head[:6] in (b'GIF87a', b'GIF89a'): return int.from_bytes(head[6:8], 'little'), int.from_bytes(head[8:10], 'little')
     if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
@@ -1669,7 +1688,7 @@ def main():
                 # hình chụp lúc ấy lệch nửa bề ngang (trình render chụp ngay, không đợi khung sau).
                 size = image_size(os.path.join(out, name))
                 dims = f" cutout{n + 1}.width = {size[0]}; cutout{n + 1}.height = {size[1]};" if size else ''
-                if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF or WebP, or it may be placed off by half its width until it loads')
+                if not size: notes.append(f'set.cutouts[{n}]: could not read the size of {name} — give it a PNG, JPEG, GIF, WebP or an SVG with width / height or a viewBox, or it may be placed off by half its width until it loads')
                 setup.append(f"    const cutout{n + 1} = document.createElement('img'); cutout{n + 1}.src = {js(name)}; cutout{n + 1}.alt = '';{dims} set.stand(cutout{n + 1}, {{ {where_} }});")
         # ÁNH SÁNG: giờ trong ngày + đèn. Cây đèn đường / đèn cây có trong bối cảnh (cutout "lamp") tự là một nguồn sáng ở
         # chỗ bóng đèn của nó (554 / 470 chiều cao khung); "lamps" thêm đèn tuỳ ý (đèn trần: "kind": "ceiling").

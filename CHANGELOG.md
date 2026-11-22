@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.74.1
+
+Added
+- **SVG pictures in 3D sets get their size too.** `tools/scene.py` reads an SVG's size from its root `<svg>` tag
+  (`width` / `height` when they are numbers or px, else the `viewBox`) and writes it on the `<img>` of a
+  `set.cutouts` picture, as it does for PNG, JPEG, GIF and WebP — so an SVG cutout is centred before it loads and the
+  "could not read the size" note is gone.
+
+Fixed
+- **A picture cutout drawn stretched sideways when its file size differed from its scene size.** `set.stand` cleared
+  the width with `style.width = ''`, which leaves the `<img>`'s width attribute in force: a 2x PNG (or an SVG scaled
+  in the set) stood at its scene `height` kept its file width. `stand` now sets `width: auto`, so the picture keeps
+  its own proportions at any resolution or scale.
+
 ## 0.74.0
 
 Added
