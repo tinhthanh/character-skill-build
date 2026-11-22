@@ -211,7 +211,7 @@ const NGHI = Object.freeze({
   petWrap: 0,                   // 0…1 BĂNG đã quấn lên chân trước con vật (`bandage`, đợt 35) — con vật đọc lại (RigThu.careLevel); giữ sau động tác
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
-  ring: 0, ringX: 0, ringY: 0, ringR: 40,   // VÒNG LOA đang cầm (`putCone`, đợt 35 lượt hai): hiện / tâm / bán kính, khung của `#aimOf`
+  ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,   // VÒNG LOA đang cầm (`putCone`, đợt 35 lượt hai): hiện / tâm / bán kính, khung của `#aimOf`
   pageL: 0, pageR: 0,           // 0…1 tờ trên cùng của bìa kẹp hồ sơ đang LẬT lên (`readChart`, đợt 35)
   tayL: 'mo', tayR: 'mo',
 });
@@ -978,6 +978,10 @@ class RigSVG {
     <text data-note="1" x="-56" y="-27" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
     <text data-note="2" x="-56" y="-10" font-family="Arial, sans-serif" font-size="13" fill="#3b5560" data-layout-ignore=""></text>
   </g>
+  <!-- …và bản vẽ TRƯỚC người (\`ringFront\`): lúc giơ vòng lên trước bụng — sau thân thì khuất; mờ hơn cho thấy hai bàn tay qua nó. -->
+  <g id="${p}-ringFront" style="display:none"><ellipse rx="40" ry="36" fill="#e6f3fa" fill-opacity=".38" stroke="#8fb8cf" stroke-width="3"/>
+    <ellipse rx="28" ry="25" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".6"/>
+    <path d="M -36 14 Q -32 -14 -12 -30" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
   <g id="${p}-ball" style="display:none"><circle r="11" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.5"/>
     <path d="M -10 -3 Q 0 5 10 -3 M -10 4 Q 0 -4 10 4" stroke="#ffffff" stroke-width="1.8" fill="none" opacity=".9"/></g>
 </svg>`;
@@ -988,7 +992,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), ring: q('ring'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), ring: q('ring'), ringFront: q('ringFront'), note: q('note'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -1428,9 +1432,10 @@ class RigSVG {
     this.#drawLeash();
     this.#drawBall();
     this.#drawNote();
-    if (e.ring) {
-      e.ring.style.display = s.ring >= 0.5 ? '' : 'none';
-      if (s.ring >= 0.5) e.ring.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
+    for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
+      if (!el) continue;
+      el.style.display = on ? '' : 'none';
+      if (on) el.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
     }
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
     for (const pet of this.caring || []) if (pet.el) pet.apDung();
@@ -2950,12 +2955,14 @@ class RigSVG {
       const a = arm(k, cx + Math.cos(angK * deg) * R, cy + Math.sin(angK * deg) * R), b = arm(o, cx + Math.cos(angO * deg) * R, cy + Math.sin(angO * deg) * R);
       return { ['bat' + k]: a.bat, ['cang' + k]: a.cang, ['bat' + o]: b.bat, ['cang' + o]: b.cang, ringX: cx, ringY: cy };
     };
-    const chestX = HONG.x + side * 50, chestY = this.#shoulderY() + 62;      // lệch về phía con vật: vành không che mặt
-    t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'nam', ring: 1, ringR: R, ringX: chestX, ringY: chestY }, 0.02);
+    const chestX = HONG.x + side * 42, chestY = this.#shoulderY() + 44;      // trước ngực, lệch về phía con vật: vành không che mặt
+    t.set(s, { ringR: R, ringX: chestX, ringY: chestY }, 0);                 // chỗ của vòng đặt TRƯỚC tween dưới (không trượt vào từ toạ độ 0)
+    t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'nam', ring: 1, ringFront: 1 }, 0.02);
     t.to(s, { ...pose(chestX, chestY), cuoi: 0.8, mayL: 0.5, mayR: 0.5, nhinX: side * 1.2, nhinY: 1.5, duration: 0.5, ease: 'power2.out' }, 0);
     t.to(s, { dauY: 4, duration: 0.2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
     t.to(s, { ...pose(tx, ty), than: N.than - side * 3, dau: N.dau + side * 4, dauY: 9, nhinY: 2.6, cuoi: 0.5, chum: 0.25, duration: 0.55, ease: 'power2.inOut' }, 0.85);
     if (pet) t.to(s, { onTopL: 1, onTopR: 1, duration: 0.02 }, 0.85);
+    t.set(s, { ringFront: 0 }, 0.85);                                          // rời ngực: vòng về sau người (con vật vẽ trước, vòng quanh cổ nó)
     t.to(s, { ...pose(tx, ty + R * 0.12), duration: 0.25, ease: 'sine.inOut' }, 1.45);
     t.set(s, { petCone: 1, ring: 0 }, 1.72);
     const lock = pose(tx, ty, 90 + side * 22, 90 + side * 48);
@@ -7308,7 +7315,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           facing: person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
-            .concat(e.ring && e.ring.style.display !== 'none' ? [{ side: 'ring', kind: 7, box: rect(drawnRect(e.ring)) }] : []) : [],
+            .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 7, box: rect(drawnRect(el)) }))) : [],
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];

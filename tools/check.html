@@ -1764,7 +1764,7 @@ try {
         const kit = L.createPet(spot('left:75px;top:118px;width:100px;height:82px'), { species: 'cat' }).rig, helper = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
         const cone = L.sequence(helper, [['putCone', kit]], { breathe: false });
         // Vòng loa trong tay (hình riêng `ring`) thấy rõ trước khi chuyển; lúc ở quanh đầu, TÂM vòng trùng đầu con vật; hai bàn tay ở mép vòng.
-        cone.time(0.6); if (helper.el.ring.style.display === 'none') hong('putCone', 'no cone held up in the hands before it goes on the pet');
+        cone.time(0.6); if (helper.el.ringFront.style.display === 'none') hong('putCone', 'no cone held up in front of the body before it goes on the pet');
         if (kit.el.cone.style.display !== 'none') hong('putCone', 'the cone is already on the pet while it is still in the hands');
         cone.time(1.6);
         { const r = helper.el.ring.getBoundingClientRect(), h = kit.el.dau.getBoundingClientRect(), off = Math.hypot(r.left + r.width / 2 - h.left - h.width / 2, r.top + r.height / 2 - h.top - h.height / 2);
