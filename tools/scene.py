@@ -504,7 +504,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if op['kind'] == 'readChart':
                 hold = float(op.get('hold') or 2.0); flip = 0.5 + max(1.3, hold * 0.6); up = flip + 0.85 + max(1.2, hold * 0.4)
                 check.update(reading=[round(t0 + a, 2) for a in (0.7, flip - 0.5, flip + 1.0, up - 0.2)], raised=[round(t0 + up + 0.55, 2)],
-                             nods=[round(t0 + up + a, 2) for a in (1.1, 1.45, 1.85)])
+                             nods=[round(t0 + up + a, 2) for a in (1.2, 1.72, 2.2)])          # đáy lần 1 · giữa hai lần · đáy lần 2 (gật có giữ ở đáy)
                 ask = ask + [f'After pointing, does {op["who"]} turn toward {op["listener"]} (not to the camera)?']
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]}', 'ask': ask, 'check': check})
             continue

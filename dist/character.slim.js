@@ -3004,10 +3004,11 @@ class RigSVG {
     scan(flip + 0.9, up - 0.05);
     t.to(s, { dauY: 0, dau: N.dau, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.35, ease: 'power2.out' }, up);
     for (let i = 0; i < 2; i++) {
-      t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.35, ease: 'sine.inOut' }, up + 0.75 + i * 0.75)
-       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.35, ease: 'sine.inOut' }, up + 1.1 + i * 0.75);
+      const a = up + 0.75 + i * 1.0;
+      t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.3, ease: 'sine.inOut' }, a)
+       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.65);
     }
-    const end = up + 2.3;
+    const end = up + 2.8;
     this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}) });
     t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
