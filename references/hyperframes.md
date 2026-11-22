@@ -552,7 +552,7 @@ character facing right is seen more from the front as the camera moves to the ri
   or wall screen showing the app, a poster, an X-ray, the clinic's sign).
 - **`set.cutouts`** — flat upright pictures that stand in the room like the characters (always
   facing the lens, sharp, stacked by depth with them): `kind` (a ready-made prop: `plant`,
-  `chair`, `stool`, `table`, `counter`, `laptop`, `monitor`) or `image` (a picture file), `x`, `z`, optional `y`,
+  `chair`, `stool`, `table`, `counter`, `laptop`, `monitor`, `scooter`…) or `image` (a picture file), `x`, `z`, optional `y`,
   `height`, `color`, `shadow: false`. `laptop` and `monitor` take `screen` (a picture on the
   screen) and the laptop `facing` (`"away"`, the default, or `"viewer"`); stand them on a box
   with `y` = the box's height, and leave `height` out so they keep a person's scale. A laptop
@@ -576,6 +576,19 @@ character facing right is seen more from the front as the camera moves to the ri
   door panel there (`"wall": "left"`); a character fades out as it crosses the wall line.
   `walkForward` / `walkAway` still shrink and grow the drawing in place, as in a flat scene.
 - **Seated people:** `"seated": "chair"` or `"stool"` stands the seat behind the character.
+- **Driving in, riding a scooter** (`examples/scene-ride/scene.json`): a cutout with
+  `"drive": { "from": -1500, "dur": 3.2, "ease": "power2.out" }` slides from x `from` to its own `x` at the start
+  (after the opening card, if any), easing out like braking; a `scooter` also turns its wheels by the distance. The
+  conversation, its views and its voice clips start when every vehicle has stopped (`T0` = card + longest drive + 0.3 s).
+  A person with `"rides": "<scooter name>"` (the cutout needs a `"name"`) sits on it from the first frame in the `ride`
+  stance, facing the way it drives, and moves with it — no `x` / `z` needed; when `"getOff"` plays in one of its turns
+  it steps down to the floor beside the scooter. A scooter without `facing` points the way it drives.
+  ```json
+  "set": { "preset": "street", "cutouts": [ { "kind": "scooter", "name": "scooter", "x": -380, "z": -500,
+                                              "drive": { "from": -1500, "dur": 3.2 } } ] },
+  "characters": [ { "name": "vet", "id": "vet", "rides": "scooter" }, … ],
+  "script": [ { "who": "vet", "do": ["getOff", "wave"] }, … ]
+  ```
 - **Vertical frames** (`"width": 1080, "height": 1920`): the camera starts closer and aims at
   62 % of the frame height; captions sit at the top of the safe area.
 - Not available in a 3D set: `props` (use `set.boxes` and `set.cutouts`), `background`, the 2D

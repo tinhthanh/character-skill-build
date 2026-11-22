@@ -941,6 +941,10 @@ with tempfile.TemporaryDirectory() as work:
         ('an unknown sky', lambda s: s['script'][1].update({'sky': 'dusk'}), '"sky"'),
         ('a power word that is not on / off', lambda s: s['script'][1].update({'power': 'cut'}), '"power"'),
         ('a window on a side wall', lambda s: s['set'].setdefault('panels', []).append({'wall': 'left', 'at': -300, 'y': 500, 'width': 200, 'height': 200, 'window': True}), 'back wall'),
+        ('riding something that is not a scooter', lambda s: s['characters'][0].update({'rides': 'table'}), 'scooter'),
+        ('a drive without "from"', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300, 'drive': {'dur': 3}}), '"from"'),
+        ('a pet that rides', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300}) or s['characters'][2].update({'rides': 'moto'}), 'cannot ride'),
+        ('a scooter facing up', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'x': 0, 'z': -300, 'facing': 'up'}), 'facing'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:
@@ -951,6 +955,20 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif 'Traceback' in done.stderr: problems.append(f'{label}: the tool crashed instead of explaining — {done.stderr.strip().splitlines()[-1][:160]}')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
+
+    # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
+    # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.
+    ride = os.path.join(ROOT, 'examples', 'scene-ride', 'scene.json')
+    done = build(ride, os.path.join(work, 'ride'))
+    if done.returncode != 0: problems.append('the riding example does not build: ' + (done.stderr.strip() or done.stdout.strip())[:300])
+    else:
+        html = open(os.path.join(work, 'ride', 'index.html'), encoding='utf-8').read()
+        for needle in ('createProp(cutout4, "scooter", {"facing": "right"}); const cutout4Spot = set.stand(cutout4, { x: -1500',
+                       'const vetSpot = set.place(vet, { x: -1500', 'cutout4Prop.rideLift(vet)', 'vet.state.ride = 1', 'T0 = TI + 3.5',
+                       'tl.fromTo(cutout4Spot, { x: -1500 }, { x: -380, duration: 3.2', 'tl.add(cutout4Prop.roll(', 'tl.fromTo(vetSpot',
+                       "step.name === 'getOff'", '"getOff"'):
+            if needle not in html: problems.append(f'riding example: {needle!r} not in index.html')
+        if 'vet.state.facing = 0.55' in html or 'vet.state.facing = -0.55' in html: problems.append('riding example: the rider is also turned toward someone at the start (it should face the way it rides)')
 
 for problem in problems: print(f'  ✗ scene: {problem}')
 print('scene: PASS' if not problems else f'scene: FAIL ({len(problems)} problems)')

@@ -37,6 +37,7 @@
     { "label": "face right → front", "steps": [["face", "right"], "nod", ["face", "front"]] },
     { "label": "sit", "steps": [["sit", 1.4]] },
     { "label": "sitDown → standUp", "steps": ["sitDown", "nod", "standUp"] },
+    { "label": "ride → getOff", "steps": ["ride", ["speak", "Chào bà, em tới khám cho bé đây.", 1.8], "getOff"] },
     { "label": "march", "steps": [["march", 4]] },
     { "label": "stroll", "steps": [["stroll", 4]] },
     { "label": "stepInPlace", "steps": [["stepInPlace", 4]] },
