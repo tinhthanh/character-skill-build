@@ -91,6 +91,7 @@
     { "label": "giveTreat (pet)", "steps": [["giveTreat", "@pet"]], "pet": "dog" },
     { "label": "giveTreat pill (pet)", "steps": [["giveTreat", "@pet", { "kind": "pill" }]], "pet": "cat" },
     { "label": "offerHand (pet)", "steps": [["offerHand", "@pet", 1.6]], "pet": "dog", "petOnFloor": true },
+    { "label": "carry → offerCheek (pet)", "steps": [["carry", "@pet"], ["offerCheek", 1.6], "putDown"], "pet": "cat" },
     { "label": "brush (pet)", "steps": [["brush", "@pet"]], "pet": "dog" },
     { "label": "kneel → stroke → standUp (pet)", "steps": ["kneel", ["stroke", "@pet"], "standUp"], "pet": "cat", "petOnFloor": true },
     { "label": "kneel (hold)", "steps": ["kneel", ["idle", 1.2], "standUp"] },

@@ -109,8 +109,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
                Pets at play: "rollOver" (dogs, cats: on its back, paws in the air), ["chaseTail", 3] (dogs; then dizzy),
                ["knead", 8] (cats), ["lick", "@boy"] (dogs, cats: the boy holds out a hand at the same time — added for you;
-               a pet the boy carries licks his face), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet
-               a z 20–40 further than the vet's so the vet stands in front of it), ["eatCarrot", 6] (the rabbit).
+               a pet the boy carries licks his face — he bends his cheek to it, "offerCheek"), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet
+               a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 6] (the rabbit).
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -498,8 +498,13 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
             times = ([round(t1 - 2.75, 2), round(t1 - 1.25, 2), round(t1 - 1.0, 2)] if op['name'] == 'hide'
                      else [round(t0 + (t1 - t0) * f, 2) for f in ((0.25, 0.4, 0.5) if op['name'] == 'chaseTail' else (0.4, 0.55, 0.7))])
+            # DẢI MỐC (đợt 35, lượt hai): đuổi đuôi — mỗi 1/15 s suốt quãng chạy vòng (đếm số lần đổi hướng); nhào — mỗi 0,06 s (biên độ
+            # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
+            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 0.05)}.get(op['name'])
+            samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
-                            'check': {'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times}})
+                            'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},
+                                          **({'samples': samples} if samples else {}))})
             continue
         if op['kind'] == 'putDown':
             # ĐẶT XUỐNG (đợt 30): con vật nằm trên sàn sát chân người đặt, và đứng yên — từ lúc tay thả (60 % bước) tới 0,8 s sau
@@ -1002,7 +1007,7 @@ def main():
                 if stage_set is not None and actor and step[0] == 'shine': parts.append(f"set.aimAt({actor}, {item[1:]})")
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_front') is not None and other['_front'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'crown'{at})")
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_back') is not None and other['_back'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'top'{at})")
-                elif stage_set is not None and actor and step[0] == 'offerHand': parts.append(f"set.target({actor}, {item[1:]}, 'chin'{at})")
+                elif stage_set is not None and actor and step[0] == 'offerHand': parts.append(f"set.target({actor}, {item[1:]}, 'tongue'{at})")
                 elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush', 'hide'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
                 else: parts.append(item[1:])
@@ -1493,8 +1498,8 @@ def main():
                 if name in PET_ACTS and turn.get('who') in names and names[turn['who']]['_pet']:
                     aim = step[1][1:] if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None
                     gear_ops.append({'turn': emitted[0], 'kind': 'petAct', 'name': name, 'who': turn.get('who'), 'target': aim, 'carried': bool(aim and arms.get(aim) == turn.get('who'))})
-                    if name == 'hide' and aim in names and stage_set is not None and float(names[aim].get('z', -300)) <= float(names[turn['who']].get('z', -300)):
-                        reach_notes.append(f'{where}: "{turn["who"]}" hides behind "{aim}", but stands at z {float(names[turn["who"]].get("z", -300)):g}, not further than "{aim}" (z {float(names[aim].get("z", -300)):g}) — it will be drawn in front; give it a z 20–40 smaller')
+                    if name == 'hide' and aim in names and stage_set is not None and float(names[aim].get('z', -300)) - float(names[turn['who']].get('z', -300)) < 60:
+                        reach_notes.append(f'{where}: "{turn["who"]}" hides behind "{aim}", but stands at z {float(names[turn["who"]].get("z", -300)):g}, less than 60 further than "{aim}" (z {float(names[aim].get("z", -300)):g}) — it is drawn in front, or seems to run through the legs; give it a z 60–120 smaller')
                 if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
                     # Bước `walk` tường minh: ghi lại chỗ đứng mới — không thì lượt "lại gần để vuốt ve" sau đó tính từ chỗ cũ, người
@@ -1586,11 +1591,15 @@ def main():
                 # Trong vòng tay người ấy: liếm MẶT — báo cho rig (lúc dựng bước, hình con vật có thể chưa nằm trong tay).
                 times = licked[0][2] if len(licked[0]) > 2 else 4
                 code = code.replace(step_code(licked[0], where, entry['who']), step_code(licked[0][:2] + [times, {'face': True}], where, entry['who']), 1)
+                # Người bế GHÉ MÁ xuống cho nó liếm cùng lúc (đợt 35, lượt hai: mèo trong tay rướn cổ mà không tới mặt).
+                if 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
+                    code = '{ together: [' + code + f", [{names[licked[0][1][1:]]['name']}, ['offerCheek', {round(0.3 + times * 0.4, 2)}]]] }}"
+                    emitted[0] += 1
             if licked and names[entry['who']]['_pet'] and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
                 person = names.get(licked[0][1][1:])
                 if arms.get(person['name']) != entry['who']:
                     times = licked[0][2] if len(licked[0]) > 2 and isinstance(licked[0][2], (int, float)) else 4
-                    low = stage_set is not None and not person.get('seated') and not names[entry['who']].get('on')
+                    low = False          # đợt 35, lượt hai: người đứng, con vật chồm lên liếm (quỳ thì ống chân rút ngắn trông như lún xuống sàn)
                     hand = step_code(['offerHand', '@' + entry['who'], round(0.3 + times * 0.36, 2)], where, person['name'])
                     lead = 0.65 if low else 0
                     pet_code = code if not lead else code.replace(f"[{names[entry['who']]['name']}, ", f"[{names[entry['who']]['name']}, {lead}, ", 1)

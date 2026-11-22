@@ -454,7 +454,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // 'crown' (con vật vẽ trên người): ngay trên mép đỉnh đầu — tay đè mép, không khuất sau tai. 'top' (người vẽ trước con
         // vật): trong đỉnh đầu, 15 % — tay đặt lên đầu mà không che mặt nó.
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : part === 'chin' ? 0.8 : 0.5;          // 'chin' (đợt 35): dưới cằm — tay chìa cho liếm
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        // 'tongue' (đợt 35, lượt hai): ngay dưới đầu lưỡi con vật lúc liếm — lòng bàn tay chìa ra ở đó (`offerHand`).
+        if (part === 'tongue' && typeof to.lickPoint === 'function') { const q = to.lickPoint(of(from).spot.x < f.x ? -1 : 1, { rear: !(from.s && from.s.seat > 0.5) }); hx = q.x; hy = q.y + 1; }
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
@@ -1645,6 +1647,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           // BÀN CHÂN CON VẬT (đợt 35): khung hình vẽ của bốn bàn chân — acting_check đo chân trên sàn, chân chổng trời khi lăn ngửa.
           paws: !person && !carried ? ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => rect(drawnRect(el))).filter((r) => r.y1 > r.y0) : [],
+          // Đợt 35, lượt hai: bàn chân trước theo tên (biên độ nhào), hướng quay (đếm vòng đuổi đuôi), khung LƯỠI (liếm tới tay / mặt),
+          // đầu người (mặt người bế), người đang quỳ.
+          front: !person && !carried ? Object.fromEntries(['tnBan', 'txBan'].filter((key) => e[key]).map((key) => [key, rect(drawnRect(e[key]))])) : null,
+          facing: !person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
+          tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
+          head: person && e.dau ? rect(drawnRect(e.dau)) : null,
+          kneel: !!(person && rig.s && rig.s.kneel > 0.5),
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [] };
       });
     },

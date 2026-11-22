@@ -752,7 +752,7 @@ export class RigSVG {
                      'speak', 'explain', 'worry', 'express', 'turn', 'sit', 'cheer', 'drink', 'stroke', 'write',
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
-                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'offerHand'];
+                     'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'offerHand', 'offerCheek'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -3345,7 +3345,8 @@ export class RigSVG {
   // hình vẽ, từng cột) ít nhất mà phần đè + dải `STROKE_BAND` đơn vị quanh viền đầu ≥ `STROKE_TOUCH` bàn tay, đè ≤ `STROKE_SUNK`.
   static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
 
-  #reachLow(target, hand = null, part = 'head') {
+  // `maxCrouch` (đợt 35, lượt hai): khuỵu gối tối đa — `offerHand` khuỵu ít (khuỵu sâu mà không quỳ trông như ngồi lên không khí).
+  #reachLow(target, hand = null, part = 'head', maxCrouch = 0.5) {
     const s = this.s;
     let tx = 300, ty = 400, span = 0;                 // span: bề ngang đầu con vật (khung của người) — quãng tay trượt khi vuốt
     const live = target && target.live ? target.live : target;
@@ -3362,7 +3363,13 @@ export class RigSVG {
       // ngang, cách lưng con chó vừa tới sát chân 6,7 % chiều cao).
       const anchored = target !== live && typeof target.centerX === 'function' && typeof live.centerX === 'function' && typeof live.apDung === 'function';
       if (anchored && node) live.apDung();
-      if (node) {
+      // ĐẦU LƯỠI con vật đang liếm (đợt 35, lượt hai): `offerHand` đặt lòng bàn tay ngay dưới đó.
+      const tongue = part === 'tongue' && typeof live.lickPoint === 'function' && live.svg && live.svg.getScreenCTM ? live.lickPoint(typeof live.centerX === 'function' && this.centerX() < live.centerX() ? -1 : 1, { rear: !(s.seat > 0.5) }) : null;
+      if (tongue) {
+        const q = new DOMPoint(tongue.x, tongue.y + 1).matrixTransform(live.svg.getScreenCTM()), sv = this.svg.getBoundingClientRect();
+        const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+        tx = (q.x - ox) / unit - s.x; ty = (q.y - oy) / unit - s.y - DOI_Y; span = 0;
+      } else if (node) {
         const r = node.getBoundingClientRect(), sv = this.svg.getBoundingClientRect();
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
         const shift = anchored ? (target.centerX() - live.centerX()) / unit : 0;
@@ -3375,7 +3382,7 @@ export class RigSVG {
     if (!hand && this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
     // Đích thấp hơn hông (con vật dưới đất) thì KHUỴU GỐI xuống — mượn kênh `seat` — cho bàn tay tới gần hơn; vai hạ
     // theo đúng phần thân vừa hạ, nên góc tay tính từ vai ĐÃ HẠ.
-    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
     // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
     // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
@@ -4043,15 +4050,27 @@ export class RigSVG {
   }
 
   /**
-   * CHÌA TAY cho con vật (đợt 35): cúi xuống, đưa bàn tay mở ra ngay DƯỚI CẰM `target` (lưỡi thè xuống là chạm lòng bàn tay) và giữ `hold` giây — cho nó
+   * CHÌA TAY cho con vật (đợt 35): cúi xuống, đưa bàn tay mở ra trước mõm `target`, ngay dưới ĐẦU LƯỠI nó lúc liếm (`lickPoint()`) và giữ `hold` giây — cho nó
    * ngửi, liếm (`lick` của rig thú, tools/scene.py tự ghép), cười; bàn tay nhích nhẹ như bị liếm nhột. Rồi rụt về.
    */
   offerHand(target = null, hold = 1.6) {
-    const t = this.tl(), s = this.s, reach = this.#reachLow(target, null, 'chin'), { k, upper, fore } = reach;
+    const t = this.tl(), s = this.s, reach = this.#reachLow(target, null, 'tongue', 0.15), { k, upper, fore } = reach;
     this.#leanTo(t, reach, 'xoe');
     t.to(s, { cuoi: 1, mieng: 0.3, mayL: 0.6, mayR: 0.6, duration: 0.3 }, 0.4);
     for (let a = 0.6, i = 0; a + 0.3 <= 0.6 + hold; a += 0.3, i++) t.to(s, { ['bat' + k]: upper + (i % 2 ? -1.5 : 1.5), ['cang' + k]: fore + (i % 2 ? 2 : -2), duration: 0.3, ease: 'sine.inOut' }, a);
     this.#khep(t, 0.5, 0.6 + hold);
+    return t;
+  }
+
+  /**
+   * GHÉ MÁ cho con vật đang bế liếm (đợt 35, lượt hai): cúi đầu xuống, nghiêng má về phía nó, mắt nhắm híp cười, `hold` giây — đi
+   * cặp với `lick(…, { face: true })` của con vật trong tay (tools/scene.py tự thêm). Hai tay vẫn ôm.
+   */
+  offerCheek(hold = 1.8) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    t.to(s, { dauY: N.dauY + 9, dau: N.dau + 12, dauX: N.dauX + 3, matY: 0.7, nhinY: 1.5, cuoi: 1, mieng: 0.35, duration: 0.35, ease: 'power2.out' }, 0);
+    for (let a = 0.4, i = 0; a + 0.4 <= 0.35 + hold; a += 0.4, i++) t.to(s, { dau: N.dau + (i % 2 ? 12 : 9), duration: 0.4, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.45, 0.35 + hold);
     return t;
   }
 
