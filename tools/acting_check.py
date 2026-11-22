@@ -579,6 +579,8 @@ CARE_NEAR = 0.06      # đợt 35, lượt hai: ở MỌI mốc của dải `tra
 APPEAR_NEAR = 0.05    # … đồ (loa, băng) hiện / dài thêm trên con vật: bàn tay gần nhất ≤ 5 % chiều cao từ khung của nó
 HELD_BEFORE = 3       # … loa: thấy trong tay ở ≥ 3 mốc (0,3 s) trước khi chuyển sang con vật, và lúc chuyển thì vành ôm quanh đầu nó
 FACE_TURN = 0.3       # chỉ phim xong: |huong| ≥ 0,3, về phía người nghe
+CARE_FRONT = 0.4      # băng chân: mọi bàn tay ở ≥ 40 % trục đuôi → đầu của con vật (lượt ba — không gần đuôi)
+CONE_NEAR = 0.5       # đeo loa: mọi bàn tay cách khung đầu ≤ 0,5 × bề ngang đầu (ở cổ, không phía đuôi — lượt ba)
 
 
 def near_pet(hand, pet, frame):
@@ -609,6 +611,28 @@ def check_care(folder, c, shots):
         bad = [(t, d) for t, d in far if d > CARE_NEAR]; top = max(far, key=lambda x: x[1])
         out.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — both hands on it throughout ({len(far)} moments)', 'ok': not bad,
                     'note': f'the farther hand at most {top[1] * 100:.1f} % of height from {c["target"]} (at {top[0]:g} s; limit {CARE_NEAR * 100:g} %)' + (f'; {len(bad)} moments over' if bad else '')})
+    # (1b) Lượt ba (Gemini 00:41: "tay chạm gần đuôi mèo"): ở mọi mốc `track`, mọi bàn tay ở PHÍA ĐẦU con vật — theo trục đuôi → đầu
+    # của khung thân, bàn tay ở ≥ 40 % (0 = mép đuôi, 1 = mép đầu).
+    toward = []
+    for t in c['track']:
+        f = frame(t); who, pet = f.get(c['who']), f.get(c['target'])
+        parts = (pet or {}).get('parts') or {}
+        if not who or not who.get('hands') or 'head' not in parts or not pet.get('body'): continue
+        hb, bb = parts['head'], pet['body']
+        head_right = (hb['x0'] + hb['x1']) / 2 > (bb['x0'] + bb['x1']) / 2
+        tail, nose = (bb['x0'], bb['x1']) if head_right else (bb['x1'], bb['x0'])
+        if c['kind'] == 'putCone':
+            # Loa: bàn tay ở CỔ / ĐẦU — khoảng cách tới khung đầu ≤ nửa bề ngang đầu (mèo ngồi: đuôi vắt dài làm trục thân lệch hẳn).
+            toward.append((t, max(gap(h, hb) for h in who['hands']) / ((hb['x1'] - hb['x0']) or 1)))
+        else: toward.append((t, min((h['x'] - tail) / ((nose - tail) or 1) for h in who['hands'])))
+    if toward and c['kind'] == 'putCone':
+        far = max(toward, key=lambda r: r[1])
+        out.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hands at the neck, away from the tail', 'ok': far[1] <= CONE_NEAR,
+                    'note': f'the farther hand {far[1] * 100:.0f} % of a head width from {c["target"]}\'s head (at {far[0]:g} s; limit {CONE_NEAR * 100:g} %)'})
+    elif toward:
+        low = min(toward, key=lambda r: r[1])
+        out.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hands at the head end, away from the tail', 'ok': low[1] >= CARE_FRONT,
+                    'note': f'the hand nearest the tail at {low[1] * 100:.0f} % of the way from tail to head (at {low[0]:g} s; least {CARE_FRONT * 100:g} %)'})
     # (2) + (3): theo dải `appear` (mỗi 0,1 s suốt bước).
     prev, held, moved, unheld = None, 0, [], []
     for t in c.get('appear', []):
@@ -639,14 +663,47 @@ def check_care(folder, c, shots):
 
 
 def check_gaze(folder, c, shots):
-    """CHỈ PHIM XONG QUAY VỀ NGƯỜI NGHE (đợt 35, lượt hai — Gemini: "quay ra nhìn máy quay thay vì quay về phía bà")."""
-    t = c['after'][0]; f = {a['name']: a for a in shots.get(float(t), [])}
-    who, other = f.get(c['who']), f.get(c['listener'])
-    what = f'{c["who"]} turns to {c["listener"]} after showXray'
-    if not who or who.get('facing') is None or not other: return [{'scene': folder, 'what': what, 'ok': None, 'note': f'not both in the frame at {t:g} s'}]
-    want = 1 if other['x'] > who['x'] else -1
-    ok = who['facing'] * want >= FACE_TURN
-    return [{'scene': folder, 'what': what, 'ok': ok, 'note': f'facing {who["facing"]:+.2f} at {t:g} s, {c["listener"]} is to the {"right" if want > 0 else "left"} (want ≥ {FACE_TURN:g} that way)'}]
+    """CHỈ PHIM XONG QUAY VỀ NGƯỜI NGHE (đợt 35, lượt hai — Gemini: "quay ra nhìn máy quay thay vì quay về phía bà"). Lượt ba: ở MỌI
+    mốc của `after` (≥ 1 s: 0,9 s và 0,4 s trước khi bước xong, 0,3 s sau) — đầu / người quay về phía người nghe ≥ FACE_TURN, đo trên
+    màn hình (`facing` đã trừ phần máy quay lệch)."""
+    rows, what = [], f'{c["who"]} turns to {c["listener"]} after showXray, held'
+    for t in c['after']:
+        f = {a['name']: a for a in shots.get(float(t), [])}
+        who, other = f.get(c['who']), f.get(c['listener'])
+        if not who or who.get('facing') is None or not other: continue
+        want = 1 if other['x'] > who['x'] else -1
+        rows.append((t, who['facing'] * want))
+    if not rows: return [{'scene': folder, 'what': what, 'ok': None, 'note': 'not both in the frame'}]
+    least = min(rows, key=lambda r: r[1])
+    return [{'scene': folder, 'what': what + f' ({len(rows)} moments)', 'ok': least[1] >= FACE_TURN and len(rows) >= 2,
+             'note': f'turned toward {c["listener"]} by at least {least[1]:+.2f} (at {least[0]:g} s; want ≥ {FACE_TURN:g} at every moment, {rows[0][0]:g}–{rows[-1][0]:g} s)'}]
+
+
+READ_TILT = 12        # đọc bệnh án: đầu nghiêng ≥ 12° …
+READ_DOWN = 8         # … và hạ ≥ 8 đơn vị ở mọi mốc đọc (lượt ba — Gemini 1 khung / giây: "nhìn thẳng ra trước")
+NOD_DEEP = 14         # gật: đáy hai lần gật hạ đầu ≥ 14; giữa hai lần và lúc ngẩng ≤ 4
+
+
+def check_reading(folder, c, shots):
+    """ĐỌC BỆNH ÁN (lượt ba): (1) đầu CÚI — nghiêng ≥ 12°, hạ ≥ 8 — ở cả bốn mốc của hai lúc đọc (trước, sau khi lật); (2) NGẨNG
+    lên trước khi gật; (3) hai lần gật rõ (đáy ≥ 14, giữa ≤ 4). Gemini lượt hai: "nhìn thẳng ra trước", "không ngẩng lên, không gật"."""
+    head = lambda t: (({a['name']: a for a in shots.get(float(t), [])}.get(c['who']) or {}).get('head'))
+    rows = [(t, head(t)) for t in c['reading']]; rows = [(t, h) for t, h in rows if h]
+    out = []
+    if not rows: return [{'scene': folder, 'what': f'{c["who"]} reads the chart — head bent down', 'ok': None, 'note': 'not measured'}]
+    least = min(rows, key=lambda r: abs(r[1]['tilt']))
+    shallow = min(rows, key=lambda r: r[1]['down'])
+    out.append({'scene': folder, 'what': f'{c["who"]} reads the chart — head bent down ({len(rows)} moments)', 'ok': abs(least[1]['tilt']) >= READ_TILT and shallow[1]['down'] >= READ_DOWN,
+                'note': f'head tilted at least {abs(least[1]["tilt"]):.1f}° (at {least[0]:g} s; least {READ_TILT}°), lowered at least {shallow[1]["down"]:.1f} (at {shallow[0]:g} s; least {READ_DOWN})'})
+    raised = [h for h in (head(t) for t in c.get('raised', [])) if h]
+    nods = [head(t) for t in c.get('nods', [])]
+    if raised and all(nods):
+        up_ok = all(abs(h['tilt']) <= 3 and h['down'] <= 4 for h in raised)
+        nod_ok = nods[0]['down'] >= NOD_DEEP and nods[2]['down'] >= NOD_DEEP and nods[1]['down'] <= 4
+        out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': up_ok and nod_ok,
+                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP})'})
+    else: out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': None, 'note': 'not measured'})
+    return out
 
 
 PERSON_CUT = (0.2, 0.8)    # người bị mép trái / phải khung CẮT DỞ: thấy 20…80 % bề ngang khung thân (đợt 35, lượt hai — Gemini: bác sĩ lẹm mép)
@@ -674,7 +731,7 @@ def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
-    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('track', []) + c.get('appear', []) + c.get('after', [])]
+    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('track', []) + c.get('appear', []) + c.get('after', []) + c.get('reading', []) + c.get('raised', []) + c.get('nods', [])]
                                      + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     results += check_people_framed(folder, moments, shots)
@@ -682,6 +739,7 @@ def check_scene(folder):
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
         if c['kind'] == 'showXray' and c.get('listener'): results.extend(check_gaze(folder, c, shots))
+        if c['kind'] == 'readChart' and c.get('reading'): results.extend(check_reading(folder, c, shots))
         if c['kind'] == 'walk':
             worst = None
             for t, frame in zip(c['times'], frames):

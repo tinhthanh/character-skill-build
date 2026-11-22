@@ -1784,7 +1784,9 @@ try {
         const board = nurse.el.itemR.getBoundingClientRect(), chest = nurse.el.ao.getBoundingClientRect();
         if (!(board.top + board.height / 2 < chest.top + chest.height * 0.75)) hong('readChart', 'the clipboard is not held up in front of the chest');
         if (!(nurse.s.itemZoomR > 1.3) || !(nurse.s.dauY > 6)) hong('readChart', 'the clipboard is not enlarged, or the head is not bent down to read');
-        read.time(0.45 + 2 * 0.5 + 0.4); if (!(nurse.s.pageR > 0.6)) hong('readChart', `the top page is not flipped (page ${nurse.s.pageR.toFixed(2)})`);
+        if (!(Math.abs(nurse.s.dau - nurse.NGHI.dau) >= 12)) hong('readChart', `the head is not tilted down to the clipboard (${(nurse.s.dau - nurse.NGHI.dau).toFixed(1)}°, want ≥ 12°)`);
+        read.time(0.5 + 1.3 + 0.5); if (!(nurse.s.pageR > 0.6)) hong('readChart', `the top page is not flipped (page ${nurse.s.pageR.toFixed(2)})`);
+        { const sheet = nurse.el.itemR.querySelector('[data-sheet]'); if (!sheet || !/Q/.test(sheet.getAttribute('d') || '')) hong('readChart', 'the flipping page is not drawn curved'); }
         read.progress(1); if (nurse.s.pageR !== 0 || nurse.s.itemZoomR !== 1) hong('readChart', 'the page or the clipboard size does not come back after reading');
         read.kill(); nurse.datNghi();
         let noBoard = ''; try { actor.readChart(); } catch (error) { noBoard = error.message; }

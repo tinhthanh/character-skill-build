@@ -701,8 +701,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       // ĐANG BĂNG CHÂN / ĐEO LOA (đợt 35, lượt hai: `rig.caring` + `onTop`): con vật lên TRƯỚC người ấy — hai cánh tay vươn qua
       // thân nó nằm sau nó, chỉ hai bàn tay (bản chép, ở dưới) vẽ trên nó. Người trước con vật thì hai cánh tay che 33 % con chó.
-      for (const item of shown.filter((entry) => isPerson(entry.actor) && entry.actor.rig && entry.actor.rig.caring && entry.actor.rig.s
-          && (entry.actor.rig.s.onTopL > 0.5 || entry.actor.rig.s.onTopR > 0.5))) {
+      for (const item of shown.filter((entry) => isPerson(entry.actor) && entry.actor.rig && entry.actor.rig.caring && entry.actor.rig.s && entry.actor.rig.s.careFront > 0.5)) {
         for (const pet of shown.filter((entry) => entry.actor.rig && item.actor.rig.caring.has(entry.actor.rig))) {
           const from = shown.indexOf(pet), to = shown.indexOf(item);
           if (from < to && together(item.actor, pet.actor)) { shown.splice(from, 1); shown.splice(shown.indexOf(item) + 1, 0, pet); }
@@ -1684,6 +1683,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
           // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
           facing: person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
+          // ĐẦU (lượt ba): nghiêng (độ, so với dáng nghỉ) và hạ (`dauY`) — đọc bệnh án cúi đầu, gật.
+          head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2) } : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
             // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 7 như vành loa

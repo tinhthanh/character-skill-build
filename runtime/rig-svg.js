@@ -63,7 +63,8 @@ const NGHI = Object.freeze({
   petWrap: 0,                   // 0…1 BĂNG đã quấn lên chân trước con vật (`bandage`, đợt 35) — con vật đọc lại (RigThu.careLevel); giữ sau động tác
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
-  ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,   // VÒNG LOA đang cầm (`putCone`, đợt 35 lượt hai): hiện / tâm / bán kính, khung của `#aimOf`
+  ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,
+  careFront: 0,                 // 1 = con vật đang được đeo đồ vẽ TRƯỚC người này (set3d; `putCone` — cánh tay sau nó, hai bàn tay chép trên nó)   // VÒNG LOA đang cầm (`putCone`, đợt 35 lượt hai): hiện / tâm / bán kính, khung của `#aimOf`
   pageL: 0, pageR: 0,           // 0…1 tờ trên cùng của bìa kẹp hồ sơ đang LẬT lên (`readChart`, đợt 35)
   tayL: 'mo', tayR: 'mo',
 });
@@ -252,8 +253,10 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 // Đợt 35 — dụng cụ & hồ sơ ở phòng khám.
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
-const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
+const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
+const XRAY_LISTEN = 0.75, XRAY_FACE_HOLD = 1.0;   // chỉ xong: quay HẲN về người nghe (0,75) và giữ 1 s trong bước (lượt ba)
 const COUNT_POSE = [35, 135];             // khuỷu HẠ, cẳng tay dựng lên: bàn tay giơ cạnh vai (khuỷu cao, cẳng tay chúc xuống thì bàn tay nằm dưới cẳng tay, ngón chĩa ngược vào tay áo)
 const WATCH_POSE = [24, -120];            // cẳng tay NGANG trước ngực, mặt đồng hồ hướng ra (sát cằm thì ở cảnh cận chỉ còn mẩu tay áo cạnh cằm)
 const SHAKE_POSE = [40, 50];
@@ -1907,11 +1910,19 @@ export class RigSVG {
       if (plunger) plunger.setAttribute('transform', `translate(0 ${(clamp(s['plunger' + side], 0, 1) * +(plunger.dataset.plunger || 10)).toFixed(2)})`);
       // TỜ TRÊN CÙNG của bìa hồ sơ (`data-page`) lật lên quanh mép kẹp theo `page` (0…1, `readChart`): co về mép trên rồi
       // lật hẳn ra phía trên kẹp, mặt sau (trắng, không chữ) — tờ dưới lộ ra.
+      // Lượt ba: tờ giấy LẬT MỀM — mép dưới đi theo một cung quanh mép kẹp (cos), hai mép bên phồng cong (sin), quá nửa thì thấy mặt
+      // sau (xám nhạt, không chữ), gần hết thì khuất sau bảng. `data-sheet` là hình tờ giấy, vẽ lại mỗi khung.
       const sheet = e['item' + side].querySelector('[data-page]');
       if (sheet) {
-        const flip = clamp(s['page' + side] || 0, 0, 1), top = +(sheet.dataset.page || 0);
-        sheet.setAttribute('transform', flip ? `translate(0 ${top}) scale(1 ${(1 - 1.9 * flip).toFixed(3)}) translate(0 ${-top})` : '');
-        for (const ink of sheet.querySelectorAll('[data-ink]')) ink.style.display = flip > 0.5 ? 'none' : '';
+        const flip = clamp(s['page' + side] || 0, 0, 1), top = +(sheet.dataset.page || 0), shape = sheet.querySelector('[data-sheet]');
+        sheet.style.display = flip > 0.93 ? 'none' : '';
+        sheet.removeAttribute('transform');
+        if (shape) {
+          const span = 32, yb = top + span * Math.cos(Math.PI * flip), bulge = 7 * Math.sin(Math.PI * flip), mid = (top + yb) / 2, curl = -4 * Math.sin(Math.PI * flip);
+          shape.setAttribute('d', `M -12 ${top} L 12 ${top} Q ${(12 + bulge).toFixed(2)} ${(mid + curl).toFixed(2)} 12 ${yb.toFixed(2)} Q 0 ${(yb + curl * 1.5).toFixed(2)} -12 ${yb.toFixed(2)} Q ${(-12 - bulge).toFixed(2)} ${(mid + curl).toFixed(2)} -12 ${top} Z`);
+          shape.setAttribute('fill', flip > 0.5 ? '#e4e9ee' : shape.dataset.paper || '#ffffff');
+        }
+        for (const ink of sheet.querySelectorAll('[data-ink]')) ink.style.display = flip > 0.02 ? 'none' : '';
       }
       for (const face of e['item' + side].querySelectorAll('[data-back]')) face.style.display = back ? '' : 'none';
       for (const face of e['item' + side].querySelectorAll('[data-front]')) face.style.display = back ? 'none' : '';
@@ -4248,16 +4259,16 @@ export class RigSVG {
     this.#careFor(pet, 'petWrap', 'bandage');
     const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, tx, ty } = reach;
     const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, reach, 0.4);
-    // Tay kia GIỮ bàn chân ngay dưới chỗ quấn (giữ phía trên thì hai bàn tay che 32 % con chó); tay cầm cuộn băng quấn vòng elip quanh ống chân, trượt dần xuống theo băng.
-    const holdLeg = arm(o, tx - side * 2, ty + 12), R = BANDAGE_LOOP, loop = 0.55, start = 0.55, n = Math.round(wraps);
+    // Tay kia GIỮ cổ chân ngay dưới chỗ quấn — trên mặt bàn, không thấp hơn (lượt ba: tay khuất sau mép bàn); tay cầm cuộn băng quấn vòng elip quanh ống chân, trượt dần xuống theo băng.
+    const holdLeg = arm(o, tx - side * 2, ty + 7), R = BANDAGE_LOOP, loop = 0.55, start = 0.55, n = Math.round(wraps);
     const wrapAt = (w, q) => { const a = -Math.PI / 2 + q * Math.PI / 2; return arm(k, tx + Math.cos(a) * R, ty + 2 + ((w + q / 4) / n) * 9 - 3 + Math.sin(a) * R * 0.75); };
     const first = wrapAt(0, 0);
     t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'nam' }, 0.02);
     t.to(s, { ['bat' + k]: first.bat, ['cang' + k]: first.cang, ['bat' + o]: holdLeg.bat, ['cang' + o]: holdLeg.cang, than: N.than - side * 3, dau: N.dau + side * 4,
               dauY: 11, nhinY: 3, nhinX: side * 1.4, matY: 0.25, cuoi: 0.5, chum: 0.25, mayL: 0.2, mayR: 0.2, duration: 0.5, ease: 'power2.out' }, 0);
     t.set(s, { ['gadget' + k]: 6 }, 0.15);
-    // Bối cảnh 3D: con vật vẽ trước người — HAI bàn tay vẽ thêm TRÊN nó (set3d, `onTop`), không khuất sau thân nó.
-    if (pet) t.to(s, { onTopL: 1, onTopR: 1, duration: 0.02 }, 0.05);          // ngay đầu động tác: con vật lên trước người (set3d) khi hai tay còn đang vươn tới
+    // Lượt ba: người vẽ TRƯỚC con chó (như các động tác khám) — con chó lên trước người thì hai cánh tay "lồng ra sau con chó và mép
+    // bàn" (Gemini, 00:16). Đứng ở phía đầu con vật (scene.py) để cánh tay không vắt qua thân nó.
     for (let w = 0; w < n; w++) for (let q = 1; q <= 4; q++) {
       const p = wrapAt(w, q);
       t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: loop / 4, ease: 'sine.inOut' }, start + w * loop + (q - 1) * loop / 4);
@@ -4273,7 +4284,6 @@ export class RigSVG {
      .to(s, { ['bat' + k]: patUp.bat, ['cang' + k]: patUp.cang, duration: 0.14, ease: 'sine.out' }, done + 0.28)
      .to(s, { ['bat' + k]: pat.bat, ['cang' + k]: pat.cang, duration: 0.14, ease: 'sine.in' }, done + 0.42);
     t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, matY: 0, dauY: 6, duration: 0.25 }, done + 0.1);
-    if (pet) t.to(s, { onTopL: 0, onTopR: 0, duration: 0.02 }, done + 0.6);
     this.#khep(t, 0.5, done + 0.62, { ...keep, ...(pet ? { petWrap: 1 } : {}) });
     return t;
   }
@@ -4293,9 +4303,14 @@ export class RigSVG {
     // luôn ở đúng chỗ (trước ngực → quanh đầu con vật), hai bàn tay đặt lên MÉP nó — gắn vào bàn tay thì vòng lệch theo cổ tay
     // (đo: tâm vòng cách đầu mèo 18 px với tay phải, 60 px với tay trái).
     const R = Math.max(CONE_GRIP, (head.span || 0) * 70 / 132 + 4);
-    const rimK = side > 0 ? 205 : -25, rimO = side > 0 ? 150 : 30;
-    const pose = (cx, cy, angK = rimK, angO = rimO) => {
-      const a = arm(k, cx + Math.cos(angK * deg) * R, cy + Math.sin(angK * deg) * R), b = arm(o, cx + Math.cos(angO * deg) * R, cy + Math.sin(angO * deg) * R);
+    // Lượt ba: hai tay cầm vành ở phía người đứng (hơi trên) và phía dưới–trước (dưới cằm) — không ở mép dưới–sau, chỗ ấy là thân /
+    // đuôi con vật (Gemini 00:41: "tay chạm gần đuôi mèo").
+    // (Phía bên kia vành tay chibi không với tới — bàn tay dừng trên mặt con vật; đo trên ảnh lượt ba.)
+    // Tay GẦN (phía con vật, `k`) lo chỗ xa hơn — dưới–trước; tay XA (`o`) lo mép vành phía người đứng (lượt ba: ngược lại thì tay xa dừng
+    // ngắn ở gốc đuôi mèo, đo 28 % trục đuôi → đầu).
+    const rimK = side > 0 ? 150 : 30, rimO = side > 0 ? 205 : -25;
+    const pose = (cx, cy, angK = rimK, angO = rimO, r = R) => {
+      const a = arm(k, cx + Math.cos(angK * deg) * r, cy + Math.sin(angK * deg) * r), b = arm(o, cx + Math.cos(angO * deg) * r, cy + Math.sin(angO * deg) * r);
       return { ['bat' + k]: a.bat, ['cang' + k]: a.cang, ['bat' + o]: b.bat, ['cang' + o]: b.cang, ringX: cx, ringY: cy };
     };
     // 1. Giơ loa lên trước bụng, về phía con vật — "đây là cái loa".
@@ -4306,17 +4321,19 @@ export class RigSVG {
     t.to(s, { dauY: 4, duration: 0.2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0.5);
     // 2. Cúi tới, đưa vành quanh đầu con vật, 3. tuột xuống quanh cổ.
     t.to(s, { ...pose(tx, ty), than: N.than - side * 3, dau: N.dau + side * 4, dauY: 9, nhinY: 2.6, cuoi: 0.5, chum: 0.25, duration: 0.55, ease: 'power2.inOut' }, 0.85);
-    if (pet) t.to(s, { onTopL: 1, onTopR: 1, duration: 0.02 }, 0.85);
+    if (pet) t.to(s, { onTopL: 1, onTopR: 1, careFront: 1, duration: 0.02 }, 0.85);
     t.set(s, { ringFront: 0 }, 0.85);                                          // rời ngực: vòng về sau người (con vật vẽ trước, vòng quanh cổ nó)
     t.to(s, { ...pose(tx, ty + R * 0.12), duration: 0.25, ease: 'sine.inOut' }, 1.45);
     // 4. Loa chuyển sang con vật đúng chỗ ấy: loa của nó hiện đủ cỡ, vòng trong tay tắt — cùng một khung hình.
     t.set(s, { petCone: 1, ring: 0 }, 1.72);
     // 5. Hai tay cài khoá dưới cằm (mép dưới vành), ấn hai nhịp, 6. rồi mới thả tay, gật.
-    const lock = pose(tx, ty, 90 + side * 22, 90 + side * 48);
+    // Cài khoá: hai tay ở BÊN CỔ phía người đứng, ngang cổ (một trên, một dưới) — mép dưới vòng nằm ngang ngực con vật, gần gốc đuôi
+    // (đo: tay ở 28–32 % trục đuôi → đầu); bên kia vòng tay chibi không với tới.
+    const lock = pose(tx, ty, side > 0 ? 158 : 22, side > 0 ? 196 : -16, R * 0.88);      // ngay trong mép vành: ấn khoá không nhấc tay khỏi loa
     t.to(s, { ['bat' + k]: lock['bat' + k], ['cang' + k]: lock['cang' + k], ['bat' + o]: lock['bat' + o], ['cang' + o]: lock['cang' + o], duration: 0.3, ease: 'sine.inOut' }, 1.75);
     t.to(s, { ['cang' + k]: lock['cang' + k] + 4, ['cang' + o]: lock['cang' + o] + 4, duration: 0.12, ease: 'sine.inOut', yoyo: true, repeat: 3 }, 2.08);
     t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.25 }, 2.4);
-    if (pet) t.to(s, { onTopL: 0, onTopR: 0, duration: 0.02 }, 2.7);
+    if (pet) t.to(s, { onTopL: 0, onTopR: 0, careFront: 0, duration: 0.02 }, 2.7);
     t.to(s, { dauY: 14, duration: 0.15, ease: 'sine.out', yoyo: true, repeat: 1 }, 2.3);          // gật: "xong rồi"
     this.#khep(t, 0.5, 2.62, { ...keep, ...(pet ? { petCone: 1 } : {}) });
     return t;
@@ -4336,28 +4353,35 @@ export class RigSVG {
     this.#openUp(t);
     if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
     t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
-    t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, dauY: LOOK_DOWN.head, dau: N.dau + m * 3, nhinY: LOOK_DOWN.eyes,
-              matY: LOOK_DOWN.lids, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.45, ease: 'power2.out' }, 0);
-    // Mắt dò từng dòng: trái → phải, xuống dòng.
-    const read = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
-    const flip = 0.45 + hold * 0.5;
-    read(0.5, flip - 0.35);
-    // Lật trang: tay kia lên mép trên của bìa, kéo tờ trên cùng lật ra sau kẹp, rồi buông xuống.
-    t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.4);
-    t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.35, ease: 'power2.out' }, flip - 0.4);
-    // Tờ giấy lật HẲN lên trên kẹp (0,6 s), tay kéo theo mép tờ lên cao — đọc ra rõ là lật trang (Gemini, lượt một: không thấy).
-    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, nhinY: LOOK_DOWN.eyes - 2, duration: 0.6, ease: 'power1.inOut' }, flip);
-    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], nhinY: LOOK_DOWN.eyes, duration: 0.4, ease: 'power2.inOut' }, flip + 0.7);
-    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.1);
-    const up = flip + 1.2 + Math.max(0.4, hold * 0.25);
-    read(flip + 0.8, up - 0.05);
-    // Ngẩng lên nhìn người đối diện, cười, rồi GẬT hai cái rõ (như `nod`: đầu, vai, thân chúi theo) — "ổn rồi".
-    t.to(s, { dauY: 0, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.3, ease: 'power2.out' }, up);
+    // CÚI ĐẦU RÕ xuống tấm bảng (lượt ba — Gemini đọc ~1 khung / giây, chỉ thấy ĐẦU cúi / nghiêng, không thấy mắt liếc khi mặt
+    // nhỏ): đầu nghiêng `CHART_TILT` độ về phía bảng và hạ xuống, mắt nhìn xuống, mí hạ.
+    const read = { dauY: CHART_DOWN, dau: N.dau + m * CHART_TILT, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids };
+    t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, ...read, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.5, ease: 'power2.out' }, 0);
+    // Mắt dò từng dòng (trái → phải), đầu nhích theo dòng — vẫn cúi.
+    const scan = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, dau: read.dau - m * 1.5, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, dau: read.dau + m * 1.5, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
+    const flip = 0.5 + Math.max(1.3, hold * 0.6);                 // đọc tờ đầu ≥ 1,3 s rồi mới lật
+    scan(0.55, flip - 0.45);
+    // LẬT TRANG MỀM: tay kia lên mép dưới tờ giấy, kéo nó cong lên, vòng qua mép kẹp ra SAU bảng (`page` 0 → 1: tờ giấy cong,
+    // co dần về mép kẹp, vượt qua kẹp rồi khuất sau bảng) — không còn dựng cứng trên đầu tấm bảng (Gemini lượt hai, 00:06).
+    t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.45);
+    t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.4, ease: 'power2.out' }, flip - 0.45);
+    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, duration: 0.8, ease: 'sine.inOut' }, flip);
+    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 0.85);
+    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.25);
+    // Đọc tờ sau ≥ 1,2 s, vẫn cúi.
+    const up = flip + 0.85 + Math.max(1.2, hold * 0.4);
+    scan(flip + 0.9, up - 0.05);
+    // NGẨNG LÊN nhìn người đối diện (giữ 0,4 s), cười, rồi GẬT hai nhịp CHẬM, sâu (0,35 s xuống, 0,35 s lên) — ở 1 khung / giây
+    // vẫn bắt được đầu cúi.
+    t.to(s, { dauY: 0, dau: N.dau, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.35, ease: 'power2.out' }, up);
     for (let i = 0; i < 2; i++) {
-      t.to(s, { dauY: 15, nhinY: 2, vai: N.vai + 2.5, duration: 0.2, ease: 'power2.out' }, up + 0.4 + i * 0.5)
-       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, duration: 0.3, ease: 'power2.inOut' }, up + 0.6 + i * 0.5);
+      t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.35, ease: 'sine.inOut' }, up + 0.75 + i * 0.75)
+       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.35, ease: 'sine.inOut' }, up + 1.1 + i * 0.75);
     }
-    this.#khep(t, 0.5, up + 1.45, stowed ? { ['item' + k]: 0 } : {});
+    // Tờ đã lật nằm sau bảng: đặt lại tờ trên cùng khi bìa đã hạ (khép xong) — không lật ngược lại trước mắt người xem.
+    const end = up + 2.3;
+    this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}) });
+    t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
   }
 
@@ -4374,8 +4398,8 @@ export class RigSVG {
     if (to && typeof to === 'object') {
       const box = to.getBoundingClientRect ? to.getBoundingClientRect() : null;
       const dx = (typeof to.centerX === 'function' ? to.centerX() : box ? box.left + box.width / 2 : this.centerX()) - this.centerX();
-      if (Math.abs(dx) >= 1) before = (dx < 0 ? -1 : 1) * 0.55;
-    } else if (to === 'left' || to === 'right') before = (to === 'left' ? -1 : 1) * 0.55;
+      if (Math.abs(dx) >= 1) before = (dx < 0 ? -1 : 1) * XRAY_LISTEN;
+    } else if (to === 'left' || to === 'right') before = (to === 'left' ? -1 : 1) * XRAY_LISTEN;
     else if (to !== null && to !== 'front') throw new Error(`[character] showXray: { to } is the listener — a rig, an element, 'left', 'right' or 'front', got ${JSON.stringify(to)}`);
     else if (to === 'front') before = 0;
     // Góc tay tính ở hướng SẼ quay tới (vai dồn vào giữa khi quay 3/4): tính ở hướng đang đứng thì tay chỉ lệch đích.
@@ -4392,6 +4416,8 @@ export class RigSVG {
     const back = 0.6 + hold, look = Math.sign(before) * 1.6;
     t.to(s, { nhinX: look, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
     this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look });
+    // Có người nghe: GIỮ hướng mới ≥ 1 s trong chính bước này (lượt ba — Gemini 1 khung / giây: thấy rõ đã quay về phía bà).
+    if (to && to !== 'front') t.to(s, { cuoi: 0.9, duration: XRAY_FACE_HOLD, ease: 'none' }, back + 0.65);
     return t;
   }
 

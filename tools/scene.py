@@ -495,9 +495,16 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             ask = ([f'Is {op["who"]} holding a clipboard up in front of the chest and looking down to read it?'] if op['kind'] == 'readChart'
                    else [f'Is {op["who"]} pointing at a spot on the X-ray film of the viewer beside them?', 'Is the X-ray film (bones on a dark film) in the frame?'])
             check = {'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'times': times}
-            # HƯỚNG NHÌN SAU KHI CHỈ PHIM (đợt 35, lượt hai): 0,3 s sau bước, người chỉ quay về phía người nghe.
+            # HƯỚNG NHÌN SAU KHI CHỈ PHIM (đợt 35, lượt hai): người chỉ quay về phía người nghe — lượt ba: ở BA mốc (0,9 s và 0,4 s trước
+            # khi bước xong, 0,3 s sau) — giữ ≥ 1 s (Gemini đọc ~1 khung / giây).
             if op['kind'] == 'showXray' and op.get('listener'):
-                check.update(listener=op['listener'], after=[round(min(t1 + 0.3, float(timings.get('duration') or t1 + 1) - 0.05), 2)])
+                check.update(listener=op['listener'], after=[round(t1 - 0.9, 2), round(t1 - 0.4, 2), round(min(t1 + 0.3, float(timings.get('duration') or t1 + 1) - 0.05), 2)])
+            # ĐỌC BỆNH ÁN (lượt ba): đầu CÚI (nghiêng + hạ) ở 4 mốc của hai lúc đọc, NGẨNG lên trước khi gật, rồi hai lần gật (đáy / giữa
+            # hai lần). Mốc tính theo runtime/rig-svg.js `readChart` (lật ở 0,5 + max(1,3; 0,6 × hold), ngẩng ở lật + 0,85 + max(1,2; 0,4 × hold)).
+            if op['kind'] == 'readChart':
+                hold = float(op.get('hold') or 2.0); flip = 0.5 + max(1.3, hold * 0.6); up = flip + 0.85 + max(1.2, hold * 0.4)
+                check.update(reading=[round(t0 + a, 2) for a in (0.7, flip - 0.5, flip + 1.0, up - 0.2)], raised=[round(t0 + up + 0.55, 2)],
+                             nods=[round(t0 + up + a, 2) for a in (1.1, 1.45, 1.85)])
                 ask = ask + [f'After pointing, does {op["who"]} turn toward {op["listener"]} (not to the camera)?']
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]}', 'ask': ask, 'check': check})
             continue
@@ -1427,13 +1434,21 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'bandage': 0.16, 'putCone': 0.16}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'bandage': 0.16, 'putCone': 0.24}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # BĂNG CHÂN (đợt 35, lượt hai): đứng ngang CHÂN TRƯỚC con vật (về phía đầu nó, ~0,2 × chiều cao host của nó), không ngang
                 # giữa thân — tay phía xa của người chibi không với tới chân trước, bàn tay giữ dừng ở bụng con chó (đo trên ảnh).
-                if step[0] == 'bandage' and target['_pet']:
+                if step[0] == 'bandage' and target['_pet'] and not who.get('seated'):
+                    # Lượt ba: đứng ở PHÍA ĐẦU con vật (sang bên ấy nếu đang ở phía đuôi) — từ phía đuôi hai cánh tay vắt qua thân nó (người
+                    # vẽ trước con vật): con chó chỉ thấy 57 % (cảnh CI `care`); lượt hai đưa con vật lên trước thì tay "lồng ra sau nó".
                     head = -1 if target.get('faces') in names and float(names[target['faces']]['x']) < float(target['x']) else 1
-                    gap += head * 0.2 * target['_host_height']
+                    leg = float(target['x']) + target.get('_drop', 0) + head * 0.2 * target['_host_height']
+                    move = leg + head * wanted - float(who['x'])
+                    if abs(move) > 0.05 * who['_host_height']:
+                        turns.append((f'  // {who["name"]} goes round to the head end of {step[1][1:]} for "bandage"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                        emitted[0] += 1
+                        who['x'] = float(who['x']) + move
+                    continue
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
                 if step[0] in ('stroke', 'brush') and target['_pet'] and target.get('on') and not who.get('seated'): wanted = 0.16 * who['_host_height']
@@ -1560,6 +1575,7 @@ def main():
                 # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ trước ngực, trong khung; tay chỉ trúng điểm trên phim (acting_check).
                 if name in CHART_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': name, 'name': name, 'who': turn.get('who'), 'target': step[1] if name == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None,
+                                     'hold': float(step[1]) if name == 'readChart' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], (int, float)) else 2.0,
                                      'listener': showxray_listener(turn.get('who')) if name == 'showXray' and stage_set is not None else None})
                 if step == 'putDown' and turn.get('who') in holding: gear_ops.append({'turn': emitted[0], 'kind': 'putDown', 'who': turn.get('who'), 'target': holding.pop(turn.get('who'))})
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'walk' and isinstance(step[1], (int, float)):
