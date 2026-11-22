@@ -477,7 +477,22 @@ KNEAD_LIFT = 0.15      # nhào (lượt ba): mỗi bàn chân trước lên xu�
 KNEAD_BEAT = 0.5       # … mỗi lần ấn ≥ 0,5 s
 PET_SHARE = 0.35       # (lượt ba) lượt động tác riêng của thú: hình con vật cao ≥ 35 % khung ở lúc được hỏi — ở góc toàn nó chỉ ~1/12 khung
 TONGUE_LONG = 0.25     # lưỡi lúc chạm đích dài ≥ 1/4 chiều cao đầu
-CLOSE_ACTS = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick')
+CLOSE_ACTS = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
+JUMP = 0.05            # (lượt bốn) giữa hai khung liền nhau (1/30 s) con vật được bế / bàn tay chìa cho liếm dời ≤ 5 % chiều cao người, ĐO SO VỚI
+                       # NGƯỜI ẤY (máy quay lia / đổi cỡ thì cả hai cùng dời) — nhấc lên ngực trong 0,6 s nhanh nhất ~4 %; dịch tức thời thì hơn nhiều
+HAND_ON_FACE = 0.15    # … bàn tay chìa cho liếm che ≤ 15 % khung đầu con vật (không đè lên mặt nó)
+
+def biggest_jump(track, pick):
+    """Bước dời lớn nhất của một điểm giữa hai mốc liền nhau của `track` (danh sách (lúc, khung)); `pick(khung)` → (x, y) | None."""
+    best, prev = None, None
+    for t, f in track:
+        p = pick(f)
+        if p and prev and prev[1]:
+            d = ((p[0] - prev[1][0]) ** 2 + (p[1] - prev[1][1]) ** 2) ** 0.5
+            if best is None or d > best[1]: best = (t, d)
+        prev = (t, p)
+    return best
+
 THROUGH = 0.03         # nấp: chạy ngang qua chân người mà đường sàn dưới chân hai bên lệch < 3 % chiều cao người — là đi XUYÊN qua chân họ
                        # (đợt 35, lượt hai: con shiba xa hơn cô bé 30 đơn vị — 1,6 %, Gemini thấy đi xuyên; xa hơn 100 — 5,3 %)
 
@@ -569,6 +584,21 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         out.append({'scene': folder, 'what': f'{what} — the carrot gets shorter bite by bite', 'ok': full > 0 and steps >= 3,
                     'note': f'{steps} steps shorter (least 3), from {full:.0f} px to {min([v for v in lens if v], default=0):.0f} px over {len(track)} frames'})
     if c['name'] == 'hide' and track:
+        # (lượt bốn) bàn tay người đứng trước không đè lên cái đầu đang ló ra
+        worst = None
+        for t2, f in zip(c.get('samples', []), track):
+            if t2 < c['times'][0] - 1e-3: continue          # chỉ lúc đã nấp và ló đầu (lúc chạy ngang sau lưng người thì khuất là đúng)
+            a = f[c['who']]; head = (a.get('parts') or {}).get('head')
+            if not head: continue
+            for name, other in f.items():
+                if not other.get('person'): continue
+                for h in other.get('hands') or []:
+                    b = h.get('box')
+                    if not b: continue
+                    cover = max(0, min(b['x1'], head['x1']) - max(b['x0'], head['x0'])) * max(0, min(b['y1'], head['y1']) - max(b['y0'], head['y0'])) / max(1, (head['x1'] - head['x0']) * (head['y1'] - head['y0']))
+                    if worst is None or cover > worst[1]: worst = (t2, cover, name)
+        if worst: out.append({'scene': folder, 'what': f'{what} — no hand over the peeking head', 'ok': worst[1] <= HAND_ON_FACE,
+                              'note': f'a hand of {worst[2]} covers at most {worst[1] * 100:.0f} % of {c["who"]}\'s head (at {worst[0]:g} s; limit {HAND_ON_FACE * 100:g} %)'})
         through = []
         for t, f in zip(c.get('samples', []), track):
             a, box = f[c['who']], f[c['who']].get('body')
@@ -612,9 +642,36 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
                         'note': (f'the tongue touches {c["target"]}\'s {"head" if c.get("carried") else "hand"} {touches} times (least 3; touch = tip within {TONGUE_GAP * 100:g} % of height, tongue ≥ {TONGUE_LONG * 100:g} % of the head, longest {max([a / b for a, b in zip(size, heads) if b], default=0) * 100:.0f} %; closest {near * 100:.1f} %) over {len(gaps)} frames' if near is not None
                                  else 'no tongue out')})
             if not c.get('carried'):
-                off = (person['feet'] - person['ground']) / person['tall'] if person.get('feet') is not None else None
-                out.append({'scene': folder, 'what': f'{c["target"]} holds out a hand standing — feet on the floor, not kneeling', 'ok': off is not None and abs(off) <= FEET and not person.get('kneel'),
-                            'note': ('kneels: the shins are drawn foreshortened and read as sunk into the floor' if person.get('kneel') else f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)' if off is not None else 'feet not seen')})
+                # (lượt bốn) con vật ĐỨNG trên sàn — cả hai bàn chân trước, không chồm lên lơ lửng; bàn tay không đè lên mặt nó; bàn tay
+                # không bật nhảy giữa hai khung lúc nó đang liếm.
+                front = pet.get('front') or {}
+                if front:
+                    lift = max(abs(b['y1'] - pet['ground']) for b in front.values()) / (pet.get('tall') or 1)
+                    out.append({'scene': folder, 'what': f'{what} — stands on all fours, front paws on the floor', 'ok': lift <= PAW_FLOOR,
+                                'note': f'front paws {lift * 100:.1f} % of its height off the floor at {t:g} s (limit {PAW_FLOOR * 100:g} %)'})
+                head = (pet.get('parts') or {}).get('head')
+                # MẶT = 65 % trên của khung đầu (mắt, trán, tai) — bàn tay ở MÕM là đúng chỗ (đang liếm), đè lên mắt mới là che mặt.
+                head = dict(head, y1=head['y0'] + 0.65 * (head['y1'] - head['y0'])) if head else None
+                if head and person.get('hands'):
+                    area = max(1, (head['x1'] - head['x0']) * (head['y1'] - head['y0']))
+                    cover = max(max(0, min(h['box']['x1'], head['x1']) - max(h['box']['x0'], head['x0'])) * max(0, min(h['box']['y1'], head['y1']) - max(h['box']['y0'], head['y0'])) / area
+                                for h in person['hands'] if h.get('box'))
+                    out.append({'scene': folder, 'what': f'{c["target"]}\'s hand stays off {c["who"]}\'s face', 'ok': cover <= HAND_ON_FACE,
+                                'note': f'the hand covers {cover * 100:.0f} % of {c["who"]}\'s face (upper 65 % of the head) at {t:g} s (limit {HAND_ON_FACE * 100:g} %)'})
+                hop = biggest_jump(list(zip(c.get('samples', []), track)), lambda f: (lambda q: min(((h['x'], h['y']) for h in q['hands']), key=lambda h: abs(h[0] - (pet['x'] if pet.get('x') else 0))) if q and q.get('hands') else None)(f.get(c['target'])))
+                if hop: out.append({'scene': folder, 'what': f'{c["target"]}\'s hand holds steady while {c["who"]} licks', 'ok': hop[1] / person['tall'] <= JUMP,
+                                    'note': f'the hand moves at most {hop[1] / person["tall"] * 100:.1f} % of height between two frames (at {hop[0]:g} s; limit {JUMP * 100:g} %)'})
+                # Người chìa tay đứng trên sàn — hay QUỲ: hai đầu gối chạm sàn (lượt bốn; lượt hai cấm quỳ vì ở góc toàn ống chân rút ngắn
+                # trông như lún, ở góc cận con vật đầu gối thấy rõ chạm sàn).
+                if person.get('kneel'):
+                    knees = [leg['b']['y'] + leg['r'] for leg in person.get('legs') or [] if leg['part'] == 'thigh']      # mép dưới đầu gối
+                    off = (max(knees) - person['ground']) / person['tall'] if knees else None
+                    out.append({'scene': folder, 'what': f'{c["target"]} kneels to hold out a hand — knees on the floor', 'ok': off is not None and abs(off) <= FEET,
+                                'note': f'knees {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)' if off is not None else 'knees not seen'})
+                else:
+                    off = (person['feet'] - person['ground']) / person['tall'] if person.get('feet') is not None else None
+                    out.append({'scene': folder, 'what': f'{c["target"]} holds out a hand standing — feet on the floor', 'ok': off is not None and abs(off) <= FEET,
+                                'note': f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)' if off is not None else 'feet not seen'})
     return out
 
 
@@ -681,6 +738,17 @@ def check_scene(folder):
                 if worst is None or seen < worst[1]: worst = (t, seen)
             if worst: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — the pet stays in the frame', 'ok': worst[1] >= 0.7,
                                       'note': f'least {worst[1] * 100:.0f} % of {c["target"]} in the frame (at {worst[0]:g} s; least 70 % at every moment measured)'})
+            # MƯỢT (lượt bốn): mỗi 1/30 s suốt bước, giữa thân con vật dời ≤ 2,5 % chiều cao người bế giữa hai khung — không nhảy vào tay,
+            # không rơi bịch xuống sàn.
+            if c.get('samples'):
+                track = [(t, {a['name']: a for a in shots.get(float(t), [])}) for t in c['samples']]
+                def centre(f):
+                    b, who = ((f.get(c['target']) or {}).get('parts') or {}).get('back'), f.get(c['who'])
+                    if not b or not who or not who.get('tall'): return None
+                    return (((b['x0'] + b['x1']) / 2 - who['x']) / who['tall'], ((b['y0'] + b['y1']) / 2 - who['ground']) / who['tall'])
+                hop = biggest_jump(track, centre)
+                if hop: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — the pet moves smoothly, no jump', 'ok': hop[1] <= JUMP,
+                                        'note': f'the pet\'s body moves at most {hop[1] * 100:.1f} % of {c["who"]}\'s height between two frames, measured against {c["who"]} (at {hop[0]:g} s; limit {JUMP * 100:g} %)'})
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
             continue

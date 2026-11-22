@@ -108,10 +108,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                one of its turns steps it down beside the scooter (examples/scene-ride/scene.json).
                A cutout or prop "carrier" (pet carrier, "door": "right" | "left") — stand a pet behind it to put it inside.
                Pets at play: "rollOver" (dogs, cats: on its back, paws in the air), ["chaseTail", 3] (dogs; then dizzy),
-               ["knead", 8] (cats), ["lick", "@boy"] (dogs, cats: the boy holds out a hand at the same time — added for you;
+               ["knead", 6] (cats), ["lick", "@boy"] (dogs, cats: the boy kneels and holds out a hand at the same time — added for you;
                a pet the boy carries licks his face — he bends his cheek to it, "offerCheek"), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet
                a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 4] (the rabbit).
-               In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot or lick (and no "view") cuts to a close
+               In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot, lick or bark (and no "view") cuts to a close
                shot of the pet for that turn — the pet ≥ 35 % of the frame height, others may be cropped — then back.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
@@ -195,13 +195,14 @@ GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsD
             'introduce', 'shrug', 'throwBall')
 # ĐỘNG TÁC THÚ đợt 35: moments.json đo con vật trong khung, chân trên sàn (lăn ngửa: lưng trên sàn, chân chổng trời), nấp: đầu ló ra,
 # thân khuất một phần; liếm: mõm tới tay / mặt người.
-PET_ACTS = ('rollOver', 'chaseTail', 'knead', 'lick', 'hide', 'eatCarrot')
+PET_ACTS = ('rollOver', 'chaseTail', 'knead', 'lick', 'hide', 'eatCarrot', 'bark')
 PET_ACT_ASK = {'rollOver': 'Is the animal lying on its back, belly up, with its paws in the air?',
                'chaseTail': 'Is the dog spinning round after its tail (or, at the end, dizzy)?',
                'knead': 'Is the cat pressing its front paws up and down (kneading), eyes half shut?',
                'lick': 'Is the animal licking the person (tongue out at their hand or face)?',
                'hide': 'Is the animal hiding behind someone, only its head peeking out, scared?',
-               'eatCarrot': 'Is the rabbit holding a carrot to its mouth with its front paws, nibbling it?'}
+               'eatCarrot': 'Is the rabbit holding a carrot to its mouth with its front paws, nibbling it?',
+               'bark': 'Is the dog barking — mouth wide open, head tossed up, bark lines in front of its mouth?'}
 CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
@@ -299,7 +300,7 @@ CAMERA_START = {'yaw': 0, 'pitch': 6, 'distance': 1700, 'x': 0, 'y': 300, 'z': -
 VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide', 'on', 'size', 'back', 'alone', 'fill')
 # GÓC CẬN TỰ ĐỘNG cho động tác riêng của thú (đợt 35, lượt ba): con vật ≥ 35 % chiều cao khung — ở góc toàn phòng khách nó chỉ cao ~1/12
 # khung, lưỡi và chân trước chỉ vài điểm ảnh. `alone`: được lẹm người khác; `fill`: phần chiều cao khung con vật chiếm.
-PET_CLOSE = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick')
+PET_CLOSE = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
 PET_CLOSE_FILL = 0.62
 VIEW_SIZES = ('close', 'medium', 'full')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
@@ -472,6 +473,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if op['kind'] == 'carry': ask = [f'Is {op["who"]} holding the animal ({op["target"]}) in their arms, against the chest — not floating beside them?']
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["kind"]} {op["target"]}', 'ask': ask + ['Are the standing characters\' feet on the floor (not floating above it or sunk into it)?'],
                             'check': dict({'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times},
+                                          # BẾ (đợt 35, lượt bốn): mỗi 1/30 s suốt bước — con vật không nhảy chỗ giữa hai khung
+                                          **({'samples': [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]} if op['kind'] == 'carry' else {}),
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
@@ -506,7 +509,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                      else [round(t0 + (t1 - t0) * f, 2) for f in ((0.25, 0.4, 0.5) if op['name'] == 'chaseTail' else (0.4, 0.55, 0.7))])
             # DẢI MỐC (đợt 35, lượt hai): đuổi đuôi — mỗi 1/15 s suốt quãng chạy vòng (đếm số lần đổi hướng); nhào — mỗi 0,06 s (biên độ
             # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
-            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 0.05), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2)}.get(op['name'])
+            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 1 / 30), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2)}.get(op['name'])
             samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
                             'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},
@@ -523,7 +526,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             after = min([t1 + 0.8, float(timings.get('duration') or t1 + 0.8)] + [float(a) - 0.05 for a, _ in turns if float(a) > t1 + 0.1])
             times = [round(t0 + (t1 - t0) * 0.62, 2), round(t1, 2), round(max(t1, after), 2)]
             moments.append({'t': times[1], 'what': f'{op["who"]} puts {op["target"]} down', 'ask': [f'Is the animal ({op["target"]}) on the floor right next to {op["who"]}\'s feet (not across the room, not sliding away)?'],
-                            'check': {'kind': 'putDown', 'who': op['who'], 'target': op['target'], 'to': 'floor', 'times': times}})
+                            'check': {'kind': 'putDown', 'who': op['who'], 'target': op['target'], 'to': 'floor', 'times': times,
+                                      'samples': [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]}})
             continue
         if op['kind'] == 'walk':
             # ĐI NGANG QUA ĐÈN (tối, có đèn): hai khung đầu / cuối quãng đi — bóng phải xoay / dài ngắn theo vị trí đèn, người sáng
@@ -989,6 +993,13 @@ def main():
     # ── kịch bản ──
     script = scene.get('script')
     if not isinstance(script, list) or not script: fail('"script" must be a non-empty list of turns')
+    # AI CÓ CON VẬT NẤP SAU LƯNG (đợt 35, lượt bốn): người ấy nói thì múa tay phía KIA — tay phía con vật vẽ đè lên cái đầu nó đang ló ra.
+    hiders = {}
+    for entry in script:
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            for step in (turn.get('do') or []) if isinstance(turn, dict) else []:
+                if isinstance(step, list) and len(step) > 1 and step[0] == 'hide' and isinstance(step[1], str) and step[1].startswith('@'):
+                    hiders[step[1][1:]] = turn.get('who')
     voices = []                                             # { key, file, text }
 
     def step_code(step, where, actor=None):
@@ -1057,6 +1068,9 @@ def main():
         options = []
         if mood and 'say' in turn: options.append(f'mood: {js(mood)}')
         if scene.get('layout') == 'presenter' and width >= height and not who['_pet']: options.append(f"hand: {js('L' if float(who['x']) > width / 2 else 'R')}")
+        elif not who['_pet'] and who['name'] in hiders and hiders[who['name']] in names:
+            pet = names[hiders[who['name']]]
+            options.append(f"hand: {js('L' if float(pet['_x0']) > float(who['x']) else 'R')}")
         spoken_mood = (', { ' + ', '.join(options) + ' }') if options and 'say' in turn else ''
         # `"phone": true` — câu nói của lượt này nói QUA ĐIỆN THOẠI: nhấc máy áp lên má trước, đặt xuống sau lượt.
         phone = turn.get('phone')
@@ -1539,7 +1553,7 @@ def main():
             if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
                 licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
                 entry['view'] = ({'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
-                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.74 if 'rollOver' in acts else 0.7 if 'chaseTail' in acts else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
+                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
             view_of(entry, where)
             if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
@@ -1613,9 +1627,9 @@ def main():
                 person = names.get(licked[0][1][1:])
                 if arms.get(person['name']) != entry['who']:
                     times = licked[0][2] if len(licked[0]) > 2 and isinstance(licked[0][2], (int, float)) else 4
-                    low = False          # đợt 35, lượt hai: người đứng, con vật chồm lên liếm (quỳ thì ống chân rút ngắn trông như lún xuống sàn)
-                    hand = step_code(['offerHand', '@' + entry['who'], round(0.3 + times * 0.36, 2)], where, person['name'])
-                    lead = 0.65 if low else 0
+                    low = stage_set is not None and not person.get('seated') and not names[entry['who']].get('on')      # lượt bốn: quỳ xuống ngang mõm con vật (chồm lên thì lơ lửng)
+                    hand = step_code(['offerHand', '@' + entry['who'], round(0.9 + times * 0.8, 2)], where, person['name'])
+                    lead = 0.65 if low else 0.6          # lượt bốn: bàn tay tới trước mõm rồi con vật mới liếm (tay không bật ra giữa lúc liếm)
                     pet_code = code if not lead else code.replace(f"[{names[entry['who']]['name']}, ", f"[{names[entry['who']]['name']}, {lead}, ", 1)
                     code = '{ together: [' + pet_code + f", [{person['name']}, " + ("'kneel', " if low else '') + hand + (", 'standUp'" if low else '') + ']] }'
                     gear_ops.append({'turn': emitted[0] + 1, 'kind': 'offerHand', 'who': person['name'], 'target': entry['who']})

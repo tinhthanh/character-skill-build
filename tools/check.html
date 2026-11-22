@@ -1813,7 +1813,7 @@ try {
         const apart = Math.min(...[boy.el.coTayL, boy.el.coTayR].map((hand) => { const palm = hand.getBoundingClientRect(); return Math.max(0, palm.left - muzzle.right, muzzle.left - palm.right, palm.top - muzzle.bottom, muzzle.top - palm.bottom); }));
         if (apart > 12) hong('offerHand', `the offered hand is ${apart.toFixed(0)} px from the dog's head`);
         if (!(dog.s.luoi > 0.2 && dog.s.liem > 0.9)) hong('lick', 'the long tongue is not out while licking');
-        if (!(dog.s.truocY < -25 && dog.s.tnNhac > 0.9)) hong('lick', 'the dog does not rear up to lick a standing person\'s hand');
+        if (!(dog.s.tnNhac < 0.1 && dog.s.txNhac < 0.1)) hong('lick', 'the dog should stand on all fours to lick the hand held out to it (rearing up read as floating)');
         offer.kill(); licking.kill(); dog.datNghi();
         const run = L.sequence(dog, [['hide', boy]], { breathe: false });
         run.progress(1);

@@ -456,7 +456,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : part === 'chin' ? 0.8 : 0.5;          // 'chin' (đợt 35): dưới cằm — tay chìa cho liếm
         let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         // 'tongue' (đợt 35, lượt hai): ngay dưới đầu lưỡi con vật lúc liếm — lòng bàn tay chìa ra ở đó (`offerHand`).
-        if (part === 'tongue' && typeof to.lickPoint === 'function') { const q = to.lickPoint(of(from).spot.x < f.x ? -1 : 1, { rear: !(from.s && from.s.seat > 0.5) }); hx = q.x; hy = q.y + 1; }
+        if (part === 'tongue' && typeof to.lickPoint === 'function') { const q = to.lickPoint(of(from).spot.x < f.x ? -1 : 1); hx = q.x; hy = q.y + 7; }
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
