@@ -807,8 +807,9 @@ class RigSVG {
                 <rect x="-2.9" y="0" width="5.8" height="9" rx="1" fill="#1d2b33"/><path d="M -1.6 2.4 h 3.2 M -1.6 4.6 h 3.2 M -1.6 6.8 h 2" stroke="#7dffb0" stroke-width="1"/>
                 <circle cx="0" cy="14" r="2" fill="#2f9e8f"/><path d="M -2 22 L -1 36 Q 0 38.5 1 36 L 2 22 Z" fill="#c9d1d9" stroke="#3d4b58" stroke-width="1"/></g>
               <!-- VIÊN THUỐC TO (\`givePill\`, đợt 35): trắng, viền đậm, kẹp giữa ngón cái và ngón trỏ ở đầu bàn tay — đủ to để thấy ở góc trung. -->
-              <g data-gadget="7" transform="translate(0 25) rotate(90)"><ellipse data-pill cx="0" cy="0" rx="10" ry="6" fill="#ffffff" stroke="#3d4b58" stroke-width="1.6"/>
-                <path d="M -6 -1.5 Q 0 -4 6 -1.5" stroke="#d5dde3" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
+              <g data-gadget="7" transform="translate(0 27) rotate(90)"><rect data-pill x="-15" y="-8" width="30" height="16" rx="8" fill="#ffffff" stroke="#1f2a33" stroke-width="2"/>
+                <path d="M 0 -8 H 7 A 8 8 0 0 1 7 8 H 0 Z" fill="#e8553f" stroke="#1f2a33" stroke-width="2"/>
+                <path d="M -9 -3.5 H -3" stroke="#d5dde3" stroke-width="2" stroke-linecap="round"/></g>
             </g></g>
         </g>
       </g>`;
@@ -1415,6 +1416,7 @@ class RigSVG {
     this.#drawBall();
     this.#drawNote();
     this.#drawReadout();
+    this.#drawScales();
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
   }
   mark(kind = null) {
@@ -1450,7 +1452,7 @@ class RigSVG {
       const hand = e['coTay' + r.side], ctm = hand && hand.getScreenCTM(), root = this.svg.getScreenCTM();
       if (!ctm || !root) { e.readout.style.display = 'none'; return; }
       const p = new DOMPoint(0, 0).matrixTransform(ctm).matrixTransform(root.inverse());
-      x = p.x + (r.side === 'L' ? -1 : 1) * 72; y = p.y - 50;          // cạnh bàn tay, lệch hẳn ra ngoài: không che mặt
+      x = p.x + (r.side === 'L' ? -1 : 1) * 105; y = p.y - 62;          // cạnh bàn tay, lệch hẳn ra ngoài: không che mặt
     }
     const text = e.readout.querySelector('[data-readout]');
     if (text.textContent !== r.text) text.textContent = r.text;
@@ -2873,8 +2875,20 @@ class RigSVG {
     this.#khep(t, 0.5, 1.85, { ['plunger' + k]: 0, ...(stowed ? { ['item' + k]: 0 } : {}) });
     return t;
   }
-  static TEMP_POSE = [35, 135];            // giơ nhiệt kế lên cạnh vai (khuỷu hạ, cẳng tay dựng — như đếm ngón): đầu đo chĩa lên, thẻ số bên đầu
+  static TEMP_POSE = [40, 145];            // giơ nhiệt kế lên SÁT MẶT, ngang cằm (khuỷu hạ sát sườn, cẳng tay gập dựng): đầu đo chĩa lên, thẻ số bên đầu
+  static TEMP_READ = 1.6;                  // giữ dáng đọc nhiệt kế bấy nhiêu giây (đợt 35, lượt ba: ≥ 1,2 s)
+  static TEMP_TURN = 0.45;                 // lúc đọc: QUAY người / mặt 3/4 về phía nhiệt kế (chỉ liếc mắt thì ở góc trung không đọc ra)
   static WEIGH_READING = '4.2 kg';         // số cân khi không ai cho (`reading`), và cân không ghi số
+  static zeroReading(text) { return String(text).replace(/\d+(?:([.,])\d+)?/, (all, mark) => (mark ? '0' + mark + '0' : '0')); }
+  #drawScales() {
+    if (!this.scaleShows) return;
+    const s = this.s;
+    for (const item of this.scaleShows) {
+      const on = this.carried && this.carried.pet === item.pet && s.om >= 0.5 && s.omScale >= 0.5 && s.omRise < 0.5;
+      const want = on ? item.text : item.zero;
+      if (item.el.textContent !== want) item.el.textContent = want;
+    }
+  }
   #reading(entry) {
     this.readings = this.readings || [];
     const key = JSON.stringify(entry), found = this.readings.findIndex((item) => JSON.stringify(item) === key);
@@ -2890,9 +2904,9 @@ class RigSVG {
     const r = svg.getBoundingClientRect(), inv = this.svg.getScreenCTM().inverse();
     const top = new DOMPoint(r.left + r.width / 2, r.top + r.height * (458 - 17) / 470).matrixTransform(inv);
     const label = svg.querySelector('text');
-    return { x: top.x, y: top.y, text: label ? label.textContent : null };
+    return { x: top.x, y: top.y, text: label ? label.getAttribute('data-reading') || label.textContent : null };
   }
-  weigh(pet, scale = null, { reading = null, hold = 1.6 } = {}) {
+  weigh(pet, scale = null, { reading = null, hold = 1.6, display = null } = {}) {
     if (!pet || !pet.svg || typeof pet.apDung !== 'function' || !pet.el || !pet.el.dau || pet instanceof RigSVG) throw new Error('[character] weigh(pet, scale): pet must be a pet rig (createPet(...).rig)');
     if (this.s.om >= 0.5) throw new Error('[character] weigh: already carrying a pet — putDown() first, or weigh it before picking it up');
     if (reading !== null && typeof reading !== 'string') throw new Error(`[character] weigh: reading must be a string such as '4.2 kg', got ${JSON.stringify(reading)}`);
@@ -2908,6 +2922,15 @@ class RigSVG {
     const side = home.tx >= HONG.x ? 1 : -1, spot = this.#scaleSpot(scale, side);
     c.scale = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
     const n = this.#reading({ text: reading || spot.text || RigSVG.WEIGH_READING, x: spot.x, y: c.scale.y + (crown - offY - c.from.y) - 8 });
+    const shown = display || (scale && (scale.svg || scale.querySelector) ? scale : null);
+    const screen = shown && (shown.svg || shown).querySelector && (shown.svg || shown).querySelector('svg[data-prop="scale"] text, text');
+    if (shown && !screen) throw new Error('[character] weigh: display must be a "scale" prop made with a reading (createProp(host, "scale", { reading: "0.0 kg" }))');
+    if (screen) {
+      if (!screen.hasAttribute('data-reading')) screen.setAttribute('data-reading', screen.textContent);
+      const text = reading || spot.text || RigSVG.WEIGH_READING, zero = RigSVG.zeroReading(text);
+      this.scaleShows = (this.scaleShows || []).filter((item) => item.el !== screen).concat([{ el: screen, pet, text, zero }]);
+      if (screen.textContent !== zero) screen.textContent = zero;
+    }
     const was = { seat: s.seat, kneel: s.kneel };
     s.seat = 1; s.kneel = 1;
     const onScale = this.#reachLow({ x: spot.x, y: spot.y - (feetY - crown) * 0.45 }, null, 'body');
@@ -2951,13 +2974,14 @@ class RigSVG {
     t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
     const up = 0.6 + hold;
     t.to(s, { ['ovBat' + k]: RigSVG.TEMP_POSE[0], ['ovCang' + k]: RigSVG.TEMP_POSE[1], duration: 0.02 }, up);
-    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: 1.5, seat: reach.crouch ? N.seat : s.seat, than: N.than, dau: N.dau + m * 12, dauY: 6, nhinX: m * 4, nhinY: 2.8, matY: 0.25,
+    const R = RigSVG.TEMP_READ, facing = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
+    t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: 1.7, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than, dau: N.dau + m * 10, dauY: 10, nhinX: m * 2.8, nhinY: 4.6, matY: 0.3,
               cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
     t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
     t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, up + 0.32);
-    t.to(s, { dauY: 11, cuoi: 0.95, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, up + 1.15);
-    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, up + 1.55);
-    this.#khep(t, 0.45, up + 1.75);
+    t.to(s, { dauY: 13, cuoi: 0.95, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, up + 0.45 + R * 0.75);
+    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, up + 0.45 + R);
+    this.#khep(t, 0.45, up + 0.65 + R);
     return t;
   }
   #armTo(k, x, y, huong, drop = 0) {
@@ -6363,6 +6387,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
         let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         if (part === 'chin' && box) hy = box.y + box.height * 0.92;
+        if (part === 'rear' && box) hy = box.y + box.height * 0.52;                     // hông (mèo ngồi: giữa khung là ngực — lượt ba)
         const lips = part === 'lips' && to.el && to.el.moi ? lipsOf(to) : null;
         if (lips) { hx = lips.x; hy = lips.y; }
         if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
@@ -6785,8 +6810,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
       };
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
+      const mixedClose = wanted.some((actor) => actor.rig && typeof actor.rig.seatY === 'function') && wanted.some((actor) => actor.rig && typeof actor.rig.seatY !== 'function');
       const regionOf = (m) => {
         const h = m.top - m.base;
+        if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
@@ -6805,7 +6832,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
-      const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      const fill = (size === 'close' && mixedClose && !tall ? 0.8 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
@@ -7223,10 +7250,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const eyes = ['L', 'R'].map((side) => { const eye = e['mat' + side], pupil = e['nguoi' + side];               // tròng mắt, con ngươi (rig-svg: `mat`, `nguoi`)
             const a = centre(eye), b = centre(pupil); return a && b ? { side, eye: a, pupil: b } : null; }).filter(Boolean);
           const gadgets = ['L', 'R'].map((side) => { const kind = Math.round(rig.s['gadget' + side] || 0), g = e['gadget' + side];
-            const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown); return c ? { side, kind, ...c } : null; }).filter(Boolean);
-          out[name] = { person: true, eyes, gadgets, tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
-        } else out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi) };
+            const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown);
+            const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
+          const head = centre(e.dau);
+          out[name] = { person: true, eyes, gadgets, head, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+        } else {
+          const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
+          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+        }
       }
+      out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
+      out['@H'] = view.clientHeight;
       return out;
     },
     paws() {

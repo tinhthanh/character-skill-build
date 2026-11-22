@@ -525,6 +525,15 @@ def check_weigh(folder, c, frames, scales):
                 'note': (f'paws {worst[1] * 100:.1f} % of height off the top of the scale at {worst[0]:g} s (limit {ON_SCALE * 100:g} %)' if worst[1] is not None else f'{c["target"]} is not over a scale at {worst[0]:g} s')})
     out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} in the frame', 'ok': seen_least[1] >= 0.7,
                 'note': f'{seen_least[1] * 100:.0f} % of {c["target"]} in the frame at {seen_least[0]:g} s (least 70 %)'})
+    # MÀN HÌNH CÂN (đợt 35, lượt ba): số cân khi con vật đứng trên bệ, số 0 trước khi đặt lên và sau khi bế ra.
+    if c.get('reading') and c.get('empty'):
+        texts = lambda t: (scales.get(('care', float(t))) or {}).get('@scales') or []
+        shown = [t for t in c['times'] if c['reading'] in texts(t)]
+        zero = [t for t in c['empty'] if texts(t) and all(not any(ch in text for ch in '123456789') for text in texts(t))]
+        ok = len(shown) == len(c['times']) and len(zero) == len(c['empty'])
+        out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — the scale shows the weight only while {c["target"]} is on it', 'ok': ok,
+                    'note': f'"{c["reading"]}" at {len(shown)} of {len(c["times"])} moments on the scale; 0 at {len(zero)} of {len(c["empty"])} moments off it'
+                            + ('' if ok else f' (display: {", ".join(f"{t:g} s {texts(t)}" for t in c["times"] + c["empty"])})')})
     return out
 
 
@@ -584,8 +593,41 @@ def check_look(folder, c, scales):
             bad = angle > LOOK or shift < LOOK_SHIFT
             if worst is None or (bad and not worst[3]) or (bad == worst[3] and angle > worst[1]): worst = (t, angle, shift, bad)
     if worst is None: return [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': None, 'note': 'no thermometer in the hand at the moments asked'}]
-    return [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': not worst[3],
-             'note': f'pupils turned {worst[1]:.0f}° off the thermometer, shifted {worst[2] * 100:.0f} % of the eye width at {worst[0]:g} s (limit {LOOK}°, least {LOOK_SHIFT * 100:g} %)'}]
+    out = [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': not worst[3],
+            'note': f'pupils turned {worst[1]:.0f}° off the thermometer, shifted {worst[2] * 100:.0f} % of the eye width at {worst[0]:g} s (limit {LOOK}°, least {LOOK_SHIFT * 100:g} %)'}]
+    # Lượt ba: QUAY mặt về phía nhiệt kế (|huong| ≥ 0,3, cùng phía) và nhiệt kế SÁT MẶT (tâm nó cách tâm đầu ≤ 0,8 bề ngang đầu), ở cả
+    # ba lúc — trải ≥ 1,2 s.
+    bad, seen = [], []
+    for t in c['times']:
+        who = (scales.get(('care', float(t))) or {}).get(c['who']) or {}
+        tool = next((g for g in who.get('gadgets', []) if g['kind'] == c['gadget']), None)
+        head = who.get('head')
+        if not tool or not head: bad.append(f'{t:g} s: no thermometer'); continue
+        side = 1 if tool['x'] > head['x'] else -1
+        near = ((tool['x'] - head['x']) ** 2 + (tool['y'] - head['y']) ** 2) ** 0.5 / max(1, head['w'])
+        tilt, drop = who.get('tilt', 0) * side, who.get('drop', 0)
+        H = (scales.get(('care', float(t))) or {}).get('@H') or frame_size(folder)[1]
+        face, tool_px = head['w'] / H, max(tool.get('w', 0), tool.get('h', 0)) / H
+        seen.append((near, tilt, drop, face, tool_px))
+        if face < FACE_FRAME or tool_px < TOOL_FRAME: bad.append(f'{t:g} s: face {face * 100:.0f} % and thermometer {tool_px * 100:.0f} % of the frame height')
+        if who.get('turn', 0) * side < TURN_TO: bad.append(f'{t:g} s: turned {who.get("turn", 0):+.2f}')
+        if near > NEAR_FACE: bad.append(f'{t:g} s: thermometer {near:.2f} head widths from the face')
+        if tilt < HEAD_TILT or drop < HEAD_DROP: bad.append(f'{t:g} s: head tilted {tilt:+.0f}°, lowered {drop:+.1f} toward it')
+    span = c['times'][-1] - c['times'][0]
+    out.append({'scene': folder, 'what': f'{c["who"]} turns to the thermometer held by the face', 'ok': not bad and span >= READ_HOLD - 1e-6,
+                'note': ('; '.join(bad) if bad else f'face turned and head bent to it, the thermometer by the face at all {len(c["times"])} moments') + f' over {span:.1f} s'
+                        + (f' — farthest {max(x[0] for x in seen):.2f} head widths, least tilt {min(x[1] for x in seen):+.0f}°, least lowering {min(x[2] for x in seen):+.1f}, face ≥ {min(x[3] for x in seen) * 100:.0f} %, thermometer ≥ {min(x[4] for x in seen) * 100:.1f} % of the frame height' if seen else '')
+                        + f' (least {READ_HOLD:g} s; turn ≥ {TURN_TO:g}, within {NEAR_FACE:g} head widths, tilt ≥ {HEAD_TILT:g}°, lowered ≥ {HEAD_DROP:g}, face ≥ {FACE_FRAME * 100:g} %, thermometer ≥ {TOOL_FRAME * 100:g} %)'})
+    return out
+
+
+TURN_TO = 0.3         # đọc nhiệt kế: người quay 3/4 về phía nó (`huong`)
+NEAR_FACE = 0.8       # … nhiệt kế cách tâm đầu ≤ 0,8 bề ngang đầu
+READ_HOLD = 1.2       # … giữ ≥ 1,2 s
+HEAD_TILT = 8         # … đầu nghiêng về phía nó ≥ 8°
+HEAD_DROP = 8         # … và cúi xuống ≥ 8 đơn vị khung (`dauY`) — lượt hai: 6
+FACE_FRAME = 0.44     # … góc cận: mặt người (bề ngang đầu) ≥ 44 % chiều cao khung — lượt hai (góc trung): 35 % / 42 %, Gemini không đọc ra
+TOOL_FRAME = 0.085    # … và nhiệt kế (cạnh dài) ≥ 8,5 % chiều cao khung — lượt hai: 7,2 % / 8,2 %
 
 
 PILL_AT = 0.05        # viên thuốc cách môi con vật ≤ 5 % chiều cao người …
@@ -605,16 +647,28 @@ def check_pill(folder, c, scales):
     else:
         out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': False, 'note': f'no pill in the hand (or no lips) at {mid:g} s'})
     opens = [((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('mouth', 0) for t in c['times']]
-    out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — mouth open for the pill', 'ok': min(opens) >= MOUTH_OPEN,
-                'note': f'mouth open {min(opens):.2f} at least over {c["times"][0]:g}–{c["times"][-1]:g} s (least {MOUTH_OPEN:g})'})
+    out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — mouth open for the pill', 'ok': min(opens) >= MOUTH_OPEN and c['times'][-1] - c['times'][0] >= 0.8 - 1e-6,
+                'note': f'mouth open {min(opens):.2f} at least over {c["times"][0]:g}–{c["times"][-1]:g} s (least {MOUTH_OPEN:g}, over ≥ 0.8 s)'})
+    # Lượt ba — CỠ TRÊN KHUNG ở lúc được hỏi: mặt con vật ≥ 15 % chiều cao khung, viên thuốc (cạnh dài) ≥ 1/3 bề ngang mõm (nét môi),
+    # hàm há ≥ 12 % chiều cao đầu nó.
+    H = care.get('@H') or frame_size(folder)[1]
+    if pet and pill:
+        face, lips, jaw, size = pet.get('face', 0), pet.get('lipsW', 0), pet.get('jaw', 0), max(pill.get('w', 0), pill.get('h', 0))
+        ok = face / H >= FACE_SHARE and lips > 0 and size >= lips / 3 and face > 0 and jaw / face >= JAW_OPEN
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — big enough on screen', 'ok': ok,
+                    'note': f'at {mid:g} s: {c["target"]}\'s face {face / H * 100:.0f} % of the frame height (least {FACE_SHARE * 100:g} %), pill {size:.0f} px vs mouth {lips:.0f} px (least 1/3), jaw open {jaw:.0f} px = {jaw / max(1, face) * 100:.0f} % of its head (least {JAW_OPEN * 100:g} %)'})
     return out
+
+
+FACE_SHARE = 0.15     # cho thuốc: mặt con vật ≥ 15 % chiều cao khung (góc cận)
+JAW_OPEN = 0.12       # … hàm há ≥ 12 % chiều cao đầu nó
 
 
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
-    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('frames', [])] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('frames', []) + c.get('empty', [])] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:

@@ -780,15 +780,17 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('care35: the scene does not build: ' + done.stderr.strip()[:300])
     else:
         html = open(os.path.join(work, 'care35', 'index.html'), encoding='utf-8').read()
-        for needle in ("['weigh', cho, set.targetPoint(bac_si, [-120, 27.3, -560]), {\"reading\": \"9.6 kg\"}]", 'set.target(bac_si, cho, "rear")', "[cho, ['face', \"right\"]]",
-                       "['openMouth', 0.8], ['chew', 4]", 'set.target(bac_si, cho, "lips")'):
+        for needle in ('[\'weigh\', cho, set.targetPoint(bac_si, [-120, 27.3, -560]), { reading: "9.6 kg", display: cutout2Prop }]', '"scale", {"reading": "0.0 kg"}', 'set.target(bac_si, cho, "rear")', "[cho, ['face', \"right\"]]",
+                       "['openMouth', 1.1], ['chew', 3]", 'set.target(bac_si, cho, "lips")'):
             if needle not in html: problems.append(f'care35: {needle} is not in the composition')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'care35')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('care35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         else:
             # Lượt hai (đợt 35): con vật không tự nhảy chỗ suốt bước cân, mắt nhìn nhiệt kế lúc đọc, viên thuốc ở môi lúc miệng con vật há.
             for needle in ('bac_si weighs cho — cho on the scale', 'bac_si carry cho — hand reaches', 'bac_si takeTemp cho — hand reaches', 'bac_si givePill cho — hand reaches', 'cho in view at',
-                           'bac_si weighs cho — cho never jumps', 'bac_si looks at the thermometer', 'bac_si givePill cho — pill at the mouth', 'bac_si givePill cho — mouth open for the pill'):
+                           'bac_si weighs cho — cho never jumps', 'bac_si looks at the thermometer', 'bac_si givePill cho — pill at the mouth', 'bac_si givePill cho — mouth open for the pill',
+                           # lượt ba: màn hình cân đồng bộ, đọc nhiệt kế ở góc cận (mặt quay, cúi, nhiệt kế sát mặt), viên thuốc / mặt / miệng đủ to trên khung
+                           'the scale shows the weight only while cho is on it', 'bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen'):
                 if needle not in done.stdout: problems.append(f'care35: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
 
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %

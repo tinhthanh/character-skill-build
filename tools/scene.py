@@ -100,7 +100,8 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
                Exam room: ["weigh", "@pet", "<scale cutout name>"] (picks the pet up, sets it on a set.cutouts "scale" with a
                "name" — stand it beside the person, same z ±60 — reads the number, a big display pops up with the scale's
-               "reading", puts the pet back; optional 4th { "reading": "4.2 kg", "hold": 1.6 }); ["takeTemp", "@pet"] (a
+               "reading", the scale's own display reads 0 until the pet is on it; puts the pet back; optional 4th
+               { "reading": "4.2 kg", "hold": 1.6 }); ["takeTemp", "@pet"] (a
                thermometer to the pet's rear, held 1.5 s, then read: { "reading": "38.5°C" } as 3rd argument after the hold,
                e.g. ["takeTemp", "@pet", 1.5, { "reading": "39.2°C" }]); ["givePill", "@pet"] (one hand holds the head, the
                other puts a pill in its mouth — the pet opens its mouth and chews by itself; both hands must be free).
@@ -470,12 +471,12 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if op['kind'] == 'takeTemp' and reach:
                 # ĐỌC NHIỆT KẾ (đợt 35): mắt nhìn vào nhiệt kế đang giơ lên (lúc 0,6 + hold + 0,6 / 0,9 / 1,2 s của bước).
                 up = float(reach['start']) + 0.6 + float(op.get('hold', 1.5))
-                look = [round(up + f, 2) for f in (0.6, 0.9, 1.2)]
+                look = [round(up + f, 2) for f in (0.6, 1.2, 1.8)]           # lượt ba: giữ dáng đọc ≥ 1,2 s — đo đầu, giữa, cuối quãng ấy
                 moments.append({'t': look[1], 'what': f'{op["who"]} reads the thermometer', 'ask': [f'Is {op["who"]} looking at the thermometer in their raised hand, with the temperature shown beside it?'],
                                 'check': {'kind': 'look', 'who': op['who'], 'gadget': 6, 'times': look}})
             if op['kind'] == 'givePill' and reach:
                 # VIÊN THUỐC VÀO MÕM (đợt 35): viên thuốc ở môi con vật và miệng nó đang há (0,8 / 0,95 / 1,1 s của bước).
-                pill = [round(float(reach['start']) + f, 2) for f in (0.8, 0.95, 1.1)]
+                pill = [round(float(reach['start']) + f, 2) for f in (0.6, 1.0, 1.4)]        # miệng há suốt ≥ 0,8 s quanh lúc viên thuốc vào (1,0 s)
                 moments.append({'t': pill[1], 'what': f'{op["who"]} puts a pill in {op["target"]}\'s mouth', 'ask': [f'Is a white pill at the mouth of the animal ({op["target"]}), with its mouth open?'],
                                 'check': {'kind': 'pill', 'who': op['who'], 'target': op['target'], 'times': pill}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
@@ -494,7 +495,9 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                             'check': {'kind': 'carry', 'who': op['who'], 'target': op['target'], 'to': 'body', 'times': pick, 'only': 'reach'}})
             moments.append({'t': read[1], 'what': f'{op["who"]} weighs {op["target"]}', 'ask': [f'Is the animal ({op["target"]}) standing on the scale, with its weight shown on a display above it?',
                                                                                             f'Is {op["who"]} standing up looking at the scale?'],
-                            'check': {'kind': 'weigh', 'who': op['who'], 'target': op['target'], 'times': read, 'frames': track}})
+                            'check': {'kind': 'weigh', 'who': op['who'], 'target': op['target'], 'times': read, 'frames': track,
+                                      # MÀN HÌNH CÂN (lượt ba): số cân lúc đọc, số 0 trước khi đặt lên và sau khi bế ra
+                                      'reading': op.get('reading'), 'empty': [round(t0 + 0.3, 2), round(t0 + 2.85 + hold + 1.3, 2)]}})     # trước khi đặt lên; đã bế lên trước bụng
             continue
         if op['kind'] == 'reaction':
             # PHẢN ỨNG CỦA CON VẬT (đợt 33): ở 30 / 50 / 70 % lượt nó thấy được trong khung; `start` / `end` để `acting_check` xét góc chèn
@@ -1016,10 +1019,13 @@ def main():
             if abs(float(scale['z']) - float(names[actor].get('z', -300))) > 60:
                 fail(f'{where}: the scale "{step[2]}" stands at z {float(scale["z"]):g}, "{actor}" at z {float(names[actor].get("z", -300)):g} — the pet is set down in the person\'s own plane: give the scale the same z (within 60)')
             tall = float(scale.get('height', round(person_default)))
-            reading = options.get('reading', scale.get('reading'))
+            reading = options.get('reading', scale.get('reading')) or '4.2 kg'
             extra = {key: value for key, value in (('reading', reading), ('hold', options.get('hold'))) if value is not None}
             point = f"set.targetPoint({actor}, [{float(scale['x']):g}, {float(scale.get('y', 0)) + tall * 17 / 470:.1f}, {float(scale['z']):g}])"
-            return f"['weigh', {pet}, {point}" + (f", {js(extra)}" if extra else '') + ']'
+            # MÀN HÌNH CÂN (đợt 35, lượt ba): cái cân dựng với số 0, rig ghi số cân lên nó đúng lúc con vật đứng trên bệ (`display`).
+            scale['_weighed'] = reading if not scale.get('_weighed') else scale['_weighed']
+            prop = f"cutout{stage_set['cutouts'].index(scale) + 1}Prop"
+            return f"['weigh', {pet}, {point}, {{ {', '.join(f'{key}: {js(value)}' for key, value in extra.items())}, display: {prop} }}]"
         if name == 'takeTemp':
             if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
                 fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
@@ -1342,6 +1348,10 @@ def main():
             # Bắt tay / đưa đồ giữa hai người: hai bàn tay gặp nhau ngang hông — cỡ trung cắt ngang đúng chỗ ấy (đợt 28).
             # Cân (đợt 35): con vật đặt lên cân dưới SÀN — góc toàn (thấy chân người, bệ cân).
             low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh') for step in turn.get('do', []))
+            # Cho thuốc / đo nhiệt độ (đợt 35, lượt ba): GÓC CẬN người + con vật — viên thuốc, miệng con vật, mặt người nhìn nhiệt kế chỉ
+            # vài pixel ở góc trung hai người (Gemini đọc ~1 khung / giây).
+            if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
+                return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='close')
             return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='full' if low_hands or not targets else 'medium')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
         subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
@@ -1420,7 +1430,7 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.2, 'takeTemp': 0.27}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.2, 'takeTemp': 0.24}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
@@ -1548,7 +1558,10 @@ def main():
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
                 # CÂN (đợt 35): con vật đứng trên bệ cân lúc đọc số; tay tới nó lúc bế lên.
                 if isinstance(step, list) and len(step) > 2 and step[0] == 'weigh' and isinstance(step[1], str) and step[1].startswith('@'):
-                    gear_ops.append({'turn': emitted[0], 'kind': 'weigh', 'who': turn.get('who'), 'target': step[1][1:], 'scale': step[2], 'hold': (step[3] if len(step) > 3 and isinstance(step[3], dict) else {}).get('hold', 1.6)})
+                    scale_item = next((item for item in (stage_set or {}).get('cutouts', []) if item.get('kind') == 'scale' and item.get('name') == step[2]), {})
+                    options_ = step[3] if len(step) > 3 and isinstance(step[3], dict) else {}
+                    gear_ops.append({'turn': emitted[0], 'kind': 'weigh', 'who': turn.get('who'), 'target': step[1][1:], 'scale': step[2], 'hold': options_.get('hold', 1.6),
+                                     'reading': options_.get('reading', scale_item.get('reading')) or '4.2 kg'})
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
                 # ĐỘNG TÁC TAY của người (đợt 33): moments.json đo bàn tay trong khung ở lúc được hỏi.
                 name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
@@ -1634,12 +1647,12 @@ def main():
                 if lead == 0:
                     code = '{ together: [' + code + f", [{names[fed[0]]['name']}, 0.95, ['chew', 3]]] }}"
                     emitted[0] += 1
-            # `["givePill", "@con vật"]` một mình (đợt 35): con vật HÁ MIỆNG từ ~0,55 s (há hẳn ~0,9 s, giữ tới ~1,7 s) — viên thuốc vào môi lúc
-            # 1,0 s, mất lúc 1,15 s —, rồi NHAI nuốt.
+            # `["givePill", "@con vật"]` một mình (đợt 35): con vật HÁ MIỆNG từ ~0,45 s (há hẳn ~0,75 s, giữ tới ~1,85 s — ≥ 0,8 s quanh lúc
+            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp.
             pilled = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'givePill' and isinstance(step[1], str) and step[1].startswith('@')]
             pilled = [name for name in pilled if name in names and names[name]['_pet']]
             if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):
-                code = '{ together: [' + code + f", [{names[pilled[0]]['name']}, 0.45, ['openMouth', 0.8], ['chew', 4]]] }}"
+                code = '{ together: [' + code + f", [{names[pilled[0]]['name']}, 0.35, ['openMouth', 1.1], ['chew', 3]]] }}"
                 emitted[0] += 1
             turns.append((None, code))
             emitted[0] += 1
@@ -1827,6 +1840,8 @@ def main():
                         options['image'] = name
                 for key in ('fill', 'reading', 'door'):
                     if key in item: options[key] = item[key]
+                # Cân có người cân con vật trên nó: số 0 cho tới lúc con vật đứng lên (rig `weigh` ghi số — đợt 35, lượt ba).
+                if item.get('_weighed'): options['reading'] = re.sub(r'\d+(?:([.,])\d+)?', lambda m: '0' + m.group(1) + '0' if m.group(1) else '0', str(item['_weighed']), count=1)
                 if item['kind'] == 'scooter' and item.get('facing'): options['facing'] = item['facing']
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
