@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.76.0
+
+Added — 15 ready-made actions (wave 35: three agents in parallel; every one measured by `tools/acting_check.py`
+and reviewed by Gemini 4 Hydrogen on a rendered film)
+- **Clinic, hands on the pet** (person): `weigh(pet, scale)` kneels, lifts the pet onto a floor scale, the scale and a
+  card show the weight, then puts it back; `takeTemp(pet)` holds a digital thermometer to the pet's rear, then reads it at
+  eye level beside the face (a card shows the reading); `givePill(pet)` holds the chin, puts a pill to the mouth, the pet
+  opens its mouth and chews.
+- **Clinic, tools and records** (person): `bandage(pet)` kneels and wraps the front leg with both hands, the bandage stays;
+  `putCone(pet)` lifts a recovery cone with both hands onto the pet's neck, the cone stays; `readChart()` looks down at a
+  clipboard, turns a page, looks up and nods; `showXray(film)` turns to an X-ray viewer, points at a spot, turns back to the
+  listener.
+- **Pets**: `rollOver` (dog, cat), `chaseTail` (dog: circles on the floor, then dizzy), `knead` (cat), `lick` (dog, cat:
+  a person's offered hand or cheek — `offerHand` / `offerCheek` for the person), `hide` (runs behind a person or object and
+  peeks out), `eatCarrot` (rabbit: the carrot gets shorter bite by bite).
+- All of them in scene files (`"do": ["weigh", "@pet", "<scale>"]` …), in Vietnamese scripts (`tools/script.py`: "cân",
+  "đo nhiệt độ", "cho uống thuốc", "băng chân", "đeo loa", "đọc bệnh án", "chỉ phim X-quang" …), the action catalog, the
+  test page and `tools/check_scene.py` (CI scenes `care35`, the clinic tools scene and `pets35`). 88 person actions.
+- `tools/acting_check.py` measures more: a pet that jumps place without a hand on it; where the person looks (thermometer,
+  listener) and how far the head bends to read; the pill at the mouth and the mouth open; tools appearing only where the
+  hands are; hands on target at several moments of an action, not one; a pet's own action shot close enough to see
+  (pet ≥ 35 % of the frame height); the lick reaching the hand or cheek; turns of `chaseTail`; paw lift of `knead`.
+- Pet actions and close-up reactions cut to a close shot automatically; key poses hold ≥ 1 s so a sparse viewer (about one
+  frame a second) still sees them.
+
+Review — Gemini 4 Hydrogen on the trial films (`/Users/vetgo/Movies/character-skill-trials/dot35/`), per pass:
+clinic hands-on (s1) 8 → 10 → 7 → 8 / 16; clinic tools (s2) 4 → 6 → 7 / 9; pets (s3) 3 → 2 → 6 → 6 / 8. The first passes
+showed the result without the action (a bandage or cone appearing, a pill vanishing) and pets too small in a wide shot;
+`acting_check` passed them — the new measurements above catch both.
+
+Known
+- `takeTemp`: the reviewer still says the person "looks at the camera" while reading — the eyes turn, the head barely does.
+  Needs a real `lookAt(point)` for heads and eyes in the person rig.
+- `givePill`: the pet's open mouth is too small to read at clinic shot sizes ("mouth stays closed, no chewing") — the pet
+  rig needs a wider, longer mouth-open pose.
+- `readChart`: the page turn is seen in one pass, missed in the next (borderline at one frame a second).
+- `bandage`: in the last pass one hand reaches the leg, the other bends across the chest.
+- `knead`: paw lift is borderline (passed in one pass, missed in the next).
+- Minor: a cone floats a beat before the hands take it; the person's arm rests over the cat after `putCone`; frame edges cut
+  a person in a few close shots (00:50 of the clinic-tools film, the boy's head in the pets film).
+
 ## 0.75.0
 
 Added — riding a scooter
