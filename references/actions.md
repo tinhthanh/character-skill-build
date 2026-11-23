@@ -180,7 +180,7 @@ viewer. `walk` with a negative distance turns the animal round first.
 | `tremble` | `(hold = 2)` | crouch low, ears pinned, tail tucked, eyes wide, shaking all over — scared of the vet, of fireworks | `hold` + 0.75 |
 | `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
 | `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
-| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
+| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — the lower jaw drops below the chin (about a third of the head), tongue and small fangs show; held the whole `hold` — for `examine(pet, 'teeth')` and `givePill` | `hold` + 0.65 |
 | `shakeOff` | — | shake the whole body from head to tail, ears flapping, water drops flying off — after a bath | 1.25 |
 | `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
@@ -219,7 +219,7 @@ stand them up first:
 | `tremble` | `(hold = 2)` | crouch low, ears pinned, tail tucked, eyes wide, shaking all over — scared of the vet, of fireworks | `hold` + 0.75 |
 | `eat` / `drink` | `(dur = 2)` | head down to a bowl on the floor in front (the `bowl` prop), chewing / lapping | `dur` + 0.8 |
 | `cough` | `(times = 3)` | neck forward, a jolt of the chest and an open mouth for each cough | 0.8 + 0.5 × `times` |
-| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — for `examine(pet, 'teeth')` | `hold` + 0.65 |
+| `openMouth` | `(hold = 1.2)` | chin up, mouth wide open — the lower jaw drops below the chin (about a third of the head), tongue and small fangs show; held the whole `hold` — for `examine(pet, 'teeth')` and `givePill` | `hold` + 0.65 |
 | `shakeOff` | — | shake the whole body from head to tail, ears flapping, water drops flying off — after a bath | 1.25 |
 | `sneeze` | — | breathe in with the head back, then a quick snap down, eyes shut, mouth open | 1.6 |
 | `pant` | `(dur = 2)` | mouth open, tongue out, fast breathing — heat, after running | `dur` + 0.65 |
@@ -230,7 +230,7 @@ stand them up first:
 | `goIn` / `comeOut` | `(distance = 90)` / `(distance = 120)` | **stance**: walk `distance` units the way it faces into a pet `carrier` and lie down there; `comeOut` gets up, turns to the door and walks out. The carrier hides the pet when it is nearer the camera (3D set: a slightly larger `z`; 2D: its host after the pet's) | about 1.5 / 2.6 |
 | `fetch` | `(distance = 260, { delay = 0.7 })` | after `delay` seconds run `distance` units the way it faces, pick a ball up in the mouth, run back to where it started, wag with the ball, drop it. Pair with a person's `throwBall` | about 4–7 |
 | `rollOver` | `(hold = 2.4)` | lie down and roll onto the back, belly up, all four paws curled in the air and pedalling, tail sweeping the floor, then roll back and get up (a cat sits again). The head is not upside down: it rests on the floor by the shoulder, face to the viewer | `hold` + 1.6 |
-| `knead` | `(times = 6)` | crouch, chest low, eyes shut, and knead: each front paw in turn lifts high, holds, and presses down, 0.6 s a press, purring (a fine tremble), tail up, a heart over the head — a blanket or a lap | 0.7 + 0.6 × `times` |
+| `knead` | `(times = 6)` | crouch, chest low, eyes shut, and knead: each front paw in turn is raised up and forward clear of the chest (a quarter of the cat's height), holds, and presses down, 0.6 s a press, purring (a fine tremble), tail up, a heart over the head — a blanket or a lap | 0.7 + 0.6 × `times` |
 | `lick` | `(target, times = 4, { face })` | lick the person `target` with a long tongue, lick after lick (0.8 s a lick, the tongue held on the hand / cheek): on the floor the pet stands on all fours and licks the palm the person holds out just in front of its muzzle (their `offerHand(pet)` at the same time — `tools/scene.py` adds it, kneeling them first in a 3D set, the pet waiting until the hand is there); carried by them, it stretches up to the cheek and licks upward (`{ face: true }` — `tools/scene.py` passes it and adds the carrier's `offerCheek`). `rig.lickPoint(side)` gives the tip of the tongue | 0.75 + 0.8 × `times` |
 | `hide` | `(target, { peeks = 2 })` | start (ears pinned, eyes wide, `!`), run behind `target` — a person rig, an element, or `{ x, y }` in its frame —, turn back, crouch and peek the head out `peeks` times, trembling; stays there. So that it is hidden: in a 3D set give the pet a z 20–40 further than the person; in 2D put the person's host after the pet's | about 1.3 + run + 1.5 × `peeks` |
 | `lieDown` / `sleep` | — / `(dur = 3)` | **stance**: lie down; `sleep` lies down, head down, eyes closed, tail curled, slow breaths, and stays lying when it wakes | 0.6 / `dur` + 1.4 |
@@ -261,8 +261,10 @@ shakeOff, sneeze, pant, yawn, rub, play, goIn / comeOut, `hide`, `wear`) plus:
 | `eatCarrot` | `(bites = 4)` | sit up and hold a carrot (it appears) to the mouth in both front paws — whole for a second —, then nibble it `bites` times (2–8), 1.1 s a bite, the carrot a clear step shorter after each bite and gone after the last; a lick of the lips | 2.05 + 1.1 × `bites` |
 | `hide` | `(target, { peeks = 2 })` | start (ears pinned, eyes wide, `!`), run behind `target` — a person rig, an element, or `{ x, y }` in its frame —, turn back, crouch and peek the head out `peeks` times, trembling; stays there. So that it is hidden: in a 3D set give the pet a z 20–40 further than the person; in 2D put the person's host after the pet's | about 1.3 + run + 1.5 × `peeks` |
 
-`chew(times = 4)`: munch what it was just given, eyes half shut, then lick the lips twice (≈ 0.8 + 0.24 ×
-`times` s). In a scene file a turn `["giveTreat", "@dog"]` on its own adds it for the pet by itself.
+`chew(times = 4)`: munch what it was just given — each chew opens the jaw wide and shuts it, 0.45 s a chew, so it
+reads at one frame a second — eyes half shut, then lick the lips twice (≈ 0.8 + 0.45 × `times` s). The wide-open
+mouth is the pet channel `gape` (0…1; `openMouth`, `chew`, `bark`, `yawn`, `eat` use it; small mouths — `meow`,
+`pant`, `cough` — still use the old `mieng`). In a scene file a turn `["giveTreat", "@dog"]` on its own adds it for the pet by itself.
 
 **Pet expressions** (every species and breed). A pet has no eyebrows, so its feelings are in
 the ears, eyes, pupils, mouth, head and tail:

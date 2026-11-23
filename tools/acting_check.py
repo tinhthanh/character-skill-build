@@ -490,7 +490,7 @@ TONGUE_GAP = 0.025     # … và (lượt hai) ĐẦU LƯỠI cách bàn tay / �
 SPIN_FLIPS = 4         # đuổi đuôi: đổi hướng trái ↔ phải ≥ 4 lần (2 vòng) trong quãng chạy vòng
 SPIN_TRAVEL = 1.0      # … và (lượt ba) đi ngang ≥ 1 thân con chó (đường kính vòng chạy ≥ một thân)
 SPIN_TURN = 1.2        # … mỗi vòng ≥ 1,2 s — người chấm xem thưa (~1 khung / giây)
-KNEAD_LIFT = 0.15      # nhào (lượt ba): mỗi bàn chân trước lên xuống ≥ 15 % chiều cao HÌNH con vật (đầu tới bàn chân)
+KNEAD_LIFT = 0.2       # nhào (lượt ba: 15 %; đợt 36: 20 % — chân giơ chéo lên trước, đo được 28 %): mỗi bàn chân trước lên xuống ≥ 20 % chiều cao HÌNH con vật
 KNEAD_BEAT = 0.5       # … mỗi lần ấn ≥ 0,5 s
 PET_SHARE = 0.35       # (lượt ba) lượt động tác riêng của thú: hình con vật cao ≥ 35 % khung ở lúc được hỏi — ở góc toàn nó chỉ ~1/12 khung
 TONGUE_LONG = 0.25     # lưỡi lúc chạm đích dài ≥ 1/4 chiều cao đầu
@@ -898,6 +898,36 @@ def check_pill(folder, c, scales):
     return out
 
 
+GAPE_MIN = 0.25       # (đợt 36) lúc viên thuốc ở môi: khoang miệng (`ham`) cao ≥ 25 % bầu đầu con vật — hình học trong khung đầu
+CHEW_OPEN = 0.15      # … nhai: một nhịp = há ≥ 15 % bầu đầu rồi khép ≤ 5 %
+CHEW_SHUT = 0.05
+CHEW_BEATS = 2        # … ≥ 2 nhịp, mỗi nhịp ≥ 0,35 s (người chấm xem thưa ~1 khung / giây)
+CHEW_BEAT = 0.35
+
+
+def check_gape(folder, c, scales):
+    """HÁ MIỆNG LỚN VÀ NHAI THẤY ĐƯỢC (đợt 36, cho thuốc): (1) ở cả ba lúc viên thuốc tới môi, khoang miệng cao ≥ 25 % bầu đầu
+    (`jawRatio` của careProbe — không tính tai, không theo cỡ cảnh); (2) quãng sau đó (`chew`, mỗi 0,1 s): ≥ 2 nhịp há ≥ 15 % rồi
+    khép ≤ 5 %, mỗi nhịp ≥ 0,35 s."""
+    out, pick = [], lambda t: ((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('jawRatio')
+    ratios = [pick(t) for t in c['times']]
+    if any(r is None for r in ratios): return out          # bộ dựng cũ: không có số đo hình học
+    out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — mouth wide open', 'ok': min(ratios) >= GAPE_MIN,
+                'note': 'jaw open ' + ' / '.join(f'{r * 100:.0f} %' for r in ratios) + f' of {c["target"]}\'s head at {c["times"][0]:g} / {c["times"][1]:g} / {c["times"][2]:g} s (least {GAPE_MIN * 100:g} % each)'})
+    series = [(t, pick(t)) for t in c.get('chew') or []]
+    series = [(t, r) for t, r in series if r is not None]
+    if series:
+        beats, state, opened = [], 'shut', None
+        for t, r in series:
+            if state == 'shut' and r >= CHEW_OPEN: state, opened = 'open', t
+            elif state == 'open' and r <= CHEW_SHUT: state = 'shut'; beats.append(opened)
+        gaps = [b - a for a, b in zip(beats, beats[1:])]
+        beat = min(gaps) if gaps else 0
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — chews visibly', 'ok': len(beats) >= CHEW_BEATS and beat >= CHEW_BEAT - 1e-6,
+                    'note': f'{len(beats)} open–shut beats (least {CHEW_BEATS}; open ≥ {CHEW_OPEN * 100:g} %, shut ≤ {CHEW_SHUT * 100:g} % of the head), shortest beat {beat:.2f} s (least {CHEW_BEAT:g}) over {series[0][0]:g}–{series[-1][0]:g} s, widest {max(r for _, r in series) * 100:.0f} %'})
+    return out
+
+
 FACE_SHARE = 0.15     # cho thuốc: mặt con vật ≥ 15 % chiều cao khung (góc cận)
 JAW_OPEN = 0.12       # … hàm há ≥ 12 % chiều cao đầu nó
 
@@ -1134,7 +1164,7 @@ def check_scene(folder):
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     # Mọi lúc cần chụp: các dải thời gian của từng phép đo (danh sách số — `reading` của cân là chữ, bỏ qua).
-    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
+    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -1201,6 +1231,7 @@ def check_scene(folder):
             continue
         if c['kind'] == 'pill':
             results.extend(check_pill(folder, c, scales))
+            results.extend(check_gape(folder, c, scales))
             continue
         if c['kind'] == 'worn':
             results.extend(check_worn(folder, c, frames))

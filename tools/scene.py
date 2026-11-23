@@ -527,7 +527,9 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                 # VIÊN THUỐC VÀO MÕM (đợt 35): viên thuốc ở môi con vật và miệng nó đang há (0,8 / 0,95 / 1,1 s của bước).
                 pill = [round(float(reach['start']) + f, 2) for f in (0.6, 1.0, 1.4)]        # miệng há suốt ≥ 0,8 s quanh lúc viên thuốc vào (1,0 s)
                 moments.append({'t': pill[1], 'what': f'{op["who"]} puts a pill in {op["target"]}\'s mouth', 'ask': [f'Is a white pill at the mouth of the animal ({op["target"]}), with its mouth open?'],
-                                'check': {'kind': 'pill', 'who': op['who'], 'target': op['target'], 'times': pill}})
+                                'check': {'kind': 'pill', 'who': op['who'], 'target': op['target'], 'times': pill,
+                                          # NHAI (đợt 36): độ há mỗi 0,1 s suốt quãng con vật nhai sau khi khép miệng (bước + 2,2 … 4,8 s; miệng khép xong lúc ~2,1 s)
+                                          'chew': [round(float(reach['start']) + 2.2 + i * 0.1, 2) for i in range(27)]}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
         if op['kind'] == 'weigh':
             # CÂN (đợt 35): lúc bế lên (0,3 / 0,4 / 0,48 s — tay tới thân con vật) và lúc đọc số (con vật đứng trên bệ cân, thẻ số đã

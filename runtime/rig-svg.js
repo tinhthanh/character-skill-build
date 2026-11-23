@@ -4570,6 +4570,7 @@ export class RigSVG {
    * (đầu ngang bụng người — trên bàn khám): cho nó `openMouth` từ ~0,55 s rồi `chew` (`tools/scene.py` tự thêm, đúng nhịp).
    */
   static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
+  static PILL_CHIN = 0.34;                 // tay đỡ dưới môi bao nhiêu bề ngang đầu con vật (đích là một điểm — bối cảnh 3D; đợt 36: 0,18 → 0,34)
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
@@ -4578,7 +4579,9 @@ export class RigSVG {
     // cho môi; cằm thấp hơn môi theo bề ngang đầu `span`).
     const lips = this.#reachLow(target, null, 'lips'), k = lips.k, other = k === 'L' ? 'R' : 'L', dir = k === 'R' ? 1 : -1;
     const point = !(target && (target.el || target.getBoundingClientRect)) && !(target && target.live && target.live.el);
-    const chinAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * 0.18 } : this.#reachLow(target, k, 'chin');
+    // Đợt 36: con vật HÁ MIỆNG LỚN (`gape` của rig thú — hàm dưới hạ ~1/3 đầu) — tay đỡ đặt dưới cái cằm ĐÃ HẠ (0,34 bề ngang đầu dưới
+    // môi; bản trước 0,18 — bàn tay vẽ đè lên đúng chỗ khoang miệng há, che mất nó).
+    const chinAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * RigSVG.PILL_CHIN } : this.#reachLow(target, k, 'chin');
     const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * lips.crouch;
     // QUAY GẦN NGHIÊNG HẲN về phía con vật (`PILL_TURN`, lượt bốn): hai vai gần như một chỗ, HAI TAY cùng vươn ra trước — tay xa đặt
     // dưới cằm, tay gần đưa viên thuốc tới mép miệng. (Lượt ba quay 0,35: tay xa vắt ngang không tới, buông ở eo.)

@@ -1944,8 +1944,9 @@ try {
         run.kill(); boy.svg.remove(); dog.svg.remove();
         const cat = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'cat' }).rig;
         const press = L.sequence(cat, [['knead', 6]], { breathe: false });
-        let lifted = 0; for (let time = 0; time <= press.duration(); time += 0.05) { press.time(time); lifted = Math.max(lifted, cat.s.tnY, cat.s.txY); }
-        if (lifted < 10) hong('knead', `the front paws do not lift and press (highest ${lifted.toFixed(1)})`);
+        // Đợt 36: chân nhấc TREO theo vai (`tnNhac` / `txNhac` = 1, chĩa chéo lên trước) thay cho dời bàn chân lên (`tnY`) — đo cả hai.
+        let lifted = 0, raised = 0; for (let time = 0; time <= press.duration(); time += 0.05) { press.time(time); lifted = Math.max(lifted, cat.s.tnY, cat.s.txY); raised = Math.max(raised, cat.s.tnNhac, cat.s.txNhac); }
+        if (lifted < 10 && raised < 0.9) hong('knead', `the front paws do not lift and press (highest ${lifted.toFixed(1)}, raised ${raised.toFixed(2)})`);
         press.progress(1); if (!(cat.s.ngoi > 0.9)) hong('knead', 'the cat does not sit back down (its rest pose)'); press.kill(); cat.svg.remove();
         const bun = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'rabbit' }).rig;
         const munch = L.sequence(bun, [['eatCarrot', 6]], { breathe: false });
