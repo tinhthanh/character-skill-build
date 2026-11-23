@@ -676,8 +676,8 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
                     out.append({'scene': folder, 'what': f'{c["target"]}\'s hand stays off {c["who"]}\'s face', 'ok': cover <= HAND_ON_FACE,
                                 'note': f'the hand covers {cover * 100:.0f} % of {c["who"]}\'s face (upper 65 % of the head) at {t:g} s (limit {HAND_ON_FACE * 100:g} %)'})
                 hop = biggest_jump(list(zip(c.get('samples', []), track)), lambda f: (lambda q: min(((h['x'], h['y']) for h in q['hands']), key=lambda h: abs(h[0] - (pet['x'] if pet.get('x') else 0))) if q and q.get('hands') else None)(f.get(c['target'])))
-                if hop: out.append({'scene': folder, 'what': f'{c["target"]}\'s hand holds steady while {c["who"]} licks', 'ok': hop[1] / person['tall'] <= JUMP,
-                                    'note': f'the hand moves at most {hop[1] / person["tall"] * 100:.1f} % of height between two frames (at {hop[0]:g} s; limit {JUMP * 100:g} %)'})
+                if hop: out.append({'scene': folder, 'what': f'{c["target"]}\'s hand holds steady while {c["who"]} licks', 'ok': hop[1] / person['tall'] <= PET_JUMP,
+                                    'note': f'the hand moves at most {hop[1] / person["tall"] * 100:.1f} % of height between two frames (at {hop[0]:g} s; limit {PET_JUMP * 100:g} %)'})
                 # Người chìa tay đứng trên sàn — hay QUỲ: hai đầu gối chạm sàn (lượt bốn; lượt hai cấm quỳ vì ở góc toàn ống chân rút ngắn
                 # trông như lún, ở góc cận con vật đầu gối thấy rõ chạm sàn).
                 if person.get('kneel'):
@@ -1120,6 +1120,9 @@ def check_people_framed(folder, moments, shots):
         for a in shots.get(float(m['t']), []):
             b = a.get('body')
             if not a.get('person') or not b or b['x1'] <= b['x0']: continue
+            # Người làm NỀN trong góc cận riêng con vật (đợt 35 · s3: chó lăn ngửa, đuổi đuôi — góc cận được cắt người khác): đầu đã
+            # ra ngoài mép trên thì người ấy không phải chủ thể của khung — không tính là "lẹm mép" (gộp đợt 35).
+            if a.get('headBox') and a['headBox']['y1'] <= 0: continue
             seen = (min(b['x1'], W) - max(b['x0'], 0)) / (b['x1'] - b['x0'])
             if PERSON_CUT[0] <= seen <= PERSON_CUT[1]: cut.append(f'{a["name"]} {seen * 100:.0f} % ({"left" if b["x0"] < 0 else "right"} edge)')
         out.append({'scene': folder, 'what': f'people inside the frame at {m["t"]:g} s ({m.get("what", "")})', 'ok': not cut, 'note': '; '.join(cut) or 'nobody cut by the left / right edge'})
@@ -1178,8 +1181,8 @@ def check_scene(folder):
                     if not b or not who or not who.get('tall'): return None
                     return (((b['x0'] + b['x1']) / 2 - who['x']) / who['tall'], ((b['y0'] + b['y1']) / 2 - who['ground']) / who['tall'])
                 hop = biggest_jump(track, centre)
-                if hop: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — the pet moves smoothly, no jump', 'ok': hop[1] <= JUMP,
-                                        'note': f'the pet\'s body moves at most {hop[1] * 100:.1f} % of {c["who"]}\'s height between two frames, measured against {c["who"]} (at {hop[0]:g} s; limit {JUMP * 100:g} %)'})
+                if hop: results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — the pet moves smoothly, no jump', 'ok': hop[1] <= PET_JUMP,
+                                        'note': f'the pet\'s body moves at most {hop[1] * 100:.1f} % of {c["who"]}\'s height between two frames, measured against {c["who"]} (at {hop[0]:g} s; limit {PET_JUMP * 100:g} %)'})
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
             continue
