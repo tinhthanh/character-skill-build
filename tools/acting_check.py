@@ -1080,6 +1080,7 @@ def check_gaze(folder, c, shots):
 
 READ_TILT = 12        # đọc bệnh án: đầu nghiêng ≥ 12° …
 READ_DOWN = 8         # … và hạ ≥ 8 đơn vị ở mọi mốc đọc (lượt ba — Gemini 1 khung / giây: "nhìn thẳng ra trước")
+NOD_BEND = 12        # đợt 36: gật — đầu cúi ≥ 12° ở đáy
 NOD_DEEP = 14         # gật: đáy hai lần gật hạ đầu ≥ 14; giữa hai lần và lúc ngẩng ≤ 4
 
 
@@ -1099,8 +1100,11 @@ def check_reading(folder, c, shots):
     if raised and all(nods):
         up_ok = all(abs(h['tilt']) <= 3 and h['down'] <= 4 for h in raised)
         nod_ok = nods[0]['down'] >= NOD_DEEP and nods[2]['down'] >= NOD_DEEP and nods[1]['down'] <= 4
+        # Đợt 36: ĐẦU CÚI THẬT ở đáy hai lần gật (`headPitch` × 32° ≥ NOD_BEND°), ngẩng ở giữa (Gemini: "ngẩng lên có, nhưng không gật").
+        bend = [h.get('pitch', 0) * 32 for h in nods]
+        nod_ok = nod_ok and bend[0] >= NOD_BEND and bend[2] >= NOD_BEND and bend[1] <= NOD_BEND / 2
         out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': up_ok and nod_ok,
-                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP})'})
+                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP}), head bent {bend[0]:.0f}° / {bend[1]:.0f}° / {bend[2]:.0f}° (want ≥ {NOD_BEND}° / ≤ {NOD_BEND / 2:g}° / ≥ {NOD_BEND}°)'})
     else: out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': None, 'note': 'not measured'})
     return out
 

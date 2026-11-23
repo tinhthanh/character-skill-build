@@ -209,6 +209,9 @@ REACH_TIMES = {'takeTemp': (0.2, 0.28, 0.36), 'givePill': (0.3, 0.36, 0.42)}
 CARE_35 = ('weigh', 'takeTemp', 'givePill')              # động tác phòng khám đợt 35 — cùng các danh sách "với tới con vật" như khám, tiêm
 # ĐỢT 35 — dụng cụ & hồ sơ: đeo đồ cho con vật (băng / loa, còn lại trên nó), đọc bệnh án, chỉ phim X-quang.
 CARE_ACTIONS = ('bandage', 'putCone')                    # tay tới con vật + đồ đeo còn trên nó sau động tác (acting_check `worn`)
+PILL_HEAD = 0.15                                         # đợt 36: givePill — giữa thân tới đầu con chó / thỏ, × chiều cao host của nó
+CAT_SPECIES = ('cat', 'orange_cat', 'black_cat', 'white_cat', 'calico')
+CONE_BACK = 0.12                                         # đợt 36: đeo loa xong lùi ra bấy nhiêu chiều cao người
 CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ sơ trước ngực / tay chỉ trúng điểm trên phim
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
@@ -574,7 +577,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if op['kind'] == 'readChart':
                 hold = float(op.get('hold') or 2.0); flip = 0.5 + max(1.3, hold * 0.6); up = flip + 0.85 + max(1.2, hold * 0.4)
                 check.update(reading=[round(t0 + a, 2) for a in (0.7, flip - 0.5, flip + 1.0, up - 0.2)], raised=[round(t0 + up + 0.55, 2)],
-                             nods=[round(t0 + up + a, 2) for a in (1.2, 1.72, 2.2)])          # đáy lần 1 · giữa hai lần · đáy lần 2 (gật có giữ ở đáy)
+                             nods=[round(t0 + up + a, 2) for a in (1.33, 1.95, 2.58)])          # đáy lần 1 · giữa hai lần · đáy lần 2 (gật có giữ ở đáy)
                 ask = ask + [f'After pointing, does {op["who"]} turn toward {op["listener"]} (not to the camera)?']
             # HƯỚNG ĐẦU (đợt 36): đọc — đầu hướng về tấm bảng; ngẩng lên — về người nghe.
             if op['kind'] == 'readChart':
@@ -1602,6 +1605,11 @@ def main():
                 # (đo bằng tools/acting_check.py, đợt 28).
                 wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19, 'bandage': 0.16, 'putCone': 0.24}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
+                # CHO UỐNG THUỐC con chó / thỏ (đợt 36 — Gemini: "chỉ một tay gần mõm, không thấy viên thuốc" ở cảnh corgi): thân dài, ĐẦU
+                # nằm ở đầu gần người (nó quay mặt về người) — đứng 0,18 tính từ GIỮA thân là đứng đè lên đầu nó, hai bàn tay chồng lên
+                # nhau trước ngực người. Cộng thêm quãng từ giữa thân tới đầu (~0,15 chiều cao host của nó); mèo ngồi thì đầu trên ngực.
+                if step[0] == 'givePill' and target['_pet'] and str(target.get('species', '')) not in CAT_SPECIES and not who.get('seated'):
+                    wanted += PILL_HEAD * target['_host_height']
                 # BĂNG CHÂN (đợt 35, lượt hai): đứng ngang CHÂN TRƯỚC con vật (về phía đầu nó, ~0,2 × chiều cao host của nó), không ngang
                 # giữa thân — tay phía xa của người chibi không với tới chân trước, bàn tay giữ dừng ở bụng con chó (đo trên ảnh).
                 if step[0] == 'bandage' and target['_pet'] and not who.get('seated'):
@@ -1645,6 +1653,13 @@ def main():
                     # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
                     away = (wanted - abs(gap)) * (-1 if gap > 0 else 1)
                     turns.append((f'  // {who["name"]} steps back from {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(away / who['_unit'])}]]"))
+                    emitted[0] += 1
+                    who['x'] = float(who['x']) + away
+                    continue
+                if step[0] == 'givePill' and target['_pet'] and not who.get('seated') and abs(gap) < wanted - 0.04 * who['_host_height']:
+                    # Đợt 36: QUÁ SÁT đầu con vật để cho thuốc — lùi ra cho đủ chỗ hai bàn tay (cằm / môi) thấy riêng từng cái.
+                    away = (wanted - abs(gap)) * (-1 if gap > 0 else 1)
+                    turns.append((f'  // {who["name"]} steps back from {step[1][1:]} for "givePill"', f"[{who['name']}, ['walk', 4, {round(away / who['_unit'])}]]"))
                     emitted[0] += 1
                     who['x'] = float(who['x']) + away
                     continue
@@ -1890,6 +1905,14 @@ def main():
         for pet, who in turned_back:
             turns.append((f'  // {pet["name"]} turns back to {who["name"]}', f"[{pet['name']}, ['face', {who['name']}]]"))
             emitted[0] += 1
+        # ĐEO LOA XONG (đợt 36 — Gemini: "đầu / tay bác sĩ che nửa con mèo và cái vòng" sau khi đeo): lùi ra một bước nhỏ khỏi con vật,
+        # tay ở dáng nghỉ không còn vắt qua nó và cái loa thấy trọn.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or turn.get('who') not in names or names[turn['who']]['_pet'] or names[turn['who']].get('seated'): continue
+            for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
+                if isinstance(step, list) and len(step) > 1 and step[0] == 'putCone' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']:
+                    who, pet = names[turn['who']], names[step[1][1:]]
+                    backs.append((who, (1 if float(who['x']) >= float(pet['x']) else -1) * CONE_BACK * who['_host_height']))
         for who, move in backs:
             turns.append((f'  // {who["name"]} steps back after reaching close', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
             emitted[0] += 1

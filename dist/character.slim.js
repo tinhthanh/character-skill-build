@@ -324,6 +324,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_NOD_PITCH = 0.7;            // đợt 36: gật sau khi đọc bệnh án — đầu cúi (headPitch) ở đáy mỗi lần gật
 const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
@@ -2955,7 +2956,7 @@ class RigSVG {
     return t;
   }
   static TEMP_POSE = [40, 145];            // giơ nhiệt kế lên SÁT MẶT, ngang cằm (khuỷu hạ sát sườn, cẳng tay gập dựng): đầu đo chĩa lên, thẻ số bên đầu
-  static TEMP_SIDE = 0.75;                 // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
+  static TEMP_SIDE = 0.6;                  // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
   static TEMP_ZOOM = 2.0;                  // nhiệt kế phóng to lúc đọc
   static TEMP_TIP = 34;                    // đầu đo cách cổ tay (đơn vị khung) theo hướng bàn tay
   static TEMP_READ = 1.6;                  // giữ dáng đọc nhiệt kế bấy nhiêu giây (đợt 35, lượt ba: ≥ 1,2 s)
@@ -3286,11 +3287,13 @@ class RigSVG {
     const listen = this.#lookAngles(this.#lookPoint(gaze));
     t.to(s, { headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt, duration: 0.4, ease: 'power2.inOut' }, up);
     for (let i = 0; i < 2; i++) {
-      const a = up + 0.75 + i * 1.0;
+      const a = up + 0.75 + i * 1.25;       // đợt 36: mỗi lần gật 1,25 s, giữ ở đáy 0,55 s
       t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.3, ease: 'sine.inOut' }, a)
-       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.65);
+       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
+      t.to(s, { headPitch: CHART_NOD_PITCH, duration: 0.3, ease: 'sine.inOut' }, a)
+       .to(s, { headPitch: listen.headPitch, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
     }
-    const end = up + 2.8;
+    const end = up + 3.25;
     this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}), headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
@@ -4238,7 +4241,7 @@ class RigThu {
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi', 'nanh', 'lanhL', 'lanhR', 'nhanL', 'nhanR',
       'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', 'lan', 'carrot', 'carrotBody', 'carrotRidge', 'carrotLeaf', 'trail', 'sua', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
-    this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? 48 : 32, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
+    this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? -30 : -26, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
     this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
     this.apDung();
   }
@@ -7951,7 +7954,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
-          head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2) } : null,
+          head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2), pitch: +(rig.s.headPitch || 0).toFixed(3) } : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
             .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 9, box: rect(drawnRect(el)) }))) : [],

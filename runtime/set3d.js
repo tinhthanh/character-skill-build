@@ -1725,7 +1725,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
           // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
           // ĐẦU (lượt ba): nghiêng (độ, so với dáng nghỉ) và hạ (`dauY`) — đọc bệnh án cúi đầu, gật.
-          head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2) } : null,
+          head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2), pitch: +(rig.s.headPitch || 0).toFixed(3) } : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
             // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 9 như vành loa

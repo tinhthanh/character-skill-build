@@ -260,6 +260,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_NOD_PITCH = 0.7;            // đợt 36: gật sau khi đọc bệnh án — đầu cúi (headPitch) ở đáy mỗi lần gật
 const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
@@ -4285,7 +4286,7 @@ export class RigSVG {
    * trên màn hình nhỏ của cân / nhiệt kế không đọc được ở cỡ trung cảnh.
    */
   static TEMP_POSE = [40, 145];            // giơ nhiệt kế lên SÁT MẶT, ngang cằm (khuỷu hạ sát sườn, cẳng tay gập dựng): đầu đo chĩa lên, thẻ số bên đầu
-  static TEMP_SIDE = 0.75;                 // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
+  static TEMP_SIDE = 0.6;                  // lúc đọc: tâm nhiệt kế cách tâm mặt bấy nhiêu bề ngang đầu, về phía con vật (lượt bốn)
   static TEMP_ZOOM = 2.0;                  // nhiệt kế phóng to lúc đọc
   static TEMP_TIP = 34;                    // đầu đo cách cổ tay (đơn vị khung) theo hướng bàn tay
   static TEMP_READ = 1.6;                  // giữ dáng đọc nhiệt kế bấy nhiêu giây (đợt 35, lượt ba: ≥ 1,2 s)
@@ -4769,12 +4770,16 @@ export class RigSVG {
     // Mỗi lần gật: xuống 0,3 s, GIỮ ở đáy 0,35 s, lên 0,3 s — ở 1 khung / giây (cách Gemini đọc video) vẫn có khung rơi vào lúc đầu
     // đang cúi (lượt ba, tự xem phim ở 1 khung / giây: gật 0,35 + 0,35 s không khung nào bắt được).
     for (let i = 0; i < 2; i++) {
-      const a = up + 0.75 + i * 1.0;
+      const a = up + 0.75 + i * 1.25;       // đợt 36: mỗi lần gật 1,25 s, giữ ở đáy 0,55 s
       t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.3, ease: 'sine.inOut' }, a)
-       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.65);
+       .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
+      // Đợt 36: GẬT THẬT — đầu cúi hẳn (`headPitch` lên CHART_NOD_PITCH ≈ 22°: nét mặt trượt xuống, mí hạ) cùng lúc hạ đầu, giữ ở đáy;
+      // Gemini (1 khung / giây) thấy ngẩng lên mà "không gật" khi chỉ có `dauY`.
+      t.to(s, { headPitch: CHART_NOD_PITCH, duration: 0.3, ease: 'sine.inOut' }, a)
+       .to(s, { headPitch: listen.headPitch, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
     }
     // Tờ đã lật nằm sau bảng: đặt lại tờ trên cùng khi bìa đã hạ (khép xong) — không lật ngược lại trước mắt người xem.
-    const end = up + 2.8;
+    const end = up + 3.25;
     this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}), headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
