@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.77.0
+
+Added — the rig itself (wave 36: two agents in parallel), for the reviewer's two standing misses in 0.76.0
+- **`rig.lookAt(target, { head = 1, eyes = 1, dur = 0.35, hold })`** (person): turns and bends the HEAD, not only the eyes,
+  toward a point (`{ x, y }`, another rig, the own hand `'L'` / `'R'`, `set.target(...)` in a 3D set); `null` looks back. New
+  head channels `headTurn`, `headPitch`, `headTilt`; held like `face` until the next action. Scene files: `["look", "@cho"]`,
+  `{ "hold": 1.5 }`. `rig.lookAngles(target)`. Used by `takeTemp` (turns to the raised thermometer while reading),
+  `readChart` (bends to the board, then turns to the listener and nods), `showXray` (to the spot, then the listener),
+  `givePill`, `weigh`, `bandage`. 89 person actions.
+- **Pet channel `gape`** (dog, cat, rabbit): a wide open mouth — the lower jaw drops, dark cavity up to 32 % of the skull
+  height, tongue and fangs. Used by `openMouth`, `chew` (0.45 s a chew), `bark`, `yawn`, `eat`; small mouths (`meow`, `pant`,
+  `lick` …) unchanged. `set.careProbe()` gives `jawRatio`.
+- `tools/acting_check.py`: **head direction** — a ray from the face along the head's direction must pass within 50 % of the
+  face height of the target (thermometer, clipboard, X-ray spot, listener, pet), with the head really turned or bent;
+  **mouth wide open** at the pill (`jawRatio` ≥ 25 %) and **visible chewing** (≥ 2 open → shut beats of ≥ 0.35 s);
+  **the other hand holds the chin** while giving a pill; `knead` paw lift ≥ 20 %.
+
+Fixed
+- `takeTemp`: reading the thermometer "looks at the camera" — the head now turns three-quarters to it (ray 11 % of the face
+  height off the thermometer).
+- `givePill`: the pet opens its mouth wide around the pill (31–33 % of the skull, held 1.45 s) and chews 3 beats; the other
+  hand holds the chin, under the dropped jaw while it is open, then at the chin for the strokes.
+- `bandage`: both hands at the leg (the person turns side-on to the pet). `readChart`: the page turn is bigger and stops
+  half-turned for 0.35 s; a clear nod after looking up. `putCone`: the person steps back after, no longer covering the cat.
+- `knead`: each front paw is raised from the shoulder and the head drawn back, so both paws show (26 % of the cat).
+- A pet's emotion mark sits behind its head, not over the face of a person in front of it.
+
+Review — Gemini 4 Hydrogen, same questions as 0.76.0, on the dot35 trial scenes rebuilt on each branch
+(`/Users/vetgo/Movies/character-skill-trials/dot36/`): clinic hands-on (weigh / temperature / pill) 8 → 12 / 16 on either
+branch — the `lookAt` branch passes reading the thermometer (0 → 2 / 2), the `gape` branch the open mouth (0 → 2 / 2);
+clinic tools 7 → 7 / 9 (the misses moved: page turn and gaze to the listener now pass; the nod and a head over the cat
+failed, both fixed after). The pets film scored 3 / 8 at 720p (6 / 8 in 0.76.0) with identical frames except `knead` —
+the reviewer's spread, not a change. Not yet reviewed on the merged code.
+
+Known
+- The head-direction measure reads the rig state, not the pixels. In a 3D set with a yawed camera a listener far to one side
+  may look less turned on screen than three-quarters.
+- The pill hand covers part of the open mouth for about 0.3 s while pushing the pill in.
+- Park trial: the girl is cut by the right frame edge in the rabbit's close shot (from 0.76.0).
+- Reviewer misses still open from 0.76.0 on the pets: the dog's and the cat's lick read as small, the carrot as vanishing.
+
 ## 0.76.0
 
 Added — 15 ready-made actions (wave 35: three agents in parallel; every one measured by `tools/acting_check.py`
