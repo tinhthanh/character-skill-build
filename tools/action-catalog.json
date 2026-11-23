@@ -1,5 +1,5 @@
 {
-  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species). Points are in the 400 × 470 frame.",
+  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species), person (pets: a person of that id standing beside the pet, \"@person\" in the steps; personSteps: what the person does at the same time, \"@pet\" is the pet; personAt: the person's centre in px of the cell, default 150). Points are in the 400 × 470 frame.",
   "people": [
     { "label": "idle", "steps": [["idle", 1.6]] },
     { "label": "wave", "steps": ["wave"] },
@@ -93,6 +93,8 @@
     { "label": "weigh (pet on a scale)", "steps": [["weigh", "@pet", "@scale"]], "pet": "cat", "scale": "4.2 kg" },
     { "label": "takeTemp (pet)", "steps": [["takeTemp", "@pet"]], "pet": "dog" },
     { "label": "givePill (pet)", "steps": [["givePill", "@pet"]], "pet": "dog" },
+    { "label": "offerHand (pet)", "steps": [["offerHand", "@pet", 1.6]], "pet": "dog", "petOnFloor": true },
+    { "label": "carry → offerCheek (pet)", "steps": [["carry", "@pet"], ["offerCheek", 1.6], "putDown"], "pet": "cat" },
     { "label": "brush (pet)", "steps": [["brush", "@pet"]], "pet": "dog" },
     { "label": "kneel → stroke → standUp (pet)", "steps": ["kneel", ["stroke", "@pet"], "standUp"], "pet": "cat", "petOnFloor": true },
     { "label": "kneel (hold)", "steps": ["kneel", ["idle", 1.2], "standUp"] },
@@ -156,6 +158,14 @@
     { "label": "cat: stretch", "steps": ["stretch"], "species": "cat" },
     { "label": "cat: hiss", "steps": ["hiss"], "species": "cat" },
     { "label": "cat: tailSwish", "steps": ["tailSwish"], "species": "cat" },
-    { "label": "cat: pounce", "steps": ["pounce"], "species": "cat" }
+    { "label": "cat: pounce", "steps": ["pounce"], "species": "cat" },
+    { "label": "dog: rollOver", "steps": ["rollOver"], "species": "dog" },
+    { "label": "cat: rollOver", "steps": ["rollOver"], "species": "cat" },
+    { "label": "dog: chaseTail", "steps": [["chaseTail", 3]], "species": "dog" },
+    { "label": "cat: knead", "steps": [["knead", 8]], "species": "cat" },
+    { "label": "dog: lick", "steps": [["lick", "@person", 4]], "species": "dog", "person": "boy", "personSteps": [["offerHand", "@pet", 1.8]] },
+    { "label": "cat: lick", "steps": [["lick", "@person", 4]], "species": "cat", "person": "boy", "personSteps": [["offerHand", "@pet", 1.8]] },
+    { "label": "hide", "steps": [["hide", "@person"]], "person": "boy", "personAt": 150 },
+    { "label": "rabbit: eatCarrot", "steps": [["eatCarrot", 6]], "species": "rabbit" }
   ]
 }

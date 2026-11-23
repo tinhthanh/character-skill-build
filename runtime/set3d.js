@@ -453,7 +453,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // 'crown' (đợt 31): ĐỈNH ĐẦU — con vật đứng TRƯỚC người vuốt (lớp vẽ trên): nhắm giữa mặt thì bàn tay khuất sau đầu nó.
         // 'crown' (con vật vẽ trên người): ngay trên mép đỉnh đầu — tay đè mép, không khuất sau tai. 'top' (người vẽ trước con
         // vật): trong đỉnh đầu, 15 % — tay đặt lên đầu mà không che mặt nó.
-        const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
+        const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : part === 'chin' ? 0.8 : 0.5;          // 'chin' (đợt 35): dưới cằm — tay chìa cho liếm
         let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
         // 'rear' (đợt 35, đo nhiệt độ): THÂN SAU — từ giữa khung toàn thân dời về phía NGƯỜI ĐO một phần tư bề ngang. Con vật quay đuôi
         // về phía người đo trước lượt ấy (tools/scene.py); hướng nó lúc đích được đọc có thể còn là hướng cũ — không suy từ cái đầu.
@@ -465,6 +465,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
         // 'leg' (đợt 35): giữa ống chân trước phía người xem — chỗ quấn băng (`bandage`).
         if (part === 'leg' && typeof to.legPoint === 'function') { const q = to.legPoint(); hx = q.x; hy = q.y; }
+        // 'tongue' (đợt 35, lượt hai): ngay dưới đầu lưỡi con vật lúc liếm — lòng bàn tay chìa ra ở đó (`offerHand`).
+        if (part === 'tongue' && typeof to.lickPoint === 'function') { const q = to.lickPoint(of(from).spot.x < f.x ? -1 : 1); hx = q.x; hy = q.y + 7; }
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
@@ -1051,7 +1053,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
      */
     // `limit` (đợt 31): khoảng cách máy tối đa — góc trung không lùi quá chừng ấy để lấy trọn đồ đạc; đồ đạc PHỤ (không phải TV,
     // không ai ngồi / đứng trên nó) thì được lẹm mép. `direct` đặt nó khi góc trung gần rộng bằng góc toàn.
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null } = {}) {
+    // `fill` (đợt 35, lượt ba): phần chiều cao khung chủ thể chiếm — thay số mặc định của cỡ cảnh (góc cận riêng một con vật đang diễn).
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null, fill: share = null } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -1132,7 +1135,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       // Góc cận người + con vật (đợt 35, lượt ba): vùng (mặt người … đầu con vật) chiếm 80 % chiều cao khung — 55 % thì mặt con corgi
       // chỉ 13,9 % khung, viên thuốc / miệng nó vài chục px (Gemini đọc ~1 khung / giây).
-      const fill = (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      const fill = share || (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
@@ -1703,16 +1706,25 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           // `lean` (đợt 31): thân người nghiêng bao nhiêu độ so với dáng nghỉ — người ngồi cúi qua đầu gối tới con vật.
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
+          // BÀN CHÂN CON VẬT (đợt 35): khung hình vẽ của bốn bàn chân — acting_check đo chân trên sàn, chân chổng trời khi lăn ngửa.
+          paws: !person && !carried ? ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => rect(drawnRect(el))).filter((r) => r.y1 > r.y0) : [],
+          // Đợt 35, lượt hai: bàn chân trước theo tên (biên độ nhào), hướng quay (đếm vòng đuổi đuôi), khung LƯỠI (liếm tới tay / mặt),
+          // đầu người (mặt người bế), người đang quỳ.
+          front: !person && !carried ? Object.fromEntries(['tnBan', 'txBan'].filter((key) => e[key]).map((key) => [key, rect(drawnRect(e[key]))])) : null,
+          facing: rig.s ? +(rig.s.huong || 0).toFixed(3) : null,                       // người và con vật (đếm vòng đuổi đuôi)
+          tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
+          carrot: !person && e.carrot && e.carrot.style.display !== 'none' && e.carrotBody ? rect(drawnRect(e.carrotBody)) : null,
+          headBox: person && e.dau ? rect(drawnRect(e.dau)) : null,                    // khung đầu người (mặt người bế — liếm mặt)
+          kneel: !!(person && rig.s && rig.s.kneel > 0.5),
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
           // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
-          facing: person && rig.s ? +(rig.s.huong || 0).toFixed(3) : null,
           // ĐẦU (lượt ba): nghiêng (độ, so với dáng nghỉ) và hạ (`dauY`) — đọc bệnh án cúi đầu, gật.
           head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2) } : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
-            // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 7 như vành loa
-            .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 7, box: rect(drawnRect(el)) }))) : [],
+            // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 9 như vành loa
+            .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 9, box: rect(drawnRect(el)) }))) : [],
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];

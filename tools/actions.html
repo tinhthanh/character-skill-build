@@ -44,6 +44,17 @@ for (const entry of entries) {
       }
       const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
       cell.insertBefore(host, cell.firstChild);
+      // CON VẬT CẠNH MỘT NGƯỜI (đợt 35: liếm tay, chạy nấp): người `entry.person` đứng cạnh, cỡ thật so với con vật (host con vật
+      // = 0,43 × host người), sàn hai bên trùng nhau; vẽ SAU con vật (đứng trước nó) — con vật nấp sau chân người ấy.
+      let person = null;
+      if (isPet && entry.person) {
+        const tall = 225 * zoom, petTall = tall * 0.43, floor = 10 * zoom + tall * 458 / 470;
+        host.style.cssText = `position:absolute;left:${20 * zoom}px;top:${floor - petTall * 292 / 330}px;width:${petTall * 400 / 330}px;height:${petTall}px`;
+        const personHost = document.createElement('div');
+        personHost.style.cssText = `position:absolute;left:${(entry.personAt || 150) * zoom - tall * 200 / 470}px;top:${10 * zoom}px;width:${tall * 400 / 470}px;height:${tall}px`;
+        cell.insertBefore(personHost, host.nextSibling);
+        person = createCharacter(personHost, { id: entry.person }).rig;
+      }
       const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
         : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
@@ -53,10 +64,12 @@ for (const entry of entries) {
         const scaleHost = document.createElement('div'); scaleHost.style.cssText = `position:absolute;left:${(5 - 62) * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
         cell.insertBefore(scaleHost, cell.firstChild); scale = createProp(scaleHost, 'scale', { reading: entry.scale === true ? '4.2 kg' : String(entry.scale) });
       }
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg)) : step));
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
       const line = sequence(rig, steps);
+      const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? rig : arg)) : step))) : null;
       const at = line.duration() * (column + 0.5) / cols;
       line.time(at); rig.render();
+      if (other) { other.time(Math.min(at, other.duration())); person.render(); }
       const stamp = document.createElement('span'); stamp.style.cssText = 'position:absolute;right:4px;top:2px;color:#8fb3c4';
       stamp.textContent = `${at.toFixed(2)} s`; cell.appendChild(stamp);
     } catch (error) {

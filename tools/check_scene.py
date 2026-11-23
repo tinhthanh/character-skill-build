@@ -1016,6 +1016,8 @@ with tempfile.TemporaryDirectory() as work:
         ('a pet that weighs', lambda s: s['set']['cutouts'].append({'kind': 'scale', 'name': 'can', 'x': 0, 'z': -330}) or s['script'].append({'who': 'cat', 'do': [['weigh', '@cat', 'can']]}), 'by a person'),
         ('a temperature held for a minute', lambda s: s['script'].append({'who': 'vet', 'do': [['takeTemp', '@cat', 60]]}), 'hold'),
         ('a pill with extra words', lambda s: s['script'].append({'who': 'vet', 'do': [['givePill', '@cat', 'twice']]}), 'just the pet'),
+        ('a pet licking a pet', lambda s: s['script'].append({'who': 'cat', 'do': [['lick', '@cat']]}), 'licks a person'),
+        ('a cat chasing its tail', lambda s: s['script'].append({'who': 'cat', 'do': [['chaseTail', 2]]}), 'is for dogs'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:
@@ -1026,6 +1028,35 @@ with tempfile.TemporaryDirectory() as work:
         if done.returncode == 0: problems.append(f'{label}: the scene was accepted')
         elif 'Traceback' in done.stderr: problems.append(f'{label}: the tool crashed instead of explaining — {done.stderr.strip().splitlines()[-1][:160]}')
         elif needle not in done.stderr: problems.append(f'{label}: the error does not mention {needle!r} — got: {done.stderr.strip()[:160]}')
+
+    # Đợt 35: thú chơi đùa trong phòng khách — chó lăn ngửa, đuổi đuôi, liếm tay bé (bé tự chìa tay, quỳ xuống), mèo được bế liếm mặt bé,
+    # mèo nhào, thỏ gặm cà rốt, chó chạy nấp sau bé. acting_check đo từng động tác: trong khung, chân / lưng trên sàn, chân chổng
+    # trời khi lăn, mõm tới tay / mặt, đầu ló ra mà thân khuất một phần.
+    pets = {'id': 'pets35', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500, 'faces': 'be'}, {'name': 'meo', 'species': 'cat', 'x': -70, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}], 'script': [{'who': 'cho', 'do': ['rollOver']}, {'who': 'cho', 'do': [['chaseTail', 2]]}, {'who': 'cho', 'do': [['lick', '@be', 4]]}, {'who': 'be', 'say': 'Mèo ơi lên đây.', 'do': [['carry', '@meo']], 'view': {'on': ['be', 'meo'], 'size': 'full'}}, {'who': 'meo', 'do': [['lick', '@be', 3]]}, {'who': 'tho', 'do': [['eatCarrot', 4]]}, {'who': 'tho', 'do': [['hide', '@be']], 'view': {'on': ['tho', 'be'], 'size': 'full'}}, {'who': 'be', 'say': 'Xuống chơi nhé.', 'do': ['putDown'], 'view': {'on': ['be', 'meo'], 'size': 'full'}}, {'who': 'meo', 'do': [['knead', 4]]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_pets35.json')
+    try:
+        json.dump(pets, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'pets35'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('pets35: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'pets35', 'index.html'), encoding='utf-8').read()
+        if '"offerHand", set.target(be, cho, \'tongue\')' not in html: problems.append('pets35: the boy does not hold out a hand to the dog\'s tongue')
+        if '{"face": true}' not in html or "['offerCheek'," not in html: problems.append('pets35: the carried cat is not told to lick the face, or the boy does not bend his cheek to it')
+        if 'avoid: [], span:' not in html: problems.append('pets35: the pet actions are not given their own close-up (frameAt … avoid: [], span)')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pets35')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('pets35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('cho rollOver — back on the floor, paws up', 'cho chaseTail — paws on the floor', 'cho lick be — muzzle at the hand', 'meo lick be — muzzle at the face',
+                           'meo knead — paws on the floor', 'tho eatCarrot — paws on the floor', 'tho hide — hides, head peeking out', 'be offerHand cho — hand reaches',
+                           # đợt 35, lượt hai: vòng chạy đuổi đuôi, biên độ nhào, lưỡi chạm tay / má nhiều nhịp, người đứng chìa tay, không chạy xuyên chân
+                           'cho chaseTail — runs round, turn after turn', 'meo knead — both front paws press up and down', 'cho lick be — tongue reaches the hand, lick after lick',
+                           'meo lick be — tongue reaches the face, lick after lick', 'be kneels to hold out a hand — knees on the floor', 'cho lick — stands on all fours', 'be\'s hand stays off cho\'s face', 'tho hide — goes behind, not through, anyone',
+                           # đợt 35, lượt ba: góc cận con vật ≥ 35 % khung, con vật trong khung suốt lúc bế / đặt xuống
+                           'cho rollOver — big enough in the frame', 'cho chaseTail — big enough in the frame', 'meo knead — big enough in the frame',
+                           'tho eatCarrot — big enough in the frame', 'tho eatCarrot — the carrot gets shorter bite by bite', 'be carry meo — the pet stays in the frame', 'be putDown meo — the pet stays in the frame'):
+                if needle not in done.stdout: problems.append(f'pets35: acting_check did not measure {needle!r}')
 
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
     # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.

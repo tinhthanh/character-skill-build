@@ -12,14 +12,15 @@ cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, s
 the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
 clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
-or mouth, give it a treat or a pill, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
+or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
 read a patient chart (flipping a page), point at an X-ray film,
-get a notification on the phone (86 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
+get a notification on the phone (88 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
-mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, and wear a recovery
-cone or a leg bandage; people can wear a mask, exam gloves and a surgical cap. 3D sets include outdoor places (`park`,
+mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase
+the tail (dogs), knead (cats), lick a held-out hand or the face of whoever carries them, run and hide behind someone, nibble a
+carrot (the rabbit), and wear a recovery cone or a leg bandage; people can wear a mask, exam gloves and a surgical cap. 3D sets include outdoor places (`park`,
 `street`). Pets: dogs `dog`, `shiba`, `corgi`, `poodle`, `husky`, `black_dog`; cats `cat`, `orange_cat`, `black_cat`,
 `white_cat`, `calico`; and a `rabbit` that hops.
 

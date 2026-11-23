@@ -770,7 +770,7 @@ export class RigSVG {
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
                      'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'takeTemp',
-                     'bandage', 'putCone', 'showXray'];
+                     'bandage', 'putCone', 'showXray', 'offerHand', 'offerCheek'];
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -3443,7 +3443,8 @@ export class RigSVG {
   // hình vẽ, từng cột) ít nhất mà phần đè + dải `STROKE_BAND` đơn vị quanh viền đầu ≥ `STROKE_TOUCH` bàn tay, đè ≤ `STROKE_SUNK`.
   static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
 
-  #reachLow(target, hand = null, part = 'head') {
+  // `maxCrouch` (đợt 35, lượt hai): khuỵu gối tối đa — `offerHand` khuỵu ít (khuỵu sâu mà không quỳ trông như ngồi lên không khí).
+  #reachLow(target, hand = null, part = 'head', maxCrouch = 0.5) {
     const s = this.s;
     let tx = 300, ty = 400, span = 0;                 // span: bề ngang đầu con vật (khung của người) — quãng tay trượt khi vuốt
     const live = target && target.live ? target.live : target;
@@ -3464,7 +3465,13 @@ export class RigSVG {
       // ngang, cách lưng con chó vừa tới sát chân 6,7 % chiều cao).
       const anchored = target !== live && typeof target.centerX === 'function' && typeof live.centerX === 'function' && typeof live.apDung === 'function';
       if (anchored && node) live.apDung();
-      if (node) {
+      // ĐẦU LƯỠI con vật đang liếm (đợt 35, lượt hai): `offerHand` đặt lòng bàn tay ngay dưới đó.
+      const tongue = part === 'tongue' && typeof live.lickPoint === 'function' && live.svg && live.svg.getScreenCTM ? live.lickPoint(typeof live.centerX === 'function' && this.centerX() < live.centerX() ? -1 : 1) : null;
+      if (tongue) {
+        const q = new DOMPoint(tongue.x, tongue.y + 7).matrixTransform(live.svg.getScreenCTM()), sv = this.svg.getBoundingClientRect();
+        const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+        tx = (q.x - ox) / unit - s.x; ty = (q.y - oy) / unit - s.y - DOI_Y; span = 0;
+      } else if (node) {
         const r = node.getBoundingClientRect(), sv = this.svg.getBoundingClientRect();
         const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
         const shift = anchored ? (target.centerX() - live.centerX()) / unit : 0;
@@ -3479,7 +3486,7 @@ export class RigSVG {
     if (!hand && this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
     // Đích thấp hơn hông (con vật dưới đất) thì KHUỴU GỐI xuống — mượn kênh `seat` — cho bàn tay tới gần hơn; vai hạ
     // theo đúng phần thân vừa hạ, nên góc tay tính từ vai ĐÃ HẠ.
-    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, 0.5), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
     // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
     // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
@@ -4147,6 +4154,31 @@ export class RigSVG {
   }
 
   /**
+   * CHÌA TAY cho con vật (đợt 35): cúi xuống, đưa bàn tay mở ra trước mõm `target`, ngay dưới ĐẦU LƯỠI nó lúc liếm (`lickPoint()`) và giữ `hold` giây — cho nó
+   * ngửi, liếm (`lick` của rig thú, tools/scene.py tự ghép), cười; bàn tay nhích nhẹ như bị liếm nhột. Rồi rụt về.
+   */
+  offerHand(target = null, hold = 1.6) {
+    const t = this.tl(), s = this.s, reach = this.#reachLow(target, null, 'tongue', 0.5), { k, upper, fore } = reach;
+    this.#leanTo(t, reach, 'xoe');
+    t.to(s, { cuoi: 1, mieng: 0.3, mayL: 0.6, mayR: 0.6, duration: 0.3 }, 0.4);
+    for (let a = 0.6, i = 0; a + 0.3 <= 0.6 + hold; a += 0.3, i++) t.to(s, { ['bat' + k]: upper + (i % 2 ? -0.5 : 0.5), ['cang' + k]: fore + (i % 2 ? 0.7 : -0.7), duration: 0.3, ease: 'sine.inOut' }, a);      // nhột khẽ — nhích nhiều thì tay rời đầu lưỡi
+    this.#khep(t, 0.5, 0.6 + hold);
+    return t;
+  }
+
+  /**
+   * GHÉ MÁ cho con vật đang bế liếm (đợt 35, lượt hai): cúi đầu xuống, nghiêng má về phía nó, mắt nhắm híp cười, `hold` giây — đi
+   * cặp với `lick(…, { face: true })` của con vật trong tay (tools/scene.py tự thêm). Hai tay vẫn ôm.
+   */
+  offerCheek(hold = 1.8) {
+    const t = this.tl(), s = this.s, N = this.NGHI;
+    t.to(s, { dauY: N.dauY + 9, dau: N.dau + 12, dauX: N.dauX + 3, matY: 0.7, nhinY: 1.5, cuoi: 1, mieng: 0.35, duration: 0.35, ease: 'power2.out' }, 0);
+    for (let a = 0.4, i = 0; a + 0.4 <= 0.35 + hold; a += 0.4, i++) t.to(s, { dau: N.dau + (i % 2 ? 12 : 9), duration: 0.4, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.45, 0.35 + hold);
+    return t;
+  }
+
+  /**
    * CHẢI LÔNG: cúi xuống, cây lược hiện trong tay, chải dọc lưng con vật `target` bốn đường dài, cười — dịch vụ grooming.
    */
   brush(target = null, strokes = 4) {
@@ -4756,10 +4788,19 @@ export class RigSVG {
     const belly = new DOMPoint(0, -62).matrixTransform(fromThan);
     // Lúc ôm, con vật PHÓNG TO dần tới `CARRY_ZOOM` theo độ nhấc: đúng tỉ lệ thì một con mèo trước ngực một người chibi
     // chỉ bằng nửa bề ngang thân, chìm vào áo (cùng một lối "nói dối" như điện thoại phóng to khi khoe màn hình).
-    const down = (s.omHome || 0) > 0.5, rise = clamp(s.omRise, 0, 1), grow = c.giver && !down ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = c.from.w * grow, h = c.from.h * grow;
+    // CHỖ Ở NHÀ ĐO LẠI MỖI KHUNG (đợt 35, lượt bốn): host của con vật vẫn nằm đúng chỗ nó đứng (bối cảnh 3D đặt nó theo máy quay của
+    // khung này). Đo một lần lúc dựng bước thì lúc phát (máy đã đổi góc) chỗ ấy lệch — con vật nhảy một khúc lúc vào tay / lúc
+    // được đặt xuống (5,7 % chiều cao người giữa hai khung).
+    let from = c.from;
+    const hostBox = c.host && c.host.getBoundingClientRect ? c.host.getBoundingClientRect() : null;
+    if (hostBox && hostBox.width > 0 && hostBox.height > 0 && this.svg.getScreenCTM && !c.giver) {
+      const inv = this.svg.getScreenCTM().inverse(), p0 = new DOMPoint(hostBox.left, hostBox.top).matrixTransform(inv), p1 = new DOMPoint(hostBox.right, hostBox.bottom).matrixTransform(inv);
+      from = { x: p0.x, y: p0.y, w: p1.x - p0.x, h: p1.y - p0.y };
+    }
+    const down = (s.omHome || 0) > 0.5, rise = clamp(s.omRise, 0, 1), grow = c.giver && !down ? CARRY_ZOOM : pha(1, CARRY_ZOOM, rise), w = from.w * grow, h = from.h * grow;
     // Nhận con vật TỪ TAY NGƯỜI KHÁC (`takePet`): nó trượt từ trước bụng người trao (đo trên màn hình, ở khung này) về
     // trước bụng người nhận, giữ nguyên cỡ đang bế — không từ chỗ nó đứng dưới đất.
-    let fromX = c.from.x, fromY = c.from.y;
+    let fromX = from.x, fromY = from.y;
     // Con vật ĐÃ ĐI trong khung của nó (`walk`: hình vẽ dời s.x đơn vị khung — con mèo đi tới người ngồi sofa). Đang được bế
     // thì hình nó KHÔNG dời nữa (RigThu.apDung), nên chỗ XUẤT PHÁT (`from`, khung ở nhà) phải cộng phần dời ấy — con vật bắt
     // đầu được nhấc lên từ đúng chỗ nó đứng; các đích (trước bụng, điểm giao) thì không (đợt 29).
@@ -4785,7 +4826,10 @@ export class RigSVG {
     }
     for (const [name, value] of [['x', x], ['y', y], ['width', w], ['height', h]]) pet.svg.setAttribute(name, value.toFixed(2));
     pet.svg.style.overflow = 'visible';
-    if (!inside) pet.apDung();
+    // Dáng cuộn trong tay đến DẦN theo độ nhấc (đợt 35, lượt bốn): vào tay mà đổi dáng ngay thì con vật như dịch tức thời vào tay.
+    const blend = c.giver && !down ? 1 : rise;
+    if (pet.heldBlend !== blend) { pet.heldBlend = blend; pet.apDung(); }
+    else if (!inside) pet.apDung();
   }
 
   // Đưa SVG con vật về host của chính nó (bỏ vị trí / cỡ của thế bế) nếu nó đang nằm trong tay ai đó.
@@ -5028,7 +5072,8 @@ export class RigSVG {
     // Đang NGỒI quay 3/4 (đùi nằm trên mặt ghế): giữ một chút quay (0,22) — nhìn thẳng hẳn thì đùi dựng lại, người bế con vật
     // trông như đứng trước ghế (đợt 29). Hai cánh tay vẫn gần như nhìn thẳng.
     const turnKeep = s.seat >= 0.5 && Math.abs(s.huong) > 0.02 ? Math.sign(s.huong) * 0.22 : 0;
-    t.to(s, { omRise: 1, huong: turnKeep, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'power2.inOut' }, 0.55);
+    // `sine.inOut` (đợt 35, lượt bốn): power2 nhanh gấp đôi ở giữa — con vật vụt vào tay (5,2–5,9 % chiều cao người giữa hai khung).
+    t.to(s, { omRise: 1, huong: turnKeep, seat: s.seat >= 0.5 ? s.seat : N.seat, than: N.than, dau: N.dau, dauY: 3, nhinX: 0, nhinY: 1.8, cuoi: 1, duration: 0.6, ease: 'sine.inOut' }, 0.55);
     this.#khep(t, 0.4, 1.15, { om: 1, omRise: 1, huong: turnKeep });
     return t;
   }
@@ -5046,7 +5091,7 @@ export class RigSVG {
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, 0.02);
     t.to(s, { omHome: 1, duration: 0.02 }, 0);                                             // hạ về chỗ nhà (xem `#placeCarried`)
     if (reach.crouch) t.to(s, { seat: reach.crouch, duration: 0.5, ease: 'power2.inOut' }, 0);
-    t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'power2.inOut' }, 0);
+    t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'sine.inOut' }, 0);
     t.to(s, { huong: c.facing, duration: 0.5, ease: 'sine.inOut' }, 0);                    // quay lại hướng lúc bế lên
     t.set(s, { om: 0 }, 0.6);                                                              // con vật về chỗ của nó
     this.#khep(t, 0.45, 0.65, { om: 0, omRise: 0, omHome: 0, huong: c.facing });
