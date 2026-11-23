@@ -334,6 +334,9 @@ export function list() {
 // Các bước CÓ LỜI, và quãng "về chỗ" (miệng đã khép, tay đang thu về) ở cuối mỗi bước ấy.
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
+// Kênh của thế NHÌN THEO (`lookAt`, đợt 36) và các bước KHÔNG thả nó ra.
+const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
+const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
 
 export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -369,9 +372,17 @@ export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = 
     // Rồi tua nháp về 0 trước khi bỏ: vài động tác đổi DOM theo trạng thái (carry đưa SVG con vật vào vòng tay) và đo
     // DOM lúc dựng — bản thật phải được dựng trên DOM như lúc bước bắt đầu.
     draft.progress(1); endState = snapshot(); draft.progress(0); draft.kill();
+    // Đang NHÌN THEO (`lookAt`) mà bước này thả nó ra (xem dưới): bước không tự đụng tới đầu thì kết thúc với đầu đã về nghỉ.
+    const releases = !LOOK_KEEP.includes(name) && LOOK_KEYS.some((key) => keys.includes(key) && Math.abs(startState[keys.indexOf(key)] || 0) > 1e-3);
+    if (releases) for (const key of LOOK_KEYS) { const n = keys.indexOf(key); if (endState[n] === startState[n]) endState[n] = 0; }
     RigSVG.traNgau(randomState[0]); RigThu.traNgau(randomState[1]);
     restore(startState);
     if (!firstFrame) firstFrame = startState;
+    // NHÌN THEO (`lookAt`, đợt 36) là một thế giữ: động tác khác BẮT ĐẦU thì đầu và mắt về nghỉ trong 0,35 s — trừ khi động tác ấy là
+    // một `lookAt` khác, `idle` (đứng nhìn tiếp) hay dấu / nét mặt. Tween thả thêm vào TRƯỚC bước, nên bước nào tự xoay đầu thì thắng.
+    if (releases) {
+      source.to(rig.s, { headTurn: 0, headPitch: 0, headTilt: 0, nhinX: rig.NGHI.nhinX, nhinY: rig.NGHI.nhinY, matY: rig.NGHI.matY, duration: 0.35, ease: 'power2.inOut' }, at);
+    }
     const child = rig[name](...args);
     child.paused(false);
     source.add(child, at);

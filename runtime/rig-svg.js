@@ -71,6 +71,8 @@ const NGHI = Object.freeze({
   readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
   readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
+  // ĐỢT 36 — NHÌN THEO MỘT ĐIỂM (`lookAt`): đầu quay riêng so với thân (cùng đơn vị `huong`), cúi (1) / ngẩng (−1), nghiêng thêm (độ).
+  headTurn: 0, headPitch: 0, headTilt: 0,
 });
 
 const MAU_MAC_DINH = {
@@ -258,6 +260,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
 const XRAY_LISTEN = 0.75, XRAY_FACE_HOLD = 1.0;   // chỉ xong: quay HẲN về người nghe (0,75) và giữ 1 s trong bước (lượt ba)
@@ -777,7 +780,7 @@ export class RigSVG {
   static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   static SIDESTEP = 70;                  // quãng `walk` ngắn hơn chừng này (đơn vị khung) thì bước nhích, không quay ngang
   // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
-  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff', 'lookAt'];
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet', 'weigh', 'givePill'];       // `givePill`: cần con vật và hai tay rảnh
   // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
@@ -1481,14 +1484,20 @@ export class RigSVG {
     // vì thế chỉ cần MỘT phép dịch (netLech ≈ R·sinθ) và MỘT phép co ngang (cosθ).
     // Mọi thứ đổi bằng HÌNH HỌC, không bằng opacity: mảng tóc mờ dần đè lên da cho ra
     // một cái bóng xám giữa mặt suốt lúc đang xoay.
-    const nv = this.nv, K = nv.khuon, k = mem(ah), sg = h < 0 ? -1 : 1;
-    const co = 1 - ah * 0.15, lech = h * nv.netLech;
-    e.net.setAttribute('transform', `translate(${lech} 0) scale(${co} 1)`);
+    // HƯỚNG ĐẦU (đợt 36, `lookAt`): đầu quay thêm `headTurn` so với thân (cùng đơn vị với `huong`), cúi `headPitch` (1 = cúi hẳn,
+    // −1 = ngẩng). Mọi thứ trên đầu (nét mặt, tóc, tai, mũ) vẽ theo `hd`; thân, cổ áo vẫn theo `h`.
+    const hd = clamp(h + (s.headTurn || 0), -1, 1), ahd = Math.abs(hd), pitch = clamp(s.headPitch || 0, -1, 1);
+    const nv = this.nv, K = nv.khuon, k = mem(ahd), sg = h < 0 ? -1 : 1, sgd = hd < 0 ? -1 : 1;
+    const co = 1 - ahd * 0.15, lech = hd * nv.netLech;
+    // Cúi / ngẩng (`headPitch`): cụm nét mặt trượt xuống / lên trên khối cầu của đầu và hơi dẹt lại theo chiều dọc.
+    const pitchY = pitch * RigSVG.PITCH_SHIFT;
+    e.net.setAttribute('transform', `translate(${lech} ${pitchY.toFixed(2)}) scale(${co} ${(1 - Math.abs(pitch) * 0.08).toFixed(3)})`);
     // Má đi theo nét mặt và bị CẮT theo viền mặt: má phía xa trượt ra mép rồi khuất
     // sau đường bao, thay vì tràn ra ngoài tóc.
     for (const [ben, dau] of [['L', -1], ['R', 1]]) {
-      const xa = Math.max(0, dau * h);                    // 1 = má này nằm phía mặt đang quay tới
+      const xa = Math.max(0, dau * hd);                    // 1 = má này nằm phía mặt đang quay tới
       e['ma' + ben].setAttribute('cx', lech + co * dau * nv.maX);
+      e['ma' + ben].setAttribute('cy', nv.maY + pitchY);
       e['ma' + ben].setAttribute('rx', nv.maRong * co * (1 - xa * 0.25) * (1 + 0.6 * clamp(s.doMa, 0, 1)));
       e['ma' + ben].setAttribute('ry', nv.maRong * 0.62 * (1 + 0.35 * clamp(s.doMa, 0, 1)));
       e['ma' + ben].setAttribute('opacity', (0.55 + 0.45 * clamp(s.doMa, 0, 1)).toFixed(3));     // ngượng: má đỏ đậm và lan rộng ra
@@ -1505,13 +1514,13 @@ export class RigSVG {
     const G = nv.khuonGoc;
     const coToc = `scale(${(K.rong / G.rong).toFixed(4)} ${((K.cao + K.yRong) / (G.cao + G.yRong)).toFixed(4)})`;
     e.tocG.setAttribute('transform', coToc);
-    e.muG.setAttribute('transform', `${coToc} translate(${h * nv.tocLech} 0)`);   // mũ đi đúng theo mái tóc
+    e.muG.setAttribute('transform', `${coToc} translate(${hd * nv.tocLech} 0)`);   // mũ đi đúng theo mái tóc
     // Chỏm/mái dịch nhẹ theo mặt; búi tóc nằm sau đỉnh đầu nên đi NGƯỢC lại, về phía gáy.
-    e.tocTruoc.setAttribute('transform', `translate(${h * nv.tocLech} 0)`);
-    if (e.tocBui) e.tocBui.setAttribute('transform', `translate(${-h * (nv.buiLech + nv.tocLech)} ${ah * 3})`);
+    e.tocTruoc.setAttribute('transform', `translate(${hd * nv.tocLech} ${(pitch * RigSVG.PITCH_SHIFT * 0.3).toFixed(2)})`);
+    if (e.tocBui) e.tocBui.setAttribute('transform', `translate(${-hd * (nv.buiLech + nv.tocLech)} ${ahd * 3})`);
     // Sọ sau: một khối tóc nằm SAU khuôn mặt, nhìn thẳng thì khuất hẳn, xoay thì lùi về
     // gáy — đầu người sâu hơn bề ngang mặt, thiếu nó thì nhìn nghiêng đầu dẹt như cái đĩa.
-    e.tocLungE.setAttribute('cx', -h * K.rong * 0.3);
+    e.tocLungE.setAttribute('cx', -hd * K.rong * 0.3);
     e.tocLungE.setAttribute('cy', -K.cao * 0.22);
     e.tocLungE.setAttribute('rx', K.rong - 1);
     e.tocLungE.setAttribute('ry', K.cao * 0.78 - 1);
@@ -1523,7 +1532,7 @@ export class RigSVG {
     // mặt vào tới sau vành tai (cắt theo viền mặt nên nhìn thẳng không lộ gì): từ đỉnh
     // đầu vòng xuống thái dương, nhọn thành tóc mai ngay trước tai, rồi lẩn ra sau tai.
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
-    e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
+    e.tocGay.setAttribute('transform', `scale(${sgd} 1)`);
     // Mép trên của mảng tóc gáy: đỉnh đầu (tóc đủ), hoặc đường chân tóc (hói đỉnh); trọc thì không vẽ.
     const napeTop = nv.backHair === 'low'
       // Hói đỉnh: mép trước là MỘT đường cong tròn từ chân tóc xuống sau tai — không có mũi tóc mai
@@ -1537,9 +1546,9 @@ export class RigSVG {
     // trượt vào sau má — cùng màu da nên tự khuất, không cần làm mờ.
     const w4 = beRongTaiY(K, 4);
     for (const [ben, dau] of [['L', -1], ['R', 1]]) {
-      const gan = Math.max(0, -dau * h), xa = Math.max(0, dau * h);
+      const gan = Math.max(0, -dau * hd), xa = Math.max(0, dau * hd);
       const x = gan ? nv.taiX * (1 - 0.18 * mem(gan)) : nv.taiX + (w4 - 6 - nv.taiX) * mem(xa);
-      e['tai' + ben].setAttribute('transform', `translate(${dau * x} 4) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
+      e['tai' + ben].setAttribute('transform', `translate(${dau * x} ${(4 - pitch * RigSVG.PITCH_SHIFT * 0.45).toFixed(2)}) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
     // NGỒI (`seat`): nhìn từ trước, đùi chĩa về phía người xem nên chỉ còn một khúc ngắn, còn
@@ -1654,7 +1663,7 @@ export class RigSVG {
     // Còng lưng: đầu chúi xuống giữa hai vai (cổ ngắn lại) và nhô ra trước khi quay nghiêng.
     // Đang áp điện thoại: đầu nghiêng về phía nó (cộng thêm, không ghi vào `dau` — các cử chỉ lúc nói vẫn lắc đầu được).
     const onPhone = clamp(s.phoneR, 0, 1) - clamp(s.phoneL, 0, 1);
-    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau + onPhone * CALL_TILT}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
+    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7) + (s.headTurn || 0) * 2.5} ${-103 + this.nv.dauLech + s.dauY + stoop * 9 + pitch * 3}) rotate(${s.dau + onPhone * CALL_TILT + (s.headTilt || 0)}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
 
@@ -1935,7 +1944,7 @@ export class RigSVG {
         sheet.style.display = flip > 0.93 ? 'none' : '';
         sheet.removeAttribute('transform');
         if (shape) {
-          const span = 32, yb = top + span * Math.cos(Math.PI * flip), bulge = 7 * Math.sin(Math.PI * flip), mid = (top + yb) / 2, curl = -4 * Math.sin(Math.PI * flip);
+          const span = 32, yb = top + span * Math.cos(Math.PI * flip), bulge = 10 * Math.sin(Math.PI * flip), mid = (top + yb) / 2, curl = -4 * Math.sin(Math.PI * flip);
           shape.setAttribute('d', `M -12 ${top} L 12 ${top} Q ${(12 + bulge).toFixed(2)} ${(mid + curl).toFixed(2)} 12 ${yb.toFixed(2)} Q 0 ${(yb + curl * 1.5).toFixed(2)} -12 ${yb.toFixed(2)} Q ${(-12 - bulge).toFixed(2)} ${(mid + curl).toFixed(2)} -12 ${top} Z`);
           shape.setAttribute('fill', flip > 0.5 ? '#e4e9ee' : shape.dataset.paper || '#ffffff');
         }
@@ -2026,22 +2035,23 @@ export class RigSVG {
     // `matCo` nhân vào CẢ HAI trục của phép co sẵn có (nheo theo góc xoay,
     // nhắm theo `matY`), nên nháy mắt và liếc mắt vẫn đúng ở mọi cỡ.
     const mc = this.nv.matCo;
-    e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -h) * 0.3)} ${mc * mi})`);
-    e.matR.setAttribute('transform', `translate(${this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, h) * 0.3)} ${mc * mi})`);
-    if (e.mui) e.mui.setAttribute('transform', `translate(${h * 3} ${this.nv.muiY}) scale(${this.nv.muiCo})`);
+    // Mắt, mũi, con ngươi, chân mày theo HƯỚNG ĐẦU `hd` (`headTurn` cộng vào `huong`, đợt 36).
+    e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -hd) * 0.3)} ${mc * mi})`);
+    e.matR.setAttribute('transform', `translate(${this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, hd) * 0.3)} ${mc * mi})`);
+    if (e.mui) e.mui.setAttribute('transform', `translate(${hd * 3} ${this.nv.muiY}) scale(${this.nv.muiCo})`);
     if (e.netThem && this.nv.netTheoMat && this.nv.netGoc) {
       const g = this.nv.netGoc;
       e.netThem.setAttribute('transform',
         `translate(0 ${(this.nv.matY - g.matY).toFixed(2)}) scale(${(this.nv.matX / g.matX).toFixed(4)} ${this.nv.matCo})`);
     }
-    e.nguoiL.setAttribute('transform', `translate(${s.nhinX + h * 1.2} ${s.nhinY})`);   // mắt nhìn theo hướng đi
-    e.nguoiR.setAttribute('transform', `translate(${s.nhinX + h * 1.2} ${s.nhinY})`);
+    e.nguoiL.setAttribute('transform', `translate(${s.nhinX + hd * 1.2} ${s.nhinY})`);   // mắt nhìn theo hướng đi
+    e.nguoiR.setAttribute('transform', `translate(${s.nhinX + hd * 1.2} ${s.nhinY})`);
     // Chân mày KHÔNG buộc phải thẳng hàng với mắt: `mayX` tách riêng, bỏ trống
     // thì rơi về `matX` như cũ. Trên mặt thật hai mày thường cách nhau rộng hơn
     // hai con ngươi một chút, và đó là thứ đổi được nét mặt rõ nhất sau `xech`.
     const mx = this.nv.mayX ?? this.nv.matX;
-    e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -h) * 0.28} 1) rotate(${-s.mayL * 8})`);
-    e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, h) * 0.28} 1) rotate(${s.mayR * 8})`);
+    e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -hd) * 0.28} 1) rotate(${-s.mayL * 8})`);
+    e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, hd) * 0.28} 1) rotate(${s.mayR * 8})`);
 
     this.#veMom();
     this.#drawLeash();
@@ -4369,10 +4379,17 @@ export class RigSVG {
     // 1. Quỳ xuống, hạ con vật từ trước bụng xuống bệ cân CÙNG LÚC (tay sẵn ở dáng đặt — bị dáng ôm che lúc `omRise` = 1).
     t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: otherArm, ['cang' + other]: -40, ['aim' + onScale.k]: 1, omScale: 1, duration: 0.02 }, T1);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, T1 + 0.02);
+    // Đợt 36: nhìn con vật (đầu quay / cúi tới chỗ nó trên bệ cân) lúc đặt nó xuống và lúc bế nó lên lại.
+    s.seat = 1; s.kneel = 1;
+    const kneelLook = this.#lookAngles({ x: onScale.tx, y: onScale.ty });
+    s.seat = was.seat; s.kneel = was.kneel;
+    t.to(s, { ...kneelLook, duration: 0.6, ease: 'power2.inOut' }, T1);
     t.to(s, { ...down, duration: 0.6, ease: 'power2.inOut' }, T1);
     t.to(s, { omRise: 0, duration: 0.65, ease: 'power2.inOut' }, T1);
     // 2. Buông tay, đứng dậy, cúi nhìn số trên cân (thẻ số bật lên trên con vật), gật.
     const R = T1 + 0.7;
+    // …đứng dậy: đầu quay / cúi về SỐ CÂN (thẻ số trên con vật) — Gemini đọc 1 khung / giây, mắt liếc không đủ.
+    this.#lookTo(t, { x: spot.x - s.x, y: c.scale.y + (crown - offY - c.from.y) - 30 - (s.y || 0) - DOI_Y }, R, { d: 0.55 });
     t.to(s, { ['bat' + onScale.k]: N['bat' + onScale.k], ['cang' + onScale.k]: N['cang' + onScale.k], ['bat' + other]: N['bat' + other], ['cang' + other]: N['cang' + other],
               seat: N.seat, kneel: 0, than: N.than, dau: N.dau + (spot.x > HONG.x + s.x ? 4 : -4), dauY: 8, nhinX: clamp((spot.x - s.x - HONG.x) * 0.02, -3, 3), nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids, cuoi: 0.7,
               duration: 0.55, ease: 'power2.inOut' }, R);
@@ -4383,13 +4400,16 @@ export class RigSVG {
     // 3. Thẻ tắt, quỳ xuống, hai tay ôm lấy con vật trên cân, rồi đứng dậy bế nó lên (nó lên theo thân người).
     const B = R + 0.55 + hold;
     t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, B - 0.1);
+    t.to(s, { ...kneelLook, duration: 0.6, ease: 'power2.inOut' }, B);
     t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: otherArm, ['cang' + other]: -40, ...down, matY: 0, duration: 0.6, ease: 'power2.inOut' }, B);
+    this.#lookTo(t, null, B + 0.65, { d: 0.6 });
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, B + 0.3);
     t.to(s, { omRise: 1, seat: N.seat, kneel: 0, than: N.than, dau: N.dau, dauY: 3, nhinY: 1.8, nhinX: 0, cuoi: 1, duration: 0.7, ease: 'power2.inOut' }, B + 0.65);
     // 4. Mang về, cúi đặt xuống đúng chỗ cũ (như `putDown`).
     const D = B + 1.4, back = home.k === 'L' ? 'R' : 'L';
     t.to(s, { omScale: 0, ['bat' + home.k]: home.upper, ['cang' + home.k]: home.fore, ['bat' + back]: home.bend ? -home.bend : home.upper * 0.6, ['cang' + back]: -40, duration: 0.02 }, D);
     if (home.crouch) t.to(s, { seat: home.crouch, duration: 0.5, ease: 'power2.inOut' }, D);
+    this.#lookTo(t, { x: home.tx, y: home.ty }, D, { d: 0.55, huong: c.facing });
     t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'power2.inOut' }, D);
     t.to(s, { huong: c.facing, duration: 0.5, ease: 'sine.inOut' }, D);
     t.set(s, { om: 0 }, D + 0.6);
@@ -4462,6 +4482,12 @@ export class RigSVG {
     this.#careFor(pet, 'petWrap', 'bandage');
     const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, tx, ty } = reach;
     const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, reach, 0.4);
+    // ĐỢT 36: QUAY GẦN NGHIÊNG HẲN về con vật (`BANDAGE_TURN`, như `givePill`) — hai vai dồn về một chỗ, HAI TAY cùng vươn ra trước tới
+    // ống chân. Đứng 3/4 thì tay phía xa phải vắt ngang ngực mới tới chân (Gemini, đợt 35: "một tay tới, tay kia gập ngang ngực").
+    // Góc tay tính ở hướng ấy (vai thật khi đã quay); trả hướng cũ trước khi `return`.
+    const facing = s.huong, turn = clamp(facing + side * RigSVG.BANDAGE_TURN, -1, 1);
+    t.to(s, { huong: turn, duration: 0.45, ease: 'sine.inOut' }, 0);
+    s.huong = turn;
     // Tay kia GIỮ cổ chân ngay dưới chỗ quấn — trên mặt bàn, không thấp hơn (lượt ba: tay khuất sau mép bàn); tay cầm cuộn băng quấn vòng elip quanh ống chân, trượt dần xuống theo băng.
     const holdLeg = arm(o, tx - side * 2, ty + 7), R = BANDAGE_LOOP, loop = 0.55, start = 0.55, n = Math.round(wraps);
     const wrapAt = (w, q) => { const a = -Math.PI / 2 + q * Math.PI / 2; return arm(k, tx + Math.cos(a) * R, ty + 2 + ((w + q / 4) / n) * 9 - 3 + Math.sin(a) * R * 0.75); };
@@ -4470,6 +4496,7 @@ export class RigSVG {
     t.to(s, { ['bat' + k]: first.bat, ['cang' + k]: first.cang, ['bat' + o]: holdLeg.bat, ['cang' + o]: holdLeg.cang, than: N.than - side * 3, dau: N.dau + side * 4,
               dauY: 11, nhinY: 3, nhinX: side * 1.4, matY: 0.25, cuoi: 0.5, chum: 0.25, mayL: 0.2, mayR: 0.2, duration: 0.5, ease: 'power2.out' }, 0);
     t.set(s, { ['gadget' + k]: 8 }, 0.15);
+    this.#lookTo(t, { x: tx, y: ty }, 0.05, { d: 0.45 });          // đợt 36: đầu cúi / quay về chỗ quấn
     // Lượt ba: người vẽ TRƯỚC con chó (như các động tác khám) — con chó lên trước người thì hai cánh tay "lồng ra sau con chó và mép
     // bàn" (Gemini, 00:16). Đứng ở phía đầu con vật (scene.py) để cánh tay không vắt qua thân nó.
     for (let w = 0; w < n; w++) for (let q = 1; q <= 4; q++) {
@@ -4487,6 +4514,7 @@ export class RigSVG {
      .to(s, { ['bat' + k]: patUp.bat, ['cang' + k]: patUp.cang, duration: 0.14, ease: 'sine.out' }, done + 0.28)
      .to(s, { ['bat' + k]: pat.bat, ['cang' + k]: pat.cang, duration: 0.14, ease: 'sine.in' }, done + 0.42);
     t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, matY: 0, dauY: 6, duration: 0.25 }, done + 0.1);
+    s.huong = facing;
     this.#khep(t, 0.5, done + 0.62, { ...keep, ...(pet ? { petWrap: 1 } : {}) });
     return t;
   }
@@ -4510,6 +4538,8 @@ export class RigSVG {
     // Ấn đầu đo vào (bàn tay áp vào thân — đo: ấn ±2° / 3° thì bàn tay chỉ 4 % sát con vật ở cảnh CI), rồi đứng yên chờ: đầu
     // nghiêng, mắt nhìn chỗ đo, môi mím.
     t.to(s, { ['bat' + k]: upper + 2, ['cang' + k]: fore - 3, duration: 0.2, ease: 'sine.out' }, 0.45);
+    // Đợt 36: QUAY / CÚI ĐẦU về chỗ đo (`lookAt`), không chỉ liếc mắt.
+    this.#lookTo(t, { x: reach.tx, y: reach.ty }, 0.5);
     t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
     // Rút ra, đứng thẳng, giơ nhiệt kế lên đọc (kênh `ov`: góc cuối cùng trên màn hình, đè lên dáng cúi).
     const up = 0.6 + hold;
@@ -4518,14 +4548,14 @@ export class RigSVG {
     // trên cổ tay × `handZoom` (cẳng tay dựng) — giải hai đốt tay tới cổ tay ấy, khi người đã quay `TEMP_TURN`.
     const facingTo = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
     const box = (el) => { const b = el.getBBox(), q = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM()); const a = new DOMPoint(b.x, b.y).matrixTransform(q), c = new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(q); return { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
-    let readPose = RigSVG.TEMP_POSE;
+    let readPose = RigSVG.TEMP_POSE, toolAt = null;
     try {
       const head = box(this.el.dau), eyes = [box(this.el.matL), box(this.el.matR)], eyeY = (eyes[0].y + eyes[1].y) / 2;
       // Ngoài tầm tay (người thấp, tay ngắn: tay duỗi thẳng thì nhiệt kế tụt dưới tầm mắt) — thu độ lệch dần, không dưới 0,55 bề ngang đầu.
       for (let side = RigSVG.TEMP_SIDE; side >= 0.55 - 1e-6; side -= 0.05) {
         const tx = head.x + m * side * head.w, ty = eyeY - 0.06 * head.h + 17 * RigSVG.TEMP_ZOOM;      // cổ tay (hệ gốc); mô hình đặt nhiệt kế thấp hơn hình vẽ ~12 % đầu — bù 6 %
         const pose = this.#armToTurned(k, tx - s.x, ty - (s.y || 0) - DOI_Y, facingTo, 0);
-        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) readPose = [pose.bat, pose.cang];
+        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) { readPose = [pose.bat, pose.cang]; toolAt = { x: tx - s.x, y: ty - 17 * RigSVG.TEMP_ZOOM - (s.y || 0) - DOI_Y }; }
         if (!(pose.short > 0)) break;
       }
     } catch (error) { /* chưa vẽ: dáng mặc định */ }
@@ -4534,6 +4564,10 @@ export class RigSVG {
     // nhiệt kế giơ sát mặt, phóng 1,7×; giữ `TEMP_READ` giây. Đợt 35 lượt hai chỉ liếc mắt — ở góc trung hai người mặt chỉ ~1/6 khung,
     // không đọc ra là đang nhìn nhiệt kế (Gemini, lượt ba).
     const R = RigSVG.TEMP_READ, facing = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
+    // Đợt 36: ĐẦU QUAY HẲN về nhiệt kế (`lookAt`: ~3/4 về phía nó) — đợt 35 chỉ quay người 0,3 và liếc mắt, Gemini vẫn thấy "nhìn ra
+    // máy quay". Tween này trước tween đọc bên dưới: mắt, đầu nghiêng, hạ đầu của dáng đọc vẫn như cũ.
+    const face = this.#faceCentre(facing);
+    this.#lookTo(t, toolAt || { x: face.x + m * face.r * 1.3, y: face.y }, up, { d: 0.45, huong: facing });
     t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: RigSVG.TEMP_ZOOM, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than - m * 4, dau: N.dau + m * 3, dauY: 4, nhinX: m * 4.2, nhinY: 0.4, matY: 0.15,
               cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
     t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
@@ -4569,6 +4603,7 @@ export class RigSVG {
    * đỡ vuốt cằm hai nhịp cho nó nuốt. Tay đỡ ở dưới cằm, tay thuốc ở môi — không tay nào vắt ngang mặt con vật. Cần cả hai tay rảnh. Con vật đứng sát
    * (đầu ngang bụng người — trên bàn khám): cho nó `openMouth` từ ~0,55 s rồi `chew` (`tools/scene.py` tự thêm, đúng nhịp).
    */
+  static BANDAGE_TURN = 0.8;               // đợt 36: quấn băng — quay gần nghiêng hẳn về con vật, hai tay cùng ra trước tới ống chân
   static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
@@ -4614,6 +4649,8 @@ export class RigSVG {
     }
     // 0,45 s: dài hơn tween `#openUp` (trong `#leanTo`, 0,4 s về GESTURE_TURN) — ngắn hơn thì nó ghi đè hướng quay về 0,3.
     t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
+    // Đợt 36: đầu cúi / quay về MÕM con vật suốt lúc đưa thuốc và vuốt cằm.
+    this.#lookTo(t, { x: lips.tx, y: lips.ty }, 0.1, { d: 0.45, huong: turn });
     t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
     t.set(s, { ['gadget' + k]: 7 }, 0.05);
     // 1. Tay đỡ vắt qua đỡ dưới cằm; tay viên thuốc dừng trước môi (dáng `#leanTo`).
@@ -4687,7 +4724,7 @@ export class RigSVG {
    * đọc — mắt dò theo dòng —, tay kia lật tờ trên cùng lên, đọc tiếp, ngẩng lên gật. Đang cất bìa (`itemsHidden`) thì lấy ra
    * rồi cất lại. Không cầm bìa hồ sơ thì báo lỗi.
    */
-  readChart(hold = 2, { side = 'auto' } = {}) {
+  readChart(hold = 2, { side = 'auto', to = null, gaze = to } = {}) {
     const s = this.s, N = this.NGHI, board = (k) => this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-clipboard]');
     const k = side === 'L' || side === 'R' ? side : ['R', 'L'].find(board);
     if (!k || !board(k)) throw new Error('[character] readChart: the character is not holding a clipboard' + (side === 'L' || side === 'R' ? ` in hand ${side}` : '') + ' — give it one: createCharacter(host, { id, items: { R: "clipboard" } })');
@@ -4699,6 +4736,9 @@ export class RigSVG {
     // CÚI ĐẦU RÕ xuống tấm bảng (lượt ba — Gemini đọc ~1 khung / giây, chỉ thấy ĐẦU cúi / nghiêng, không thấy mắt liếc khi mặt
     // nhỏ): đầu nghiêng `CHART_TILT` độ về phía bảng và hạ xuống, mắt nhìn xuống, mí hạ.
     const read = { dauY: CHART_DOWN, dau: N.dau + m * CHART_TILT, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids };
+    // Đợt 36: đầu CÚI hẳn về tấm bảng trước ngực (`lookAt`: nét mặt trượt xuống, mí hạ), thêm vào dáng nghiêng / hạ đầu ở trên.
+    const face = this.#faceCentre(), boardAt = { x: face.x + m * face.r * 0.35, y: face.y + face.r * 2 };
+    this.#lookTo(t, boardAt, 0, { d: 0.5 });
     t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, ...read, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.5, ease: 'power2.out' }, 0);
     // Mắt dò từng dòng (trái → phải), đầu nhích theo dòng — vẫn cúi.
     const scan = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, dau: read.dau - m * 1.5, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, dau: read.dau + m * 1.5, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
@@ -4708,15 +4748,24 @@ export class RigSVG {
     // co dần về mép kẹp, vượt qua kẹp rồi khuất sau bảng) — không còn dựng cứng trên đầu tấm bảng (Gemini lượt hai, 00:06).
     t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.45);
     t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.4, ease: 'power2.out' }, flip - 0.45);
-    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, duration: 0.8, ease: 'sine.inOut' }, flip);
-    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 0.85);
-    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.25);
+    // Đợt 36: LẬT TO, RÕ — bìa phóng to thêm (`CHART_FLIP_ZOOM`) suốt lúc lật, tờ giấy DỪNG ở giữa vòng lật (dựng cong trên mép kẹp)
+    // 0,35 s rồi mới lật nốt — ở 1 khung / giây (cách Gemini đọc phim) lượt trước lúc thấy lúc không.
+    t.to(s, { ['itemZoom' + k]: CHART_FLIP_ZOOM, duration: 0.35, ease: 'power2.out' }, flip - 0.45);
+    t.to(s, { ['page' + k]: 0.55, ['bat' + pen]: CHART_POSE.flip[0] + 9, ['cang' + pen]: CHART_POSE.flip[1] - 11, duration: 0.45, ease: 'sine.out' }, flip);
+    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, duration: 0.3, ease: 'sine.in' }, flip + 0.8);
+    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 1.1);
+    t.to(s, { ['itemZoom' + k]: CHART_POSE.zoom, duration: 0.35, ease: 'power2.inOut' }, flip + 1.15);
+    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.5);
     // Đọc tờ sau ≥ 1,2 s, vẫn cúi.
     const up = flip + 0.85 + Math.max(1.2, hold * 0.4);
     scan(flip + 0.9, up - 0.05);
     // NGẨNG LÊN nhìn người đối diện (giữ 0,4 s), cười, rồi GẬT hai nhịp CHẬM, sâu (0,35 s xuống, 0,35 s lên) — ở 1 khung / giây
     // vẫn bắt được đầu cúi.
     t.to(s, { dauY: 0, dau: N.dau, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.35, ease: 'power2.out' }, up);
+    // Đợt 36: NGẨNG lên nhìn NGƯỜI NGHE (`to` / `gaze`: rig, `set.target(…)`, điểm) — đầu quay hẳn về phía họ, giữ qua hai lần gật và sau
+    // bước (thế `lookAt`); không có người nghe thì đầu về thẳng.
+    const listen = this.#lookAngles(this.#lookPoint(gaze));
+    t.to(s, { headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt, duration: 0.4, ease: 'power2.inOut' }, up);
     // Mỗi lần gật: xuống 0,3 s, GIỮ ở đáy 0,35 s, lên 0,3 s — ở 1 khung / giây (cách Gemini đọc video) vẫn có khung rơi vào lúc đầu
     // đang cúi (lượt ba, tự xem phim ở 1 khung / giây: gật 0,35 + 0,35 s không khung nào bắt được).
     for (let i = 0; i < 2; i++) {
@@ -4726,7 +4775,7 @@ export class RigSVG {
     }
     // Tờ đã lật nằm sau bảng: đặt lại tờ trên cùng khi bìa đã hạ (khép xong) — không lật ngược lại trước mắt người xem.
     const end = up + 2.8;
-    this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}) });
+    this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}), headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
   }
@@ -4736,7 +4785,7 @@ export class RigSVG {
    * `set.targetPoint(…)`), giơ ngón trỏ chỉ vào một điểm trên phim, nhấn hai nhịp "chỗ này" (`hold` giây), rồi quay lại
    * (hướng cũ) — tay hạ, mày nhướn, sẵn sàng nói. Đạo cụ `xray` có sẵn điểm chỉ (`createProp(host, 'xray').spot`).
    */
-  showXray(target = null, hold = 1.6, { to = null } = {}) {
+  showXray(target = null, hold = 1.6, { to = null, gaze = to } = {}) {
     if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] showXray: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
     const t = this.tl(), s = this.s;
     // `to` (đợt 35, lượt hai): NGƯỜI NGHE — xong thì quay hẳn về phía họ và giữ hướng ấy (như `face`), không quay ra máy quay.
@@ -4754,6 +4803,9 @@ export class RigSVG {
     t.to(s, { huong: turn, nhinX, duration: 0.4, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + ben]: 'nam' }, 0.1);
     t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
+    // Đợt 36: ĐẦU quay / ngẩng về ĐIỂM CHỈ trên phim (`lookAt`), giữ suốt lúc chỉ.
+    const film = this.#lookPoint(target);
+    if (film) this.#lookTo(t, film, 0.1, { d: 0.45, huong: turn });
     t.to(s, { ['bat' + ben]: bat, ['cang' + ben]: 0, dau, nhinY, cuoi: 0.4, chum: 0.2, mayL: 0.45, mayR: 0.45, duration: 0.45, ease: 'back.out(1.2)' }, 0.15);
     t.set(s, { ['tay' + ben]: 'chi' }, 0.35);
     // Nhấn hai nhịp vào điểm trên phim.
@@ -4761,11 +4813,110 @@ export class RigSVG {
     // Quay lại người nghe: tay hạ (khép), mày nhướn, miệng hé — sẵn sàng giải thích.
     const back = 0.6 + hold, look = Math.sign(before) * 1.6;
     t.to(s, { nhinX: look, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
-    this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look });
+    // Đợt 36: đầu quay về NGƯỜI NGHE (`gaze`, mặc định `to`) và GIỮ sau bước (thế `lookAt` — động tác sau thả ra).
+    const was = s.huong; s.huong = before;
+    const listen = gaze && gaze !== 'front' && typeof gaze === 'object' ? this.#lookAngles(this.#lookPoint(gaze), { huong: before }) : { headTurn: 0, headPitch: 0, headTilt: 0 };
+    s.huong = was;
+    this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look, headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     // Có người nghe: GIỮ hướng mới ≥ 1 s trong chính bước này (lượt ba — Gemini 1 khung / giây: thấy rõ đã quay về phía bà).
     if (to && to !== 'front') t.to(s, { cuoi: 0.9, duration: XRAY_FACE_HOLD, ease: 'none' }, back + 0.65);
     return t;
   }
+
+  // ═══════════════════════════════════════════════ ĐỢT 36 — NHÌN THEO MỘT ĐIỂM (`lookAt`)
+  // Đầu QUAY (`headTurn`, cộng vào hướng thân), CÚI / NGẨNG (`headPitch`) và NGHIÊNG (`headTilt`) về một điểm; mắt đi theo. Ở cảnh
+  // trung mặt chỉ ~1/6 khung: chỉ liếc mắt thì người xem (và Gemini, ~1 khung / giây) đọc thành "nhìn thẳng ra máy quay".
+  static LOOK_YAW = 0.75;         // tổng hướng đầu khi đích ở hẳn một bên (đơn vị `huong`: 1 = nghiêng hẳn) — ≈ 3/4, đọc ra ở cảnh trung
+  static LOOK_TURN_MAX = 0.9;     // đầu quay thêm tối đa bấy nhiêu so với thân
+  static LOOK_PITCH_DEG = 32;     // đích thấp hơn mặt chừng ấy độ (so với phương ngang) → cúi hẳn (`headPitch` 1)
+  static LOOK_UP = 0.6;           // ngẩng tối đa (`headPitch` −0,6)
+  static PITCH_SHIFT = 12;        // `headPitch` 1: cụm nét mặt trượt xuống bấy nhiêu đơn vị đầu (đầu cũng hạ 3)
+  static LOOK_TILT = 7;           // nhìn chếch xuống sang bên: nghiêng đầu thêm tối đa bấy nhiêu độ
+  static LOOK_DUR = 0.35;
+
+  // TÂM MẶT trong hệ của `#aimOf` (khung 400 × 470, trừ `DOI_Y` và `s.y`), ở trạng thái hiện tại; `huong` cho trước thì ở hướng ấy.
+  #faceCentre(huong = this.s.huong) {
+    const nv = this.nv, s = this.s;
+    return { x: HONG.x + (s.dauX + huong * 2.5) * nv.coThan,
+             y: HONG.y + this.hangChan() + this.#lowered() + (nv.coDau * -62 + (-103 + nv.dauLech) + s.dauY) * nv.coThan,
+             r: 64 * nv.coDau * nv.coThan };
+  }
+
+  // ĐÍCH NHÌN → điểm trong hệ của `#aimOf`, hay null (nhìn thẳng). Nhận: { x, y } trong khung (kể cả `set.target(…)` /
+  // `set.targetPoint(…)`), một rig (đầu nó), 'L' / 'R' (bàn tay mình — đồ đang cầm), một phần tử trang hay DOMRect.
+  #lookPoint(target) {
+    const s = this.s;
+    if (target === null || target === undefined || target === 'front') return null;
+    if (target === 'L' || target === 'R') {
+      const el = this.el['coTay' + target];
+      const q = el && el.getScreenCTM && this.svg.getScreenCTM ? this.svg.getScreenCTM() : null;
+      if (!q) return null;
+      const p = new DOMPoint(0, 10).matrixTransform(q.inverse().multiply(el.getScreenCTM()));
+      return { x: p.x - s.x, y: p.y - s.y - DOI_Y };
+    }
+    let muc = target;
+    if (muc && muc.svg && muc.el) muc = muc.el.dau || muc.svg;
+    if (muc && typeof muc.x === 'number' && typeof muc.y === 'number' && !(typeof Element !== 'undefined' && muc instanceof Element)) {
+      const x = muc.x, y = muc.y;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x: x - s.x, y: y - s.y - DOI_Y } : null;
+    }
+    if (muc && (muc instanceof Element || typeof muc.left === 'number')) {
+      const r = muc instanceof Element ? muc.getBoundingClientRect() : muc, sv = this.svg.getBoundingClientRect();
+      const k = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * k) / 2, oy = sv.top + (sv.height - KHUNG.h * k) / 2;
+      const x = (r.left + r.width / 2 - ox) / k - s.x, y = (r.top + r.height / 2 - oy) / k - s.y - DOI_Y;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    }
+    throw new Error(`[character] lookAt(target): target must be a rig, { x, y } in the 400 × 470 frame, 'L' / 'R' (own hand), an element, a DOMRect, 'front' or null — got ${JSON.stringify(target)}`);
+  }
+
+  // GÓC NHÌN tới một điểm (hệ `#aimOf`): kênh đầu + mắt. `huong`: hướng THÂN lúc ấy (động tác quay người cùng lúc nhìn).
+  // Đích ở một bên → tổng hướng đầu tới `LOOK_YAW` về phía ấy (thân đã quay xa hơn về phía ấy thì giữ); đích ngay trước / dưới mặt
+  // → giữ hướng thân, chỉ cúi. Cúi theo góc từ mặt xuống đích.
+  #lookAngles(point, { head = 1, eyes = 1, huong = this.s.huong } = {}) {
+    const N = this.NGHI;
+    if (!point) return { headTurn: 0, headPitch: 0, headTilt: 0, matY: N.matY, nhinX: N.nhinX, nhinY: N.nhinY };
+    const f = this.#faceCentre(huong), dx = point.x - f.x, dy = point.y - f.y, side = dx < 0 ? -1 : 1;
+    const w = clamp((Math.abs(dx) - f.r * 0.25) / (f.r * 1.1), 0, 1);       // đích lệch sang bên bao nhiêu (0: trước mặt, 1: hẳn một bên)
+    const full = side * Math.max(RigSVG.LOOK_YAW, side * huong > 0 ? Math.abs(huong) : 0);
+    const total = huong * (1 - w) + full * w;
+    const headTurn = clamp(total - huong, -RigSVG.LOOK_TURN_MAX, RigSVG.LOOK_TURN_MAX) * head;
+    const angle = Math.atan2(dy, Math.max(Math.abs(dx), f.r * 0.8)) * 180 / Math.PI;
+    const headPitch = clamp(angle / RigSVG.LOOK_PITCH_DEG, -RigSVG.LOOK_UP, 1) * head;
+    const headTilt = -side * RigSVG.LOOK_TILT * Math.max(0, headPitch) * w * head;
+    // Nhìn xuống thì mí mắt hạ theo (như `LOOK_DOWN`) — mắt mở tròn mà con ngươi dồn xuống đọc thành trợn mắt.
+    return { headTurn, headPitch, headTilt, matY: N.matY + Math.max(0, headPitch) * LOOK_DOWN.lids * eyes,
+             nhinX: N.nhinX + clamp(dx * 0.035, -3, 3) * eyes, nhinY: N.nhinY + clamp(dy * 0.03, -1.5, 2.6) * eyes };
+  }
+
+  /** Góc nhìn tới `target` ở trạng thái hiện tại (công khai cho công cụ đo / trang thử): { headTurn, headPitch, headTilt, nhinX, nhinY }. */
+  lookAngles(target, options = {}) { return this.#lookAngles(this.#lookPoint(target), options); }
+
+  // Trong một động tác: NHÌN tới điểm `point` (hệ `#aimOf`) từ giây `at`.
+  #lookTo(t, point, at, { d = RigSVG.LOOK_DUR, huong = this.s.huong, head = 1, eyes = 1, ease = 'power2.inOut' } = {}) {
+    t.to(this.s, { ...this.#lookAngles(point, { head, eyes, huong }), duration: d, ease }, at);
+  }
+
+  /**
+   * NHÌN THEO MỘT ĐIỂM: QUAY và NGHIÊNG ĐẦU (không chỉ mắt) về `target` — `{ x, y }` trong khung 400 × 470 (hay `set.target(…)`,
+   * `set.targetPoint(…)` trong bối cảnh 3D), một rig khác (đầu nó), 'L' / 'R' (bàn tay mình, đồ đang cầm), một phần tử trang;
+   * `null` / 'front' = thôi nhìn, đầu về nghỉ. Thân đứng yên; đầu quay tới ~3/4 về phía đích ở một bên, cúi / ngẩng theo độ cao
+   * của nó (tới ~30°), mắt đi theo.
+   *   `head` / `eyes` 0…1: phần đầu / mắt (0 = chỉ liếc mắt; 0,5 = nửa chừng). `dur`: giây quay tới.
+   *   `hold`: giữ chừng ấy giây rồi tự về; bỏ trống = GIỮ như một thế (như `face`) — về nghỉ khi động tác khác bắt đầu (trong
+   *   `sequence()`) hay `lookAt(null)`.
+   */
+  lookAt(target = null, { head = 1, eyes = 1, dur = RigSVG.LOOK_DUR, hold = null } = {}) {
+    if (!(Number.isFinite(head) && Number.isFinite(eyes))) throw new Error('[character] lookAt: head and eyes must be numbers 0…1');
+    if (!(Number.isFinite(dur) && dur > 0)) throw new Error(`[character] lookAt: dur must be a number of seconds > 0, got ${JSON.stringify(dur)}`);
+    if (hold !== null && !(Number.isFinite(hold) && hold >= 0)) throw new Error(`[character] lookAt: hold must be a number of seconds ≥ 0 or null (keep looking), got ${JSON.stringify(hold)}`);
+    const t = this.tl(), point = this.#lookPoint(target);
+    this.#lookTo(t, point, 0, { d: dur, head: clamp(head, 0, 1), eyes: clamp(eyes, 0, 1) });
+    if (hold === null) return t;
+    if (hold > 1) this.#chop(t, dur + hold * 0.5);
+    this.#lookTo(t, null, dur + hold, { d: dur });
+    return t;
+  }
+  static LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 
   // ĐẶT CON VẬT ĐANG BẾ vào đúng chỗ (gọi trong `apDung`, là hàm của trạng thái): `om` ≥ 0,5 thì SVG của nó nằm trong
   // ngăn `om` (giữa thân và hai tay), ở vị trí trượt từ chỗ nó đứng (`from`) lên trước bụng theo `omRise`; dưới 0,5 thì

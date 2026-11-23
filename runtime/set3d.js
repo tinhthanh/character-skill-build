@@ -1715,6 +1715,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
           carrot: !person && e.carrot && e.carrot.style.display !== 'none' && e.carrotBody ? rect(drawnRect(e.carrotBody)) : null,
           headBox: person && e.dau ? rect(drawnRect(e.dau)) : null,                    // khung đầu người (mặt người bế — liếm mặt)
+          // HƯỚNG ĐẦU (đợt 36, `lookAt`): quay (đơn vị `huong`, thân + đầu — đã gồm phần bù góc máy), cúi (`headPitch`), nghiêng; tâm và chiều
+          // cao KHUÔN MẶT trên màn hình — tools/acting_check.py dựng tia nhìn từ đó.
+          gaze: person && rig.s && e.khuon ? (() => { const r = rect(drawnRect(e.khuon)); return { yaw: +Math.max(-1, Math.min(1, (rig.s.huong || 0) + (rig.s.headTurn || 0))).toFixed(3), pitch: +(rig.s.headPitch || 0).toFixed(3),
+            tilt: +(rig.s.headTilt || 0).toFixed(2), x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, h: r.y1 - r.y0, pitchDeg: (rig.constructor && rig.constructor.LOOK_PITCH_DEG) || 32 }; })() : null,
+          readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.

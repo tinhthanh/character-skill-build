@@ -222,6 +222,7 @@ const NGHI = Object.freeze({
   readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
   readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
+  headTurn: 0, headPitch: 0, headTilt: 0,
 });
 const MAU_MAC_DINH = {
   da: '#f1c3a0', daToi: '#d9a583', toc: '#2c2a33', ao: '#4a8ed6', aoToi: '#3a74b3',
@@ -323,6 +324,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
 const XRAY_TURN = 0.55;                   // quay 3/4 về phía tấm phim lúc chỉ
 const XRAY_LISTEN = 0.75, XRAY_FACE_HOLD = 1.0;   // chỉ xong: quay HẲN về người nghe (0,75) và giữ 1 s trong bước (lượt ba)
@@ -622,7 +624,7 @@ class RigSVG {
                      'bandage', 'putCone', 'showXray', 'offerHand', 'offerCheek'];
   static DI_NGANG = ['walk', 'enter', 'exit', 'hurry'];
   static SIDESTEP = 70;                  // quãng `walk` ngắn hơn chừng này (đơn vị khung) thì bước nhích, không quay ngang
-  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff'];
+  static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff', 'lookAt'];
   static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet', 'weigh', 'givePill'];       // `givePill`: cần con vật và hai tay rảnh
   static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify', 'readChart'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static gieo(hat) { gieoHat(hat); }
@@ -1128,12 +1130,15 @@ class RigSVG {
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
     if (e.chanG.lastElementChild !== gan && e.chanG.lastElementChild !== e.skirt) e.chanG.appendChild(gan);
     else if (e.skirt && e.skirt.previousElementSibling !== gan) e.chanG.insertBefore(gan, e.skirt);      // váy luôn nằm trên cả hai chân
-    const nv = this.nv, K = nv.khuon, k = mem(ah), sg = h < 0 ? -1 : 1;
-    const co = 1 - ah * 0.15, lech = h * nv.netLech;
-    e.net.setAttribute('transform', `translate(${lech} 0) scale(${co} 1)`);
+    const hd = clamp(h + (s.headTurn || 0), -1, 1), ahd = Math.abs(hd), pitch = clamp(s.headPitch || 0, -1, 1);
+    const nv = this.nv, K = nv.khuon, k = mem(ahd), sg = h < 0 ? -1 : 1, sgd = hd < 0 ? -1 : 1;
+    const co = 1 - ahd * 0.15, lech = hd * nv.netLech;
+    const pitchY = pitch * RigSVG.PITCH_SHIFT;
+    e.net.setAttribute('transform', `translate(${lech} ${pitchY.toFixed(2)}) scale(${co} ${(1 - Math.abs(pitch) * 0.08).toFixed(3)})`);
     for (const [ben, dau] of [['L', -1], ['R', 1]]) {
-      const xa = Math.max(0, dau * h);                    // 1 = má này nằm phía mặt đang quay tới
+      const xa = Math.max(0, dau * hd);                    // 1 = má này nằm phía mặt đang quay tới
       e['ma' + ben].setAttribute('cx', lech + co * dau * nv.maX);
+      e['ma' + ben].setAttribute('cy', nv.maY + pitchY);
       e['ma' + ben].setAttribute('rx', nv.maRong * co * (1 - xa * 0.25) * (1 + 0.6 * clamp(s.doMa, 0, 1)));
       e['ma' + ben].setAttribute('ry', nv.maRong * 0.62 * (1 + 0.35 * clamp(s.doMa, 0, 1)));
       e['ma' + ben].setAttribute('opacity', (0.55 + 0.45 * clamp(s.doMa, 0, 1)).toFixed(3));     // ngượng: má đỏ đậm và lan rộng ra
@@ -1146,10 +1151,10 @@ class RigSVG {
     const G = nv.khuonGoc;
     const coToc = `scale(${(K.rong / G.rong).toFixed(4)} ${((K.cao + K.yRong) / (G.cao + G.yRong)).toFixed(4)})`;
     e.tocG.setAttribute('transform', coToc);
-    e.muG.setAttribute('transform', `${coToc} translate(${h * nv.tocLech} 0)`);   // mũ đi đúng theo mái tóc
-    e.tocTruoc.setAttribute('transform', `translate(${h * nv.tocLech} 0)`);
-    if (e.tocBui) e.tocBui.setAttribute('transform', `translate(${-h * (nv.buiLech + nv.tocLech)} ${ah * 3})`);
-    e.tocLungE.setAttribute('cx', -h * K.rong * 0.3);
+    e.muG.setAttribute('transform', `${coToc} translate(${hd * nv.tocLech} 0)`);   // mũ đi đúng theo mái tóc
+    e.tocTruoc.setAttribute('transform', `translate(${hd * nv.tocLech} ${(pitch * RigSVG.PITCH_SHIFT * 0.3).toFixed(2)})`);
+    if (e.tocBui) e.tocBui.setAttribute('transform', `translate(${-hd * (nv.buiLech + nv.tocLech)} ${ahd * 3})`);
+    e.tocLungE.setAttribute('cx', -hd * K.rong * 0.3);
     e.tocLungE.setAttribute('cy', -K.cao * 0.22);
     e.tocLungE.setAttribute('rx', K.rong - 1);
     e.tocLungE.setAttribute('ry', K.cao * 0.78 - 1);
@@ -1157,7 +1162,7 @@ class RigSVG {
     e.lowHairClipR.setAttribute('y', hairline);
     if (e.tocLungLow) for (const a of ['cx', 'cy', 'rx', 'ry']) e.tocLungLow.setAttribute(a, e.tocLungE.getAttribute(a));
     const xN = -K.rong - 8, tai = -nv.taiX * (1 - 0.18 * k), X = (d) => (xN + (d - xN) * k).toFixed(2);
-    e.tocGay.setAttribute('transform', `scale(${sg} 1)`);
+    e.tocGay.setAttribute('transform', `scale(${sgd} 1)`);
     const napeTop = nv.backHair === 'low'
       ? `M ${xN} ${hairline} L ${X(tai + 6)} ${hairline} Q ${X(tai + 10)} ${(hairline + 2) / 2} ${X(tai + 1)} 3`
       : `M ${xN} ${-K.cao - 8} L ${X(-K.rong * 0.1)} ${-K.cao - 8} Q ${X(tai + 15)} ${-K.cao * 0.5} ${X(tai + 7)} -5`;
@@ -1166,9 +1171,9 @@ class RigSVG {
     e.suon.setAttribute('opacity', 0.45 * (1 - ah));           // vệt tối sườn chỉ hợp khi nhìn thẳng
     const w4 = beRongTaiY(K, 4);
     for (const [ben, dau] of [['L', -1], ['R', 1]]) {
-      const gan = Math.max(0, -dau * h), xa = Math.max(0, dau * h);
+      const gan = Math.max(0, -dau * hd), xa = Math.max(0, dau * hd);
       const x = gan ? nv.taiX * (1 - 0.18 * mem(gan)) : nv.taiX + (w4 - 6 - nv.taiX) * mem(xa);
-      e['tai' + ben].setAttribute('transform', `translate(${dau * x} 4) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
+      e['tai' + ben].setAttribute('transform', `translate(${dau * x} ${(4 - pitch * RigSVG.PITCH_SHIFT * 0.45).toFixed(2)}) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
     const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah) * (1 - clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1)));
@@ -1235,7 +1240,7 @@ class RigSVG {
     e.co.setAttribute('transform', `translate(${h * 3} 0) scale(${coHep} 1)`);
     e.coDa.setAttribute('d', `M -13 -130 L 13 -130 L 13.5 -106 Q ${eoCo} -100 ${chanCo} -96 L ${-chanCo} -96 Q ${-eoCo} -100 -13.5 -106 Z`);
     const onPhone = clamp(s.phoneR, 0, 1) - clamp(s.phoneL, 0, 1);
-    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7)} ${-103 + this.nv.dauLech + s.dauY + stoop * 9}) rotate(${s.dau + onPhone * CALL_TILT}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
+    e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7) + (s.headTurn || 0) * 2.5} ${-103 + this.nv.dauLech + s.dauY + stoop * 9 + pitch * 3}) rotate(${s.dau + onPhone * CALL_TILT + (s.headTilt || 0)}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
     const tayTheoSau = (bat, cang, v) => {
@@ -1400,7 +1405,7 @@ class RigSVG {
         sheet.style.display = flip > 0.93 ? 'none' : '';
         sheet.removeAttribute('transform');
         if (shape) {
-          const span = 32, yb = top + span * Math.cos(Math.PI * flip), bulge = 7 * Math.sin(Math.PI * flip), mid = (top + yb) / 2, curl = -4 * Math.sin(Math.PI * flip);
+          const span = 32, yb = top + span * Math.cos(Math.PI * flip), bulge = 10 * Math.sin(Math.PI * flip), mid = (top + yb) / 2, curl = -4 * Math.sin(Math.PI * flip);
           shape.setAttribute('d', `M -12 ${top} L 12 ${top} Q ${(12 + bulge).toFixed(2)} ${(mid + curl).toFixed(2)} 12 ${yb.toFixed(2)} Q 0 ${(yb + curl * 1.5).toFixed(2)} -12 ${yb.toFixed(2)} Q ${(-12 - bulge).toFixed(2)} ${(mid + curl).toFixed(2)} -12 ${top} Z`);
           shape.setAttribute('fill', flip > 0.5 ? '#e4e9ee' : shape.dataset.paper || '#ffffff');
         }
@@ -1444,19 +1449,19 @@ class RigSVG {
     }
     const mi = Math.max(0.05, 1 - s.matY);
     const mc = this.nv.matCo;
-    e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -h) * 0.3)} ${mc * mi})`);
-    e.matR.setAttribute('transform', `translate(${this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, h) * 0.3)} ${mc * mi})`);
-    if (e.mui) e.mui.setAttribute('transform', `translate(${h * 3} ${this.nv.muiY}) scale(${this.nv.muiCo})`);
+    e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -hd) * 0.3)} ${mc * mi})`);
+    e.matR.setAttribute('transform', `translate(${this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, hd) * 0.3)} ${mc * mi})`);
+    if (e.mui) e.mui.setAttribute('transform', `translate(${hd * 3} ${this.nv.muiY}) scale(${this.nv.muiCo})`);
     if (e.netThem && this.nv.netTheoMat && this.nv.netGoc) {
       const g = this.nv.netGoc;
       e.netThem.setAttribute('transform',
         `translate(0 ${(this.nv.matY - g.matY).toFixed(2)}) scale(${(this.nv.matX / g.matX).toFixed(4)} ${this.nv.matCo})`);
     }
-    e.nguoiL.setAttribute('transform', `translate(${s.nhinX + h * 1.2} ${s.nhinY})`);   // mắt nhìn theo hướng đi
-    e.nguoiR.setAttribute('transform', `translate(${s.nhinX + h * 1.2} ${s.nhinY})`);
+    e.nguoiL.setAttribute('transform', `translate(${s.nhinX + hd * 1.2} ${s.nhinY})`);   // mắt nhìn theo hướng đi
+    e.nguoiR.setAttribute('transform', `translate(${s.nhinX + hd * 1.2} ${s.nhinY})`);
     const mx = this.nv.mayX ?? this.nv.matX;
-    e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -h) * 0.28} 1) rotate(${-s.mayL * 8})`);
-    e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, h) * 0.28} 1) rotate(${s.mayR * 8})`);
+    e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -hd) * 0.28} 1) rotate(${-s.mayL * 8})`);
+    e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, hd) * 0.28} 1) rotate(${s.mayR * 8})`);
     this.#veMom();
     this.#drawLeash();
     this.#drawBall();
@@ -3017,9 +3022,14 @@ class RigSVG {
     const T1 = 1.6;
     t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: otherArm, ['cang' + other]: -40, ['aim' + onScale.k]: 1, omScale: 1, duration: 0.02 }, T1);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, T1 + 0.02);
+    s.seat = 1; s.kneel = 1;
+    const kneelLook = this.#lookAngles({ x: onScale.tx, y: onScale.ty });
+    s.seat = was.seat; s.kneel = was.kneel;
+    t.to(s, { ...kneelLook, duration: 0.6, ease: 'power2.inOut' }, T1);
     t.to(s, { ...down, duration: 0.6, ease: 'power2.inOut' }, T1);
     t.to(s, { omRise: 0, duration: 0.65, ease: 'power2.inOut' }, T1);
     const R = T1 + 0.7;
+    this.#lookTo(t, { x: spot.x - s.x, y: c.scale.y + (crown - offY - c.from.y) - 30 - (s.y || 0) - DOI_Y }, R, { d: 0.55 });
     t.to(s, { ['bat' + onScale.k]: N['bat' + onScale.k], ['cang' + onScale.k]: N['cang' + onScale.k], ['bat' + other]: N['bat' + other], ['cang' + other]: N['cang' + other],
               seat: N.seat, kneel: 0, than: N.than, dau: N.dau + (spot.x > HONG.x + s.x ? 4 : -4), dauY: 8, nhinX: clamp((spot.x - s.x - HONG.x) * 0.02, -3, 3), nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids, cuoi: 0.7,
               duration: 0.55, ease: 'power2.inOut' }, R);
@@ -3029,12 +3039,15 @@ class RigSVG {
     t.to(s, { dauY: 11, cuoi: 1, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, R + 0.45 + hold * 0.6);
     const B = R + 0.55 + hold;
     t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, B - 0.1);
+    t.to(s, { ...kneelLook, duration: 0.6, ease: 'power2.inOut' }, B);
     t.to(s, { ['bat' + onScale.k]: onScale.upper, ['cang' + onScale.k]: onScale.fore, ['bat' + other]: otherArm, ['cang' + other]: -40, ...down, matY: 0, duration: 0.6, ease: 'power2.inOut' }, B);
+    this.#lookTo(t, null, B + 0.65, { d: 0.6 });
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, B + 0.3);
     t.to(s, { omRise: 1, seat: N.seat, kneel: 0, than: N.than, dau: N.dau, dauY: 3, nhinY: 1.8, nhinX: 0, cuoi: 1, duration: 0.7, ease: 'power2.inOut' }, B + 0.65);
     const D = B + 1.4, back = home.k === 'L' ? 'R' : 'L';
     t.to(s, { omScale: 0, ['bat' + home.k]: home.upper, ['cang' + home.k]: home.fore, ['bat' + back]: home.bend ? -home.bend : home.upper * 0.6, ['cang' + back]: -40, duration: 0.02 }, D);
     if (home.crouch) t.to(s, { seat: home.crouch, duration: 0.5, ease: 'power2.inOut' }, D);
+    this.#lookTo(t, { x: home.tx, y: home.ty }, D, { d: 0.55, huong: c.facing });
     t.to(s, { omRise: 0, dauY: 7, nhinY: 2.4, duration: 0.55, ease: 'power2.inOut' }, D);
     t.to(s, { huong: c.facing, duration: 0.5, ease: 'sine.inOut' }, D);
     t.set(s, { om: 0 }, D + 0.6);
@@ -3081,6 +3094,9 @@ class RigSVG {
     this.#careFor(pet, 'petWrap', 'bandage');
     const t = this.tl(), s = this.s, N = this.NGHI, { reach, keep } = this.#careHand(t, target, 'leg'), { k, tx, ty } = reach;
     const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, reach, 0.4);
+    const facing = s.huong, turn = clamp(facing + side * RigSVG.BANDAGE_TURN, -1, 1);
+    t.to(s, { huong: turn, duration: 0.45, ease: 'sine.inOut' }, 0);
+    s.huong = turn;
     const holdLeg = arm(o, tx - side * 2, ty + 7), R = BANDAGE_LOOP, loop = 0.55, start = 0.55, n = Math.round(wraps);
     const wrapAt = (w, q) => { const a = -Math.PI / 2 + q * Math.PI / 2; return arm(k, tx + Math.cos(a) * R, ty + 2 + ((w + q / 4) / n) * 9 - 3 + Math.sin(a) * R * 0.75); };
     const first = wrapAt(0, 0);
@@ -3088,6 +3104,7 @@ class RigSVG {
     t.to(s, { ['bat' + k]: first.bat, ['cang' + k]: first.cang, ['bat' + o]: holdLeg.bat, ['cang' + o]: holdLeg.cang, than: N.than - side * 3, dau: N.dau + side * 4,
               dauY: 11, nhinY: 3, nhinX: side * 1.4, matY: 0.25, cuoi: 0.5, chum: 0.25, mayL: 0.2, mayR: 0.2, duration: 0.5, ease: 'power2.out' }, 0);
     t.set(s, { ['gadget' + k]: 8 }, 0.15);
+    this.#lookTo(t, { x: tx, y: ty }, 0.05, { d: 0.45 });          // đợt 36: đầu cúi / quay về chỗ quấn
     for (let w = 0; w < n; w++) for (let q = 1; q <= 4; q++) {
       const p = wrapAt(w, q);
       t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: loop / 4, ease: 'sine.inOut' }, start + w * loop + (q - 1) * loop / 4);
@@ -3101,6 +3118,7 @@ class RigSVG {
      .to(s, { ['bat' + k]: patUp.bat, ['cang' + k]: patUp.cang, duration: 0.14, ease: 'sine.out' }, done + 0.28)
      .to(s, { ['bat' + k]: pat.bat, ['cang' + k]: pat.cang, duration: 0.14, ease: 'sine.in' }, done + 0.42);
     t.to(s, { cuoi: 1, chum: 0, mayL: 0.55, mayR: 0.55, matY: 0, dauY: 6, duration: 0.25 }, done + 0.1);
+    s.huong = facing;
     this.#khep(t, 0.5, done + 0.62, { ...keep, ...(pet ? { petWrap: 1 } : {}) });
     return t;
   }
@@ -3114,22 +3132,25 @@ class RigSVG {
     this.#leanTo(t, { ...reach, upper, fore }, 'nam');
     t.set(s, { ['gadget' + k]: 6 }, 0.1);
     t.to(s, { ['bat' + k]: upper + 2, ['cang' + k]: fore - 3, duration: 0.2, ease: 'sine.out' }, 0.45);
+    this.#lookTo(t, { x: reach.tx, y: reach.ty }, 0.5);
     t.to(s, { dau: N.dau + m * 5 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.25, mayR: 0.25, cuoi: 0.35, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.5);
     const up = 0.6 + hold;
     const facingTo = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
     const box = (el) => { const b = el.getBBox(), q = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM()); const a = new DOMPoint(b.x, b.y).matrixTransform(q), c = new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(q); return { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
-    let readPose = RigSVG.TEMP_POSE;
+    let readPose = RigSVG.TEMP_POSE, toolAt = null;
     try {
       const head = box(this.el.dau), eyes = [box(this.el.matL), box(this.el.matR)], eyeY = (eyes[0].y + eyes[1].y) / 2;
       for (let side = RigSVG.TEMP_SIDE; side >= 0.55 - 1e-6; side -= 0.05) {
         const tx = head.x + m * side * head.w, ty = eyeY - 0.06 * head.h + 17 * RigSVG.TEMP_ZOOM;      // cổ tay (hệ gốc); mô hình đặt nhiệt kế thấp hơn hình vẽ ~12 % đầu — bù 6 %
         const pose = this.#armToTurned(k, tx - s.x, ty - (s.y || 0) - DOI_Y, facingTo, 0);
-        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) readPose = [pose.bat, pose.cang];
+        if (Number.isFinite(pose.bat) && Number.isFinite(pose.cang)) { readPose = [pose.bat, pose.cang]; toolAt = { x: tx - s.x, y: ty - 17 * RigSVG.TEMP_ZOOM - (s.y || 0) - DOI_Y }; }
         if (!(pose.short > 0)) break;
       }
     } catch (error) { /* chưa vẽ: dáng mặc định */ }
     t.to(s, { ['ovBat' + k]: readPose[0], ['ovCang' + k]: readPose[1], duration: 0.02 }, up);
     const R = RigSVG.TEMP_READ, facing = clamp(s.huong + m * RigSVG.TEMP_TURN, -1, 1);
+    const face = this.#faceCentre(facing);
+    this.#lookTo(t, toolAt || { x: face.x + m * face.r * 1.3, y: face.y }, up, { d: 0.45, huong: facing });
     t.to(s, { ['ov' + k]: 1, ['handZoom' + k]: RigSVG.TEMP_ZOOM, huong: facing, seat: reach.crouch ? N.seat : s.seat, than: N.than - m * 4, dau: N.dau + m * 3, dauY: 4, nhinX: m * 4.2, nhinY: 0.4, matY: 0.15,
               cuoi: 0.5, chum: 0, mayL: 0.55, mayR: 0.55, duration: 0.45, ease: 'power2.inOut' }, up);
     t.to(s, { readoutN: this.#reading({ text: reading, side: k }), duration: 0.02 }, up + 0.3);
@@ -3152,6 +3173,7 @@ class RigSVG {
     if (toward < 0) return { bat: chuanHoaGoc(toward + alpha), cang: -(180 - beta), short: 0 };
     return { bat: chuanHoaGoc(toward - alpha), cang: 180 - beta, short: 0 };
   }
+  static BANDAGE_TURN = 0.8;               // đợt 36: quấn băng — quay gần nghiêng hẳn về con vật, hai tay cùng ra trước tới ống chân
   static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
@@ -3189,6 +3211,7 @@ class RigSVG {
        .to(s, { ['onTop' + other]: 0, duration: 0.02 }, RigSVG.PILL_IN + 1.05);                 // tay đỡ cằm: tới hết hai nhịp vuốt cằm
     }
     t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
+    this.#lookTo(t, { x: lips.tx, y: lips.ty }, 0.1, { d: 0.45, huong: turn });
     t.set(s, { ['tay' + other]: 'xoe' }, 0.02);
     t.set(s, { ['gadget' + k]: 7 }, 0.05);
     t.to(s, { ['bat' + other]: chin.bat, ['cang' + other]: chin.cang, duration: 0.5, ease: 'power2.out' }, 0.05);
@@ -3233,7 +3256,7 @@ class RigSVG {
     this.#khep(t, 0.5, 2.62, { ...keep, ...(pet ? { petCone: 1 } : {}) });
     return t;
   }
-  readChart(hold = 2, { side = 'auto' } = {}) {
+  readChart(hold = 2, { side = 'auto', to = null, gaze = to } = {}) {
     const s = this.s, N = this.NGHI, board = (k) => this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-clipboard]');
     const k = side === 'L' || side === 'R' ? side : ['R', 'L'].find(board);
     if (!k || !board(k)) throw new Error('[character] readChart: the character is not holding a clipboard' + (side === 'L' || side === 'R' ? ` in hand ${side}` : '') + ' — give it one: createCharacter(host, { id, items: { R: "clipboard" } })');
@@ -3243,29 +3266,36 @@ class RigSVG {
     if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
     t.to(s, { ['carry' + k]: 0, duration: 0.15 }, 0);
     const read = { dauY: CHART_DOWN, dau: N.dau + m * CHART_TILT, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids };
+    const face = this.#faceCentre(), boardAt = { x: face.x + m * face.r * 0.35, y: face.y + face.r * 2 };
+    this.#lookTo(t, boardAt, 0, { d: 0.5 });
     t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, ...read, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.5, ease: 'power2.out' }, 0);
     const scan = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, dau: read.dau - m * 1.5, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, dau: read.dau + m * 1.5, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
     const flip = 0.5 + Math.max(1.3, hold * 0.6);                 // đọc tờ đầu ≥ 1,3 s rồi mới lật
     scan(0.55, flip - 0.45);
     t.set(s, { ['tay' + pen]: 'nam' }, flip - 0.45);
     t.to(s, { ['bat' + pen]: CHART_POSE.flip[0], ['cang' + pen]: CHART_POSE.flip[1], nhinX: 0, duration: 0.4, ease: 'power2.out' }, flip - 0.45);
-    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, duration: 0.8, ease: 'sine.inOut' }, flip);
-    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 0.85);
-    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.25);
+    t.to(s, { ['itemZoom' + k]: CHART_FLIP_ZOOM, duration: 0.35, ease: 'power2.out' }, flip - 0.45);
+    t.to(s, { ['page' + k]: 0.55, ['bat' + pen]: CHART_POSE.flip[0] + 9, ['cang' + pen]: CHART_POSE.flip[1] - 11, duration: 0.45, ease: 'sine.out' }, flip);
+    t.to(s, { ['page' + k]: 1, ['bat' + pen]: CHART_POSE.flip[0] + 14, ['cang' + pen]: CHART_POSE.flip[1] - 18, duration: 0.3, ease: 'sine.in' }, flip + 0.8);
+    t.to(s, { ['bat' + pen]: N['bat' + pen], ['cang' + pen]: N['cang' + pen], duration: 0.4, ease: 'power2.inOut' }, flip + 1.1);
+    t.to(s, { ['itemZoom' + k]: CHART_POSE.zoom, duration: 0.35, ease: 'power2.inOut' }, flip + 1.15);
+    t.set(s, { ['tay' + pen]: N['tay' + pen] }, flip + 1.5);
     const up = flip + 0.85 + Math.max(1.2, hold * 0.4);
     scan(flip + 0.9, up - 0.05);
     t.to(s, { dauY: 0, dau: N.dau, nhinY: 0, matY: 0, nhinX: 0, cuoi: 0.85, mayL: 0.55, mayR: 0.55, duration: 0.35, ease: 'power2.out' }, up);
+    const listen = this.#lookAngles(this.#lookPoint(gaze));
+    t.to(s, { headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt, duration: 0.4, ease: 'power2.inOut' }, up);
     for (let i = 0; i < 2; i++) {
       const a = up + 0.75 + i * 1.0;
       t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.3, ease: 'sine.inOut' }, a)
        .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.65);
     }
     const end = up + 2.8;
-    this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}) });
+    this.#khep(t, 0.5, end, { ['page' + k]: 1, ...(stowed ? { ['item' + k]: 0 } : {}), headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     t.set(s, { ['page' + k]: 0 }, end + 0.5);
     return t;
   }
-  showXray(target = null, hold = 1.6, { to = null } = {}) {
+  showXray(target = null, hold = 1.6, { to = null, gaze = to } = {}) {
     if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] showXray: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
     const t = this.tl(), s = this.s;
     let before = s.huong;
@@ -3281,15 +3311,87 @@ class RigSVG {
     t.to(s, { huong: turn, nhinX, duration: 0.4, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + ben]: 'nam' }, 0.1);
     t.to(s, { ['aim' + ben]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.1);
+    const film = this.#lookPoint(target);
+    if (film) this.#lookTo(t, film, 0.1, { d: 0.45, huong: turn });
     t.to(s, { ['bat' + ben]: bat, ['cang' + ben]: 0, dau, nhinY, cuoi: 0.4, chum: 0.2, mayL: 0.45, mayR: 0.45, duration: 0.45, ease: 'back.out(1.2)' }, 0.15);
     t.set(s, { ['tay' + ben]: 'chi' }, 0.35);
     for (const at of [0.75, 0.75 + hold * 0.5]) t.to(s, { ['cang' + ben]: 5, ['bat' + ben]: bat + 1.5, dauY: 2.5, duration: 0.14, ease: 'power2.out', yoyo: true, repeat: 1 }, at);
     const back = 0.6 + hold, look = Math.sign(before) * 1.6;
     t.to(s, { nhinX: look, nhinY: 0, dau: 0, chum: 0, mayL: 0.65, mayR: 0.65, cuoi: 0.8, mieng: 0.25, duration: 0.35, ease: 'sine.inOut' }, back);
-    this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look });
+    const was = s.huong; s.huong = before;
+    const listen = gaze && gaze !== 'front' && typeof gaze === 'object' ? this.#lookAngles(this.#lookPoint(gaze), { huong: before }) : { headTurn: 0, headPitch: 0, headTilt: 0 };
+    s.huong = was;
+    this.#khep(t, 0.55, back + 0.1, { huong: before, nhinX: look, headTurn: listen.headTurn, headPitch: listen.headPitch, headTilt: listen.headTilt });
     if (to && to !== 'front') t.to(s, { cuoi: 0.9, duration: XRAY_FACE_HOLD, ease: 'none' }, back + 0.65);
     return t;
   }
+  static LOOK_YAW = 0.75;         // tổng hướng đầu khi đích ở hẳn một bên (đơn vị `huong`: 1 = nghiêng hẳn) — ≈ 3/4, đọc ra ở cảnh trung
+  static LOOK_TURN_MAX = 0.9;     // đầu quay thêm tối đa bấy nhiêu so với thân
+  static LOOK_PITCH_DEG = 32;     // đích thấp hơn mặt chừng ấy độ (so với phương ngang) → cúi hẳn (`headPitch` 1)
+  static LOOK_UP = 0.6;           // ngẩng tối đa (`headPitch` −0,6)
+  static PITCH_SHIFT = 12;        // `headPitch` 1: cụm nét mặt trượt xuống bấy nhiêu đơn vị đầu (đầu cũng hạ 3)
+  static LOOK_TILT = 7;           // nhìn chếch xuống sang bên: nghiêng đầu thêm tối đa bấy nhiêu độ
+  static LOOK_DUR = 0.35;
+  #faceCentre(huong = this.s.huong) {
+    const nv = this.nv, s = this.s;
+    return { x: HONG.x + (s.dauX + huong * 2.5) * nv.coThan,
+             y: HONG.y + this.hangChan() + this.#lowered() + (nv.coDau * -62 + (-103 + nv.dauLech) + s.dauY) * nv.coThan,
+             r: 64 * nv.coDau * nv.coThan };
+  }
+  #lookPoint(target) {
+    const s = this.s;
+    if (target === null || target === undefined || target === 'front') return null;
+    if (target === 'L' || target === 'R') {
+      const el = this.el['coTay' + target];
+      const q = el && el.getScreenCTM && this.svg.getScreenCTM ? this.svg.getScreenCTM() : null;
+      if (!q) return null;
+      const p = new DOMPoint(0, 10).matrixTransform(q.inverse().multiply(el.getScreenCTM()));
+      return { x: p.x - s.x, y: p.y - s.y - DOI_Y };
+    }
+    let muc = target;
+    if (muc && muc.svg && muc.el) muc = muc.el.dau || muc.svg;
+    if (muc && typeof muc.x === 'number' && typeof muc.y === 'number' && !(typeof Element !== 'undefined' && muc instanceof Element)) {
+      const x = muc.x, y = muc.y;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x: x - s.x, y: y - s.y - DOI_Y } : null;
+    }
+    if (muc && (muc instanceof Element || typeof muc.left === 'number')) {
+      const r = muc instanceof Element ? muc.getBoundingClientRect() : muc, sv = this.svg.getBoundingClientRect();
+      const k = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * k) / 2, oy = sv.top + (sv.height - KHUNG.h * k) / 2;
+      const x = (r.left + r.width / 2 - ox) / k - s.x, y = (r.top + r.height / 2 - oy) / k - s.y - DOI_Y;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    }
+    throw new Error(`[character] lookAt(target): target must be a rig, { x, y } in the 400 × 470 frame, 'L' / 'R' (own hand), an element, a DOMRect, 'front' or null — got ${JSON.stringify(target)}`);
+  }
+  #lookAngles(point, { head = 1, eyes = 1, huong = this.s.huong } = {}) {
+    const N = this.NGHI;
+    if (!point) return { headTurn: 0, headPitch: 0, headTilt: 0, matY: N.matY, nhinX: N.nhinX, nhinY: N.nhinY };
+    const f = this.#faceCentre(huong), dx = point.x - f.x, dy = point.y - f.y, side = dx < 0 ? -1 : 1;
+    const w = clamp((Math.abs(dx) - f.r * 0.25) / (f.r * 1.1), 0, 1);       // đích lệch sang bên bao nhiêu (0: trước mặt, 1: hẳn một bên)
+    const full = side * Math.max(RigSVG.LOOK_YAW, side * huong > 0 ? Math.abs(huong) : 0);
+    const total = huong * (1 - w) + full * w;
+    const headTurn = clamp(total - huong, -RigSVG.LOOK_TURN_MAX, RigSVG.LOOK_TURN_MAX) * head;
+    const angle = Math.atan2(dy, Math.max(Math.abs(dx), f.r * 0.8)) * 180 / Math.PI;
+    const headPitch = clamp(angle / RigSVG.LOOK_PITCH_DEG, -RigSVG.LOOK_UP, 1) * head;
+    const headTilt = -side * RigSVG.LOOK_TILT * Math.max(0, headPitch) * w * head;
+    return { headTurn, headPitch, headTilt, matY: N.matY + Math.max(0, headPitch) * LOOK_DOWN.lids * eyes,
+             nhinX: N.nhinX + clamp(dx * 0.035, -3, 3) * eyes, nhinY: N.nhinY + clamp(dy * 0.03, -1.5, 2.6) * eyes };
+  }
+  lookAngles(target, options = {}) { return this.#lookAngles(this.#lookPoint(target), options); }
+  #lookTo(t, point, at, { d = RigSVG.LOOK_DUR, huong = this.s.huong, head = 1, eyes = 1, ease = 'power2.inOut' } = {}) {
+    t.to(this.s, { ...this.#lookAngles(point, { head, eyes, huong }), duration: d, ease }, at);
+  }
+  lookAt(target = null, { head = 1, eyes = 1, dur = RigSVG.LOOK_DUR, hold = null } = {}) {
+    if (!(Number.isFinite(head) && Number.isFinite(eyes))) throw new Error('[character] lookAt: head and eyes must be numbers 0…1');
+    if (!(Number.isFinite(dur) && dur > 0)) throw new Error(`[character] lookAt: dur must be a number of seconds > 0, got ${JSON.stringify(dur)}`);
+    if (hold !== null && !(Number.isFinite(hold) && hold >= 0)) throw new Error(`[character] lookAt: hold must be a number of seconds ≥ 0 or null (keep looking), got ${JSON.stringify(hold)}`);
+    const t = this.tl(), point = this.#lookPoint(target);
+    this.#lookTo(t, point, 0, { d: dur, head: clamp(head, 0, 1), eyes: clamp(eyes, 0, 1) });
+    if (hold === null) return t;
+    if (hold > 1) this.#chop(t, dur + hold * 0.5);
+    this.#lookTo(t, null, dur + hold, { d: dur });
+    return t;
+  }
+  static LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
   #placeCarried() {
     const c = this.carried, e = this.el, s = this.s;
     if (!c || !e.om) return;
@@ -7844,6 +7946,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
           carrot: !person && e.carrot && e.carrot.style.display !== 'none' && e.carrotBody ? rect(drawnRect(e.carrotBody)) : null,
           headBox: person && e.dau ? rect(drawnRect(e.dau)) : null,                    // khung đầu người (mặt người bế — liếm mặt)
+          gaze: person && rig.s && e.khuon ? (() => { const r = rect(drawnRect(e.khuon)); return { yaw: +Math.max(-1, Math.min(1, (rig.s.huong || 0) + (rig.s.headTurn || 0))).toFixed(3), pitch: +(rig.s.headPitch || 0).toFixed(3),
+            tilt: +(rig.s.headTilt || 0).toFixed(2), x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, h: r.y1 - r.y0, pitchDeg: (rig.constructor && rig.constructor.LOOK_PITCH_DEG) || 32 }; })() : null,
+          readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2) } : null,
@@ -8451,6 +8556,8 @@ function list() {
 }
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
+const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
+const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
@@ -8473,9 +8580,14 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
     const draft = rig[name](...args);
     draft.progress(1e-6); const startState = snapshot();
     draft.progress(1); endState = snapshot(); draft.progress(0); draft.kill();
+    const releases = !LOOK_KEEP.includes(name) && LOOK_KEYS.some((key) => keys.includes(key) && Math.abs(startState[keys.indexOf(key)] || 0) > 1e-3);
+    if (releases) for (const key of LOOK_KEYS) { const n = keys.indexOf(key); if (endState[n] === startState[n]) endState[n] = 0; }
     RigSVG.traNgau(randomState[0]); RigThu.traNgau(randomState[1]);
     restore(startState);
     if (!firstFrame) firstFrame = startState;
+    if (releases) {
+      source.to(rig.s, { headTurn: 0, headPitch: 0, headTilt: 0, nhinX: rig.NGHI.nhinX, nhinY: rig.NGHI.nhinY, matY: rig.NGHI.matY, duration: 0.35, ease: 'power2.inOut' }, at);
+    }
     const child = rig[name](...args);
     child.paused(false);
     source.add(child, at);

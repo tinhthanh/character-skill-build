@@ -1840,7 +1840,7 @@ try {
         if (!(board.top + board.height / 2 < chest.top + chest.height * 0.75)) hong('readChart', 'the clipboard is not held up in front of the chest');
         if (!(nurse.s.itemZoomR > 1.3) || !(nurse.s.dauY > 6)) hong('readChart', 'the clipboard is not enlarged, or the head is not bent down to read');
         if (!(Math.abs(nurse.s.dau - nurse.NGHI.dau) >= 12)) hong('readChart', `the head is not tilted down to the clipboard (${(nurse.s.dau - nurse.NGHI.dau).toFixed(1)}°, want ≥ 12°)`);
-        read.time(0.5 + 1.3 + 0.5); if (!(nurse.s.pageR > 0.6)) hong('readChart', `the top page is not flipped (page ${nurse.s.pageR.toFixed(2)})`);
+        read.time(0.5 + 1.3 + 1.0); if (!(nurse.s.pageR > 0.6))      // đợt 36: tờ dừng nửa vòng 0,35 s, lật xong ở 1,1 s hong('readChart', `the top page is not flipped (page ${nurse.s.pageR.toFixed(2)})`);
         { const sheet = nurse.el.itemR.querySelector('[data-sheet]'); if (!sheet || !/Q/.test(sheet.getAttribute('d') || '')) hong('readChart', 'the flipping page is not drawn curved'); }
         read.progress(1); if (nurse.s.pageR !== 0 || nurse.s.itemZoomR !== 1) hong('readChart', 'the page or the clipboard size does not come back after reading');
         read.kill(); nurse.datNghi();
