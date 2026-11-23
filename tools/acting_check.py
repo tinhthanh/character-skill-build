@@ -928,6 +928,39 @@ def check_gape(folder, c, scales):
     return out
 
 
+CHIN_HOLD = 0.02      # (đợt 36, lượt hai) TAY ĐỠ (tay không cầm thuốc): từ lúc viên thuốc ở môi tới hết hai nhịp vuốt cằm (bước + 0,6 …
+                      # 2,6 s) cách khung đầu con vật ≤ 2 % chiều cao người, và giữa bàn tay không thấp hơn đáy đầu (cằm) quá 2 % — Gemini:
+                      # "tay kia buông" (miệng đã khép mà tay còn ở chỗ cằm há, dưới ngực con vật). Đo: bản lượt một 2,5 % (30,77 s),
+                      # bản này 1,4 % (lúc há — tay dưới hàm hạ)
+
+
+def check_chin_hold(folder, c, shots, scales):
+    start = c['times'][0] - 0.6
+    # TAY ĐỠ = tay KHÔNG cầm viên thuốc (dụng cụ 7) ở lúc đầu — không tính tay thuốc đang rụt về gần đầu con vật.
+    pill = next((g for g in ((scales.get(('care', float(c['times'][0]))) or {}).get(c['who']) or {}).get('gadgets', []) if g['kind'] == 7), None)
+    if not pill: return []
+    holder = 'L' if pill['side'] == 'R' else 'R'
+    times = [t for t in list(c['times']) + list(c.get('chew') or []) if t <= start + 2.6 + 1e-6]
+    worst = None
+    for t in times:
+        frame = {a['name']: a for a in shots.get(float(t), [])}
+        who, pet = frame.get(c['who']), frame.get(c['target'])
+        head = ((pet or {}).get('parts') or {}).get('head')
+        if not who or not head or not who.get('tall'): continue
+        best = None
+        for h in who.get('hands') or []:
+            b = h.get('box')
+            if not b or h.get('side') != holder: continue
+            gap = max(0, head['x0'] - b['x1'], b['x0'] - head['x1'], head['y0'] - b['y1'], b['y0'] - head['y1']) / who['tall']
+            below = (h['y'] - head['y1']) / who['tall']            # > 0: GIỮA bàn tay nằm dưới đáy đầu (cằm) — không đỡ, buông dưới ngực
+            score = max(gap, below + 1e-9 if below > 0 else 0)
+            if best is None or score < best: best = score
+        if best is not None and (worst is None or best > worst[1]): worst = (t, best)
+    if worst is None: return []
+    return [{'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — the other hand holds the chin throughout', 'ok': worst[1] <= CHIN_HOLD,
+             'note': f'the holding hand ({holder}) is at most {worst[1] * 100:.1f} % of height off {c["target"]}\'s head (or below its chin) at {worst[0]:g} s, over {times[0]:g}–{times[-1]:g} s (limit {CHIN_HOLD * 100:g} %)'}]
+
+
 FACE_SHARE = 0.15     # cho thuốc: mặt con vật ≥ 15 % chiều cao khung (góc cận)
 JAW_OPEN = 0.12       # … hàm há ≥ 12 % chiều cao đầu nó
 
@@ -1232,6 +1265,7 @@ def check_scene(folder):
         if c['kind'] == 'pill':
             results.extend(check_pill(folder, c, scales))
             results.extend(check_gape(folder, c, scales))
+            results.extend(check_chin_hold(folder, c, shots, scales))
             continue
         if c['kind'] == 'worn':
             results.extend(check_worn(folder, c, frames))

@@ -4812,7 +4812,9 @@ class RigSVG {
    * (đầu ngang bụng người — trên bàn khám): cho nó `openMouth` từ ~0,55 s rồi `chew` (`tools/scene.py` tự thêm, đúng nhịp).
    */
   static PILL_TURN = 0.85;                 // quay gần nghiêng hẳn về phía con vật lúc cho thuốc (lượt bốn; lượt ba 0,35)
-  static PILL_CHIN = 0.34;                 // tay đỡ dưới môi bao nhiêu bề ngang đầu con vật (đích là một điểm — bối cảnh 3D; đợt 36: 0,18 → 0,34)
+  static PILL_CHIN = 0.31;                 // tay đỡ dưới môi bao nhiêu bề ngang đầu con vật LÚC NÓ HÁ LỚN (đích là một điểm — bối cảnh 3D; đợt 36)
+  static PILL_CHIN_UP = 0.18;              // … và lúc miệng đã khép (cằm thật) — hai nhịp vuốt cằm ở đây
+  static PILL_SHUT = 1.6;                  // giây (của bước này) con vật khép miệng (`openMouth` giữ 1,1 s — tools/scene.py); tay đỡ nâng theo cằm
   static PILL_IN = 1.0;                    // giây viên thuốc vào tới môi (biến mất ở PILL_IN + 0,15)
   givePill(target = null) {
     const t = this.tl(), s = this.s, N = this.NGHI;
@@ -4823,7 +4825,10 @@ class RigSVG {
     const point = !(target && (target.el || target.getBoundingClientRect)) && !(target && target.live && target.live.el);
     // Đợt 36: con vật HÁ MIỆNG LỚN (`gape` của rig thú — hàm dưới hạ ~1/3 đầu) — tay đỡ đặt dưới cái cằm ĐÃ HẠ (0,34 bề ngang đầu dưới
     // môi; bản trước 0,18 — bàn tay vẽ đè lên đúng chỗ khoang miệng há, che mất nó).
-    const chinAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * RigSVG.PILL_CHIN } : this.#reachLow(target, k, 'chin');
+    // Lượt hai (Gemini: "tay kia buông" — khi miệng đã khép, bàn tay còn ở chỗ cằm há, dưới ngực con vật): hai chỗ đỡ — dưới cằm HẠ
+    // lúc há (`chinAt`), rồi nâng lên cằm THẬT (`chinUpAt`) khi miệng khép, vuốt cằm ở đó.
+    const chinUpAt = point ? { tx: lips.tx - dir * lips.span * 0.05, ty: lips.ty + lips.span * RigSVG.PILL_CHIN_UP } : this.#reachLow(target, k, 'chin');
+    const chinAt = { tx: chinUpAt.tx, ty: chinUpAt.ty + lips.span * (RigSVG.PILL_CHIN - RigSVG.PILL_CHIN_UP) };
     const drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * lips.crouch;
     // QUAY GẦN NGHIÊNG HẲN về phía con vật (`PILL_TURN`, lượt bốn): hai vai gần như một chỗ, HAI TAY cùng vươn ra trước — tay xa đặt
     // dưới cằm, tay gần đưa viên thuốc tới mép miệng. (Lượt ba quay 0,35: tay xa vắt ngang không tới, buông ở eo.)
@@ -4845,17 +4850,17 @@ class RigSVG {
       return this.#armToTurned(side, wx, wy, turn, drop);
     };
     // Tay XA: lòng bàn tay (~16 đơn vị theo bàn tay) dưới cằm. Tay GẦN: viên thuốc (~24) ở mép miệng phía người.
-    const chin = tipAt(other, chinAt.tx, chinAt.ty + 4, 16);
+    const chin = tipAt(other, chinAt.tx, chinAt.ty + 4, 16), chinUp = tipAt(other, chinUpAt.tx, chinUpAt.ty + 4, 16);
     const readyP = tipAt(k, lips.tx - dir * 18, lips.ty + 4, 24), insideP = tipAt(k, lips.tx - dir * 4, lips.ty, 24);
     const ready = { upper: readyP.bat, fore: readyP.cang }, inside = { upper: insideP.bat, fore: insideP.cang };
-    this.pillReach = Math.max(readyP.short, insideP.short, chin.short);
+    this.pillReach = Math.max(readyP.short, insideP.short, chin.short, chinUp.short);
     this.#leanTo(t, { ...lips, upper: ready.upper, fore: ready.fore }, 'nam');
     // Bối cảnh 3D: con vật đứng trước người thì đầu nó che tay ở môi — vẽ bàn tay cầm thuốc TRÊN nó lúc đưa thuốc.
     const pet = target && (target.pet || (target.el && target.svg ? target : null) || (target.live && target.live.el ? target.live : null));
     if (pet) {
       this.onTopPet = pet;
       t.to(s, { ['onTop' + k]: 1, ['onTop' + other]: 1, duration: 0.02 }, 0.45).to(s, { ['onTop' + k]: 0, duration: 0.02 }, RigSVG.PILL_IN + 0.4)
-       .to(s, { ['onTop' + other]: 0, duration: 0.02 }, RigSVG.PILL_IN + 1.05);                 // tay đỡ cằm: tới hết hai nhịp vuốt cằm
+       .to(s, { ['onTop' + other]: 0, duration: 0.02 }, RigSVG.PILL_SHUT + 0.95);               // tay đỡ cằm: vẽ trên con vật tới hết hai nhịp vuốt cằm (vẽ sau đầu thì khuất hẳn)
     }
     // 0,45 s: dài hơn tween `#openUp` (trong `#leanTo`, 0,4 s về GESTURE_TURN) — ngắn hơn thì nó ghi đè hướng quay về 0,3.
     t.to(s, { ['aim' + other]: 1, ['carry' + other]: 0, huong: turn, than: N.than, dau: N.dau + dir * 4, duration: 0.45, ease: 'sine.inOut' }, 0);
@@ -4867,12 +4872,14 @@ class RigSVG {
     t.to(s, { ['bat' + k]: inside.upper, ['cang' + k]: inside.fore, mieng: 0.2, duration: 0.3, ease: 'sine.inOut' }, RigSVG.PILL_IN - 0.3);
     t.set(s, { ['gadget' + k]: 0 }, RigSVG.PILL_IN + 0.15);
     t.to(s, { ['bat' + k]: ready.upper - 4, ['cang' + k]: ready.fore + 6, mieng: 0, cuoi: 1, mayL: 0.6, mayR: 0.6, duration: 0.25, ease: 'power2.out' }, RigSVG.PILL_IN + 0.2);
-    // 3. Tay đỡ vuốt nhẹ cằm hai nhịp: "nuốt đi nào".
+    // 3. Con vật khép miệng: tay đỡ nâng theo lên cằm thật, rồi vuốt nhẹ cằm hai nhịp: "nuốt đi nào".
+    const up = RigSVG.PILL_SHUT;
+    t.to(s, { ['bat' + other]: chinUp.bat, ['cang' + other]: chinUp.cang, duration: 0.3, ease: 'sine.inOut' }, up);
     for (let i = 0; i < 2; i++) {
-      t.to(s, { ['bat' + other]: chin.bat + 3, ['cang' + other]: chin.cang - 5, duration: 0.18, ease: 'sine.inOut' }, RigSVG.PILL_IN + 0.3 + i * 0.36)
-       .to(s, { ['bat' + other]: chin.bat, ['cang' + other]: chin.cang, duration: 0.18, ease: 'sine.inOut' }, RigSVG.PILL_IN + 0.48 + i * 0.36);
+      t.to(s, { ['bat' + other]: chinUp.bat + 3, ['cang' + other]: chinUp.cang - 5, duration: 0.18, ease: 'sine.inOut' }, up + 0.3 + i * 0.36)
+       .to(s, { ['bat' + other]: chinUp.bat, ['cang' + other]: chinUp.cang, duration: 0.18, ease: 'sine.inOut' }, up + 0.48 + i * 0.36);
     }
-    this.#khep(t, 0.5, RigSVG.PILL_IN + 1.05);
+    this.#khep(t, 0.5, up + 1.05);
     return t;
   }
 
@@ -7701,6 +7708,7 @@ class RigThu {
     return t;
   }
   static HIDE_SHORT = 36;      // nấp: thân dừng trước giữa người chừng ấy đơn vị (lượt bốn: 14 — đầu ló ra ngay dưới bàn tay buông của cô bé)
+  static KNEAD_HEAD = { x: -12, y: -10 };   // lượt hai: đầu lùi / ngẩng lúc nhào
   static KNEAD_ANGLE = 108;    // đợt 36: chân nhấc TREO theo vai (`Nhac`), chĩa chéo lên trước 108° — như giơ chân bắt tay; bản trước dời bàn chân lên
                                // 36 đơn vị, bàn chân trắng nằm gọn trước ngực trắng, dưới cằm — ở góc trung không thấy
   static KNEAD_BEAT = 0.6;     // giây mỗi lần ấn (đợt 35, lượt ba: 0,36 — người chấm xem thưa chỉ thấy một chân nhấc nhẹ)
@@ -7718,7 +7726,8 @@ class RigThu {
     const t = this.tl(), s = this.s;
     let at = this.#dung(t, 0);
     // Ngồi xổm, ngực hạ thấp, mắt nhắm híp (không chớp: chớp mắt mở mắt ra lại), cười, đuôi dựng.
-    t.to(s, { truocY: 16, sauY: 6, tnX: 10, txX: 10, dau: 0, dauY: 0, matY: 0.95, cuoi: 1, taiL: 0.3, taiR: 0.3, duoi: 30, duoiCong: 0.6, duration: 0.35, ease: 'power2.out' }, at);
+    // Lượt hai (đợt 36): đầu NGẨNG và LÙI về sau (KNEAD_HEAD) — đầu không che bàn chân đang giơ trước ngực.
+    t.to(s, { truocY: 16, sauY: 6, tnX: 10, txX: 10, dau: -6, dauX: RigThu.KNEAD_HEAD.x, dauY: RigThu.KNEAD_HEAD.y, matY: 0.95, cuoi: 1, taiL: 0.3, taiR: 0.3, duoi: 30, duoiCong: 0.6, duration: 0.35, ease: 'power2.out' }, at);
     at += 0.3;
     const beat = RigThu.KNEAD_BEAT, end = at + times * beat;
     for (let i = 0; i < times; i++) {
@@ -7730,7 +7739,7 @@ class RigThu {
        .to(s, { [k + 'Nhac']: 0, truocY: 20, duration: 0.18, ease: 'power2.in' }, a + beat * 0.65);
     }
     for (let a = at, i = 0; a < end; a += 0.09, i++) t.to(s, { tho: i % 2 ? 0 : 1, duration: 0.09, ease: 'sine.inOut' }, a);      // gừ gừ
-    t.to(s, { dau: 2, dauX: -2, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, at + 0.4);
+    t.to(s, { dau: -2, dauX: RigThu.KNEAD_HEAD.x - 2, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, at + 0.4);
     if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'heart', at + 0.2, Math.max(0.4, times * beat - 0.6));      // làm nũng, khoái chí
     this.#khep(t, 0.4, end);
     return t;

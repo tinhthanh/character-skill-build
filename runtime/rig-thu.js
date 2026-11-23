@@ -1703,6 +1703,7 @@ export class RigThu {
     return t;
   }
   static HIDE_SHORT = 36;      // nấp: thân dừng trước giữa người chừng ấy đơn vị (lượt bốn: 14 — đầu ló ra ngay dưới bàn tay buông của cô bé)
+  static KNEAD_HEAD = { x: -12, y: -10 };   // lượt hai: đầu lùi / ngẩng lúc nhào
   static KNEAD_ANGLE = 108;    // đợt 36: chân nhấc TREO theo vai (`Nhac`), chĩa chéo lên trước 108° — như giơ chân bắt tay; bản trước dời bàn chân lên
                                // 36 đơn vị, bàn chân trắng nằm gọn trước ngực trắng, dưới cằm — ở góc trung không thấy
   static KNEAD_BEAT = 0.6;     // giây mỗi lần ấn (đợt 35, lượt ba: 0,36 — người chấm xem thưa chỉ thấy một chân nhấc nhẹ)
@@ -1720,7 +1721,8 @@ export class RigThu {
     const t = this.tl(), s = this.s;
     let at = this.#dung(t, 0);
     // Ngồi xổm, ngực hạ thấp, mắt nhắm híp (không chớp: chớp mắt mở mắt ra lại), cười, đuôi dựng.
-    t.to(s, { truocY: 16, sauY: 6, tnX: 10, txX: 10, dau: 0, dauY: 0, matY: 0.95, cuoi: 1, taiL: 0.3, taiR: 0.3, duoi: 30, duoiCong: 0.6, duration: 0.35, ease: 'power2.out' }, at);
+    // Lượt hai (đợt 36): đầu NGẨNG và LÙI về sau (KNEAD_HEAD) — đầu không che bàn chân đang giơ trước ngực.
+    t.to(s, { truocY: 16, sauY: 6, tnX: 10, txX: 10, dau: -6, dauX: RigThu.KNEAD_HEAD.x, dauY: RigThu.KNEAD_HEAD.y, matY: 0.95, cuoi: 1, taiL: 0.3, taiR: 0.3, duoi: 30, duoiCong: 0.6, duration: 0.35, ease: 'power2.out' }, at);
     at += 0.3;
     const beat = RigThu.KNEAD_BEAT, end = at + times * beat;
     for (let i = 0; i < times; i++) {
@@ -1732,7 +1734,7 @@ export class RigThu {
        .to(s, { [k + 'Nhac']: 0, truocY: 20, duration: 0.18, ease: 'power2.in' }, a + beat * 0.65);
     }
     for (let a = at, i = 0; a < end; a += 0.09, i++) t.to(s, { tho: i % 2 ? 0 : 1, duration: 0.09, ease: 'sine.inOut' }, a);      // gừ gừ
-    t.to(s, { dau: 2, dauX: -2, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, at + 0.4);
+    t.to(s, { dau: -2, dauX: RigThu.KNEAD_HEAD.x - 2, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, at + 0.4);
     if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'heart', at + 0.2, Math.max(0.4, times * beat - 0.6));      // làm nũng, khoái chí
     this.#khep(t, 0.4, end);
     return t;

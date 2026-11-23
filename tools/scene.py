@@ -1829,7 +1829,8 @@ def main():
                     code = '{ together: [' + code + f", [{names[fed[0]]['name']}, 0.95, ['chew', 3]]] }}"
                     emitted[0] += 1
             # `["givePill", "@con vật"]` một mình (đợt 35): con vật HÁ MIỆNG từ ~0,45 s (há hẳn ~0,75 s, giữ tới ~1,85 s — ≥ 0,8 s quanh lúc
-            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp.
+            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp. Đợt 36, lượt hai: tay đỡ của người nâng lên cằm thật lúc miệng khép
+            # (`RigSVG.PILL_SHUT` = 1,6 s của bước người).
             pilled = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'givePill' and isinstance(step[1], str) and step[1].startswith('@')]
             pilled = [name for name in pilled if name in names and names[name]['_pet']]
             if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):
