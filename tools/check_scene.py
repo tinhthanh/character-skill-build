@@ -610,6 +610,32 @@ with tempfile.TemporaryDirectory() as work:
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'acting')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('acting: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
 
+    # Đợt 35: dụng cụ & hồ sơ ở phòng khám — bác sĩ (cầm bìa hồ sơ, cất sẵn) đọc bệnh án, chỉ phim trên đèn đọc phim X-quang, băng
+    # chân con chó trên bàn khám (cất bìa ở tay phía con chó trong lúc băng), đeo loa cho con mèo; băng và loa CÒN LẠI trên chúng.
+    # Đo bằng tools/acting_check.py: tay tới chân / đầu, con vật thấy được, đồ đeo còn lại, bìa trước ngực, tay chỉ trúng điểm phim.
+    care = {'id': 'care', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'xray', 'name': 'phim', 'x': -330, 'z': -560}]}, 'characters': [
+        {'name': 'bac_si', 'id': 'vet', 'z': -560, 'x': -120, 'holds': 'clipboard', 'holdsHidden': True}, {'name': 'cho', 'species': 'corgi', 'z': -560, 'on': 'table', 'x': 200}],
+        'script': [{'who': 'bac_si', 'do': [['readChart', 1.6]], 'view': 'medium'}, {'who': 'bac_si', 'do': [['showXray', 'phim', 1.4]], 'view': 'medium'},
+                   {'who': 'bac_si', 'do': [['bandage', '@cho']]}, {'who': 'bac_si', 'do': [['putCone', '@cho']]}, {'who': 'cho', 'do': ['wagTail']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_care.json')
+    try:
+        json.dump(care, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'care'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('care: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'care', 'index.html'), encoding='utf-8').read()
+        for needle in ('VGCharacter.createProp(cutout', '"xray"', "['showXray', set.targetPoint(bac_si, [", 'cutout2Prop.spot.x', "set.target(bac_si, cho, 'leg')", '["putCone", set.target(bac_si, cho'):
+            if needle not in html: problems.append(f'care: {needle!r} is not in the composition')
+        checks = [m['check'] for m in json.load(open(os.path.join(work, 'care', 'moments.json'), encoding='utf-8')) if m.get('check')]
+        kinds = sorted({(c['kind'], c.get('item', '')) for c in checks if c['kind'] in ('bandage', 'putCone', 'worn', 'readChart', 'showXray')})
+        if kinds != [('bandage', ''), ('putCone', ''), ('readChart', ''), ('showXray', ''), ('worn', 'bandage'), ('worn', 'cone')]: problems.append(f'care: moments.json checks are {kinds}')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'care')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('care: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        for needle in ('cho still wears the bandage', 'cho still wears the cone', 'readChart — clipboard up', 'showXray — points at the spot', 'bac_si bandage cho — hand reaches', 'bac_si putCone cho — hand reaches'):
+            if needle not in done.stdout: problems.append(f'care: acting_check did not measure {needle!r}')
+
     # Đợt 29: đưa / nhận / bế, người ngồi, sáng một bên. Bé đưa cốc cho ông ngồi ghế đá (ông tự nhận, cốc ở tay phía bé); con
     # chó đi tới ông (set.target biết chỗ nó đứng ở lượt ấy), ông vuốt, bế nó lên lòng rồi trao cho bé. Đo bằng
     # tools/acting_check.py (tay tới tay, con vật trong vòng tay, mông trên mặt ghế) và tools/light_side.py (ban ngày: nửa phía
@@ -972,6 +998,14 @@ with tempfile.TemporaryDirectory() as work:
         ('a power word that is not on / off', lambda s: s['script'][1].update({'power': 'cut'}), '"power"'),
         ('a window on a side wall', lambda s: s['set'].setdefault('panels', []).append({'wall': 'left', 'at': -300, 'y': 500, 'width': 200, 'height': 200, 'window': True}), 'back wall'),
         ('riding something that is not a scooter', lambda s: s['characters'][0].update({'rides': 'table'}), 'scooter'),
+        ('a pet that bandages', lambda s: s['script'].append({'who': s['characters'][2]['name'], 'do': [['bandage', '@' + s['characters'][0]['name']]]}), 'a pet cannot'),
+        ('a bandage without a pet', lambda s: s['script'].append({'who': s['characters'][0]['name'], 'do': ['bandage']}), 'needs the pet'),
+        ('a cone put on a person', lambda s: s['script'].append({'who': s['characters'][0]['name'], 'do': [['putCone', '@' + s['characters'][1]['name']]]}), 'needs the pet'),
+        ('reading a chart without a clipboard', lambda s: s['script'].append({'who': s['characters'][0]['name'], 'do': [['readChart', 2]]}), 'clipboard'),
+        ('an X-ray viewer that is not there', lambda s: s['script'].append({'who': s['characters'][0]['name'], 'do': [['showXray', 'nope']]}), 'no set.cutouts'),
+        ('an X-ray on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'name': 'pl', 'x': 0, 'z': -300}) or s['script'].append({'who': s['characters'][0]['name'], 'do': [['showXray', 'pl']]}), '"xray" viewer'),
+        ('a film spot on a plant', lambda s: s['set']['cutouts'].append({'kind': 'plant', 'x': 0, 'z': -300, 'spot': [0.5, 0.5]}), 'spot'),
+        ('a film spot off the film', lambda s: s['set']['cutouts'].append({'kind': 'xray', 'x': 0, 'z': -300, 'spot': [1.5, 0.5]}), 'spot'),
         ('a drive without "from"', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300, 'drive': {'dur': 3}}), '"from"'),
         ('a pet that rides', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'name': 'moto', 'x': 0, 'z': -300}) or s['characters'][2].update({'rides': 'moto'}), 'cannot ride'),
         ('a scooter facing up', lambda s: s['set']['cutouts'].append({'kind': 'scooter', 'x': 0, 'z': -300, 'facing': 'up'}), 'facing'),

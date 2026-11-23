@@ -38,6 +38,9 @@ Một tệp kịch bản:
     tên: [trời tối dần] / [hoàng hôn] / [trời sáng]   trời chuyển giờ trong 6 giây
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin),
                                        cân (tự có cái cân cạnh người cân), đo nhiệt độ, cho uống thuốc (giữ đầu, đưa viên thuốc vào mõm)
+                                       băng chân, đeo loa (băng / loa còn lại trên con vật)
+    tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
+    tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
@@ -75,11 +78,17 @@ ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc �
            'nghiêng đầu': 'tiltHead', 'nằm': 'lieDown', 'ngủ': 'sleep', 'mệt': 'unwell', 'ốm': 'unwell', 'gãi': 'scratchItch', 'gãi ngứa': 'scratchItch',
            'đi khập khiễng': 'limp', 'khập khiễng': 'limp', 'run': 'tremble', 'ăn': 'eat', 'uống nước': 'drink', 'ho': 'cough', 'há miệng': 'openMouth',
            'rũ nước': 'shakeOff', 'hắt hơi': 'sneeze', 'thở hổn hển': 'pant', 'ngáp': 'yawn', 'dụi': 'rub', 'mừng': 'greet', 'rủ chơi': 'play', 'nhai': 'chew',
-           'nhảy cóc': 'hop', 'giậm chân': 'thump', 'đứng yên': 'idle', 'chờ': 'idle', 'rọi đèn pin': 'shine', 'bật đèn pin': 'shine'}
+           'nhảy cóc': 'hop', 'giậm chân': 'thump', 'đứng yên': 'idle', 'chờ': 'idle', 'rọi đèn pin': 'shine', 'bật đèn pin': 'shine',
+           # đợt 35: hồ sơ & phim X-quang (người)
+           'đọc bệnh án': 'readChart', 'xem bệnh án': 'readChart', 'đọc hồ sơ': 'readChart', 'xem hồ sơ': 'readChart',
+           'chỉ phim': 'showXray', 'chỉ phim x-quang': 'showXray', 'xem phim x-quang': 'showXray', 'chỉ x-quang': 'showXray'}
 TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('giveTreat', {'kind': 'pill'}), 'cho bánh': ('giveTreat', None), 'cho ăn': ('giveTreat', None),
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
-            'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None)}
+            'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None),
+            # đợt 35: băng chân, đeo loa chống liếm — còn lại trên con vật
+            'băng chân': ('bandage', None), 'băng bó': ('bandage', None), 'quấn băng': ('bandage', None), 'băng': ('bandage', None),
+            'đeo loa': ('putCone', None), 'đeo vòng chống liếm': ('putCone', None), 'đeo vòng cổ chống liếm': ('putCone', None)}
 # ĐỢT 35 — phòng khám: cân (bế con vật đặt lên cân — cảnh tự có một cái cân "can" cạnh người cân), đo nhiệt độ, cho uống thuốc
 # (một tay giữ đầu, một tay đưa viên thuốc vào mõm). "cho thuốc" vẫn là đưa viên thuốc như bánh thưởng (`giveTreat`).
 TARGETED.update({'cân': ('weigh', 'can'), 'cân ký': ('weigh', 'can'), 'đo nhiệt độ': ('takeTemp', None), 'đo nhiệt': ('takeTemp', None), 'cặp nhiệt': ('takeTemp', None),
@@ -256,14 +265,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     characters = [c for c in characters if c['name'] in used] or characters
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
-    needs = {'inject': 'syringe', 'leash': 'leash'}
+    needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard'}
     for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
         for step in turn.get('do', []) if isinstance(turn, dict) else []:
-            item = needs.get(step[0]) if isinstance(step, list) and step else None
+            item = needs.get(step[0] if isinstance(step, list) and step else step if isinstance(step, str) else None)
             who = next((c for c in characters if c['name'] == turn.get('who')), None)
             if item and who and not who.get('holds') and not who.get('species'):
                 who['holds'] = item
-                if item == 'syringe': who['holdsHidden'] = True                     # cất sẵn: chỉ lấy ra lúc tiêm
+                if item in ('syringe', 'clipboard'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
     # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
     # mặt phẳng của người ấy).
@@ -272,7 +281,22 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         doer = next(c for c in characters if c['name'] == weighs[0][0])
         pet = next((c for c in characters if c['name'] == weighs[0][1]), None)
         side = -1 if not pet or float(pet.get('x', 0)) >= float(doer.get('x', 0)) else 1
-        scene['set']['cutouts'] = [{'kind': 'scale', 'name': SCALE_NAME, 'x': round(float(doer.get('x', 0)) + side * 160), 'z': doer.get('z', -560)}]
+        scene['set'].setdefault('cutouts', []).append({'kind': 'scale', 'name': SCALE_NAME, 'x': round(float(doer.get('x', 0)) + side * 160), 'z': doer.get('z', -560)})
+    # CHỈ PHIM X-QUANG (đợt 35): đặt một đèn đọc phim ("xray") cạnh người chỉ — cùng chiều sâu, phía xa con vật / người khác.
+    for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
+        steps = turn.get('do', []) if isinstance(turn, dict) else []
+        for n, step in enumerate(steps):
+            if step != 'showXray' and step != ['showXray']: continue
+            who = next((c for c in characters if c['name'] == turn.get('who')), None)
+            if not who or who.get('species'): continue
+            viewer = 'phim-' + slug(who['name'])
+            if not any(item.get('name') == viewer for item in scene['set'].get('cutouts', [])):
+                # Bên nào trống hơn (xa người / con vật gần nhất hơn), trong phòng (|x| ≤ 800).
+                others = [float(c.get('x', 0)) for c in characters if c is not who]
+                spots = [x for x in (float(who.get('x', 0)) - 200, float(who.get('x', 0)) + 200) if abs(x) <= 800] or [float(who.get('x', 0)) - 200]
+                place = max(spots, key=lambda x: min((abs(x - o) for o in others), default=1e9))
+                scene['set'].setdefault('cutouts', []).append({'kind': 'xray', 'name': viewer, 'x': round(place), 'z': who.get('z', -560)})
+            steps[n] = ['showXray', viewer]
     if head.get('ánh sáng'):
         # "chiều → tối": cảnh bắt đầu lúc chiều, trời tối dần từ giữa cảnh (6 giây).
         parts = [part.strip().lower() for part in re.split(r'→|->', head['ánh sáng'])]
