@@ -533,7 +533,9 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                 pill = [round(float(reach['start']) + f, 2) for f in (0.6, 1.0, 1.4)]        # miệng há suốt ≥ 0,8 s quanh lúc viên thuốc vào (1,0 s)
                 moments.append({'t': pill[1], 'what': f'{op["who"]} puts a pill in {op["target"]}\'s mouth', 'ask': [f'Is a white pill at the mouth of the animal ({op["target"]}), with its mouth open?'],
                                 'check': {'kind': 'pill', 'who': op['who'], 'target': op['target'], 'times': pill,
-                                          'gaze': [{'times': pill, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}]}})
+                                          'gaze': [{'times': pill, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}],
+                                          # NHAI (đợt 36): độ há mỗi 0,1 s suốt quãng con vật nhai sau khi khép miệng (bước + 2,2 … 4,8 s; miệng khép xong lúc ~2,1 s)
+                                          'chew': [round(float(reach['start']) + 2.2 + i * 0.1, 2) for i in range(27)]}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
         if op['kind'] == 'weigh':
             # CÂN (đợt 35): lúc bế lên (0,3 / 0,4 / 0,48 s — tay tới thân con vật) và lúc đọc số (con vật đứng trên bệ cân, thẻ số đã
@@ -1869,7 +1871,8 @@ def main():
                     code = '{ together: [' + code + f", [{names[fed[0]]['name']}, 0.95, ['chew', 3]]] }}"
                     emitted[0] += 1
             # `["givePill", "@con vật"]` một mình (đợt 35): con vật HÁ MIỆNG từ ~0,45 s (há hẳn ~0,75 s, giữ tới ~1,85 s — ≥ 0,8 s quanh lúc
-            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp.
+            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp. Đợt 36, lượt hai: tay đỡ của người nâng lên cằm thật lúc miệng khép
+            # (`RigSVG.PILL_SHUT` = 1,6 s của bước người).
             pilled = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'givePill' and isinstance(step[1], str) and step[1].startswith('@')]
             pilled = [name for name in pilled if name in names and names[name]['_pet']]
             if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):

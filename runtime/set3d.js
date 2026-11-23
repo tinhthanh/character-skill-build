@@ -1761,7 +1761,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         } else {
           // Đợt 35, lượt ba: cỡ TRÊN KHUNG — chiều cao đầu (`face`), bề ngang nét môi (`lipsW`), độ mở hàm (`jaw`, px).
           const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
-          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, faceW: f ? f.width * sx : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+          out[name] = { person: false, mouth: Math.max(rig.s.mieng || 0, rig.s.gape || 0), lips: centre(e.moi), face: f ? f.height * sy : 0, faceW: f ? f.width * sx : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+          // Đợt 36: độ há theo HÌNH HỌC trong khung của đầu — chiều cao khoang miệng (`ham`) / chiều cao bầu đầu (không tính tai, không
+          // phụ thuộc đầu nghiêng hay cỡ cảnh).
+          if (e.ham && typeof rig.skullHeight === 'function') { let h = 0; try { h = e.ham.getBBox().height; } catch (err) { h = 0; } out[name].jawRatio = h / rig.skullHeight(); }
         }
       }
       // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
