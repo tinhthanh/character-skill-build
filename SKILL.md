@@ -15,7 +15,7 @@ startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shi
 or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
 read a patient chart (flipping a page), point at an X-ray film,
-get a notification on the phone (88 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, put an item
+get a notification on the phone (89 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase

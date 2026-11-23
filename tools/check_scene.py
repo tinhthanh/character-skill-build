@@ -177,6 +177,7 @@ with tempfile.TemporaryDirectory() as work:
         ('a voice that is not a name', lambda s: s['script'][2].update({'voice': 3}), 'voice'),
         ('a missing audio file', lambda s: s['script'].append({'who': 'vet', 'say': 'hi', 'audio': 'nope.wav'}), 'nope.wav'),
         ('an @reference to nobody', lambda s: s['script'].append({'who': 'vet', 'do': [['face', '@ghost']]}), '@ghost'),
+        ('a lookAt target that is a number', lambda s: s['script'].append({'who': 'vet', 'do': [['look', 5]]}), 'lookAt'),
         ('two characters with one name', lambda s: s['characters'].append({'name': 'vet', 'id': 'nurse', 'x': 100}), 'vet'),
         ('a character without a position', lambda s: s['characters'].append({'name': 'extra', 'id': 'nurse'}), '"x"'),
         ('a misspelt character key', lambda s: s['characters'][1].update({'seat': 'chair'}), 'seated'),
@@ -796,7 +797,7 @@ with tempfile.TemporaryDirectory() as work:
     care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},
             'characters': [{'name': 'bac_si', 'id': 'vet', 'x': 40, 'z': -560, 'faces': 'cho'}, {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'}],
             'script': [{'who': 'bac_si', 'do': [['weigh', '@cho', 'can']]}, {'who': 'bac_si', 'do': [['takeTemp', '@cho', 1.5, {'reading': '39.4°C'}]]},
-                       {'who': 'bac_si', 'do': [['givePill', '@cho']]}]}
+                       {'who': 'bac_si', 'do': [['givePill', '@cho']]}, {'who': 'bac_si', 'do': [['look', '@cho'], ['idle', 1.2]]}]}
     path = os.path.join(os.path.dirname(stage), '_check_care35.json')
     try:
         json.dump(care, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -807,7 +808,7 @@ with tempfile.TemporaryDirectory() as work:
     else:
         html = open(os.path.join(work, 'care35', 'index.html'), encoding='utf-8').read()
         for needle in ('[\'weigh\', cho, set.targetPoint(bac_si, [-120, 27.3, -560]), { reading: "9.6 kg", display: cutout2Prop }]', '"scale", {"reading": "0.0 kg"}', 'set.target(bac_si, cho, "rear")', "[cho, ['face', \"right\"]]",
-                       "['openMouth', 1.1], ['chew', 3]", 'set.target(bac_si, cho, "lips")'):
+                       "['openMouth', 1.1], ['chew', 3]", 'set.target(bac_si, cho, "lips")', '["lookAt", set.target(bac_si, cho)]'):
             if needle not in html: problems.append(f'care35: {needle} is not in the composition')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'care35')], capture_output=True, text=True)
         if done.returncode != 0: problems.append('care35: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
@@ -818,7 +819,9 @@ with tempfile.TemporaryDirectory() as work:
                            # lượt ba: màn hình cân đồng bộ, đọc nhiệt kế ở góc cận (mặt quay, cúi, nhiệt kế sát mặt), viên thuốc / mặt / miệng đủ to trên khung
                            'the scale shows the weight only while cho is on it', 'bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen',
                            # lượt bốn: đầu đo chạm thân sau; hai tay trên đầu con vật
-                           'bac_si takeTemp cho — the thermometer touches it', 'bac_si givePill cho — both hands on its head'):
+                           'bac_si takeTemp cho — the thermometer touches it', 'bac_si givePill cho — both hands on its head',
+                           # đợt 36: HƯỚNG ĐẦU tới đích (`lookAt`) — nhiệt kế lúc đọc, mõm lúc cho thuốc, con vật trên cân
+                           'bac_si look — head turned to the thermometer', 'bac_si pill — head turned to cho', 'bac_si weigh — head turned to the weight shown over the scale'):
                 if needle not in done.stdout: problems.append(f'care35: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
 
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %

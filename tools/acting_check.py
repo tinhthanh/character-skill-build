@@ -1080,6 +1080,7 @@ def check_gaze(folder, c, shots):
 
 READ_TILT = 12        # đọc bệnh án: đầu nghiêng ≥ 12° …
 READ_DOWN = 8         # … và hạ ≥ 8 đơn vị ở mọi mốc đọc (lượt ba — Gemini 1 khung / giây: "nhìn thẳng ra trước")
+NOD_BEND = 12        # đợt 36: gật — đầu cúi ≥ 12° ở đáy
 NOD_DEEP = 14         # gật: đáy hai lần gật hạ đầu ≥ 14; giữa hai lần và lúc ngẩng ≤ 4
 
 
@@ -1099,8 +1100,11 @@ def check_reading(folder, c, shots):
     if raised and all(nods):
         up_ok = all(abs(h['tilt']) <= 3 and h['down'] <= 4 for h in raised)
         nod_ok = nods[0]['down'] >= NOD_DEEP and nods[2]['down'] >= NOD_DEEP and nods[1]['down'] <= 4
+        # Đợt 36: ĐẦU CÚI THẬT ở đáy hai lần gật (`headPitch` × 32° ≥ NOD_BEND°), ngẩng ở giữa (Gemini: "ngẩng lên có, nhưng không gật").
+        bend = [h.get('pitch', 0) * 32 for h in nods]
+        nod_ok = nod_ok and bend[0] >= NOD_BEND and bend[2] >= NOD_BEND and bend[1] <= NOD_BEND / 2
         out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': up_ok and nod_ok,
-                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP})'})
+                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP}), head bent {bend[0]:.0f}° / {bend[1]:.0f}° / {bend[2]:.0f}° (want ≥ {NOD_BEND}° / ≤ {NOD_BEND / 2:g}° / ≥ {NOD_BEND}°)'})
     else: out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': None, 'note': 'not measured'})
     return out
 
@@ -1129,12 +1133,66 @@ def check_people_framed(folder, moments, shots):
     return out
 
 
+GAZE_RAY = 0.5        # đợt 36: tia nhìn (từ giữa mặt theo hướng đầu) đi qua đích trong ± 50 % chiều cao mặt …
+GAZE_TURNED = 0.25    # … và đầu thật sự quay / cúi: |hướng đầu trên màn hình| ≥ 0,25 (≈ 15°) — trừ khi đích ở ngay trước mặt
+GAZE_NEAR = 0.5       # đích cách giữa mặt dưới 0,5 chiều cao mặt: coi như trước mặt
+
+
+def gaze_target(c, g, f, t):
+    """Tâm đích nhìn (px) ở lúc `t`: dụng cụ trong tay, bìa hồ sơ, đầu một người, đầu con vật, điểm chỉ trên phim."""
+    who = f.get(c['who']) or {}
+    centre = lambda b: ((b['x0'] + b['x1']) / 2, (b['y0'] + b['y1']) / 2) if b else None
+    if g['aim'] == 'gadget':
+        box = next((x['box'] for x in who.get('gadgets') or [] if x['kind'] == g.get('gadget')), None); return centre(box)
+    if g['aim'] == 'readout': return centre(who.get('readout'))
+    if g['aim'] == 'clipboard':
+        box = next((x['box'] for x in who.get('items') or [] if x['kind'] == 'clipboard'), None); return centre(box)
+    other = f.get(g.get('on')) or {}
+    if g['aim'] == 'person': return centre(other.get('headBox') or other.get('face'))
+    if g['aim'] == 'pet': return centre((other.get('parts') or {}).get('head') or other.get('face'))
+    if g['aim'] == 'spot':
+        spots, gz = SPOTS.get(float(t)) or [], who.get('gaze')
+        if not spots or not gz: return None
+        p = min(spots, key=lambda q: (q['x'] - gz['x']) ** 2 + (q['y'] - gz['y']) ** 2); return (p['x'], p['y'])
+    return None
+
+
+def check_gaze_dir(folder, c, shots):
+    """HƯỚNG ĐẦU TỚI ĐÍCH (đợt 36, `lookAt`): ở mỗi mốc, dựng tia từ giữa khuôn mặt theo hướng đầu trên màn hình — quay θ = hướng × 90°
+    (thân + đầu, đã gồm phần bù góc máy), cúi φ = `headPitch` × LOOK_PITCH_DEG: (sin θ · cos φ, sin φ). Đạt khi đích ở phía trước tia,
+    cách tia ≤ GAZE_RAY chiều cao mặt, và tia đủ dài (≥ GAZE_TURNED — đầu quay / cúi thật, không nhìn thẳng ra máy quay); đích ở ngay
+    trước mặt (< GAZE_NEAR) thì chỉ cần cách mặt. Gemini đợt 35: "nhìn thẳng ra máy quay" khi chỉ con ngươi liếc."""
+    import math
+    out = []
+    for g in c.get('gaze') or []:
+        what, rows = f'{c["who"]} {c["kind"]} — head turned to {g["what"]}', []
+        for t in g['times']:
+            f = {a['name']: a for a in shots.get(float(t), [])}
+            gz = (f.get(c['who']) or {}).get('gaze'); aim = gaze_target(c, g, f, t)
+            if not gz or not aim or not gz['h']: continue
+            th, ph = gz['yaw'] * math.pi / 2, gz['pitch'] * gz['pitchDeg'] * math.pi / 180
+            vx, vy = math.sin(th) * math.cos(ph), math.sin(ph)
+            ux, uy = (aim[0] - gz['x']) / gz['h'], (aim[1] - gz['y']) / gz['h']
+            length, dist = math.hypot(vx, vy), math.hypot(ux, uy)
+            if dist < GAZE_NEAR: off, ok = dist, True
+            else:
+                along = (ux * vx + uy * vy) / max(length, 1e-6)
+                off = abs(ux * vy - uy * vx) / max(length, 1e-6) if along > 0 else dist
+                ok = along > 0 and off <= GAZE_RAY and length >= GAZE_TURNED
+            rows.append((t, off, length, ok, math.degrees(th), math.degrees(ph)))
+        if not rows: out.append({'scene': folder, 'what': what, 'ok': None, 'note': 'not measured (no face or target in the frame)'}); continue
+        worst = max(rows, key=lambda r: (not r[3], r[1]))
+        out.append({'scene': folder, 'what': what + f' ({len(rows)} moments)', 'ok': all(r[3] for r in rows),
+                    'note': f'ray from the face misses the target by at most {worst[1] * 100:.0f} % of the face height (at {worst[0]:g} s: head turned {worst[4]:+.0f}°, bent {worst[5]:+.0f}°, ray length {worst[2]:.2f}; limit {GAZE_RAY * 100:g} %, length ≥ {GAZE_TURNED:g})'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     # Mọi lúc cần chụp: các dải thời gian của từng phép đo (danh sách số — `reading` của cân là chữ, bỏ qua).
-    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
+    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))] + [t for g in c.get('gaze') or [] for t in g['times']]
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -1147,6 +1205,7 @@ def check_scene(folder):
         if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
         if c['kind'] == 'showXray' and c.get('listener'): results.extend(check_gaze(folder, c, shots))
         if c['kind'] == 'readChart' and c.get('reading'): results.extend(check_reading(folder, c, shots))
+        if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))
         if c['kind'] == 'walk':
             worst = None
             for t, frame in zip(c['times'], frames):
