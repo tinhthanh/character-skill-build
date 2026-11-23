@@ -67,6 +67,7 @@ DEPTH_JS = """(tl) => { const set = window.__set; if (!set.depthLog) return null
   }
   tl.seek(0, false); set.update(); return out; }"""
 DEPTHS = None
+SCALES = {}            # đợt 35: { lúc: [bệ cân trên màn hình] }, { ('paws', lúc): {con vật: đáy chân} }
 
 
 def check_depths(folder):
@@ -95,7 +96,9 @@ def probe(folder, times):
             time.sleep(0.1)
         # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
         script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
+                  "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
+                  "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); if (window.__set.careProbe) out['care@' + t] = window.__set.careProbe(); } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
                   % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
         size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
         done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
@@ -105,7 +108,11 @@ def probe(folder, times):
         shots = found.pop('shots', None)
         global DEPTHS
         DEPTHS = found.pop('depths', None)
-        return {float(k): v for k, v in found.items() if not k.startswith('props@')}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
+        global SCALES
+        SCALES = {float(k[7:]): v for k, v in found.items() if k.startswith('scales@')}
+        SCALES.update({('paws', float(k[5:])): v for k, v in found.items() if k.startswith('paws@')})
+        SCALES.update({('care', float(k[5:])): v for k, v in found.items() if k.startswith('care@')})
+        return {float(k): v for k, v in found.items() if '@' not in k}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
     finally:
         server.terminate()
 
@@ -299,7 +306,8 @@ def pet_pixels_sharp(folder, jobs, keep=None):
 def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction') and c.get('to') != 'hands']
+    probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -311,7 +319,8 @@ def check_seen(folder, checks, keep=None):
         ok = part['all'] >= SEEN and (head is None or head >= SEEN_HEAD)
         results.append({'scene': folder, 'what': f'{name} in view at {t:g} s', 'ok': ok, 'seen': round(part['all'], 3), 'head': None if head is None else round(head, 3),
                         'note': f'{part["all"] * 100:.0f} % of {name} shows' + (f', head {head * 100:.0f} %' if head is not None else '') + f' (least {SEEN * 100:g} %, head {SEEN_HEAD * 100:g} %)'})
-        if part.get('hand') is not None:
+        # Đo nhiệt (lượt bốn): cái chạm thân là ĐẦU ĐO — bàn tay cách thân cả chiều dài nhiệt kế; đo riêng ("the thermometer touches it").
+        if part.get('hand') is not None and (t, name) not in probe_jobs:
             results.append({'scene': folder, 'what': f'{toucher}\'s hand on {name} in view at {t:g} s', 'ok': part['hand'] >= HAND_SHOWN, 'hand': round(part['hand'], 3),
                             'note': f'{part["hand"] * 100:.0f} % of the hand shows (least {HAND_SHOWN * 100:g} %)'})
             results.append({'scene': folder, 'what': f'{toucher}\'s hand rests on {name} at {t:g} s', 'ok': part['contact'] >= CONTACT, 'contact': round(part['contact'], 3),
@@ -492,11 +501,195 @@ def check_reaction(folder, c, frames, log):
     return out
 
 
+ON_SCALE = 0.03       # cân (đợt 35): chân con vật cách mặt bệ cân ≤ 3 % chiều cao người cân
+
+
+def check_weigh(folder, c, frames, scales):
+    """CÂN (đợt 35): ở ba lúc đọc số, con vật (đang nằm trong hình người cân) đứng TRÊN BỆ CÂN — đáy chân nó cách mặt bệ ≤ 3 %
+    chiều cao người, giữa thân nó trong bề ngang cân — và ≥ 70 % khung thân nó nằm trong khung hình."""
+    W, H = frame_size(folder)
+    out, worst, seen_least = [], None, None
+    for t, frame in zip(c['times'], frames):
+        who, pet = frame.get(c['who']), frame.get(c['target'])
+        paws = (scales.get(('paws', float(t))) or {}).get(c['target'])
+        box = pet and pet.get('body')
+        if not who or not who.get('tall') or not box or paws is None: continue
+        cx = (box['x0'] + box['x1']) / 2
+        under = [s for s in scales.get(float(t)) or [] if s['x0'] <= cx <= s['x1']]
+        off = min((abs(paws - s['top']) for s in under), default=None)
+        off = None if off is None else off / who['tall']
+        if worst is None or off is None or (worst[1] is not None and off > worst[1]): worst = (t, off)
+        area = max(1, (box['x1'] - box['x0']) * (box['y1'] - box['y0']))
+        seen = max(0, min(box['x1'], W) - max(box['x0'], 0)) * max(0, min(box['y1'], H) - max(box['y0'], 0)) / area
+        if seen_least is None or seen < seen_least[1]: seen_least = (t, seen)
+    if worst is None: return [{'scene': folder, 'what': f'{c["who"]} weighs {c["target"]}', 'ok': None, 'note': 'not in the frame'}]
+    out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} on the scale', 'ok': worst[1] is not None and worst[1] <= ON_SCALE,
+                'note': (f'paws {worst[1] * 100:.1f} % of height off the top of the scale at {worst[0]:g} s (limit {ON_SCALE * 100:g} %)' if worst[1] is not None else f'{c["target"]} is not over a scale at {worst[0]:g} s')})
+    out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} in the frame', 'ok': seen_least[1] >= 0.7,
+                'note': f'{seen_least[1] * 100:.0f} % of {c["target"]} in the frame at {seen_least[0]:g} s (least 70 %)'})
+    # MÀN HÌNH CÂN (đợt 35, lượt ba): số cân khi con vật đứng trên bệ, số 0 trước khi đặt lên và sau khi bế ra.
+    if c.get('reading') and c.get('empty'):
+        texts = lambda t: (scales.get(('care', float(t))) or {}).get('@scales') or []
+        shown = [t for t in c['times'] if c['reading'] in texts(t)]
+        zero = [t for t in c['empty'] if texts(t) and all(not any(ch in text for ch in '123456789') for text in texts(t))]
+        ok = len(shown) == len(c['times']) and len(zero) == len(c['empty'])
+        out.append({'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — the scale shows the weight only while {c["target"]} is on it', 'ok': ok,
+                    'note': f'"{c["reading"]}" at {len(shown)} of {len(c["times"])} moments on the scale; 0 at {len(zero)} of {len(c["empty"])} moments off it'
+                            + ('' if ok else f' (display: {", ".join(f"{t:g} s {texts(t)}" for t in c["times"] + c["empty"])})')})
+    return out
+
+
+JUMP = 0.015          # con vật dời > 1,5 % chiều cao người trong một khung (1/30 s) …
+FREE = 0.02           # … khi không bàn tay nào của người làm cách hình nó (đầu, thân) ≤ 2 % chiều cao: nó tự nhảy chỗ (đợt 35)
+
+
+def check_jumps(folder, c, frames):
+    """CON VẬT KHÔNG NHẢY CHỖ (đợt 35, cân): theo từng khung (1/30 s) của bước `weigh`, con vật dời bao nhiêu so với BÀN TAY GẦN NÓ
+    NHẤT của người cân (cùng bàn tay ở hai khung) — cả hai tính so với chỗ đứng của người, theo chiều cao người, nên máy cắt / đẩy
+    không thành "nhảy". Nó dời > 1,5 % một khung, lệch khỏi bàn tay ấy > 1,5 %, mà bàn tay ấy không chạm hình nó (đầu, thân; ≤ 2 %) là nó tự bay — bản đầu:
+    từ bệ cân về trước bụng trong 0,6 s, hai tay buông bên hông (10 / 13 khung, tới 7 % một khung)."""
+    worst, jumps, prev = None, 0, None
+    for t, frame in zip(c['frames'], frames):
+        who, pet = frame.get(c['who']), frame.get(c['target'])
+        box = pet and pet.get('body')
+        if not who or not who.get('tall') or not box or not who.get('hands'): prev = None; continue
+        # So với CHỖ ĐỨNG của người cân (điểm sàn dưới chân, không theo thân — người quỳ / đứng dậy thì thân dời).
+        rel = lambda x, y: ((x - who['x']) / who['tall'], (y - who['ground']) / who['tall'])
+        centre = rel((box['x0'] + box['x1']) / 2, (box['y0'] + box['y1']) / 2)
+        drawn = list((pet.get('parts') or {}).values()) or [box]
+        hands = {h['side']: (rel(h['x'], h['y']), min(gap(h, b) for b in drawn) / who['tall']) for h in who['hands']}
+        if prev:
+            side = min(prev['hands'], key=lambda k: prev['hands'][k][1])
+            if side in hands:
+                moved = (centre[0] - prev['centre'][0] - (hands[side][0][0] - prev['hands'][side][0][0]), centre[1] - prev['centre'][1] - (hands[side][0][1] - prev['hands'][side][0][1]))
+                step, near = (moved[0] ** 2 + moved[1] ** 2) ** 0.5, min(hands[side][1], prev['hands'][side][1])
+                own = ((centre[0] - prev['centre'][0]) ** 2 + (centre[1] - prev['centre'][1]) ** 2) ** 0.5     # con vật TỰ dời (tay rời đi thì không tính)
+                # Khung con vật vào / rời vòng tay (`carried` đổi): hình nó đổi dáng (cuộn trong tay ↔ đứng), khung thân đổi — không phải dời chỗ.
+                if own > JUMP and step > JUMP and near > FREE and bool(pet.get('carried')) == prev['carried']:
+                    jumps += 1
+                    if worst is None or step > worst[1]: worst = (t, step, near)
+        prev = {'centre': centre, 'hands': hands, 'carried': bool(pet.get('carried'))}
+    note = (f'{jumps} frame{"" if jumps == 1 else "s"} where {c["target"]} moves away from the hand nearest it, which is not on it — {worst[1] * 100:.1f} % of height in one frame at {worst[0]:g} s, the hand {worst[2] * 100:.0f} % away'
+            if jumps else f'{c["target"]} moves only with a hand, {len(c["frames"])} frames (limit {JUMP * 100:g} % a frame apart from the nearest hand when it is more than {FREE * 100:g} % off)')
+    return [{'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} never jumps', 'ok': jumps == 0, 'note': note}]
+
+
+LOOK = 50             # đọc nhiệt kế: hướng con ngươi lệch hướng từ mắt tới nhiệt kế ≤ 50° …
+LOOK_SHIFT = 0.1      # … và con ngươi lệch khỏi giữa tròng ≥ 10 % bề ngang mắt (không nhìn thẳng ra trước)
+
+
+def check_look(folder, c, scales):
+    """NHÌN VÀO DỤNG CỤ (đợt 35, đọc nhiệt kế): ở ba lúc đọc, con ngươi hai mắt lệch về phía dụng cụ đang giơ (`gadget`) — góc giữa hướng
+    lệch và hướng mắt → dụng cụ ≤ 50°, lệch ≥ 10 % bề ngang mắt."""
+    import math
+    worst = None
+    for t in c['times']:
+        who = (scales.get(('care', float(t))) or {}).get(c['who'])
+        tool = next((g for g in (who or {}).get('gadgets', []) if g['kind'] == c['gadget']), None)
+        if not who or not tool or not who.get('eyes'): continue
+        for eye in who['eyes']:
+            ox, oy = eye['pupil']['x'] - eye['eye']['x'], eye['pupil']['y'] - eye['eye']['y']
+            tx, ty = tool['x'] - eye['eye']['x'], tool['y'] - eye['eye']['y']
+            shift = (ox * ox + oy * oy) ** 0.5 / max(1, eye['eye']['w'])
+            angle = abs(math.degrees(math.atan2(ox * ty - oy * tx, ox * tx + oy * ty))) if shift > 0 else 180
+            bad = angle > LOOK or shift < LOOK_SHIFT
+            if worst is None or (bad and not worst[3]) or (bad == worst[3] and angle > worst[1]): worst = (t, angle, shift, bad)
+    if worst is None: return [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': None, 'note': 'no thermometer in the hand at the moments asked'}]
+    out = [{'scene': folder, 'what': f'{c["who"]} looks at the thermometer', 'ok': not worst[3],
+            'note': f'pupils turned {worst[1]:.0f}° off the thermometer, shifted {worst[2] * 100:.0f} % of the eye width at {worst[0]:g} s (limit {LOOK}°, least {LOOK_SHIFT * 100:g} %)'}]
+    # Lượt ba: QUAY mặt về phía nhiệt kế (|huong| ≥ 0,3, cùng phía) và nhiệt kế SÁT MẶT (tâm nó cách tâm đầu ≤ 0,8 bề ngang đầu), ở cả
+    # ba lúc — trải ≥ 1,2 s.
+    bad, seen, placed = [], [], []
+    for t in c['times']:
+        who = (scales.get(('care', float(t))) or {}).get(c['who']) or {}
+        tool = next((g for g in who.get('gadgets', []) if g['kind'] == c['gadget']), None)
+        head = who.get('head')
+        if not tool or not head: bad.append(f'{t:g} s: no thermometer'); continue
+        side = 1 if tool['x'] > head['x'] else -1
+        near = ((tool['x'] - head['x']) ** 2 + (tool['y'] - head['y']) ** 2) ** 0.5 / max(1, head['w'])
+        tilt, drop = who.get('tilt', 0) * side, who.get('drop', 0)
+        H = (scales.get(('care', float(t))) or {}).get('@H') or frame_size(folder)[1]
+        face, tool_px = head['w'] / H, max(tool.get('w', 0), tool.get('h', 0)) / H
+        seen.append((near, tilt, drop, face, tool_px))
+        if face < FACE_FRAME or tool_px < TOOL_FRAME: bad.append(f'{t:g} s: face {face * 100:.0f} % and thermometer {tool_px * 100:.0f} % of the frame height')
+        if who.get('turn', 0) * side < TURN_TO: bad.append(f'{t:g} s: turned {who.get("turn", 0):+.2f}')
+        if near > NEAR_FACE: bad.append(f'{t:g} s: thermometer {near:.2f} head widths from the face')
+        if tilt < HEAD_TILT or drop < HEAD_DROP: bad.append(f'{t:g} s: head tilted {tilt:+.0f}°, lowered {drop:+.1f} toward it')
+        # Lượt bốn: NGANG MẮT (tâm nhiệt kế ± 10 % chiều cao đầu quanh tầm mắt), LỆCH SANG BÊN (≥ 0,5 bề ngang đầu từ tâm mặt) và KHÔNG
+        # CHỒNG LÊN MIỆNG (khung nhiệt kế không chạm khung miệng) — lượt ba giơ sát cằm, nhìn như ngậm nhiệt kế.
+        eyes = who.get('eyes') or []
+        if eyes and head.get('h'):
+            eye_y = sum(e['eye']['y'] for e in eyes) / len(eyes)
+            level, aside = abs(tool['y'] - eye_y) / head['h'], abs(tool['x'] - head['x']) / max(1, head['w'])
+            mouth = who.get('mouthP')
+            over = bool(mouth) and abs(tool['x'] - mouth['x']) < (tool.get('w', 0) + mouth.get('w', 0)) / 2 and abs(tool['y'] - mouth['y']) < (tool.get('h', 0) + mouth.get('h', 0)) / 2
+            placed.append((level, aside, over))
+            if level > EYE_LEVEL or aside < ASIDE or over: bad.append(f'{t:g} s: thermometer {level * 100:.0f} % of the head height off eye level, {aside:.2f} head widths aside' + (', over the mouth' if over else ''))
+    span = c['times'][-1] - c['times'][0]
+    out.append({'scene': folder, 'what': f'{c["who"]} turns to the thermometer held by the face', 'ok': not bad and span >= READ_HOLD - 1e-6,
+                'note': ('; '.join(bad) if bad else f'face turned and head bent to it, the thermometer by the face at all {len(c["times"])} moments') + f' over {span:.1f} s'
+                        + (f' — farthest {max(x[0] for x in seen):.2f} head widths, least tilt {min(x[1] for x in seen):+.0f}°, least lowering {min(x[2] for x in seen):+.1f}, face ≥ {min(x[3] for x in seen) * 100:.0f} %, thermometer ≥ {min(x[4] for x in seen) * 100:.1f} % of the frame height' if seen else '')
+                        + (f'; eye level within {max(x[0] for x in placed) * 100:.0f} % of the head height, ≥ {min(x[1] for x in placed):.2f} head widths aside, over the mouth {sum(x[2] for x in placed)} times' if placed else '')
+                        + f' (least {READ_HOLD:g} s; turn ≥ {TURN_TO:g}, within {NEAR_FACE:g} head widths, tilt ≥ {HEAD_TILT:g}°, lowered ≥ {HEAD_DROP:g}, face ≥ {FACE_FRAME * 100:g} %, thermometer ≥ {TOOL_FRAME * 100:g} %, eye level ±{EYE_LEVEL * 100:g} %, aside ≥ {ASIDE:g})'})
+    return out
+
+
+TURN_TO = 0.3         # đọc nhiệt kế: người quay 3/4 về phía nó (`huong`)
+NEAR_FACE = 0.8       # … nhiệt kế cách tâm đầu ≤ 0,8 bề ngang đầu
+READ_HOLD = 1.2       # … giữ ≥ 1,2 s
+EYE_LEVEL = 0.10      # lượt bốn: tâm nhiệt kế cao ngang mắt ± 10 % chiều cao đầu
+ASIDE = 0.5           # … cách tâm mặt ≥ 0,5 bề ngang đầu (sang bên), không chồng lên miệng
+HEAD_TILT = 0         # … đầu không nghiêng ra xa nó (lượt bốn: nghiêng 8° về phía nhiệt kế kéo tâm đầu sang đó — nhiệt kế hết lệch sang bên)
+HEAD_DROP = 2         # … và cúi xuống ≥ 2 đơn vị khung (`dauY`) — lượt bốn: nhiệt kế ngang mắt, nhìn ngang sang nó (lượt ba: cúi 10, nhiệt kế ở cằm)
+FACE_FRAME = 0.36     # … góc cận: mặt người (bề ngang đầu) ≥ 36 % chiều cao khung (lượt bốn: góc cận giữ trọn bàn khám — 38 %; lượt ba đặt 44 % theo số đo)
+TOOL_FRAME = 0.085    # … và nhiệt kế (cạnh dài) ≥ 8,5 % chiều cao khung — lượt hai: 7,2 % / 8,2 %
+
+
+TOUCH = 0.01          # lượt bốn: bàn tay cách khung hình đầu con vật ≤ 1 % chiều cao người (khung bao — lỏng, xem Known)
+TIP_TOUCH = 0.004     # … đầu đo nhiệt kế cách khung hình thân con vật ≤ 0,4 % (lượt ba: mèo 0,5 % — lơ lửng sau đuôi)
+PILL_AT = 0.02        # viên thuốc (mép gần nhất) cách môi con vật ≤ 2 % chiều cao người …
+MOUTH_OPEN = 0.5      # … và miệng con vật há ≥ 0,5 lúc viên thuốc ở môi
+
+
+def check_pill(folder, c, scales):
+    """VIÊN THUỐC VÀO MÕM (đợt 35): ở lúc giữa viên thuốc (dụng cụ 7) cách môi con vật ≤ 5 % chiều cao người; ở cả ba lúc miệng con vật
+    há ≥ 0,5 (bản đầu: nó chỉ há lúc viên thuốc đã mất)."""
+    out, mid = [], c['times'][len(c['times']) // 2]
+    care = scales.get(('care', float(mid))) or {}
+    who, pet = care.get(c['who']), care.get(c['target'])
+    pill = next((g for g in (who or {}).get('gadgets', []) if g['kind'] == 7), None)
+    if who and pet and pill and pet.get('lips'):
+        # Tới HÌNH viên nang (mép gần nhất), không tới tâm nó: lượt ba viên nang dừng ở mép môi để không che cái miệng đang há.
+        half_w, half_h = pill.get('w', 0) / 2, pill.get('h', 0) / 2
+        dx, dy = max(0, abs(pill['x'] - pet['lips']['x']) - half_w), max(0, abs(pill['y'] - pet['lips']['y']) - half_h)
+        d = (dx * dx + dy * dy) ** 0.5 / max(1, who['tall'])
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': d <= PILL_AT, 'note': f'the pill is {d * 100:.1f} % of height from the lips at {mid:g} s (limit {PILL_AT * 100:g} %)'})
+    else:
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — pill at the mouth', 'ok': False, 'note': f'no pill in the hand (or no lips) at {mid:g} s'})
+    opens = [((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('mouth', 0) for t in c['times']]
+    out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — mouth open for the pill', 'ok': min(opens) >= MOUTH_OPEN and c['times'][-1] - c['times'][0] >= 0.8 - 1e-6,
+                'note': f'mouth open {min(opens):.2f} at least over {c["times"][0]:g}–{c["times"][-1]:g} s (least {MOUTH_OPEN:g}, over ≥ 0.8 s)'})
+    # Lượt ba — CỠ TRÊN KHUNG ở lúc được hỏi: mặt con vật ≥ 15 % chiều cao khung, viên thuốc (cạnh dài) ≥ 1/3 bề ngang mõm (nét môi),
+    # hàm há ≥ 12 % chiều cao đầu nó.
+    H = care.get('@H') or frame_size(folder)[1]
+    if pet and pill:
+        face, lips, jaw, size = pet.get('face', 0), pet.get('lipsW', 0), pet.get('jaw', 0), max(pill.get('w', 0), pill.get('h', 0))
+        ok = face / H >= FACE_SHARE and lips > 0 and size >= lips / 3 and face > 0 and jaw / face >= JAW_OPEN
+        out.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — big enough on screen', 'ok': ok,
+                    'note': f'at {mid:g} s: {c["target"]}\'s face {face / H * 100:.0f} % of the frame height (least {FACE_SHARE * 100:g} %), pill {size:.0f} px vs mouth {lips:.0f} px (least 1/3), jaw open {jaw:.0f} px = {jaw / max(1, face) * 100:.0f} % of its head (least {JAW_OPEN * 100:g} %)'})
+    return out
+
+
+FACE_SHARE = 0.15     # cho thuốc: mặt con vật ≥ 15 % chiều cao khung (góc cận)
+JAW_OPEN = 0.12       # … hàm há ≥ 12 % chiều cao đầu nó
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
-    shots, cuts, log = probe(folder, [t for c in checks for t in c['times']] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    shots, cuts, log = probe(folder, [t for c in checks for t in c['times'] + c.get('frames', []) + c.get('empty', [])] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    scales = SCALES
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
@@ -519,6 +712,16 @@ def check_scene(folder):
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
+            continue
+        if c['kind'] == 'weigh':
+            results.extend(check_weigh(folder, c, frames, scales))
+            if c.get('frames'): results.extend(check_jumps(folder, c, [{a['name']: a for a in shots.get(float(t), [])} for t in c['frames']]))
+            continue
+        if c['kind'] == 'look':
+            results.extend(check_look(folder, c, scales))
+            continue
+        if c['kind'] == 'pill':
+            results.extend(check_pill(folder, c, scales))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):
@@ -555,13 +758,34 @@ def check_scene(folder):
         judged = asked or best
         results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand reaches', 'ok': judged[1] <= REACH,
                         'note': f'{judged[1] * 100:.1f} % of height at {judged[0]:g} s, the moment asked about (closest {best[1] * 100:.1f} % at {best[0]:g} s; limit {REACH * 100:g} %)'})
+        # Lượt bốn — CHẠM THẬT ở lúc được hỏi (lúc giữa): đo nhiệt — ĐẦU ĐO (khung nhiệt kế) sát hình đầu / thân con vật; cho thuốc — CẢ HAI
+        # bàn tay sát hình đầu nó (một tay ở mõm, một tay đỡ cằm). Lượt ba: nhiệt kế lơ lửng sau đuôi con mèo, tay đỡ buông ở eo.
+        if c['kind'] in ('takeTemp', 'givePill') and asked:
+            t = asked[0]; frame = frames[c['times'].index(t)] if t in c['times'] else {}
+            who, pet = frame.get(c['who']), frame.get(c['target'])
+            drawn = list(((pet or {}).get('parts') or {}).items())
+            if who and who.get('tall') and drawn:
+                if c['kind'] == 'takeTemp':
+                    tool = next((g for g in ((scales.get(('care', float(t))) or {}).get(c['who']) or {}).get('gadgets', []) if g['kind'] == 6), None)
+                    if tool:
+                        tb = {'x0': tool['x'] - tool['w'] / 2, 'x1': tool['x'] + tool['w'] / 2, 'y0': tool['y'] - tool['h'] / 2, 'y1': tool['y'] + tool['h'] / 2}
+                        g = min(max(0, b['x0'] - tb['x1'], tb['x0'] - b['x1']) ** 2 + max(0, b['y0'] - tb['y1'], tb['y0'] - b['y1']) ** 2 for _, b in drawn) ** 0.5 / who['tall']
+                        results.append({'scene': folder, 'what': f'{c["who"]} takeTemp {c["target"]} — the thermometer touches it', 'ok': g <= TIP_TOUCH,
+                                        'note': f'the thermometer is {g * 100:.1f} % of height from {c["target"]}\'s body at {t:g} s (limit {TIP_TOUCH * 100:g} %)'})
+                    else: results.append({'scene': folder, 'what': f'{c["who"]} takeTemp {c["target"]} — the thermometer touches it', 'ok': False, 'note': f'no thermometer in the hand at {t:g} s'})
+                else:
+                    head = dict(drawn).get('head') or drawn[0][1]
+                    gaps = sorted(max(0, head['x0'] - h['box']['x1'], h['box']['x0'] - head['x1'], head['y0'] - h['box']['y1'], h['box']['y0'] - head['y1']) / who['tall'] for h in who['hands'] if h.get('box'))
+                    ok = len(gaps) == 2 and gaps[-1] <= TOUCH
+                    results.append({'scene': folder, 'what': f'{c["who"]} givePill {c["target"]} — both hands on its head', 'ok': ok,
+                                    'note': f'hands {", ".join(f"{x * 100:.1f} %" for x in gaps)} of height from {c["target"]}\'s head at {t:g} s (limit {TOUCH * 100:g} % each)'})
         if bent is not None:
             results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — leans no more than {SEATED_LEAN:g}°', 'ok': bent[1] <= SEATED_LEAN + 0.5,
                             'note': f'the body leans {bent[1]:.0f}° at {bent[0]:g} s, the moment asked about (limit {SEATED_LEAN:g}°)'})
         if lap is not None:
             results.append({'scene': folder, 'what': f'{c["who"]} {c["kind"]} {c["target"]} — hand off the own lap', 'ok': False,
                             'note': f'the hand rests on {c["who"]}\'s own thigh / knee at {lap:g} s, the moment asked about'})
-        if c['kind'] == 'carry':
+        if c['kind'] == 'carry' and c.get('only') != 'reach':
             # BẾ: ở lúc đo cuối, con vật nằm TRONG VÒNG TAY — hình nó trong hình người bế, giữa thân nằm trong khung thân người
             # ấy. Chỉ đo tay thì con mèo bay ra mép khung (đợt 29, người ngồi sofa bế mèo) vẫn "đạt": tay chạm khung con mèo lúc
             # nhấc nó lên.

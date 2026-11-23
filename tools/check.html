@@ -1567,8 +1567,10 @@ try {
         const host = spot(`left:${left}px;top:0;width:200px;height:235px`);
         const rig = id in RigThu.LOAI ? L.createPet(host, { species: id, wear: entry.wear || [] }).rig
           : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
+        // "scale" (đợt 35, `weigh`): một cái cân bên trái người — `@scale` trong các bước, như tools/actions.html.
+        const scale = entry.scale ? L.createProp(spot(`left:${left - 62}px;top:0;width:200px;height:235px`), 'scale', { reading: String(entry.scale) }) : null;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg)) };
+        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg)) };
       };
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
@@ -1686,6 +1688,59 @@ try {
         const line = vet[name](...args); line.time(0.6);
         if (!['L', 'R'].some((side) => Math.round(vet.s['gadget' + side]) === kind)) hong(name, `the ${kind === 3 ? 'pill' : 'brush'} is not in the hand`);
         line.progress(1); line.kill();
+      }
+      // ĐỢT 35 — đo nhiệt độ, cho uống thuốc, cân: dụng cụ trong tay, tay tới con vật, thẻ số đo hiện rồi tắt, con vật đứng trên
+      // bệ cân rồi về chỗ cũ; trường hợp không hợp bị từ chối rõ ràng.
+      {
+        const nurse = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'nurse' }).rig;
+        const cat = L.createPet(spot('left:1020px;top:118px;width:100px;height:82px'), { species: 'cat' }).rig;
+        const gap = (a, b) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return Math.max(0, p.left - q.right, q.left - p.right, p.top - q.bottom, q.top - p.bottom); };
+        const temp = nurse.takeTemp(cat, 1.5, { reading: '38.9°C' });
+        temp.time(1.2);
+        const k = ['L', 'R'].find((side) => Math.round(nurse.s['gadget' + side]) === 6);
+        if (!k || nurse.el['gadget' + k].style.display === 'none') hong('takeTemp', 'no thermometer in the hand');
+        else if (gap(nurse.el['gadget' + k], cat.el.than) > 6) hong('takeTemp', `the thermometer does not reach the pet's body (${gap(nurse.el['gadget' + k], cat.el.than).toFixed(0)} px off)`);
+        temp.time(2.9);
+        if (nurse.el.readout.style.display === 'none' || nurse.el.readout.querySelector('text').textContent !== '38.9°C') hong('takeTemp', 'no reading shown over the thermometer');
+        else {
+          // Lượt bốn: thẻ số cạnh nhiệt kế (ngang mắt), về phía bàn tay cầm nó, không che mặt.
+          const card = nurse.el.readout.getBoundingClientRect(), face = nurse.el.dau.getBoundingClientRect(), hand = nurse.el['coTay' + k].getBoundingClientRect();
+          const overlap = Math.max(0, Math.min(card.right, face.right) - Math.max(card.left, face.left)) * Math.max(0, Math.min(card.bottom, face.bottom) - Math.max(card.top, face.top));
+          if (overlap > card.width * card.height * 0.1) hong('takeTemp', 'the reading covers the face');
+          if ((card.left + card.right) / 2 < (face.left + face.right) / 2 === (k === 'R')) hong('takeTemp', 'the reading is not on the side of the hand holding the thermometer');
+        }
+        temp.progress(1); if (nurse.s.gadgetL || nurse.s.gadgetR || nurse.el.readout.style.display !== 'none') hong('takeTemp', 'the thermometer or the reading stays afterwards'); temp.kill();
+        // Cho thuốc: con vật đứng sát như trong cảnh (tools/scene.py đưa người tới cách nó 0,2 chiều cao) — tay quay 3/4 ngắn hơn.
+        cat.svg.parentNode.style.left = '985px'; cat.apDung();
+        const pill = nurse.givePill(cat); pill.time(0.95);
+        const p = ['L', 'R'].find((side) => Math.round(nurse.s['gadget' + side]) === 7);
+        if (!p) hong('givePill', 'no pill in the hand');
+        else {
+          const other = p === 'L' ? 'R' : 'L';
+          if (gap(nurse.el['gadget' + p], cat.el.dau) > 10) hong('givePill', `the pill does not reach the pet's head (${gap(nurse.el['gadget' + p], cat.el.dau).toFixed(0)} px off)`);
+          if (Math.abs(at(nurse.el['coTay' + other])[0] - at(cat.el.dau)[0]) > Math.abs(at(nurse.el['coTay' + other])[0] - at(nurse.el.ao)[0]) + 40) hong('givePill', 'the other hand does not come over to the pet');
+        }
+        pill.time(1.3); if (nurse.s.gadgetL || nurse.s.gadgetR) hong('givePill', 'the pill is still in the hand after it went in');
+        pill.progress(1); pill.kill();
+        const busy = L.createCharacter(spot('left:900px;top:240px;width:200px;height:235px'), { id: 'vet', items: { R: 'cup' } }).rig;
+        let why = ''; try { busy.givePill(cat); } catch (error) { why = error.message; }
+        if (!why.includes('both hands free')) hong('givePill', 'a held item should be refused with a clear message');
+        why = ''; try { nurse.weigh(null); } catch (error) { why = error.message; }
+        if (!why.includes('pet rig')) hong('weigh', 'weigh without a pet should be refused with a clear message');
+        why = ''; try { nurse.weigh(cat, document.body); } catch (error) { why = error.message; }
+        if (!why.includes('"scale" prop')) hong('weigh', 'a scale that is not a scale prop should be refused with a clear message');
+        const scaleHost = spot('left:840px;top:0;width:200px;height:235px'), scale = L.createProp(scaleHost, 'scale', { reading: '4.2 kg' });
+        const home = at(cat.el.than), line = L.sequence(nurse, [['weigh', cat, scale]]), d = line.duration();
+        line.time(3.2);
+        const plate = scale.svg.getBoundingClientRect(), top = plate.top + plate.height * 441 / 470;
+        const paws = Math.max(...['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => cat.el[key].getBoundingClientRect().bottom));
+        if (Math.abs(paws - top) > 3) hong('weigh', `the pet does not stand on the scale (paws ${(paws - top).toFixed(1)} px off its top)`);
+        if (Math.abs(at(cat.el.than)[0] - (plate.left + plate.width / 2)) > plate.width * 0.25) hong('weigh', 'the pet is not over the middle of the scale');
+        if (nurse.el.readout.style.display === 'none' || nurse.el.readout.querySelector('text').textContent !== '4.2 kg') hong('weigh', 'no weight shown over the pet on the scale');
+        line.time(d);
+        const back = at(cat.el.than);
+        if (nurse.s.om || Math.hypot(back[0] - home[0], back[1] - home[1]) > 3) hong('weigh', 'the pet is not put back where it was');
+        line.kill(); cat.svg.remove(); nurse.svg.remove(); busy.svg.remove(); scaleHost.remove();
       }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;

@@ -98,6 +98,13 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
+               Exam room: ["weigh", "@pet", "<scale cutout name>"] (picks the pet up, sets it on a set.cutouts "scale" with a
+               "name" — stand it beside the person, same z ±60 — reads the number, a big display pops up with the scale's
+               "reading", the scale's own display reads 0 until the pet is on it; puts the pet back; optional 4th
+               { "reading": "4.2 kg", "hold": 1.6 }); ["takeTemp", "@pet"] (a
+               thermometer to the pet's rear, held 1.5 s, then read: { "reading": "38.5°C" } as 3rd argument after the hold,
+               e.g. ["takeTemp", "@pet", 1.5, { "reading": "39.2°C" }]); ["givePill", "@pet"] (one hand holds the head, the
+               other puts a pill in its mouth — the pet opens its mouth and chews by itself; both hands must be free).
                A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene; a person's
                "wears": "mask" | "gloves" | "cap" (or a list). Pets: "greet", "play", ["goIn", 90] … ["comeOut", 90].
                "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
@@ -184,6 +191,11 @@ PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front
 # Vuốt ve: rig vuốt LƯNG con vật (như người thật) — đo tới thân, không tới mặt.
 REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brush': 'body', 'listen': 'body', 'inject': 'body',
                  'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body'}
+# ĐỢT 35: đo nhiệt độ (tay tới thân con vật), cho uống thuốc (tay tới đầu / mõm). Cân (`weigh`) đo riêng: con vật đứng trên bệ cân.
+REACH_ACTIONS.update({'takeTemp': 'body', 'givePill': 'face'})
+# Lúc đo (phần của bước) của từng động tác chạm: tay đang ở trên con vật — đo nhiệt độ chỉ chạm từ 0,45 s tới 0,6 + hold.
+REACH_TIMES = {'takeTemp': (0.2, 0.28, 0.36), 'givePill': (0.3, 0.36, 0.42)}
+CARE_35 = ('weigh', 'takeTemp', 'givePill')              # động tác phòng khám đợt 35 — cùng các danh sách "với tới con vật" như khám, tiêm
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
             'introduce', 'shrug', 'throwBall')
@@ -446,7 +458,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             reach = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
                           for step in timings['reaches'][n] if step['name'] == op['kind']), None)
             if reach: t0, t1 = float(reach['start']), float(reach['start']) + float(reach['duration'])
-            times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.35, 0.82, 0.95) if op['kind'] == 'carry' else (0.4, 0.55, 0.7))]
+            times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.35, 0.82, 0.95) if op['kind'] == 'carry' else REACH_TIMES.get(op['kind'], (0.4, 0.55, 0.7)))]
             pet = pet_of(op['target'])
             ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
@@ -456,7 +468,37 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}))})
+            if op['kind'] == 'takeTemp' and reach:
+                # ĐỌC NHIỆT KẾ (đợt 35): mắt nhìn vào nhiệt kế đang giơ lên (lúc 0,6 + hold + 0,6 / 0,9 / 1,2 s của bước).
+                up = float(reach['start']) + 0.6 + float(op.get('hold', 1.5))
+                look = [round(up + f, 2) for f in (0.6, 1.2, 1.8)]           # lượt ba: giữ dáng đọc ≥ 1,2 s — đo đầu, giữa, cuối quãng ấy
+                moments.append({'t': look[1], 'what': f'{op["who"]} reads the thermometer', 'ask': [f'Is {op["who"]} looking at the thermometer in their raised hand, with the temperature shown beside it?'],
+                                'check': {'kind': 'look', 'who': op['who'], 'gadget': 6, 'times': look}})
+            if op['kind'] == 'givePill' and reach:
+                # VIÊN THUỐC VÀO MÕM (đợt 35): viên thuốc ở môi con vật và miệng nó đang há (0,8 / 0,95 / 1,1 s của bước).
+                pill = [round(float(reach['start']) + f, 2) for f in (0.6, 1.0, 1.4)]        # miệng há suốt ≥ 0,8 s quanh lúc viên thuốc vào (1,0 s)
+                moments.append({'t': pill[1], 'what': f'{op["who"]} puts a pill in {op["target"]}\'s mouth', 'ask': [f'Is a white pill at the mouth of the animal ({op["target"]}), with its mouth open?'],
+                                'check': {'kind': 'pill', 'who': op['who'], 'target': op['target'], 'times': pill}})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] == 'weigh':
+            # CÂN (đợt 35): lúc bế lên (0,3 / 0,4 / 0,48 s — tay tới thân con vật) và lúc đọc số (con vật đứng trên bệ cân, thẻ số đã
+            # bật lên: 2,6 s … 2,25 + hold của bước).
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == 'weigh'), None)
+            if not step: continue
+            t0, hold = float(step['start']), float(op.get('hold', 1.6))
+            pick = [round(t0 + f, 2) for f in (0.3, 0.4, 0.48)]
+            read = [round(t0 + 2.3 + 0.45 + hold * f, 2) for f in (0.1, 0.5, 0.9)]
+            # THEO TỪNG KHUNG (đợt 35): con vật không nhảy chỗ khi không tay nào chạm nó — suốt bước, mỗi 1/30 s.
+            track = [round(t0 + n / 30, 3) for n in range(int(float(step['duration']) * 30) + 1)]
+            moments.append({'t': pick[1], 'what': f'{op["who"]} picks {op["target"]} up to weigh it', 'ask': [f'Does {op["who"]}\'s hand touch, or almost touch, the animal ({op["target"]})?'],
+                            'check': {'kind': 'carry', 'who': op['who'], 'target': op['target'], 'to': 'body', 'times': pick, 'only': 'reach'}})
+            moments.append({'t': read[1], 'what': f'{op["who"]} weighs {op["target"]}', 'ask': [f'Is the animal ({op["target"]}) standing on the scale, with its weight shown on a display above it?',
+                                                                                            f'Is {op["who"]} standing up looking at the scale?'],
+                            'check': {'kind': 'weigh', 'who': op['who'], 'target': op['target'], 'times': read, 'frames': track,
+                                      # MÀN HÌNH CÂN (lượt ba): số cân lúc đọc, số 0 trước khi đặt lên và sau khi bế ra
+                                      'reading': op.get('reading'), 'empty': [round(t0 + 0.3, 2), round(t0 + 2.85 + hold + 1.3, 2)]}})     # trước khi đặt lên; đã bế lên trước bụng
+            continue
         if op['kind'] == 'reaction':
             # PHẢN ỨNG CỦA CON VẬT (đợt 33): ở 30 / 50 / 70 % lượt nó thấy được trong khung; `start` / `end` để `acting_check` xét góc chèn
             # con vật ngay trước có giữ tới hết lượt không.
@@ -956,6 +998,44 @@ def main():
     if not isinstance(script, list) or not script: fail('"script" must be a non-empty list of turns')
     voices = []                                             # { key, file, text }
 
+    # ĐỢT 35 — CÂN, ĐO NHIỆT ĐỘ, CHO UỐNG THUỐC: kiểm tra đối số, rồi viết bước. Cân: tên một cutout "scale" (có "name") — trong
+    # bối cảnh 3D thành `set.targetPoint(người, [x, mặt bệ, z])`; số cân lấy từ "reading" của cutout ấy nếu bước không tự cho.
+    def care_code(step, where, actor):
+        name = step[0]
+        if actor not in names or names[actor]['_pet']: fail(f'{where}: "{name}" is done by a person, not a pet')
+        if len(step) < 2 or not (isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and names[step[1][1:]]['_pet']):
+            fail(f'{where}: "{name}" needs the pet as its second item, e.g. ["{name}", "@dog"' + (', "scale"]' if name == 'weigh' else ']') + f' — got {js(step)}')
+        pet = step[1][1:]
+        if name == 'weigh':
+            if stage_set is None: fail(f'{where}: "weigh" needs a 3D set ("set") with a "scale" cutout that has a "name"')
+            scales = {item.get('name'): item for item in stage_set.get('cutouts', []) if item.get('kind') == 'scale' and item.get('name')}
+            if len(step) < 3 or step[2] not in scales:
+                fail(f'{where}: "weigh" needs the scale as its third item — the "name" of a set.cutouts item with "kind": "scale" (scales here: {", ".join(scales) or "none"}) — got {js(step)}')
+            options = step[3] if len(step) > 3 else {}
+            if len(step) > 4 or not isinstance(options, dict) or set(options) - {'reading', 'hold'}: fail(f'{where}: "weigh" takes ["weigh", "@pet", "<scale>", {{ "reading": "4.2 kg", "hold": 1.6 }}] — got {js(step)}')
+            if 'reading' in options and not isinstance(options['reading'], str): fail(f'{where}: "weigh" reading is the text on the display, such as "4.2 kg"')
+            if 'hold' in options and not (isinstance(options['hold'], (int, float)) and 0.5 <= options['hold'] <= 6): fail(f'{where}: "weigh" hold must be 0.5…6 seconds')
+            scale = scales[step[2]]
+            if abs(float(scale['z']) - float(names[actor].get('z', -300))) > 60:
+                fail(f'{where}: the scale "{step[2]}" stands at z {float(scale["z"]):g}, "{actor}" at z {float(names[actor].get("z", -300)):g} — the pet is set down in the person\'s own plane: give the scale the same z (within 60)')
+            tall = float(scale.get('height', round(person_default)))
+            reading = options.get('reading', scale.get('reading')) or '4.2 kg'
+            extra = {key: value for key, value in (('reading', reading), ('hold', options.get('hold'))) if value is not None}
+            point = f"set.targetPoint({actor}, [{float(scale['x']):g}, {float(scale.get('y', 0)) + tall * 17 / 470:.1f}, {float(scale['z']):g}])"
+            # MÀN HÌNH CÂN (đợt 35, lượt ba): cái cân dựng với số 0, rig ghi số cân lên nó đúng lúc con vật đứng trên bệ (`display`).
+            scale['_weighed'] = reading if not scale.get('_weighed') else scale['_weighed']
+            prop = f"cutout{stage_set['cutouts'].index(scale) + 1}Prop"
+            return f"['weigh', {pet}, {point}, {{ {', '.join(f'{key}: {js(value)}' for key, value in extra.items())}, display: {prop} }}]"
+        if name == 'takeTemp':
+            if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
+                fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
+        if name == 'givePill' and len(step) > 2: fail(f'{where}: "givePill" takes just the pet: ["givePill", "@pet"] — got {js(step)}')
+        other = names[pet]
+        walked = (float(other['x']) - float(other['_x0'])) / other['_unit'] if other.get('_unit') and other.get('_x0') is not None else 0
+        at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
+        aim = f"set.target({actor}, {pet}, {js('rear' if name == 'takeTemp' else 'lips')}{at})" if stage_set is not None else pet
+        return '[' + ', '.join([js(name), aim] + [js(item) for item in step[2:]]) + ']'
+
     def step_code(step, where, actor=None):
         if isinstance(step, (int, float)): return js(step)
         # REO trong KHUNG DỌC (đợt 34): chữ V dang rộng cần ~1,02 × bề rộng góc toàn — không góc trung nào giữ được cả hai tay,
@@ -964,6 +1044,7 @@ def main():
         if step in ('cheer', ['cheer']) and height > width * 1.2 and actor in names and not names[actor]['_pet']: return "['cheer', { narrow: true }]"
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
+        if step[0] in CARE_35: return care_code(step, where, actor)
         parts = []
         for item in step:
             if isinstance(item, str) and item.startswith('@'):
@@ -980,6 +1061,8 @@ def main():
                 elif stage_set is not None and actor and step[0] == 'stroke' and other.get('_back') is not None and other['_back'] is names.get(actor): parts.append(f"set.target({actor}, {item[1:]}, 'top'{at})")
                 elif stage_set is not None and actor and step[0] in ('point', 'stroke', 'examine', 'giveTreat'): parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
                 elif stage_set is not None and actor and step[0] in ('listen', 'inject', 'brush'): parts.append(f"set.target({actor}, {item[1:]}, 'body'{at})")
+                elif stage_set is not None and actor and step[0] == 'takeTemp': parts.append(f"set.target({actor}, {item[1:]}, 'rear'{at})")
+                elif stage_set is not None and actor and step[0] == 'givePill': parts.append(f"set.target({actor}, {item[1:]}" + (f", 'head'{at})" if at else ")"))
                 else: parts.append(item[1:])
             else:
                 parts.append(js(item))
@@ -1263,7 +1346,12 @@ def main():
             # mặt người đứng sát nó (Gemini, đợt 18).
             if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='medium', mid=True)
             # Bắt tay / đưa đồ giữa hai người: hai bàn tay gặp nhau ngang hông — cỡ trung cắt ngang đúng chỗ ấy (đợt 28).
-            low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet') for step in turn.get('do', []))
+            # Cân (đợt 35): con vật đặt lên cân dưới SÀN — góc toàn (thấy chân người, bệ cân).
+            low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh') for step in turn.get('do', []))
+            # Cho thuốc / đo nhiệt độ (đợt 35, lượt ba): GÓC CẬN người + con vật — viên thuốc, miệng con vật, mặt người nhìn nhiệt kế chỉ
+            # vài pixel ở góc trung hai người (Gemini đọc ~1 khung / giây).
+            if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
+                return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='close')
             return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='full' if low_hands or not targets else 'medium')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
         subjects = list(dict.fromkeys(names[turn['who']]['name'] for turn in group))
@@ -1291,6 +1379,7 @@ def main():
             shows.append(dict(show, turn=flat))
         flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
         backs = []                                          # (người, quãng) — lùi lại sau lượt này
+        turned_back = []                                    # (con vật, người) — con vật quay lại nhìn người ấy sau lượt này (takeTemp)
         first_turn = emitted[0]                             # nhịp của đạo diễn tự động: gồm cả các bước lại gần / lùi lại
         # LẠI GẦN trước khi vuốt ve / đưa đồ: tay nhân vật ngắn (với tới chừng 0,2 × chiều cao host). Đích đứng xa hơn tầm
         # ấy thì chèn một lượt bước tới trước — người vuốt ve dừng cách con vật 0,24 × chiều cao, người đưa đồ dừng cách
@@ -1303,12 +1392,12 @@ def main():
             # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
             # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
             steps = turn.get('do') if isinstance(turn.get('do'), list) else []
-            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush')
+            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush', 'takeTemp', 'givePill')
                    and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet') + CARE_35 and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
                 # CON VẬT TỰ ĐI SANG MẶT PHẲNG NGƯỜI KẾ (đợt 34): người trước với tới nó ở chiều sâu khác (> 5 đơn vị) — nó sẽ dời chiều
                 # sâu trước lượt này (`set.depth`, xem `pet_depths`). Không có lần cắt cảnh nào ở giữa thì nó TRƯỢT 0,45 s trên hình
@@ -1316,7 +1405,7 @@ def main():
                 # theo bước đi ấy. Người kế ngồi thì nó vốn đi tới họ ("comes over") — chỉ ép bước ấy có, dù quãng ngắn.
                 hop_pet = names[step[1][1:]]
                 hop = None
-                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'):
+                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_35:
                     plane = plane_of(who)
                     if hop_pet.get('_plane') is not None and abs(plane - hop_pet['_plane']) > 5: hop = hop_pet
                     hop_pet['_plane'] = plane
@@ -1341,7 +1430,7 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # Vuốt / chải con vật TRÊN BÀN (đợt 31): đứng sát như khám (0,16) — 0,24 thì bé chỉ với tới mép bàn cạnh đuôi con
                 # mèo (tay cách hình nó, không chạm — acting_check đo tiếp xúc bằng pixel).
@@ -1405,7 +1494,17 @@ def main():
                 who['x'] = float(who['x']) + move
                 # Soi đèn / đưa bánh: người đứng SÁT con vật (0,16) — xong thì LÙI về chỗ cũ, không thì người (vẽ trước con
                 # vật đứng cạnh mình) che mất mặt nó suốt phần sau của cảnh (cảnh thử đợt 12: góc cận chó chỉ thấy tay bác sĩ).
+                # Cho thuốc (đợt 35, lượt bốn): KHÔNG lùi — bước lùi nằm trong nhịp máy của lượt ấy, góc cận phải chứa người ở cả hai chỗ
+                # đứng thành gần góc toàn (mặt con mèo 13 % khung).
                 if step[0] in ('examine', 'giveTreat'): backs.append((who, -move))
+            # ĐO NHIỆT ĐỘ (đợt 35): con vật QUAY ĐUÔI về phía người đo trước lượt ấy (nhiệt kế vào thân sau), quay lại sau lượt.
+            for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
+                if not (isinstance(step, list) and len(step) > 1 and step[0] == 'takeTemp' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']): continue
+                pet = names[step[1][1:]]
+                away = 'right' if float(pet['x']) + pet.get('_drop', 0) >= float(who['x']) else 'left'
+                turns.append((f'  // {pet["name"]} turns its tail to {who["name"]} for "takeTemp"', f"[{pet['name']}, ['face', {js(away)}]]"))
+                emitted[0] += 1
+                turned_back.append((pet, who))
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -1456,9 +1555,15 @@ def main():
             for step in turn['do']:
                 # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
                 if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
-                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:]})
+                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:], **({'hold': step[2]} if step[0] == 'takeTemp' and len(step) > 2 else {})})
                 # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
+                # CÂN (đợt 35): con vật đứng trên bệ cân lúc đọc số; tay tới nó lúc bế lên.
+                if isinstance(step, list) and len(step) > 2 and step[0] == 'weigh' and isinstance(step[1], str) and step[1].startswith('@'):
+                    scale_item = next((item for item in (stage_set or {}).get('cutouts', []) if item.get('kind') == 'scale' and item.get('name') == step[2]), {})
+                    options_ = step[3] if len(step) > 3 and isinstance(step[3], dict) else {}
+                    gear_ops.append({'turn': emitted[0], 'kind': 'weigh', 'who': turn.get('who'), 'target': step[1][1:], 'scale': step[2], 'hold': options_.get('hold', 1.6),
+                                     'reading': options_.get('reading', scale_item.get('reading')) or '4.2 kg'})
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
                 # ĐỘNG TÁC TAY của người (đợt 33): moments.json đo bàn tay trong khung ở lúc được hỏi.
                 name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
@@ -1544,7 +1649,17 @@ def main():
                 if lead == 0:
                     code = '{ together: [' + code + f", [{names[fed[0]]['name']}, 0.95, ['chew', 3]]] }}"
                     emitted[0] += 1
+            # `["givePill", "@con vật"]` một mình (đợt 35): con vật HÁ MIỆNG từ ~0,45 s (há hẳn ~0,75 s, giữ tới ~1,85 s — ≥ 0,8 s quanh lúc
+            # viên thuốc vào môi 1,0 s, mất 1,15 s), rồi NHAI 3 nhịp.
+            pilled = [step[1][1:] for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'givePill' and isinstance(step[1], str) and step[1].startswith('@')]
+            pilled = [name for name in pilled if name in names and names[name]['_pet']]
+            if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):
+                code = '{ together: [' + code + f", [{names[pilled[0]]['name']}, 0.35, ['openMouth', 1.1], ['chew', 3]]] }}"
+                emitted[0] += 1
             turns.append((None, code))
+            emitted[0] += 1
+        for pet, who in turned_back:
+            turns.append((f'  // {pet["name"]} turns back to {who["name"]}', f"[{pet['name']}, ['face', {who['name']}]]"))
             emitted[0] += 1
         for who, move in backs:
             turns.append((f'  // {who["name"]} steps back after reaching close', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
@@ -1727,6 +1842,8 @@ def main():
                         options['image'] = name
                 for key in ('fill', 'reading', 'door'):
                     if key in item: options[key] = item[key]
+                # Cân có người cân con vật trên nó: số 0 cho tới lúc con vật đứng lên (rig `weigh` ghi số — đợt 35, lượt ba).
+                if item.get('_weighed'): options['reading'] = re.sub(r'\d+(?:([.,])\d+)?', lambda m: '0' + m.group(1) + '0' if m.group(1) else '0', str(item['_weighed']), count=1)
                 if item['kind'] == 'scooter' and item.get('facing'): options['facing'] = item['facing']
                 options = {key: value for key, value in options.items() if value is not None}
                 look = f", {js(options)}" if options else ''
@@ -1917,7 +2034,7 @@ def main():
     pet_depths = {}
     if stage_set is not None:
         for op in gear_ops:
-            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry'): continue
+            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_35: continue
             pet, person = names.get(op.get('target') or ''), names.get(op.get('who') or '')
             if not pet or not person or not pet['_pet'] or person['_pet'] or pet.get('on'): continue
             pet_depths.setdefault(pet['name'], []).append((op['turn'], plane_of(person)))
@@ -2259,7 +2376,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown'} | set(GESTURES)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

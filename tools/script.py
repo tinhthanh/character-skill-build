@@ -36,7 +36,8 @@ Một tệp kịch bản:
     tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
     tên: [mất điện] / [có điện]        mọi đèn và màn hình tắt phụt / bật lại
     tên: [trời tối dần] / [hoàng hôn] / [trời sáng]   trời chuyển giờ trong 6 giây
-    tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin)
+    tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin),
+                                       cân (tự có cái cân cạnh người cân), đo nhiệt độ, cho uống thuốc (giữ đầu, đưa viên thuốc vào mõm)
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
@@ -79,6 +80,11 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
             'chỉ': ('point', None), 'đưa': ('handOver', None), 'trao': ('handOverPet', None), 'dắt': ('leash', None), 'nhìn': ('face', None)}
+# ĐỢT 35 — phòng khám: cân (bế con vật đặt lên cân — cảnh tự có một cái cân "can" cạnh người cân), đo nhiệt độ, cho uống thuốc
+# (một tay giữ đầu, một tay đưa viên thuốc vào mõm). "cho thuốc" vẫn là đưa viên thuốc như bánh thưởng (`giveTreat`).
+TARGETED.update({'cân': ('weigh', 'can'), 'cân ký': ('weigh', 'can'), 'đo nhiệt độ': ('takeTemp', None), 'đo nhiệt': ('takeTemp', None), 'cặp nhiệt': ('takeTemp', None),
+                 'cho uống thuốc': ('givePill', None), 'bón thuốc': ('givePill', None)})
+SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music'}
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
@@ -259,6 +265,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 who['holds'] = item
                 if item == 'syringe': who['holdsHidden'] = True                     # cất sẵn: chỉ lấy ra lúc tiêm
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
+    # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
+    # mặt phẳng của người ấy).
+    weighs = [(turn['who'], step[1][1:]) for turn in script if isinstance(turn, dict) for step in turn.get('do', []) if isinstance(step, list) and step and step[0] == 'weigh']
+    if weighs:
+        doer = next(c for c in characters if c['name'] == weighs[0][0])
+        pet = next((c for c in characters if c['name'] == weighs[0][1]), None)
+        side = -1 if not pet or float(pet.get('x', 0)) >= float(doer.get('x', 0)) else 1
+        scene['set']['cutouts'] = [{'kind': 'scale', 'name': SCALE_NAME, 'x': round(float(doer.get('x', 0)) + side * 160), 'z': doer.get('z', -560)}]
     if head.get('ánh sáng'):
         # "chiều → tối": cảnh bắt đầu lúc chiều, trời tối dần từ giữa cảnh (6 giây).
         parts = [part.strip().lower() for part in re.split(r'→|->', head['ánh sáng'])]

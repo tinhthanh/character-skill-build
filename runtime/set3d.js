@@ -449,12 +449,20 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const head = () => {
         // `part`: 'head' (mặt — chỉ tay, vuốt ve), 'crown' (đỉnh đầu) hay 'body' (giữa thân — nghe tim phổi, tiêm): khung toàn thân, dưới
         // tâm một chút (con vật nằm ngang: phần dưới khung là thân, phần trên là đầu).
-        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' ? 'full' : 'face') : null;
+        const actor = of(to), f = facts(actor), box = typeof to.shotBox === 'function' ? to.shotBox(part === 'body' || part === 'rear' ? 'full' : 'face') : null;
         // 'crown' (đợt 31): ĐỈNH ĐẦU — con vật đứng TRƯỚC người vuốt (lớp vẽ trên): nhắm giữa mặt thì bàn tay khuất sau đầu nó.
         // 'crown' (con vật vẽ trên người): ngay trên mép đỉnh đầu — tay đè mép, không khuất sau tai. 'top' (người vẽ trước con
         // vật): trong đỉnh đầu, 15 % — tay đặt lên đầu mà không che mặt nó.
         const down = part === 'crown' ? -0.04 : part === 'top' ? 0.15 : 0.5;
-        const hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        let hx = box ? box.x + box.width / 2 : f.size.w / 2, hy = box ? box.y + box.height * down : f.ground * (part === 'body' ? 0.4 : 0.6);
+        // 'rear' (đợt 35, đo nhiệt độ): THÂN SAU — từ giữa khung toàn thân dời về phía NGƯỜI ĐO một phần tư bề ngang. Con vật quay đuôi
+        // về phía người đo trước lượt ấy (tools/scene.py); hướng nó lúc đích được đọc có thể còn là hướng cũ — không suy từ cái đầu.
+        // 'chin' / 'lips' (đợt 35, cho uống thuốc): cằm — đáy khung mặt; môi — giữa nét môi THẬT của con vật (`moi`) trong khung của nó.
+        if (part === 'chin' && box) hy = box.y + box.height * 0.92;
+        if (part === 'rear' && box) hy = box.y + box.height * 0.52;                     // hông (mèo ngồi: giữa khung là ngực — lượt ba)
+        const lips = part === 'lips' && to.el && to.el.moi ? lipsOf(to) : null;
+        if (lips) { hx = lips.x; hy = lips.y; }
+        if (part === 'rear' && box) hx += Math.sign(of(from).spot.x - (f.x + (hx - f.size.w / 2 - (to.s.x || 0)) * f.unit) || 1) * box.width * 0.25;
         return { x: f.x + (hx - f.size.w / 2 - (to.s.x || 0) - (typeof to.dropX === 'function' ? to.dropX() : 0)) * f.unit, y: actor.spot.y + (f.ground - hy) * f.unit };
       };
       // DÁNG ĐẦU của `to` lúc đích được đọc (đợt 32): `follow` dời điểm từ dáng ấy sang dáng ở khung đang vẽ.
@@ -465,6 +473,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         get y() { mark(); const actor = of(from), f = facts(actor); return f.ground - (head().y - actor.spot.y) / f.unit; },
         // BỀ NGANG ĐẦU con vật trong khung của `from` (đợt 32): quãng bàn tay trượt khi vuốt (`stroke`).
         get span() { const box = typeof to.shotBox === 'function' ? to.shotBox('face') : null; return box ? box.width * facts(of(to)).unit / facts(of(from)).unit : 0; },
+        pet: to,                                          // rig được nhắm tới (đợt 35: `givePill` vẽ bàn tay trên nó)
         // ĐIỂM (x, y) trong khung của `from`, gắn vào đầu `to` lúc đầu chưa gật / nghiêng: chỗ nó đang ở bây giờ (đợt 32) — bàn tay
         // vuốt bám theo đầu con vật đang dụi, tính lại mỗi khung hình (`stroke`).
         // `time`: giây trong chuỗi (`sequence`) của `to` — đang lấy mẫu chuỗi của `from` thì con vật chưa ở đúng giây ấy: tua chuỗi
@@ -955,14 +964,18 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // ở một lớp ngay TRÊN con vật: một host chép đúng chỗ, cỡ, ánh sáng (`filter`) của host người, trong đó một SVG cùng khung
       // chỉ có `<use>` của nhóm cổ tay, đặt bằng các lớp transform của tay người — trùng từng điểm với bàn tay thật.
       for (const pet of actors) {
-        if (!pet.over || !pet.rig) continue;
-        const person = actors.find((item) => item.rig === pet.over), s = person && person.rig.s;
-        const k = s && s.onTopR > 0.5 ? 'R' : s && s.onTopL > 0.5 ? 'L' : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
-        let ghost = pet.ghost;
+        // Đợt 35: cả bàn tay ĐƯA THUỐC vào mõm con vật đứng trước người (`givePill` ghi con vật ấy ở `onTopPet` của người).
+        const owner = pet.over || (pet.rig && (actors.find((item) => item.rig && item.rig !== pet.rig && item.rig.onTopPet === pet.rig) || {}).rig);
+        if (!owner || !pet.rig) continue;
+        const person = actors.find((item) => item.rig === owner), s = person && person.rig.s;
+        // Mỗi bàn tay một bản chép (đợt 35, lượt bốn: cho thuốc — tay đưa thuốc ở mõm VÀ tay đỡ dưới cằm đều vẽ trên con vật).
+        for (const side of ['R', 'L']) {
+        const k = s && s['onTop' + side] > 0.5 ? side : null, hand = k && person.rig.el && person.rig.el['coTay' + k];
+        let ghost = (pet.ghosts = pet.ghosts || {})[side];
         const usable = hand && hand.id && person.host.style.display !== 'none' && pet.host.style.display !== 'none' && person.host.parentNode;
         if (!usable) { if (ghost) ghost.style.display = 'none'; continue; }
         if (!ghost) {
-          ghost = pet.ghost = document.createElement('div');
+          ghost = pet.ghosts[side] = document.createElement('div');
           ghost.dataset.ghost = '1';
           // bàn tay, rồi hai lớp đổ bóng / hắt sáng của người (`shading.js`) cắt theo đúng hình bàn tay — thiếu chúng thì bản chép
           // sáng hơn bàn tay thật (người ngồi trong nửa tối của chuyển sắc)
@@ -993,6 +1006,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const placed = `matrix(${[chain.a, chain.b, chain.c, chain.d, chain.e, chain.f].map((v) => +v.toFixed(4)).join(' ')})`;
         svg.firstChild.setAttribute('transform', placed); clip.setAttribute('transform', placed);
         ghost.style.display = '';
+        }
       }
       return frame;
     },
@@ -1048,13 +1062,24 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
+      const mixedClose = wanted.some((actor) => actor.rig && typeof actor.rig.seatY === 'function') && wanted.some((actor) => actor.rig && typeof actor.rig.seatY !== 'function');
       const regionOf = (m) => {
         const h = m.top - m.base;
         // Con vật: chừa chỗ cho DẤU CẢM XÚC trên đầu (! ? zzz) — không thì dấu ló ra ngoài mép khung (phim dọc đợt 15).
+        // Góc CẬN có cả người lẫn con vật (đợt 35, lượt ba — cho thuốc, đọc nhiệt kế): lấy ĐẦU con vật (chừa quanh nó), không lấy cả
+        // con — con corgi nằm dài trên bàn thấp kéo khung từ đầu người xuống tận bụng nó, thành gần góc toàn (mặt nó 13 % khung).
+        if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
+        // Góc cận người + con vật (đợt 35, lượt bốn): mép trên khung cắt qua TÓC (dưới đỉnh đầu 22 % chiều cao đầu) — con mèo nhỏ cạnh người
+        // thì khung từ đỉnh tóc xuống tới đầu nó cao quá, mặt nó chỉ 13 % khung.
+        // … và chừa phía con vật 1,0 bề ngang đầu: nhiệt kế giơ ngang mắt bên mặt, thẻ số cạnh nó (lượt bốn: thẻ lẹm mép phải).
+        if (size === 'close' && mixedClose && m.head) {
+          const hw = m.head.x1 - m.head.x0, pets = shots.filter((q) => !q.person), side = pets.length && (pets[0].x0 + pets[0].x1) / 2 > (m.head.x0 + m.head.x1) / 2 ? 1 : -1;
+          return { x0: side < 0 ? Math.min(across.x0, m.head.x0 - 1.0 * hw) : across.x0, x1: side > 0 ? Math.max(across.x1, m.head.x1 + 1.0 * hw) : across.x1, y0: m.base + 0.62 * h, y1: m.head.top - 0.22 * (m.head.top - m.head.base) };
+        }
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
@@ -1080,7 +1105,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // (cái TV lúc mất điện). Lượt đầu đợt 32 dùng 66 % cho mọi góc toàn dọc để góc trung một người chặt hơn được: góc mở đầu
       // một người đứng thừa sàn, thừa tường — nay góc trung khung dọc lấy bề ngang theo LÕI (đầu, thân áo) thay vào.
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
-      const fill = (tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      // Góc cận người + con vật (đợt 35, lượt ba): vùng (mặt người … đầu con vật) chiếm 80 % chiều cao khung — 55 % thì mặt con corgi
+      // chỉ 13,9 % khung, viên thuốc / miệng nó vài chục px (Gemini đọc ~1 khung / giây).
+      const fill = (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
@@ -1210,7 +1237,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // CÒN ĐỒ VẬT LẸM MÉP (đợt 30): sửa từng cái một thì cái này đẩy cái kia vào mép — góc mở đầu phòng khách khung ngang để
         // TV lộ 49 % ở mép phải; góc trung lúc rọi đèn (khung dọc) cắt đôi TV và bàn nước. Thử một lượt các chỗ đặt máy (dời
         // ngang, góc toàn / trung lùi thêm chút) mà chủ thể vẫn trọn, lấy chỗ ít lẹm nhất: lẹm dở nặng hơn chạm mép.
-        if (size !== 'close') {
+        // Góc cận người + con vật (đợt 35, lượt bốn) cũng né đồ đạc lẹm mép: bàn khám con vật đứng trên bị mép phải cắt dở (87 %).
+        if (size !== 'close' || mixedClose) {
           const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
           // `limit`: đồ đạc phụ được lẹm mép — chỉ TV và đồ đang được dùng phải trọn trong khung hay ra hẳn ngoài; đồ phụ lẹm
           // vẫn tính, nhẹ hơn bốn lần (đẩy được nó ra hẳn trong giới hạn thì tốt hơn). `vital`: phần do đồ quan trọng.
@@ -1648,6 +1676,55 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
     },
 
     /**
+     * SỐ ĐO CHĂM SÓC (đợt 35, tools/acting_check.py) ở khung vừa vẽ, px trong `view`: người — mắt (giữa tròng, giữa con ngươi, bề
+     * ngang mắt) và dụng cụ đang hiện trong tay (`gadget`: số, tâm); con vật — độ há miệng (`mieng`) và tâm nét môi. Gọi sau khi tua.
+     */
+    careProbe() {
+      set.update();
+      const box = view.getBoundingClientRect(), sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1);
+      const centre = (el) => { const r = el && el.getBoundingClientRect(); return r && (r.width || r.height) ? { x: (r.left + r.width / 2 - box.left) * sx, y: (r.top + r.height / 2 - box.top) * sy, w: r.width * sx, h: r.height * sy } : null; };
+      const out = {};
+      for (const actor of actors) {
+        const rig = actor.rig, e = rig && rig.el;
+        if (!e || actor.host.style.display === 'none') continue;
+        const name = actor.host.dataset.name || actor.host.id || '';
+        if (typeof rig.seatY === 'function') {
+          const eyes = ['L', 'R'].map((side) => { const eye = e['mat' + side], pupil = e['nguoi' + side];               // tròng mắt, con ngươi (rig-svg: `mat`, `nguoi`)
+            const a = centre(eye), b = centre(pupil); return a && b ? { side, eye: a, pupil: b } : null; }).filter(Boolean);
+          const gadgets = ['L', 'R'].map((side) => { const kind = Math.round(rig.s['gadget' + side] || 0), g = e['gadget' + side];
+            const shown = kind && g ? [...g.children].find((child) => +child.getAttribute('data-gadget') === kind) : null; const c = shown && centre(shown);
+            const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
+          const head = centre(e.dau), mouthP = centre(e.mieng);
+          out[name] = { person: true, eyes, gadgets, head, mouthP, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+        } else {
+          // Đợt 35, lượt ba: cỡ TRÊN KHUNG — chiều cao đầu (`face`), bề ngang nét môi (`lipsW`), độ mở hàm (`jaw`, px).
+          const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
+          out[name] = { person: false, mouth: rig.s.mieng || 0, lips: centre(e.moi), face: f ? f.height * sy : 0, faceW: f ? f.width * sx : 0, lipsW: l ? l.width * sx : 0, jaw: j ? j.height * sy : 0 };
+        }
+      }
+      // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
+      out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
+      out['@H'] = view.clientHeight;
+      return out;
+    },
+
+    /**
+     * ĐÁY CHÂN CON VẬT trên màn hình (px trong `view`), kể cả khi nó nằm trong hình người khác (bế, đặt lên cân): { tên: y }
+     * — tools/acting_check.py đo con vật đứng trên bệ cân (`weigh`, đợt 35). Gọi sau khi tua tới lúc cần đo.
+     */
+    paws() {
+      set.update();
+      const box = view.getBoundingClientRect(), sy = view.clientHeight / (box.height || 1), out = {};
+      for (const actor of actors) {
+        const rig = actor.rig, e = rig && rig.el;
+        if (!e || typeof rig.seatY === 'function' || !rig.svg.isConnected) continue;
+        const feet = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+        if (feet.length) out[actor.host.dataset.name || actor.host.id || ''] = (Math.max(...feet.map((r) => r.bottom)) - box.top) * sy;
+      }
+      return out;
+    },
+
+    /**
      * ĐỒ VẬT BỊ MÉP KHUNG CẮT ở khung vừa vẽ (đợt 30): `[{ name, kind, shown, edge, front }]` — hộp (sofa, bàn, kệ) và tấm
      * đồ vật (TV, bàn, quầy, ghế) mà mép trái / phải khung cắt dở, hay chạm: trọn trong khung là cách mép ít nhất 3 % nửa
      * khung, như `frameOn`. `shown`: phần bề ngang còn trong khung. Vật rộng hơn cả khung, vật ra hẳn ngoài khung, cây, đèn,
@@ -1780,6 +1857,18 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
   // nhân vật lơ lửng — và cũng không phải tâm cái bóng rig tự vẽ: với nhân vật chân dài (bác sĩ thú y) bàn chân thấp hơn
   // tâm bóng tới 45 đơn vị, đo được trên bản thử. Đo ĐẾ GIÀY thật: đáy thấp nhất của hai bàn chân đang hiện, trừ hai đơn
   // vị cho bề dày đế. Thú (không có phần tử bàn chân riêng) đứng trên mặt nền của khung, chỗ tâm bóng của nó.
+  // Giữa nét môi của con vật trong khung SVG của nó (đợt 35): ghép transform từng lớp tới SVG gốc — không qua màn hình.
+  function lipsOf(rig) {
+    try {
+      const b = rig.el.moi.getBBox();
+      if (!b.width && !b.height) return null;
+      let m = new DOMMatrix();
+      for (let node = rig.el.moi; node && node !== rig.svg; node = node.parentNode) m = localMatrix(node).multiply(m);
+      const p = new DOMPoint(b.x + b.width / 2, b.y + b.height / 2).matrixTransform(m);
+      return { x: p.x, y: p.y };
+    } catch (error) { return null; }
+  }
+
   function groundOf(rig) {
     if (!rig) return 1;
     const frame = rig.svg && rig.svg.getBoundingClientRect();
