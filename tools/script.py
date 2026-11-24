@@ -40,6 +40,8 @@ Một tệp kịch bản:
                                        cân (tự có cái cân cạnh người cân), đo nhiệt độ, cho uống thuốc (giữ đầu, đưa viên thuốc vào mõm)
                                        băng chân, đeo loa (băng / loa còn lại trên con vật)
                                        cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
+                                       giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
+    tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
                                        con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
@@ -112,6 +114,10 @@ CHIP_VERB = re.compile(r'^(quét chip|kiểm tra chip|đọc chip)\s+(?:mã\s+|s
 # ngoặc ("lễ tân: [chào khách]"); combo có đích viết "→" ("bác sĩ → chó: khám tổng quát", "bác sĩ → chó → bé trai: trả thú").
 sys.path.insert(0, HERE)
 from scene import COMBOS, expand_combos       # noqa: E402
+# ĐỢT 38 B — phối hợp và chuẩn bị ở phòng khám: giữ con vật cho người khác làm ("cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm"),
+# rửa tay, đeo / tháo găng tay ("bác sĩ: [rửa tay, đeo găng]").
+TARGETED.update({'giữ': ('restrain', None), 'giữ con vật': ('restrain', None), 'giữ chặt': ('restrain', None)})
+ACTIONS.update({'rửa tay': 'washHands', 'đeo găng': 'putOnGloves', 'đeo găng tay': 'putOnGloves', 'tháo găng': 'takeOffGloves', 'tháo găng tay': 'takeOffGloves'})
 COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
 SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music', 'chóng mặt': 'dizzy'}

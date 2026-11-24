@@ -314,7 +314,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -352,7 +352,7 @@ def check_track(folder, checks, keep=None):
     if found is None: return []
     results = []
     for c in tracks:
-        verb = {'bandage': 'bandages', 'putCone': 'puts the cone on'}.get(c['kind'], 'strokes')          # đợt 35: băng chân, đeo loa cũng có dải mốc
+        verb = {'bandage': 'bandages', 'putCone': 'puts the cone on', 'restrain': 'holds'}.get(c['kind'], 'strokes')          # đợt 35: băng chân, đeo loa cũng có dải mốc
         rows = [(t, found.get((t, c['target'])) or {}) for t in c['track']]
         rows = [(t, r) for t, r in rows if 'contact' in r]
         if not rows: results.append({'scene': folder, 'what': f'{c["who"]} {verb} {c["target"]} — hand on it throughout', 'ok': None, 'note': 'hand not measured'}); continue
@@ -789,7 +789,7 @@ def check_jumps(folder, c, frames):
         prev = {'centre': centre, 'hands': hands, 'carried': bool(pet.get('carried'))}
     note = (f'{jumps} frame{"" if jumps == 1 else "s"} where {c["target"]} moves away from the hand nearest it, which is not on it — {worst[1] * 100:.1f} % of height in one frame at {worst[0]:g} s, the hand {worst[2] * 100:.0f} % away'
             if jumps else f'{c["target"]} moves only with a hand, {len(c["frames"])} frames (limit {JUMP * 100:g} % a frame apart from the nearest hand when it is more than {FREE * 100:g} % off)')
-    return [{'scene': folder, 'what': f'{c["who"]} weighs {c["target"]} — {c["target"]} never jumps', 'ok': jumps == 0, 'note': note}]
+    return [{'scene': folder, 'what': f'{c["who"]} {"restrains" if c["kind"] == "restrain" else "weighs"} {c["target"]} — {c["target"]} never jumps', 'ok': jumps == 0, 'note': note}]
 
 
 LOOK = 50             # đọc nhiệt kế: hướng con ngươi lệch hướng từ mắt tới nhiệt kế ≤ 50° …
@@ -1124,6 +1124,108 @@ def check_care(folder, c, shots):
     return out
 
 
+HOLD_COVER = 0.3      # đợt 38 B, giữ con vật: tay người giữ che ≤ 30 % bàn tay người làm cùng lúc …
+HEAD_COVER = 0.25     # … và ≤ 25 % MẶT con vật (giữa khung đầu: mắt, mũi)
+
+
+def overlap(a, b):
+    """Phần diện tích khung `a` bị khung `b` phủ (0…1)."""
+    w = max(0, min(a['x1'], b['x1']) - max(a['x0'], b['x0'])); h = max(0, min(a['y1'], b['y1']) - max(a['y0'], b['y0']))
+    return w * h / max(1e-6, (a['x1'] - a['x0']) * (a['y1'] - a['y0']))
+
+
+def check_restrain(folder, c, shots):
+    """GIỮ CON VẬT (đợt 38 B): ở mọi mốc của dải `track` (lúc giữ và vuốt dỗ) — (1) CẢ HAI bàn tay người giữ ≤ 6 % chiều cao từ phần thấy
+    được của con vật; (2) tay người giữ không che tay người làm cùng lúc (`partner`: tiêm, khám — mỗi bàn tay của họ bị phủ ≤ 30 %);
+    (3) tay người giữ không che mặt con vật (≤ 25 % phần giữa khung đầu: mắt, mũi)."""
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    far, covered, head = [], [], []
+    for t in c['track']:
+        f = frame(t); who, pet = f.get(c['who']), f.get(c['target'])
+        if not who or not pet or len(who.get('hands') or []) < 2 or not who.get('tall'): continue
+        far.append((t, max(near_pet(h, pet, f) for h in who['hands']) / who['tall']))
+        boxes = [h['box'] for h in who['hands'] if h.get('box')]
+        mate = f.get(c.get('partner')) if c.get('partner') else None
+        if mate and mate.get('hands'):
+            covered.append((t, max((sum(overlap(h['box'], b) for b in boxes) for h in mate['hands'] if h.get('box')), default=0)))
+        hb = ((pet.get('parts') or {}).get('head'))
+        # MẶT con vật (mắt, mũi): giữa khung đầu — bỏ hai tai trên và cằm dưới (tay đỡ ngực ngay dưới cằm là đúng chỗ giữ, nhất là khi
+        # nó cúi đầu xuống tay người giữ).
+        if hb:
+            w, h = hb['x1'] - hb['x0'], hb['y1'] - hb['y0']
+            core = {'x0': hb['x0'] + 0.2 * w, 'x1': hb['x1'] - 0.2 * w, 'y0': hb['y0'] + 0.3 * h, 'y1': hb['y0'] + 0.72 * h}
+            head.append((t, min(1, sum(overlap(core, b) for b in boxes))))
+    out = []
+    what = f'{c["who"]} restrains {c["target"]}'
+    if not far: return [{'scene': folder, 'what': f'{what} — both hands on it throughout', 'ok': None, 'note': 'not measured'}]
+    top = max(far, key=lambda x: x[1]); bad = [r for r in far if r[1] > CARE_NEAR]
+    out.append({'scene': folder, 'what': f'{what} — both hands on it throughout ({len(far)} moments)', 'ok': not bad,
+                'note': f'the farther hand at most {top[1] * 100:.1f} % of height from {c["target"]} (at {top[0]:g} s; limit {CARE_NEAR * 100:g} %)' + (f'; {len(bad)} moments over' if bad else '')})
+    if covered:
+        top = max(covered, key=lambda x: x[1])
+        out.append({'scene': folder, 'what': f'{what} — {c["partner"]}\'s hands not covered', 'ok': top[1] <= HOLD_COVER,
+                    'note': f'at most {top[1] * 100:.0f} % of a hand of {c["partner"]} under {c["who"]}\'s hands (at {top[0]:g} s; limit {HOLD_COVER * 100:g} %)'})
+    if head:
+        top = max(head, key=lambda x: x[1])
+        out.append({'scene': folder, 'what': f'{what} — hands off its face', 'ok': top[1] <= HEAD_COVER,
+                    'note': f'{c["who"]}\'s hands cover at most {top[1] * 100:.0f} % of {c["target"]}\'s face — eyes and nose, the middle of its head (at {top[0]:g} s; limit {HEAD_COVER * 100:g} %)'})
+    return out
+
+
+GLOVE_NEAR = 0.06     # đợt 38 B: găng hiện / mất trên một bàn tay chỉ khi bàn tay kia cách nó ≤ 6 % chiều cao người
+FOAM_MIN = 0.12       # … bọt quanh mỗi bàn tay rộng ≥ 12 % chiều cao người lúc xoa (thấy được ở góc trung)
+
+
+def check_prep(folder, c, shots):
+    """RỬA TAY, ĐEO / THÁO GĂNG (đợt 38 B). Rửa tay: ở ba lúc xoa có BỌT (dụng cụ 14) quanh cả hai bàn tay, đủ to; vẩy xong thì hết bọt.
+    Găng: ở mỗi mốc 0,1 s, bàn tay nào vừa thành có găng (đeo) / hết găng (tháo) thì bàn tay kia đang sát nó — găng không tự hiện; xong
+    bước thì đủ hai găng (đeo) / không còn găng (tháo). Cả hai: hai bàn tay trong khung ở lúc được hỏi."""
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    out, what = [], f'{c["who"]} {c["name"]}'
+    out += check_gesture(folder, dict(c, name=c['name']), [frame(t) for t in c['times']])
+    if c.get('gaze'): out += check_gaze_dir(folder, dict(c, kind=c['name']), shots)
+    if c['name'] == 'washHands':
+        rows = []
+        for t in c['times']:
+            who = frame(t).get(c['who'])
+            if not who or not who.get('tall'): continue
+            foam = [g for g in who.get('gadgets') or [] if g['kind'] == 14]
+            rows.append((t, len(foam), min([(g['box']['x1'] - g['box']['x0']) / who['tall'] for g in foam], default=0)))
+        if not rows: out.append({'scene': folder, 'what': f'{what} — foam round both hands', 'ok': None, 'note': 'not in the frame'})
+        else:
+            worst = min(rows, key=lambda r: (r[1], r[2]))
+            out.append({'scene': folder, 'what': f'{what} — foam round both hands ({len(rows)} moments)', 'ok': all(r[1] == 2 and r[2] >= FOAM_MIN for r in rows),
+                        'note': f'least: {worst[1]} hand{"" if worst[1] == 1 else "s"} with foam, {worst[2] * 100:.0f} % of height wide (at {worst[0]:g} s; both hands, ≥ {FOAM_MIN * 100:g} %)'})
+        left = [t for t in c.get('after', []) if any(g['kind'] == 14 for g in (frame(t).get(c['who']) or {}).get('gadgets') or [])]
+        out.append({'scene': folder, 'what': f'{what} — foam gone after shaking dry', 'ok': not left, 'note': f'foam still on the hands at {", ".join(f"{t:g}" for t in left)} s' if left else 'no foam once the hands are shaken dry'})
+        return out
+    on = c['name'] == 'putOnGloves'
+    prev, changes, far = None, 0, []
+    for t in c.get('samples', []):
+        who = frame(t).get(c['who'])
+        if not who or len(who.get('hands') or []) < 2 or not who.get('tall'): prev = None; continue
+        now = set(who.get('gloves') or [])
+        if prev is not None:
+            for side in (now - prev) if on else (prev - now):
+                hand = next(h for h in who['hands'] if h['side'] == side); other = next(h for h in who['hands'] if h['side'] != side)
+                gap = max(0, ((hand['x'] - other['x']) ** 2 + (hand['y'] - other['y']) ** 2) ** 0.5 - 0.5 * max(hand['box']['x1'] - hand['box']['x0'], hand['box']['y1'] - hand['box']['y0'])) / who['tall']
+                changes += 1; far.append((t, side, gap))
+            if (prev - now) if on else (now - prev): far.append((t, 'wrong way', 1.0))
+        prev = now
+    if not changes: out.append({'scene': folder, 'what': f'{what} — each glove {"goes on" if on else "comes off"} under the other hand', 'ok': False, 'note': 'no glove changed during the step'})
+    else:
+        top = max(far, key=lambda r: r[2])
+        out.append({'scene': folder, 'what': f'{what} — each glove {"goes on" if on else "comes off"} under the other hand ({changes} changes)', 'ok': top[2] <= GLOVE_NEAR,
+                    'note': f'the other hand at most {top[2] * 100:.1f} % of height from the glove as it {"appears" if on else "goes"} (at {top[0]:g} s; limit {GLOVE_NEAR * 100:g} %)' if top[1] != 'wrong way' else f'a glove {"disappeared" if on else "appeared"} at {top[0]:g} s'})
+    for t in c.get('after', []):
+        who = frame(t).get(c['who'])
+        if not who: continue
+        have = sorted(who.get('gloves') or [])
+        out.append({'scene': folder, 'what': f'{what} — {"both gloves on" if on else "no gloves left"} after the step', 'ok': have == (['L', 'R'] if on else []),
+                    'note': f'gloves on {", ".join(have) or "no hand"} at {t:g} s'})
+    return out
+
+
 def check_gaze(folder, c, shots):
     """CHỈ PHIM XONG QUAY VỀ NGƯỜI NGHE (đợt 35, lượt hai — Gemini: "quay ra nhìn máy quay thay vì quay về phía bà"). Lượt ba: ở MỌI
     mốc của `after` (≥ 1 s: 0,9 s và 0,4 s trước khi bước xong, 0,3 s sau) — đầu / người quay về phía người nghe ≥ FACE_TURN, đo trên
@@ -1447,6 +1549,12 @@ def check_scene(folder):
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
+        if c['kind'] == 'prep':
+            results.extend(check_prep(folder, c, shots))
+            continue
+        if c['kind'] == 'restrain' and c.get('track'):
+            results.extend(check_restrain(folder, c, shots))
+            if c.get('frames'): results.extend(check_jumps(folder, c, [{a['name']: a for a in shots.get(float(t), [])} for t in c['frames']]))
         if c['kind'] == 'showXray' and c.get('listener'): results.extend(check_gaze(folder, c, shots))
         if c['kind'] == 'readChart' and c.get('reading'): results.extend(check_reading(folder, c, shots))
         if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))

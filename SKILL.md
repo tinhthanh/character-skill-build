@@ -16,6 +16,7 @@ or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, b
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
 read a patient chart (flipping a page), point at an X-ray film, trim its nails (holding the paw up), put drops in its eye,
 clean its ear with a cotton pad, scan its microchip (the number shows on a card),
+hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
 get a notification on the phone (93 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the

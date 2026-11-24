@@ -1733,7 +1733,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];
-            const r = drawnRect(el); return [key, r.width > 0 ? rect(r) : null]; })) : null };
+            const r = drawnRect(el); return [key, r.width > 0 ? rect(r) : null]; })) : null,
+          // ĐỢT 38 B: bàn tay nào đang đeo găng (`gloveL/R` ≥ 0,3 — `putOnGloves`, `takeOffGloves`, `wear('gloves')`).
+          gloves: person && rig.s ? ['L', 'R'].filter((side) => +(rig.s['glove' + side] || 0) >= 0.3) : [] };
       });
     },
 
