@@ -34,6 +34,10 @@ Fixed (merging the three wave 40 branches — name clashes that the block / seam
   under it. This was seen in the trial film. B's channel is now `yarn`, and the check page reads the new name.
 - Two CI scenes were named `pets40b`.
 - Merges are now also scanned for duplicate function, method, channel and CI scene names.
+- **An outro card in a 3D set broke the automatic camera.** The loop that draws the intro / outro cards reused the variable
+  `start`, which also holds the camera's start view. A scene that cut back to its start view got `set.cut("__OUTRO_START__")`,
+  and the page failed with `set.cut: unknown camera key "0"`. The video producers hit this in the living-room set. The card
+  variables are now `card_start` / `card_length`, and the CI scene `outro42` checks it.
 
 Known
 - `groomingSession` ends with a thumbs up, not a stroke: a stroke on a pet standing on the exam table hides its head behind

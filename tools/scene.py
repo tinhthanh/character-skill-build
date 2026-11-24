@@ -3164,12 +3164,12 @@ def main():
         if not 1 <= dur <= 10: fail(f'{which}.dur must be 1…10 seconds')
         colour = card.get('color', '#2f9e8f')
         if not re.match(r'^#[0-9a-fA-F]{6}$', colour): fail(f'{which}.color must be #rrggbb')
-        start, length = ('0', f'{dur:g}') if which == 'intro' else ('__OUTRO_START__', '__OUTRO_DUR__')
+        card_start, card_length = ('0', f'{dur:g}') if which == 'intro' else ('__OUTRO_START__', '__OUTRO_DUR__')      # đợt 42: không dùng tên `start` — nó là góc máy khởi đầu (cảnh 3D), máy quay về góc ấy đọc lại nó
         unit = min(width, height)
         def card_clip(kind, css, tag='div', content='', extra=''):
             style.append(f'  #{which}-{kind} {{ {css} z-index: 50; }}')
-            body.append(f'  <{tag} id="{which}-{kind}" class="clip card-{which}" data-start="{start}" data-duration="{length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>{content}</{tag}>' if tag != 'img'
-                        else f'  <img id="{which}-{kind}" class="clip card-{which}" data-start="{start}" data-duration="{length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>')
+            body.append(f'  <{tag} id="{which}-{kind}" class="clip card-{which}" data-start="{card_start}" data-duration="{card_length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>{content}</{tag}>' if tag != 'img'
+                        else f'  <img id="{which}-{kind}" class="clip card-{which}" data-start="{card_start}" data-duration="{card_length}" data-track-index="{track[0]}" data-layout-ignore=""{extra}>')
             track[0] += 1
         card_clip('bg', f'position: absolute; inset: 0; background: radial-gradient(circle at 30% 25%, #ffffff33, transparent 55%), linear-gradient(150deg, {colour}, #0f2a38);')
         top = 0.3

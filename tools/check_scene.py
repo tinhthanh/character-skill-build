@@ -1366,6 +1366,22 @@ with tempfile.TemporaryDirectory() as work:
             if needle not in html: problems.append(f'riding example: {needle!r} not in index.html')
         if 'vet.state.facing = 0.55' in html or 'vet.state.facing = -0.55' in html: problems.append('riding example: the rider is also turned toward someone at the start (it should face the way it rides)')
 
+    # Sửa đợt 42: thẻ KẾT THÚC trong bối cảnh 3D mà máy quay về góc khởi đầu — trước đây vòng lặp vẽ thẻ đè biến `start` (góc máy đầu) bằng
+    # chuỗi giữ chỗ '__OUTRO_START__', ra `set.cut("__OUTRO_START__")` và trang báo "set.cut: unknown camera key "0"" (thợ dựng video tìm ra).
+    outro42 = {'id': 'outro42', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'outro': {'title': 'VetGo', 'text': 'Chăm boss mỗi ngày'},
+               'characters': [{'name': 'me', 'id': 'manager', 'x': -300, 'z': -560}, {'name': 'meo', 'species': 'cat', 'x': 0, 'z': -560}, {'name': 'cho', 'species': 'corgi', 'x': 300, 'z': -560}],
+               'script': [{'who': 'me', 'say': 'Mèo nhà mình thích chui hộp lắm.', 'dur': 2}, {'who': 'meo', 'do': ['sitInBox']}, {'who': 'cho', 'do': ['playBow']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_outro42.json')
+    try:
+        json.dump(outro42, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'outro42'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('outro42: the scene with an outro card does not build: ' + (done.stderr.strip() or done.stdout.strip())[-300:])
+    else:
+        html = open(os.path.join(work, 'outro42', 'index.html'), encoding='utf-8').read()
+        if '__OUTRO' in html or 'set.cut("' in html: problems.append('outro42: a camera cut is given the outro placeholder instead of the start view')
+
     # ĐỢT 41 — COMBO CHO ĐỢT 38–40: chăm sóc tổng hợp + chuẩn bị khám; tiêm có y tá giữ; thanh toán tại quầy; tiễn khách + ăn mừng cùng bé
     # + chó / mèo / thỏ. Mỗi cảnh phải qua acting_check, composition không còn tên combo; chữ: "chuẩn bị khám", "chó vui"… ra đúng bước.
     bag41 = {'name': 'bac_si', 'id': 'vet', 'x': -150, 'z': -560, 'faces': 'be'}
