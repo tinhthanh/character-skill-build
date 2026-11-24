@@ -38,6 +38,9 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
     chiều sâu khi đứng yên trong khung hình mà không có lần cắt cảnh (dời lúc cắt, hay trong bước đi của chính nó).
   • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`). Đợt 32: góc trung
     bị giữ thành góc toàn cũng là hỏng; dòng cuối đếm số góc như thế.
+  • HAI NGƯỜI (đợt 38 C, `pair`): ở MỌI lúc đo — đập tay: hai lòng bàn tay chạm nhau, giơ lên; ôm: bốn bàn tay trên thân người kia, hai đầu
+    kề nhau; vỗ vai: bàn tay trên vai / cánh tay người kia; thì thầm: miệng sát đầu người nghe, bàn tay khum cạnh miệng; đưa túi thuốc: hai
+    người cùng cầm túi, túi sang tay mà không nhảy (mỗi 1/30 s). `pairLook`: người kia quay đầu nhìn lại (tia nhìn, như `lookAt`).
 """
 import argparse, json, os, re, socket, subprocess, sys, time
 
@@ -314,7 +317,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -1332,7 +1335,7 @@ def check_gaze_dir(folder, c, shots):
     import math
     out = []
     for g in c.get('gaze') or []:
-        what, rows = f'{c["who"]} {c["kind"]} — head turned to {g["what"]}', []
+        what, rows = f'{c["who"]} {c.get("name", c["kind"])} — head turned to {g["what"]}', []
         for t in g['times']:
             f = {a['name']: a for a in shots.get(float(t), [])}
             gz = (f.get(c['who']) or {}).get('gaze'); aim = gaze_target(c, g, f, t)
@@ -1528,6 +1531,101 @@ def check_care38(folder, c, shots, scales):
         row('the chip number shown on a big card', bool(ok),
             f'"{c["id"]}" shown at {sum(1 for x in texts if x == c["id"])} of {len(texts)} moments; text ' + (f'{min(big) * 100:.1f} %' if big else '—') + f' of the frame height (least {CARD_TEXT * 100:g} %); covers '
             + (f'{max(over) * 100:.0f} %' if over else '—') + f' of {pet_n}\'s head and {max(over_face or [0]) * 100:.0f} % of {who_n}\'s face (limit {CARD_OVER * 100:g} % each); ' + (f'{min(inside) * 100:.0f} % in the frame' if inside else ''))
+
+
+PAIR_HANDS = 0.04     # đợt 38 C — đập tay / đưa túi: hai lòng bàn tay cách nhau ≤ 4 % chiều cao người thấp hơn ở MỌI lúc đo
+PAIR_ON = 0.06        # vỗ vai: lòng bàn tay cách điểm vai gần của người kia ≤ 6 %; thì thầm: miệng cách đầu người nghe ≤ 6 %
+PAIR_HEADS = 0.04     # ôm: hai cái đầu cách nhau ≤ 4 % (kề nhau)
+PAIR_JUMP = 0.03      # đưa túi: túi dời ≤ 3 % chiều cao giữa hai khung liền nhau (sang tay, không nhảy)
+
+
+def check_pair(folder, c, shots, scales):
+    """HAI NGƯỜI VỚI NHAU (đợt 38 C), đo ở mọi lúc trong `times`, không một lúc:
+      • đập tay — hai lòng bàn tay chạm nhau (≤ PAIR_HANDS), trên vai người thấp hơn (giơ tay, không phải bắt tay);
+      • ôm — cả hai bàn tay của MỖI người nằm trong bề ngang thân người kia, ngang thân (vai … hông), hai đầu kề nhau;
+      • vỗ vai — bàn tay gần nhất trên vai gần của người kia (≤ PAIR_ON);
+      • thì thầm — miệng người nói sát đầu người nghe (≤ PAIR_ON), một bàn tay khum cạnh miệng (≤ 8 %);
+      • đưa túi — trước lúc sang tay túi trong tay người đưa, sau đó trong tay người nhận, lúc nào cũng ĐÚNG MỘT túi, hai người cùng có
+        tay trên túi lúc trao, túi không nhảy giữa hai khung (`samples`, mỗi 1/30 s)."""
+    name, who, other = c['name'], c['who'], c['target']
+    what = f'{who} {name} {other}'
+    frames = [(t, {a['name']: a for a in shots.get(float(t), [])}) for t in c['times']]
+    dist = lambda p, q: ((p['x'] - q['x']) ** 2 + (p['y'] - q['y']) ** 2) ** 0.5
+    rows, out = [], []
+    for t, f in frames:
+        a, b = f.get(who), f.get(other)
+        if not a or not b or not a.get('tall') or not b.get('tall'): continue
+        tall = min(a['tall'], b['tall'])
+        if name == 'highFive':
+            if not a['hands'] or not b['hands']: continue
+            h, g = min(((h, g) for h in a['hands'] for g in b['hands']), key=lambda pair: dist(*pair))
+            low = max([s['y'] for s in (a.get('shoulders') or [])] + [s['y'] for s in (b.get('shoulders') or [])] or [h['y']])
+            # Giơ tay: trên đường vai THẤP hơn (đứa bé chibi tay ngắn hơn bán kính đầu — chỉ giơ tới ngang vai nó), dung sai 3 %.
+            raised = max(h['y'], g['y']) < low + 0.03 * tall
+            rows.append((t, dist(h, g) / tall, raised and dist(h, g) / tall <= PAIR_HANDS, f'palms {dist(h, g) / tall * 100:.1f} %' + ('' if raised else ', hands below the shoulders')))
+        elif name == 'hug':
+            worst, why = 0, ''
+            for p, q in ((a, b), (b, a)):
+                body, head = q.get('body'), q.get('headBox')
+                if not body or not head or len(p.get('hands') or []) < 2: worst, why = 1, 'not measured'; continue
+                x0, x1 = body['x0'] - 0.03 * tall, body['x1'] + 0.03 * tall
+                top, bottom = head['y1'] - 0.06 * tall, body['y0'] + (body['y1'] - body['y0']) * 0.7
+                for hand in p['hands']:
+                    off = max(0, x0 - hand['x'], hand['x'] - x1, top - hand['y'], hand['y'] - bottom) / tall
+                    if off > worst: worst, why = off, f'{p["name"]}\'s {hand["side"]} hand {off * 100:.1f} % outside {q["name"]}\'s body'
+            ha, hb = a.get('headBox'), b.get('headBox')
+            heads = max(0, ha['x0'] - hb['x1'], hb['x0'] - ha['x1'], ha['y0'] - hb['y1'], hb['y0'] - ha['y1']) / tall if ha and hb else 1
+            rows.append((t, max(worst, heads - PAIR_HEADS + 0.0), worst <= 0.0 and heads <= PAIR_HEADS, (why or 'all four hands on the other\'s body') + f', heads {heads * 100:.1f} % apart'))
+        elif name == 'patShoulder':
+            near = [s for s in b.get('shoulders') or []]
+            if not near or not a['hands']: continue
+            sh = min(near, key=lambda s: abs(s['x'] - a['x']))
+            # Vai hay CÁNH TAY (trẻ con vỗ về người lớn: tay đặt lên cánh tay họ, ngang vai mình): đoạn từ điểm vai xuống 30 % chiều cao họ.
+            elbow = {'x': sh['x'], 'y': sh['y'] + 0.3 * b['tall']}
+            d = min(segment_gap(h, sh, elbow) for h in a['hands']) / a['tall']
+            rows.append((t, d, d <= PAIR_ON, f'hand {d * 100:.1f} % from {other}\'s shoulder / arm'))
+        elif name == 'whisper':
+            care = (scales.get(('care', float(t))) or {}).get(who) or {}
+            mouth, head = care.get('mouthP'), b.get('headBox')
+            if not mouth or not head or not a['hands']: continue
+            gap = max(0, head['x0'] - mouth['x'], mouth['x'] - head['x1'], head['y0'] - mouth['y'], mouth['y'] - head['y1']) / a['tall']
+            cup = min(dist(h, mouth) for h in a['hands']) / a['tall']
+            rows.append((t, gap, gap <= PAIR_ON and cup <= 0.08, f'mouth {gap * 100:.1f} % from {other}\'s head, hand {cup * 100:.1f} % from the mouth'))
+        elif name == 'handOverBag':
+            bags = [(p, item) for p in (a, b) for item in p.get('items') or []]
+            if len(bags) != 1: rows.append((t, 1, False, f'{len(bags)} bags drawn')); continue
+            holder, bag = bags[0]
+            box = bag['box']
+            near = lambda p: min((max(0, box['x0'] - h['x'], h['x'] - box['x1'], box['y0'] - h['y'], h['y'] - box['y1']) for h in p['hands']), default=9) / tall
+            d = max(near(a), near(b))
+            rows.append((t, d, d <= PAIR_ON, f'bag in {holder["name"]}\'s hand, the farther person\'s hand {d * 100:.1f} % from it'))
+    if not rows: return [{'scene': folder, 'what': what, 'ok': None, 'note': 'not both in the frame'}]
+    bad = [r for r in rows if not r[2]]
+    worst = max(rows, key=lambda r: (not r[2], r[1]))
+    label = {'highFive': 'the hands meet, raised', 'hug': 'arms round each other, heads together', 'patShoulder': 'hand on the shoulder',
+             'whisper': 'mouth at the ear, hand cupped', 'handOverBag': 'both hold the bag'}[name]
+    out.append({'scene': folder, 'what': f'{what} — {label} ({len(rows)} moments)', 'ok': not bad and len(rows) >= 2,
+                'note': f'{worst[3]} at {worst[0]:g} s' + (f' ({len(bad)} of {len(rows)} moments fail)' if bad else '') + (' — measured at fewer than 2 moments' if len(rows) < 2 else '')})
+    if name == 'handOverBag' and c.get('samples'):
+        seq, prev, jump, owners = [], None, (0, None), []
+        for t in c['samples']:
+            f = {x['name']: x for x in shots.get(float(t), [])}
+            a, b = f.get(who), f.get(other)
+            if not a or not b: continue
+            bags = [(p['name'], item['box']) for p in (a, b) for item in p.get('items') or []]
+            owners.append((t, [n for n, _ in bags]))
+            if len(bags) != 1: continue
+            box = bags[0][1]; centre = ((box['x0'] + box['x1']) / 2, (box['y0'] + box['y1']) / 2)
+            if prev:
+                step = ((centre[0] - prev[0]) ** 2 + (centre[1] - prev[1]) ** 2) ** 0.5 / min(a['tall'], b['tall'])
+                if step > jump[0]: jump = (step, t)
+            prev = centre
+        both = [t for t, names in owners if len(names) != 1]
+        passed = owners and owners[0][1] == [who] and owners[-1][1] == [other]
+        out.append({'scene': folder, 'what': f'{what} — the bag passes hand to hand', 'ok': bool(passed) and not both and jump[0] <= PAIR_JUMP,
+                    'note': (f'from {who} to {other}' if passed else f'held by {owners[0][1] if owners else "?"} then {owners[-1][1] if owners else "?"}')
+                            + (f', {len(both)} frames with no bag or two bags' if both else ', always exactly one bag')
+                            + f', moves at most {jump[0] * 100:.1f} % of height between frames (at {jump[1]} s; limit {PAIR_JUMP * 100:g} %)'})
     return out
 
 
@@ -1626,6 +1724,9 @@ def check_scene(folder):
             continue
         if c['kind'] == 'showXray':
             results.extend(check_xray(folder, c, frames))
+            continue
+        if c['kind'] in ('pair', 'pairLook'):
+            if c['kind'] == 'pair': results.extend(check_pair(folder, c, shots, scales))
             continue
         if c['kind'] == 'petAct':
             results.extend(check_pet_act(folder, c, frames, hidden, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))

@@ -166,6 +166,10 @@ clips for every voice file.
    Hands on the pet: `["clipNails", "@pet"]`, `["eyeDrops", "@pet"]`, `["cleanEars", "@pet"]`, `["scanChip", "@pet", { "id": "900 123 456 789" }]`
    — the person goes to the pet's head end and the turn cuts to a close shot; the pet's paw / chin / eyes / head follow the hands
    by themselves (nothing to add for the pet). Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai" / "lau tai", "quét chip <số>".
+   Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
+   `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
+   The other person's part is added at the same time and the two step to the right distance; an adult kneels or crouches to a child.
+   Script words: "đập tay", "ôm", "vỗ vai" / "an ủi", "thì thầm" / "nói nhỏ", "đưa túi thuốc" / "đưa thuốc".
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
    Light: `"set": { "light": "night", "lamps": [ … ] }` (`day`, `evening`, `night`), `"window": true` on a
    back-wall panel, `"lamp": "on"` on a turn — lamps glow (and flicker when switched on), light the room and the

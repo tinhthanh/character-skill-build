@@ -47,6 +47,17 @@ for (const entry of entries) {
       // CON VẬT CẠNH MỘT NGƯỜI (đợt 35: liếm tay, chạy nấp): người `entry.person` đứng cạnh, cỡ thật so với con vật (host con vật
       // = 0,43 × host người), sàn hai bên trùng nhau; vẽ SAU con vật (đứng trước nó) — con vật nấp sau chân người ấy.
       let person = null;
+      // HAI NGƯỜI (đợt 38 C: đập tay, ôm, vỗ vai, thì thầm, đưa túi thuốc): người `entry.person` đứng bên phải, cách tâm
+      // `personGap` px (ô cao 235), cỡ `personScale` (trẻ con ~0,75) — chân cùng một sàn; "@person" trong các bước, "@self" (người
+      // của hàng) trong `personSteps`.
+      if (!isPet && entry.person) {
+        const tall = 235 * zoom * (entry.personScale || 1), gap = (entry.personGap || 84) * zoom, floor = 10 * zoom + 235 * zoom;
+        host.style.left = `${-30 * zoom}px`;
+        const personHost = document.createElement('div');
+        personHost.style.cssText = `position:absolute;left:${70 * zoom + gap - tall * 200 / 470}px;top:${floor - tall}px;width:${tall * 400 / 470}px;height:${tall}px`;
+        cell.insertBefore(personHost, entry.personFront ? null : host);
+        person = createCharacter(personHost, { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig;
+      }
       if (isPet && entry.person) {
         const tall = 225 * zoom, petTall = tall * 0.43, floor = 10 * zoom + tall * 458 / 470;
         host.style.cssText = `position:absolute;left:${20 * zoom}px;top:${floor - petTall * 292 / 330}px;width:${petTall * 400 / 330}px;height:${petTall}px`;
@@ -66,7 +77,7 @@ for (const entry of entries) {
       }
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
       const line = sequence(rig, steps);
-      const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? rig : arg)) : step))) : null;
+      const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' || arg === '@self' ? rig : arg)) : step))) : null;
       const at = line.duration() * (column + 0.5) / cols;
       line.time(at); rig.render();
       if (other) { other.time(Math.min(at, other.duration())); person.render(); }

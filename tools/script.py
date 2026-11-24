@@ -110,6 +110,11 @@ TARGETED.update({'cắt móng': ('clipNails', None), 'cắt móng chân': ('clip
                  'vệ sinh tai': ('cleanEars', None), 'lau tai': ('cleanEars', None), 'làm sạch tai': ('cleanEars', None),
                  'quét chip': ('scanChip', None), 'kiểm tra chip': ('scanChip', None), 'đọc chip': ('scanChip', None)})
 CHIP_VERB = re.compile(r'^(quét chip|kiểm tra chip|đọc chip)\s+(?:mã\s+|số\s+)?([0-9][0-9 .-]{2,22}[0-9])$')
+# ĐỢT 38 C — HAI NGƯỜI VỚI NHAU (đích là một người): đập tay, ôm, vỗ vai / an ủi, thì thầm / nói nhỏ, đưa túi thuốc (người đưa tự có túi
+# thuốc trong tay, người nhận tự có túi đang cất — tools/scene.py). Người kia làm phần của mình cùng lúc.
+TARGETED.update({'đập tay': ('highFive', None), 'high five': ('highFive', None), 'ôm': ('hug', None), 'vỗ vai': ('patShoulder', None),
+                 'an ủi': ('patShoulder', None), 'thì thầm': ('whisper', None), 'nói nhỏ': ('whisper', None),
+                 'đưa túi thuốc': ('handOverBag', None), 'đưa thuốc': ('handOverBag', None)})
 # ĐỢT 37 — COMBO: một câu cho cả một chuỗi động tác (bảng chung ở runtime/combos.js, khoá "vi"). Combo không đích viết trong
 # ngoặc ("lễ tân: [chào khách]"); combo có đích viết "→" ("bác sĩ → chó: khám tổng quát", "bác sĩ → chó → bé trai: trả thú").
 sys.path.insert(0, HERE)
@@ -305,7 +310,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     characters = [c for c in characters if c['name'] in used] or characters
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
-    needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard'}
+    needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag'}
     for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
         for step in turn.get('do', []) if isinstance(turn, dict) else []:
             item = needs.get(step[0] if isinstance(step, list) and step else step if isinstance(step, str) else None)

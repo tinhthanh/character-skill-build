@@ -65,7 +65,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
                true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
-               `holds`: "cup" | "clipboard" | "phone" | "syringe" | "pills" | "leash" (right hand), { "L": "cup" }, or
+               `holds`: "cup" | "clipboard" | "phone" | "syringe" | "pills" | "leash" | "bag" (right hand), { "L": "cup" }, or
                { "R": { "kind": "phone", "image": "app.png" } } (a picture on the screen) — gives a person that item
                to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
@@ -136,6 +136,12 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 4] (the rabbit).
                In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot, lick or bark (and no "view") cuts to a close
                shot of the pet for that turn — the pet ≥ 35 % of the frame height, others may be cropped — then back.
+               Two people together: ["highFive", "@boy"] (both slap raised hands between them), ["hug", "@owner"] (step in, arms
+               round each other, heads side by side, sway, step back), ["patShoulder", "@owner"] (a hand on their shoulder, two slow
+               pats — they look back at you), ["whisper", "@nurse"] (lean to the ear, hand cupped by the mouth — they lean in,
+               then react and nod), ["handOverBag", "@owner"] (needs "holds": "bag": a medicine bag held out in both hands, they
+               take it). The other person's part is added at the same time (alone in the turn, no "say"), and the two step to
+               the right distance first; an adult kneels or crouches to a child. The receiver of the bag gets a put-away bag.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -215,6 +221,21 @@ REACH_ACTIONS = {'stroke': 'body', 'examine': 'face', 'giveTreat': 'face', 'brus
                  'handOver': 'hands', 'handOverPet': 'hands', 'handshake': 'hands', 'carry': 'body', 'bandage': 'body', 'putCone': 'face', 'offerHand': 'face'}
 # ĐỢT 35: đo nhiệt độ (tay tới thân con vật), cho uống thuốc (tay tới đầu / mõm). Cân (`weigh`) đo riêng: con vật đứng trên bệ cân.
 REACH_ACTIONS.update({'takeTemp': 'body', 'givePill': 'face'})
+# ĐỢT 38 C — HAI NGƯỜI VỚI NHAU: đập tay, ôm, vỗ vai, thì thầm, đưa túi thuốc. `PAIR_38`: phần của người kia, thêm cùng lúc khi lượt
+# chỉ có bước ấy (như bắt tay); `PAIR_GAP`: hai tâm cách nhau bấy nhiêu × chiều cao TRUNG BÌNH hai người (đập tay: người THẤP hơn) — đi lại
+# gần / lùi ra trước lượt.
+PAIR_38 = {'highFive': 'highFive', 'hug': 'hug', 'patShoulder': 'lookAt', 'whisper': 'hearWhisper', 'handOverBag': 'takeBag'}
+PAIR_PARTS = ('hearWhisper', 'takeBag')                 # phần của người kia — cũng nhận "@người"
+PAIR_GAP = {'highFive': 0.44, 'hug': 0.34, 'patShoulder': 0.32, 'whisper': 0.34, 'handOverBag': 0.4}
+REACH_ACTIONS.update({'highFive': 'hands', 'handOverBag': 'hands'})
+# Lúc đo (giây trong bước) và câu hỏi cho người chấm — xem `light_moments` (kiểm `pair` của tools/acting_check.py).
+PAIR_TIMES = {'highFive': (0.7, 1.0, 1.3, 1.55), 'hug': (1.0, 1.5, 2.0, 2.5), 'patShoulder': (0.9, 1.4, 1.9, 2.3, 2.8),
+              'whisper': (0.8, 1.3, 1.8, 2.3), 'handOverBag': (0.95, 1.1, 1.2, 1.35, 1.5)}
+PAIR_ASK = {'highFive': 'Are {who} and {target} slapping their raised hands together (a high five), hand against hand?',
+            'hug': 'Are {who} and {target} hugging — arms around each other, heads side by side?',
+            'patShoulder': 'Is {who}\'s hand resting on {target}\'s shoulder, comforting them, with {target} looking at {who}?',
+            'whisper': 'Is {who} whispering into {target}\'s ear — leaning close, a hand cupped beside the mouth?',
+            'handOverBag': 'Is {who} handing a small medicine bag to {target}, both of them holding it?'}
 # Lúc đo (phần của bước) của từng động tác chạm: tay đang ở trên con vật — đo nhiệt độ chỉ chạm từ 0,45 s tới 0,6 + hold.
 REACH_TIMES = {'takeTemp': (0.2, 0.28, 0.36), 'givePill': (0.3, 0.36, 0.42)}
 REACH_ACTIONS.update({'restrain': 'body'})                # đợt 38 B: hai tay ôm thân con vật
@@ -338,7 +359,7 @@ DRIVE_KEYS = ('from', 'dur', 'ease')               # một cutout CHẠY VÀO đ
 CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monitor', 'bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter', 'xray')
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
 FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
-ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash')
+ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
 CAMERA_SPEED = {'x': 220, 'y': 160, 'z': 220, 'yaw': 18, 'pitch': 8, 'distance': 420, 'zoom': 0.4}
@@ -743,6 +764,23 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if plan38:
                 moments.append({'t': plan38['times'][1], 'what': f'{op["who"]} {op["kind"]} {op["target"]} — the tool at work', 'ask': plan38['ask'], 'check': plan38['check']})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] == 'pair':
+            # HAI NGƯỜI (đợt 38 C): đo ở nhiều lúc trong bước (tools/acting_check.py `pair`), hỏi ở lúc giữa; người kia (và người làm) quay
+            # đầu nhìn nhau — trừ khi ôm (hai mặt áp má, hướng ra người xem).
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, span = float(step['start']), float(step['duration'])
+            times = [round(t0 + a, 2) for a in PAIR_TIMES[op['name']] if a < span - 0.2]
+            gaze = [{'times': times, 'aim': 'person', 'on': op['target'], 'what': f'{op["target"]}\'s head'}] if op['name'] in ('highFive', 'patShoulder', 'handOverBag') else []
+            check = {'kind': 'pair', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'times': times, 'gaze': gaze}
+            if op['name'] == 'handOverBag': check['samples'] = [round(t0 + 0.95 + n / 30, 3) for n in range(16)]
+            moments.append({'t': times[len(times) // 2], 'what': f'{op["who"]} {op["name"]} {op["target"]}', 'ask': [PAIR_ASK[op['name']].format(who=op['who'], target=op['target'])], 'check': check})
+            # Người kia nhìn lại: vỗ vai — suốt lúc tay trên vai; thì thầm — lúc phản ứng (quay lại nhìn người nói, gật).
+            back = times if op['name'] in ('patShoulder', 'highFive') else [round(t0 + a, 2) for a in (2.9, 3.2, 3.5) if a < span - 0.2] if op['name'] == 'whisper' else []
+            if back: moments.append({'t': back[len(back) // 2], 'what': f'{op["target"]} looks at {op["who"]}', 'ask': [f'Is {op["target"]} looking at {op["who"]} (head turned to them)?'],
+                                     'check': {'kind': 'pairLook', 'name': f'looks back ({op["name"]})', 'who': op['target'], 'times': back, 'gaze': [{'times': back, 'aim': 'person', 'on': op['who'], 'what': f'{op["who"]}\'s head'}]}})
+            continue
         if op['kind'] == 'weigh':
             # CÂN (đợt 35): lúc bế lên (0,3 / 0,4 / 0,48 s — tay tới thân con vật) và lúc đọc số (con vật đứng trên bệ cân, thẻ số đã
             # bật lên: 2,6 s … 2,25 + hold của bước).
@@ -1269,6 +1307,11 @@ def main():
         if stage_set is None and ('z' in who or 'on' in who): fail(f'character "{name}": "z" and "on" place a character in a 3D set — add "set" at the top of the scene file')
         if stage_set is not None:
             if 'on' in who and who['on'] not in [box.get('name') for box in stage_set.get('boxes', [])]: fail(f'character "{name}": "on" must name one of set.boxes (got {js(who["on"])})')
+        # NHẬN TÚI THUỐC (đợt 38 C): người được ai đó `["handOverBag", "@người này"]` mà không cầm gì thì có sẵn một túi ĐANG CẤT — `takeBag`
+        # nhận vào đó (cùng chỗ trên màn hình với túi trong tay người đưa).
+        bag_turns = [t for entry in (scene.get('script') or []) for t in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry])]
+        if not pet and 'holds' not in who and any(isinstance(t, dict) and isinstance(t.get('do'), list) and any(isinstance(step, list) and len(step) > 1 and step[0] == 'handOverBag' and step[1] == '@' + name for step in t['do']) for t in bag_turns):
+            who['holds'], who['holdsHidden'] = 'bag', True
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
@@ -1283,8 +1326,8 @@ def main():
                 # Người nhận đứng một mình trong kịch bản (`take` do công cụ thêm vào lượt `handOver` của người kia): tính theo người đưa.
                 swap = next((step[1][1:] if t.get('who') == name else t.get('who') for t in turns_of if isinstance(t, dict) and isinstance(t.get('do'), list)
                              for step in t['do'] if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str)
-                             and ((t.get('who') == name and step[0] in ('handOver', 'take') and step[1][1:] in spots)
-                                  or (step[0] == 'handOver' and step[1] == '@' + name and t.get('who') in spots and who.get('holdsHidden')))), None)
+                             and ((t.get('who') == name and step[0] in ('handOver', 'take', 'handOverBag', 'takeBag') and step[1][1:] in spots)
+                                  or (step[0] in ('handOver', 'handOverBag') and step[1] == '@' + name and t.get('who') in spots and who.get('holdsHidden')))), None)
                 if swap and name in spots and spots[swap] < spots[name]: side = 'L'
                 held = {side: held}
             # Một món đồ: tên, hoặc { "kind": "phone", "image": "app.png" } (ảnh trên màn hình điện thoại).
@@ -1469,6 +1512,17 @@ def main():
                 if listener and not (len(step) > 3 and isinstance(step[3], dict) and 'to' in step[3]): extra.append(f"{{ to: {listener}, gaze: set.target({actor}, {listener}, 'head') }}")
                 elif len(step) > 3: extra.append(js(step[3]).replace('"@', '').replace('"', '') if isinstance(step[3], dict) and str(step[3].get('to', '')).startswith('@') else js(step[3]))
                 return '[' + ', '.join(["'showXray'", spot] + extra) + ']'
+        # HAI NGƯỜI (đợt 38 C): đích là một NGƯỜI khác ("@tên"); đưa túi thuốc cần túi trong tay, nhận túi cần túi đang cất.
+        if care in tuple(PAIR_38) + PAIR_PARTS and actor in names:
+            if names[actor]['_pet']: fail(f'{where}: "{care}" is done by a person — a pet cannot {care}')
+            if not (isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and not names[step[1][1:]]['_pet'] and step[1][1:] != actor):
+                fail(f'{where}: "{care}" needs the other person: ["{care}", "@<person name>"] — got {js(step)}')
+            holds = names[actor].get('holds')
+            held = [item if isinstance(item, str) else (item or {}).get('kind') for item in holds.values()] if isinstance(holds, dict) else [holds]
+            if care == 'handOverBag' and ('bag' not in held or names[actor].get('holdsHidden')):
+                fail(f'{where}: "handOverBag" needs a medicine bag in hand — give "{actor}" "holds": "bag" (shown, not "holdsHidden")')
+            if care == 'takeBag' and ('bag' not in held or not names[actor].get('holdsHidden')):
+                fail(f'{where}: "takeBag" needs a put-away medicine bag — give "{actor}" "holds": "bag" and "holdsHidden": true (["handOverBag", "@{actor}"] alone in a turn does it for you)')
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
         if step[0] in CARE_35: return care_code(step, where, actor)
@@ -1833,7 +1887,7 @@ def main():
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_35 + CARE_ACTIONS and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_35 + CARE_ACTIONS + tuple(PAIR_38) and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
                 # CON VẬT TỰ ĐI SANG MẶT PHẲNG NGƯỜI KẾ (đợt 34): người trước với tới nó ở chiều sâu khác (> 5 đơn vị) — nó sẽ dời chiều
                 # sâu trước lượt này (`set.depth`, xem `pet_depths`). Không có lần cắt cảnh nào ở giữa thì nó TRƯỢT 0,45 s trên hình
@@ -1884,6 +1938,8 @@ def main():
                 # (đo bằng tools/acting_check.py, đợt 28).
                 wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.2, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19, 'bandage': 0.16, 'putCone': 0.24}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
+                # HAI NGƯỜI (đợt 38 C): khoảng cách theo chiều cao trung bình hai người; đập tay theo người THẤP hơn (trẻ con tay ngắn, đứng sát hơn).
+                if step[0] in PAIR_GAP and not target['_pet']: wanted = PAIR_GAP[step[0]] * (min(who['_host_height'], target['_host_height']) if step[0] == 'highFive' else (who['_host_height'] + target['_host_height']) / 2)
                 # CHO UỐNG THUỐC con chó / thỏ (đợt 36 — Gemini: "chỉ một tay gần mõm, không thấy viên thuốc" ở cảnh corgi): thân dài, ĐẦU
                 # nằm ở đầu gần người (nó quay mặt về người) — đứng 0,18 tính từ GIỮA thân là đứng đè lên đầu nó, hai bàn tay chồng lên
                 # nhau trước ngực người. Cộng thêm quãng từ giữa thân tới đầu (~0,15 chiều cao host của nó); mèo ngồi thì đầu trên ngực.
@@ -1938,7 +1994,7 @@ def main():
                         emitted[0] += 1
                         pet['x'] = float(pet['x']) - move
                     continue
-                if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - 0.12 * who['_host_height']:
+                if not target['_pet'] and not who.get('seated') and not target.get('seated') and abs(gap) < wanted - (0.04 if step[0] in PAIR_GAP else 0.12) * who['_host_height']:      # hai người (đợt 38 C): đầu chibi to — sát hơn 4 % là hai đầu chồng nhau
                     # QUÁ SÁT người kia (bắt tay, đưa đồ): hai người chồng lên nhau, tay khuất sau thân (cảnh thử đợt 28: bé vừa
                     # vuốt mèo xong đứng đè lên bác sĩ, bắt tay mà không thấy tay) — lùi ra cho đủ tầm hai cánh tay.
                     away = (wanted - abs(gap)) * (-1 if gap > 0 else 1)
@@ -2050,6 +2106,9 @@ def main():
                                       **({'partner': next((other.get('who') for other in (entry.get('together') or []) if isinstance(other, dict) and other is not turn and other.get('who') in names
                                                            and not names[other['who']]['_pet'] and any(isinstance(item, list) and len(item) > 1 and item[1] == step[1] for item in other.get('do') or [])), None)}
                                          if step[0] == RESTRAIN and isinstance(entry, dict) else {})})
+                # HAI NGƯỜI (đợt 38 C): moments.json đo tay gặp tay, tay ôm qua người kia, tay trên vai, miệng sát tai, túi sang tay.
+                if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_38 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names:
+                    gear_ops.append({'turn': emitted[0], 'kind': 'pair', 'name': step[0], 'who': turn.get('who'), 'target': step[1][1:]})
                 # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
                 # CÂN (đợt 35): con vật đứng trên bệ cân lúc đọc số; tay tới nó lúc bế lên.
@@ -2156,6 +2215,20 @@ def main():
                     side = -1 if float(giver['x']) > float(taker['x']) else 1
                     pet['_drop'] = float(taker['x']) + side * (60 * taker['_unit'] + 100 * pet['_unit']) - float(pet['x'])
                 code = '{ together: [' + code + f", [{names[name]['name']}, [{js('take' if kind == 'handOver' else 'takePet')}, {names[entry['who']]['name']}{extra}]]] }}"
+                emitted[0] += 1
+            # HAI NGƯỜI (đợt 38 C): `["highFive" | "hug" | "patShoulder" | "whisper" | "handOverBag", "@người kia"]` một mình — người kia làm
+            # phần của mình CÙNG LÚC (đập tay lại, ôm lại, nhìn lại người vỗ vai, nghiêng tai nghe, nhận túi). Một bên làm thì tay vươn vào
+            # khoảng không — như bắt tay (đợt 28).
+            paired = [(step[0], step[1][1:]) for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_38 and isinstance(step[1], str) and step[1].startswith('@')]
+            paired = [(kind, name) for kind, name in paired if name in names and not names[name]['_pet'] and name != entry.get('who')]
+            if paired and not pets and not shaken and not given and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
+                kind, name = paired[0]
+                me = names[entry['who']]['name']
+                if PAIR_38[kind] == 'lookAt':
+                    look = f"set.target({name}, {me}, 'head')" if stage_set is not None else me
+                    part = f"['lookAt', {look}, {{ hold: 2.6, up: 1.5 }}]"
+                else: part = f"[{js(PAIR_38[kind])}, {me}]"
+                code = '{ together: [' + code + f", [{names[name]['name']}, {part}]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
             # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).
@@ -2932,7 +3005,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_38)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

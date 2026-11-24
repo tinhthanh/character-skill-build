@@ -1552,6 +1552,47 @@ try {
       const ha = at(a.el.coTayR), hb = at(b.el.coTayL), gap = Math.hypot(ha[0] - hb[0], ha[1] - hb[1]) / a.svg.getScreenCTM().a;
       if (gap > 22) hong('handshake', `the two hands do not meet (${gap.toFixed(0)} units apart) — an adult and a child shaking hands must aim at one shared point`);
       shakeA.kill(); shakeB.kill();
+      // ĐỢT 38 C — HAI NGƯỜI: người lớn + trẻ con (cỡ 0,75), mỗi động tác qua sequence() của cả hai cùng lúc; chạm thật ở giữa động tác,
+      // xong thì về dáng nghỉ (tay, x, hướng), lỗi rõ khi thiếu người / túi.
+      {
+        const unitOf = (rig) => rig.svg.getScreenCTM().a;
+        const mk = (left, id, scale, items, hidden) => L.createCharacter(spot(`left:${left}px;top:${235 * (1 - scale)}px;width:${200 * scale}px;height:${235 * scale}px`), { id, items, itemsHidden: hidden }).rig;
+        const pairs = [['highFive', 'highFive', 0.33, 0.9], ['hug', 'hug', 0.3, 1.5], ['patShoulder', null, 0.3, 1.6], ['whisper', 'hearWhisper', 0.28, 1.5], ['handOverBag', 'takeBag', 0.3, 1.1]];
+        for (const [act, part, gap, mid] of pairs) {
+          stage.replaceChildren();
+          const bag = act === 'handOverBag';
+          const a2 = mk(600, 'vet', 1, bag ? { R: 'bag' } : null, false), b2 = mk(600 + 100 + gap * 235 - 0.75 * 100, 'boy', 0.75, bag ? { L: 'bag' } : null, bag);
+          const rest = { batR: a2.s.batR, x: a2.s.x, huong: a2.s.huong };      // đưa túi: tay đã trao túi về dáng buông, không về dáng cầm
+          let la, lb;
+          try { la = L.sequence(a2, [[act, b2]]); lb = L.sequence(b2, part ? [[part, a2]] : [['lookAt', a2, { hold: 2.4 }]]); }
+          catch (error) { hong(act, `throws with an adult and a child: ${error.message}`); continue; }
+          la.time(mid); lb.time(Math.min(mid, lb.duration())); a2.apDung(); b2.apDung();
+          const u = unitOf(a2), palm = (rig, k) => at(rig.el['coTay' + k]);
+          const near = (p, el) => { const r = el.getBoundingClientRect(); return Math.hypot(Math.max(r.left - p[0], 0, p[0] - r.right), Math.max(r.top - p[1], 0, p[1] - r.bottom)) / u; };
+          const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) / u;
+          if (act === 'highFive' && dist(palm(a2, 'R'), palm(b2, 'L')) > 22) hong(act, `the two palms do not meet (${dist(palm(a2, 'R'), palm(b2, 'L')).toFixed(0)} units apart) — adult and child slap at one shared point`);
+          if (act === 'hug') for (const [p, q] of [[a2, b2], [b2, a2]]) for (const k of ['L', 'R']) if (near(palm(p, k), q.el.than) > 12) hong(act, `${p === a2 ? 'the adult' : 'the child'}'s ${k} hand is ${near(palm(p, k), q.el.than).toFixed(0)} units off the other's body — the arms must go round them`);
+          if (act === 'patShoulder' && dist(palm(a2, 'R'), at(b2.el.vaiL)) > 30) hong(act, `the hand is ${dist(palm(a2, 'R'), at(b2.el.vaiL)).toFixed(0)} units from the other's shoulder`);
+          if (act === 'whisper' && near(at(a2.el.mieng), b2.el.dau) > 30) hong(act, `the mouth is ${near(at(a2.el.mieng), b2.el.dau).toFixed(0)} units from the listener's head`);
+          if (bag) {
+            const holders = (t) => { la.time(t); lb.time(t); a2.apDung(); b2.apDung(); return [a2.s.itemR > 0.5, b2.s.itemL > 0.5]; };
+            const before = holders(L.RigSVG.BAG_AT - 0.1), after = holders(L.RigSVG.BAG_AT + 0.1);
+            if (!(before[0] && !before[1] && !after[0] && after[1])) hong(act, `the bag does not pass from the giver's hand to the taker's at ${L.RigSVG.BAG_AT} s (before ${before}, after ${after})`);
+            holders(L.RigSVG.BAG_AT - 0.02); const was = at(a2.el.itemR.querySelector("[data-bag]")); holders(L.RigSVG.BAG_AT + 0.08); const now = at(b2.el.itemL.querySelector("[data-bag]"));      // thân túi (không tính ngón tay ôm quai): người lớn → trẻ con lệch ~13 đơn vị (tầm tay trẻ con)
+            if (dist(was, now) > 15) hong(act, `the bag jumps ${dist(was, now).toFixed(0)} units when it changes hands`);
+          }
+          la.progress(1); lb.progress(1);
+          if ((!bag && Math.abs(a2.s.batR - rest.batR) > 0.5) || Math.abs(a2.s.x - rest.x) > 0.5 || Math.abs(a2.s.huong - rest.huong) > 0.01 || a2.s.seat > 0.01 || a2.s.kneel > 0.01 || a2.s.pairFront > 0.01)
+            hong(act, 'does not end at the rest pose where it started (arm, x, facing, seat / kneel, layering)');
+          la.kill(); lb.kill();
+        }
+        stage.replaceChildren();
+        const lone = mk(600, 'vet', 1, null, false), other = mk(700, 'boy', 0.75, null, false);
+        for (const [call, want] of [[() => lone.highFive(null), 'other person rig'], [() => lone.hug(lone), 'other person rig'], [() => lone.handOverBag(other), 'medicine bag'], [() => other.takeBag(lone), 'medicine bag']]) {
+          let message = ''; try { call(); } catch (error) { message = error.message; }
+          if (!message.includes(want)) hong('two people', `a bad call should be refused with a clear message (got "${message || 'no error'}")`);
+        }
+      }
       stage.remove();
     }
     // QUA sequence() PHẢI GIỐNG GỌI TRỰC TIẾP — với MỌI động tác trong tools/action-catalog.json (bản mẫu mà
@@ -1569,8 +1610,11 @@ try {
           : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
         // "scale" (đợt 35, `weigh`): một cái cân bên trái người — `@scale` trong các bước, như tools/actions.html.
         const scale = entry.scale ? L.createProp(spot(`left:${left - 62}px;top:0;width:200px;height:235px`), 'scale', { reading: String(entry.scale) }) : null;
+        // HAI NGƯỜI (đợt 38 C): hàng người có `person` — đặt người ấy bên phải, như tools/actions.html (ô cao 235 px).
+        const tall = 235 * (entry.personScale || 1), partner = entry.person && !(id in RigThu.LOAI)
+          ? L.createCharacter(spot(`left:${left + 100 + (entry.personGap || 84) - tall * 200 / 470}px;top:${235 - tall}px;width:${tall * 400 / 470}px;height:${tall}px`), { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig : null;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? null : arg)) };      // '@person' (đợt 35): không đặt người — nấp tại chỗ, liếm không đích
+        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg)) };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
       };
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
