@@ -883,6 +883,25 @@ with tempfile.TemporaryDirectory() as work:
         elif 'be wave — hands in the frame' not in done.stdout or 'be point — hands in the frame' not in done.stdout or '0 medium shots kept as the full shot' not in done.stdout:
             problems.append('gesture: acting_check did not measure the hands of the wave and the point:\n' + done.stdout[-400:])
 
+    # Đợt 39 B: sáu cử chỉ thường ngày (cười lớn, lau nước mắt, ôm trán, suỵt, ra dấu OK, chào) — bàn tay trong khung, ngón ở môi, tay ở
+    # mắt / chân mày, vòng OK cạnh mặt, đầu + vai chuyển động (acting_check `check_gesture39`). Viết bằng kịch bản tiếng Việt.
+    g39 = os.path.join(work, 'g39.txt')
+    open(g39, 'w', encoding='utf-8').write('bối cảnh: đường phố\nbác sĩ (vet)\nbé (boy)\nbác sĩ: [cười lớn]\nbé: [lau nước mắt]\nbác sĩ: [ôm trán]\nbé: [suỵt]\nbác sĩ: [ra dấu ok]\nbé: [giơ tay chào]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), g39, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('gesture39: script.py: ' + (done.stderr.strip() or done.stdout.strip())[-300:])
+    else:
+        want = ['laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute']
+        got = [step for turn in json.load(open(os.path.join(work, 'g39.scene.json'), encoding='utf-8'))['script'] for step in turn.get('do', [])]
+        if got != want or any('mood' in turn for turn in json.load(open(os.path.join(work, 'g39.scene.json'), encoding='utf-8'))['script']): problems.append(f'gesture39: script.py gave {got}, want {want} and no mood')
+        else:
+            done = build(os.path.join(work, 'g39.scene.json'), os.path.join(work, 'g39'))
+            if done.returncode != 0: problems.append('gesture39: the scene does not build: ' + done.stderr.strip()[:300])
+            else:
+                done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'g39')], capture_output=True, text=True)
+                if done.returncode != 0: problems.append('gesture39: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+                elif not all(text in done.stdout for text in ('the index finger at the lips', 'the palm over the eyes', 'the flat hand at the brow', 'the OK circle beside the face', 'the hand at the eye', 'head and shoulders move with the laugh')):
+                    problems.append('gesture39: acting_check did not measure the six gestures:\n' + done.stdout[-400:])
+
     # Đợt 33, lượt hai: bác sĩ vẫy, bé REO HAI TAY, bác sĩ chỉ tay — khung dọc công viên. Bé reo chữ V cần ~1,02 góc toàn: góc trung
     # 80 % để tay trái lẹm 34 % (0.73.0 lượt đầu) — nay lượt ấy là góc toàn có cả hai tay; mọi bàn tay cách mép ≥ 5 % bề rộng tay.
     cheer = {'id': 'cheer', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'park'}, 'characters': [

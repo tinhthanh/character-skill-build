@@ -92,6 +92,12 @@ ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc �
            # đợt 35: hồ sơ & phim X-quang (người)
            'đọc bệnh án': 'readChart', 'xem bệnh án': 'readChart', 'đọc hồ sơ': 'readChart', 'xem hồ sơ': 'readChart',
            'chỉ phim': 'showXray', 'chỉ phim x-quang': 'showXray', 'xem phim x-quang': 'showXray', 'chỉ x-quang': 'showXray'}
+# ĐỢT 39 B — sáu cử chỉ thường ngày không đạo cụ. "cười" vẫn là TÂM TRẠNG ("tên (cười): lời"); "[cười lớn]" / "[cười ha hả]" trong ngoặc
+# vuông là ĐỘNG TÁC cười cả người (`laugh`: ngửa đầu, vai rung, tay ôm bụng) — xem BRACKET_FIRST. "(cười lớn)" trong ngoặc tròn vẫn là nét mặt.
+ACTIONS.update({'cười lớn': 'laugh', 'cười ha hả': 'laugh', 'lau nước mắt': 'wipeTears', 'chùi nước mắt': 'wipeTears', 'che mặt': 'facepalm',
+                'ôm trán': 'facepalm', 'facepalm': 'facepalm', 'suỵt': 'shush', 'ra hiệu im lặng': 'shush', 'ok': 'okSign', 'ra dấu ok': 'okSign',
+                'giơ tay chào': 'salute', 'chào kiểu quân đội': 'salute', 'salute': 'salute'})
+BRACKET_FIRST = {'cười lớn'}              # trong "[…]": từ này vừa là tâm trạng vừa là động tác — ưu tiên ĐỘNG TÁC
 TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('giveTreat', {'kind': 'pill'}), 'cho bánh': ('giveTreat', None), 'cho ăn': ('giveTreat', None),
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
             'chải lông': ('brush', None), 'tiêm': ('inject', None), 'nghe tim': ('listen', None), 'bắt tay': ('handshake', None), 'chỉ vào': ('point', None),
@@ -269,7 +275,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             if not rest.endswith(']'): raise ScriptError(f'{where}: thiếu "]"')
             for word in [part.strip().lower() for part in rest[1:-1].split(',') if part.strip()]:
                 table = PET_MOODS if pet else PERSON_MOODS
-                if word in table or word in table.values():
+                if (word in table or word in table.values()) and not (word in BRACKET_FIRST and not pet):
                     if 'mood' in turn: raise ScriptError(f'{where}: hai tâm trạng trong một lượt')
                     turn['mood'] = table.get(word, word)
                 elif word in MARKS: turn['mark'] = MARKS[word]

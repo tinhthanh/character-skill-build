@@ -49,6 +49,12 @@ the demo steps from `tools/action-catalog.json`.
 | `beckon` | `(times = 3, { hand })` | an open hand held out by the hip, fingers curling in — "come here" (a pet, a customer) | 0.8 + 0.36 × `times` |
 | `fingerHeart` | `(hold = 1.4, { hand })` | thumb and index crossed before the chest, a red heart pops up and beats twice, a wink — the finger heart | `hold` + 0.85 |
 | `vSign` | `(hold = 1.4, { hand })` | two fingers in a V beside the face, head tilted, a big smile and a wink — a photo pose, a sign-off | `hold` + 0.75 |
+| `laugh` | `(hold = 1.6)` | whole-body laugh: eyes squeezed, mouth wide, head back then bent forward, shoulders shaking, a hand on the belly (unlike the face-only `express('laughing')`). Script: `[cười lớn]` / `[cười ha hả]` is this action; `(cười)` / `(cười lớn)` in round brackets stays the mood | `hold` + 0.7 |
+| `wipeTears` | `(hand = 'auto')` | crying, then the back of the hand rubs under each eye (a hand holding an item: the free hand does both), a sniff, a brave small smile | ~5 s |
+| `facepalm` | `(hold = 1.2)` | flat palm over the eyes and forehead, head dropped into it, a slow shake, a sigh | `hold` + 1.1 |
+| `shush` | `(hold = 1.2)` | index finger upright on the lips, eyes wide, rounded "shh", a small lean forward | `hold` + 0.6 |
+| `okSign` | `(hold = 1.2, { hand })` | thumb and index in a circle, other fingers up, beside the face; a wink and two nods | `hold` + 0.5 |
+| `salute` | `(hold = 1.2)` | flat hand snapped up to the brow, elbow out, chin up, then snapped down | `hold` + 0.5 |
 | `handshake` | `(target)` | reach the hand on `target`'s side to a point half way between the two (at waist height, shared by both, whatever their heights) and shake three times. Run it `together` with the other person's `handshake` | 1.8 |
 | `listen` | `(target, hold = 1.6)` | bend to a pet (a rig, an element or `{ x, y }`) and put a stethoscope (it appears in the hand, tube up to the neck) on its body, listen with the head tilted and eyes up, move it once, nod. The pet must be within reach — on an exam table at about hand height | `hold` + 1.5 |
 | `inject` | `(target)` | with a held `'syringe'`, bend to the pet, needle toward its body, press the plunger, pull back, smile. The pet must stand on the side of the hand holding the syringe (otherwise an error says so); throws without a syringe | 2.35 |
