@@ -214,9 +214,18 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `badNews` | — | `worry`, `express('sad', 1.4)`, `nod` | tin buồn, báo tin buồn |
 | `waitingImpatient` | — | `checkWatch`, `lookAround`, `crossArms(1.6)` | sốt ruột, chờ lâu |
 | `dischargePet` | `(pet, owner)` | `carry`, `handOverPet(owner)`, `countFingers(3)`, `wave` | trả thú, xuất viện |
+| `groomingSession` | `(pet)` | `clipNails`, `eyeDrops`, `cleanEars`, `thumbsUp` | chăm sóc tổng hợp, spa thú cưng |
+| `prepForExam` | — | `washHands(2)`, `putOnGloves` (the gloves stay on) | chuẩn bị khám, rửa tay đeo găng |
+| `assistedVaccination` | `(pet, nurse)` | `washHands`, `putOnGloves`, `inject` (the nurse's `restrain` at the same time), `takeOffGloves`, `giveTreat` | tiêm có người giữ |
+| `checkoutCounter` | `(customer)` | the cashier waits while the customer's `payByQR` runs, `giveChange(customer)`, `stampCard` (stamps, not handed over — a customer holding a phone has no free hand for a third item), `wave` | thanh toán tại quầy |
+| `farewellOwner` | `(owner)` | `handOverBag(owner)`, `patShoulder(owner)`, `wave` | tiễn khách, dặn dò ra về |
+| `celebrateWithKid` | `(kid)` | `highFive(kid)`, `cheer`, `thumbsUp` | ăn mừng cùng bé |
+| `happyDog` (dog) | — | `playBow`, `wagTail`, `carryToy(120)` | chó vui |
+| `cozyCat` (cat) | — | `groomFace`, `loaf`, `slowBlink` | mèo thư giãn |
+| `happyBunny` (rabbit) | — | `binky`, `periscope`, `noseTwitch` | thỏ vui |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`
-injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), and the pet must be
+injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `checkoutCounter` needs a cashier holding cash and a stamp card and a customer with a phone, and the pet must be
 within reach. `tools/script.py` gives the items and the scale by itself.
 
 - **In `sequence()`** a combo expands in place into its own steps. A step done together with

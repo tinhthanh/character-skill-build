@@ -70,6 +70,84 @@ export const COMBOS = {
       "wave"
     ],
     "vi": ["trả thú", "trả về", "giao thú", "xuất viện", "trả bé về"]
+  },
+  "groomingSession": {
+    "params": ["pet"],
+    "about": "a grooming session: trim the nails, put eye drops in, clean the ear, then a thumbs up (a final stroke leaves the pet half hidden behind the person when it stands on the exam table)",
+    "steps": [
+      ["clipNails", "$pet"],
+      ["eyeDrops", "$pet"],
+      ["cleanEars", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["chăm sóc tổng hợp", "spa thú cưng", "làm đẹp cho thú"]
+  },
+  "prepForExam": {
+    "params": [],
+    "about": "get ready to examine: wash the hands, put on gloves (they stay on afterwards)",
+    "steps": [["washHands", 2], "putOnGloves"],
+    "vi": ["chuẩn bị khám", "rửa tay đeo găng", "rửa tay mang găng"]
+  },
+  "assistedVaccination": {
+    "params": ["pet", "nurse"],
+    "about": "a vaccination with a helper: wash hands, gloves on, inject while the nurse holds the pet (restrain at the same time), gloves off, a treat",
+    "steps": [
+      ["washHands", 2],
+      "putOnGloves",
+      { "step": ["inject", "$pet"], "with": { "$nurse": [["restrain", "$pet"]] } },
+      "takeOffGloves",
+      ["giveTreat", "$pet"]
+    ],
+    "vi": ["tiêm có người giữ", "tiêm có phụ tá giữ", "tiêm có y tá giữ"]
+  },
+  "checkoutCounter": {
+    "params": ["customer"],
+    "about": "the cashier's side of paying: the customer scans the QR code while the cashier waits, change is handed back, the loyalty card is stamped, a wave",
+    "steps": [
+      { "step": ["idle", 2.6], "with": { "$customer": [["payByQR"]] } },
+      ["giveChange", "$customer"],
+      "stampCard",
+      "wave"
+    ],
+    "vi": ["thanh toán tại quầy", "tính tiền tại quầy", "thu ngân tính tiền"]
+  },
+  "farewellOwner": {
+    "params": ["owner"],
+    "about": "see an owner off: hand over the medicine bag, a pat on the shoulder, a wave",
+    "steps": [
+      ["handOverBag", "$owner"],
+      ["patShoulder", "$owner"],
+      "wave"
+    ],
+    "vi": ["tiễn khách", "dặn dò ra về", "tiễn chủ về"]
+  },
+  "celebrateWithKid": {
+    "params": ["kid"],
+    "about": "celebrate with a child: a high five, a cheer, a thumbs up",
+    "steps": [
+      ["highFive", "$kid"],
+      "cheer",
+      "thumbsUp"
+    ],
+    "vi": ["ăn mừng cùng bé", "ăn mừng với bé", "mừng với bé"]
+  },
+  "happyDog": {
+    "params": [],
+    "about": "a happy dog: a play bow, a wag, then trots off with a toy and drops it",
+    "steps": [["playBow", 1.2], "wagTail", ["carryToy", 120]],
+    "vi": ["chó vui", "chó vui vẻ", "chó rủ chơi"]
+  },
+  "cozyCat": {
+    "params": [],
+    "about": "a relaxed cat: washes its face, settles into a loaf, slow-blinks",
+    "steps": [["groomFace", 3], ["loaf", 2], ["slowBlink", 1]],
+    "vi": ["mèo thư giãn", "mèo thảnh thơi", "mèo lim dim"]
+  },
+  "happyBunny": {
+    "params": [],
+    "about": "a happy rabbit: a binky leap, stands up to look around, twitches its nose",
+    "steps": [["binky", 2], ["periscope", 1.6], ["noseTwitch", 1.6]],
+    "vi": ["thỏ vui", "thỏ vui vẻ", "thỏ tung tăng"]
   }
 };
 // END COMBOS
