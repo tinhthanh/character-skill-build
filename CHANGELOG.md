@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.81.0
+
+Added: pet actions (wave 40, three Sonnet agents in parallel) and combos for waves 38–40 (wave 41). Every action works as a rig
+method, in `sequence()`, in scene files, in Vietnamese scripts and in the action catalog, and is measured by
+`tools/acting_check.py`.
+
+- **Dogs** (40 A): `playBow`, `howl`, `dig`, `carryToy(distance | person, { kind })`, `leanOnLeg(person)`,
+  `tugOfWar(person)`. The person's `pullToy(pet)` is added by itself, and the rope stays taut between the mouth and the hand.
+  Scripts: "rủ chơi", "tru", "đào đất", "ngậm đồ chơi", "dựa chân", "kéo co".
+- **Cats** (40 B): `groomFace`, `loaf`, `slowBlink`, `batToy` (a ball of yarn), `archBack`, `sitInBox`.
+- **Rabbits** (40 B): `binky`, `flop` (a held pose until `standUp`), `periscope`, `noseTwitch`.
+- **Another species is refused** with an error naming the right one. Pet actions cut to a close shot by themselves.
+- **At the clinic** (40 C): `shiverAtVet`, `struggle` (while carried, the carrier's hands shake with it), `groggy`,
+  `pawAtCone` (needs the cone).
+- **Clearer `lick`**: a 1.9× longer tongue reach, resting on the hand or cheek.
+- **Clearer `eatCarrot`**: a bigger carrot with clear bite marks and crumbs; the last stub is held, then eaten. Both were
+  "Known" since 0.76.0.
+- **Combos** (41): `groomingSession`, `prepForExam`, `assistedVaccination(pet, nurse)` (the nurse's `restrain` at the same
+  time), `checkoutCounter(customer)`, `farewellOwner`, `celebrateWithKid`, and for pets `happyDog`, `cozyCat`, `happyBunny`.
+  That makes 16 combos. Scripts: "spa thú cưng", "chuẩn bị khám", "tiêm có người giữ", "thanh toán tại quầy", "tiễn khách",
+  "ăn mừng cùng bé", "chó vui", "mèo thư giãn", "thỏ vui".
+- **Person actions**: 124 in all (`pullToy`).
+- **CI scenes**: `pets40a`, `pets40a-park`, `pets40b`, `clinic40`, `living40`, `groom41`, `vacc41`, `desk41`, `far41`, `home41`.
+
+Trial films (`/Users/vetgo/Movies/character-skill-trials/`):
+- `dot40/dot40-pets.mp4`: 5 scenes, which pass `acting_check` 82 / 82, 33 / 33, 94 / 94, 74 / 74 and 52 / 52.
+- `dot41/dot41-combos.mp4`: 5 scenes, which pass 58 / 58, 47 / 47, 22 / 22, 22 / 22 and 96 / 96.
+
+Fixed (merging the three wave 40 branches — name clashes that the block / seam checks of waves 38–39 do not catch)
+- Two measure functions were named `check_pet40` (A's overrode B's), so no cat or rabbit measure ran. B's is now `check_pet40b`.
+- Two pet rest channels were named `toy` (the dog's toy and the cat's yarn), so a dog carrying a bone had a ball of yarn drawn
+  under it. This was seen in the trial film. B's channel is now `yarn`, and the check page reads the new name.
+- Two CI scenes were named `pets40b`.
+- Merges are now also scanned for duplicate function, method, channel and CI scene names.
+
+Known
+- `groomingSession` ends with a thumbs up, not a stroke: a stroke on a pet standing on the exam table hides its head behind
+  the person.
+- `checkoutCounter` stamps the card without handing it over, because the customer holding a phone has one free hand for the
+  change.
+- `giveTreat` after `assistedVaccination` and `eyeDrops` depend on which side the person stands and where the pet faces.
+- `sitInBox` moves the cat about 112 units, so the close shot is framed on its starting place.
+- Not reviewed by Gemini on the rendered films.
+
 ## 0.80.0
 
 Added: 19 person actions (wave 39, three agents in parallel: Opus first, then Sonnet after a usage limit). Each one works as a

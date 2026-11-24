@@ -1,4 +1,4 @@
-/* VGCharacter v0.80.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.81.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -293,6 +293,7 @@ const NGHI = Object.freeze({
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
+  rope: 0,                      // đợt 40 A: 1 = đang KÉO CO (`pullToy`) — dây thừng căng từ tay tới mõm con chó
   watchL: 0, watchR: 0,
   heartL: 0, heartR: 0,         // trái tim bật ra trên bàn tay 'tim' (bắn tim): 0 = chưa có, 1 = đủ lớn
   ovL: 0, ovR: 0, ovBatL: 0, ovBatR: 0, ovCangL: 0, ovCangR: 0,   // đặt góc tay CUỐI CÙNG (góc trên màn hình), trọng số 0…1 — xem apDung
@@ -1073,6 +1074,7 @@ class RigSVG {
   static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify', 'readChart', 'takeOffGloves',
                        'takeSelfie'];       // đợt 39 C — `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static { this.DONG_TAC.push('wipeCounter'); this.EXCHANGE.push('giveChange', 'takeChange', 'takeCard'); this.WITH_ITEM.push('payByQR', 'payByCard', 'stampCard', 'pourDrink'); }       // đợt 39 A
+  static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -1613,6 +1615,9 @@ class RigSVG {
   </g>
   <!-- DÂY DẮT (leash): ở GỐC SVG, ngoài mọi phép biến đổi — hai đầu dây đo trên màn hình rồi đổi về hệ này. -->
   <path id="${p}-leash" fill="none" stroke="#c0392b" stroke-width="3.2" stroke-linecap="round" style="display:none"/>
+  <!-- DÂY KÉO CO (đợt 40 A, \`pullToy\`): như dây dắt — ở gốc SVG, đầu tay và đầu mõm đo trên màn hình; hai nét: sợi nâu, sợi be bện lên trên. -->
+  <g id="${p}-rope" style="display:none"><path data-rope="base" fill="none" stroke="#7a4a1c" stroke-linecap="round"/><path data-rope="top" fill="none" stroke="#e0a85a" stroke-linecap="round"/>
+    <path data-rope="twist" fill="none" stroke="#8a5a22" stroke-linecap="round"/><circle data-rope="knot" r="4" fill="#d6453d" stroke="#7a2520" stroke-width="1.200"/></g>
   <g id="${p}-note" style="display:none">
     <path d="M -86 -46 H 86 Q 96 -46 96 -36 V 6 Q 96 16 86 16 H 10 L 0 28 L -10 16 H -86 Q -96 16 -96 6 V -36 Q -96 -46 -86 -46 Z" fill="#ffffff" stroke="#c8d3da" stroke-width="1.6"/>
     <rect x="-86" y="-38" width="22" height="22" rx="6" fill="#2f9e8f"/><path d="M -75 -33 q -6 1 -6 8 v 4 h 12 v -4 q 0 -7 -6 -8 z M -77 -19 h 4" stroke="#ffffff" stroke-width="1.8" fill="none" stroke-linecap="round"/>
@@ -1649,7 +1654,7 @@ class RigSVG {
       goc: q('goc'), bong: q('bong'), chanG: q('chanG'), than: q('than'), ao: q('ao'), tren: q('tren'), sau: q('sau'), sauChan: q('sauChan'), xaTruoc: q('xaTruoc'), xaCang: q('xaCang'), canhL: q('canhL'), canhR: q('canhR'), xaMaskG: q('xaMaskG'), phuKienRect: q('phuKienRect'), dau: q('dau'),
       hongL: q('hongL'), hongR: q('hongR'), tocG: q('tocG'), tocSau: q('tocSau'), tocTruoc: q('tocTruoc'), tocBui: q('tocBui'), coAo: q('coAo'), muG: q('muG'), co: q('co'), coDa: q('coDa'), phuKienTren: q('phuKienTren'), vaiCatL: q('vaiCatL'), vaiCatR: q('vaiCatR'),
       tocLungE: q('tocLungE'), tocLungLow: q('tocLungLow'), lowHairClipR: q('lowHairClipR'), tocGay: q('tocGay'), tocGayP: q('tocGayP'), taiNetL: q('taiNetL'), taiNetR: q('taiNetR'), matClipP: q('matClipP'), phuKien: q('phuKien'), suon: q('suon'), banL: q('banL'), banR: q('banR'), banNgL: q('banNgL'), banNgR: q('banNgR'), net: q('net'), ma: q('ma'), maL: q('maL'), maR: q('maR'), taiL: q('taiL'), taiR: q('taiR'),
-      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), ball: q('ball'), ring: q('ring'), ringFront: q('ringFront'), note: q('note'), readout: q('readout'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
+      chanL: q('chanL'), chanR: q('chanR'), ongL: q('ongL'), ongR: q('ongR'), skirt: q('skirt'), itemL: q('itemL'), itemR: q('itemR'), toolL: q('toolL'), toolR: q('toolR'), gadgetL: q('gadgetL'), gadgetR: q('gadgetR'), leash: q('leash'), rope: q('rope'), ball: q('ball'), ring: q('ring'), ringFront: q('ringFront'), note: q('note'), readout: q('readout'), watchL: q('watchL'), watchR: q('watchR'), om: q('om'),
       batL: q('batL'), batR: q('batR'), cangL: q('cangL'), cangR: q('cangR'),
       vaiL: q('vaiL'), vaiR: q('vaiR'), capL: q('capL'), capR: q('capR'), capInvL: q('capInvL'), capInvR: q('capInvR'), mayVaiL: q('mayVaiL'), mayVaiR: q('mayVaiR'),
       tayAoL: q('tayAoL'), tayAoR: q('tayAoR'), gauTayAoL: q('gauTayAoL'), gauTayAoR: q('gauTayAoR'),
@@ -2240,6 +2245,13 @@ class RigSVG {
       rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * cradle;
       rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * cradle;
     }
+    // đợt 40 C — con vật trong tay VÙNG VẪY (`struggle` của rig thú ghi `vung` −1…1): hai cánh tay giữ chặt mà lắc theo từng cú giật —
+    // cùng quét sang một phía (`swing`) và siết vào mỗi lần giật (`squeeze`). Đọc từ trạng thái con vật mỗi lần vẽ, nên gọi thẳng hay qua `sequence()` như nhau.
+    const held40 = cradle ? this.#carriedNow() : null, squirm = held40 && held40.pet && held40.pet.s ? clamp(+held40.pet.s.vung || 0, -1, 1) : 0;
+    if (squirm) for (const [side, sign] of [['L', 1], ['R', -1]]) {
+      rotation['bat' + side] += squirm * 7 * cradle + sign * Math.abs(squirm) * 4 * cradle;
+      rotation['cang' + side] += -squirm * 5 * cradle + sign * Math.abs(squirm) * 3 * cradle;
+    }
     // CẦM LÁI: hai tay vươn ra trước–xuống tới tay lái (góc TRÊN MÀN HÌNH, cùng hướng với mặt), bàn tay nắm lại. Tay nào
     // GIƠ HẲN LÊN (vẫy, chỉ — bắp tay lệch dáng nghỉ quá 40°) thì nhả tay lái dần, xong lại về nắm; nhịp tay lúc nói
     // không làm buông tay lái.
@@ -2445,6 +2457,7 @@ class RigSVG {
     this.#veMom();
     this.#drawLeash();
     this.#drawBall();
+    this.#drawRope40();
     this.#drawNote();
     this.#drawReadout();
     this.#drawSign39();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
@@ -6384,6 +6397,7 @@ class RigSVG {
     const pet = this.#petOf(target);
     if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] putCone(pet): the target must be a pet rig (createPet(...).rig)');
     this.#careFor(pet, 'petCone', 'putCone');
+    if (pet) pet.coneAsked = true;                                  // đợt 40 C: con vật sẽ có loa (lúc dựng bước, mức `petCone` của người còn 0) — `pawAtCone` của nó cho phép
     const t = this.tl(), s = this.s, N = this.NGHI, { reach: head, keep } = this.#careHand(t, target, 'eyes'), { k, tx, ty } = head;
     const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, head, 0.15), deg = Math.PI / 180;
     // Vành loa cùng cỡ loa của con vật: 70 / 132 bề ngang khung mặt nó. Vòng là một hình riêng của người (`ring`, tâm `ringX/Y`):
@@ -6911,10 +6925,12 @@ class RigSVG {
     }
     const pet = c.pet, inside = pet.svg.parentNode === e.om;
     if (s.om < 0.5) {
+      pet.carrier = null;                                          // đợt 40 C
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
       return;
     }
     if (!inside) { e.om.appendChild(pet.svg); }
+    pet.carrier = this;                                            // đợt 40 C: con vật biết ai đang bế nó (vẽ lại người bế khi nó vùng vẫy — rig-thu.js)
     const toRoot = this.svg.getScreenCTM && e.tren.getScreenCTM ? this.svg.getScreenCTM().inverse().multiply(e.tren.getScreenCTM()) : null;
     if (!toRoot) return;
     const m = toRoot.inverse();
@@ -7617,6 +7633,72 @@ class RigSVG {
     t.fromTo(s, { ball: 0.001 }, { ball: 1, duration: 1.1, ease: 'none', immediateRender: false }, 0.55);
     t.to(s, { ['bat' + k]: 95, ['cang' + k]: 0, nhinX: m * 3, nhinY: -0.6, cuoi: 1, duration: 0.3, ease: 'power2.out' }, 0.6);
     this.#khep(t, 0.45, 1.7);
+    return t;
+  }
+
+  // ĐỢT 40 A — KÉO CO. Dây thừng căng từ lòng bàn tay cầm tới đầu dây trong mõm con chó (`ropeEnd()` của rig thú), vẽ ở gốc SVG như dây dắt; con chó tự vẽ lại
+  // theo (`onDraw`). Thẳng tắp — dây căng — và dài bằng đúng quãng tay–mõm.
+  #drawRope40() {
+    const g = this.el && this.el.rope, pet = this.tugPet40;
+    if (!g) return;
+    const off = () => { g.style.display = 'none'; };
+    if (!pet || this.s.rope < 0.5 || !pet.el || !pet.el.dau || typeof pet.ropeEnd !== 'function' || !this.svg.getScreenCTM) return off();
+    const hand = this.el['coTay' + this.tugHand40], toRoot = this.svg.getScreenCTM(), handCTM = hand && hand.getScreenCTM(), end = pet.ropeEnd();
+    if (!toRoot || !handCTM || !end) return off();
+    const inverse = toRoot.inverse(), a = new DOMPoint(0, 14).matrixTransform(handCTM).matrixTransform(inverse), b = new DOMPoint(end.x, end.y).matrixTransform(inverse);
+    const petCTM = pet.svg.getScreenCTM(), w = clamp(7 * (petCTM && toRoot.a ? petCTM.a / toRoot.a : 1), 3.2, 8), len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, tail = { x: a.x - ux * 9, y: a.y - uy * 9 };        // đuôi dây thò ra sau bàn tay
+    const d = `M ${tail.x.toFixed(1)} ${tail.y.toFixed(1)} L ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, [base, top, twist, knot] = g.children;
+    base.setAttribute('d', d); base.setAttribute('stroke-width', w.toFixed(1));
+    top.setAttribute('d', d); top.setAttribute('stroke-width', (w * 0.68).toFixed(1));
+    twist.setAttribute('d', d); twist.setAttribute('stroke-width', (w * 0.7).toFixed(1)); twist.setAttribute('stroke-dasharray', `${(w * 0.25).toFixed(1)} ${(w * 1.1).toFixed(1)}`);
+    knot.setAttribute('cx', tail.x.toFixed(1)); knot.setAttribute('cy', tail.y.toFixed(1)); knot.setAttribute('r', (w * 0.7).toFixed(1));
+    g.style.display = '';
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 40 A, `set.careProbe`): dây kéo co (phần tử + hai đầu trên màn hình + độ cong), tay cầm dây. */
+  pull40Probe() {
+    const e = this.el, pet = this.tugPet40, on = !!(e && e.rope && e.rope.style.display !== 'none' && pet && pet.ropeEnd);
+    const path = on ? e.rope.firstElementChild : null, d = path ? (path.getAttribute('d') || '').match(/-?[\d.]+/g) : null;
+    const toScreen = (x, y) => { const m = this.svg.getScreenCTM(), q = new DOMPoint(x, y).matrixTransform(m); return { x: q.x, y: q.y }; };
+    const hand = on ? e['coTay' + this.tugHand40] : null, m = hand && hand.getScreenCTM(), grip = m ? new DOMPoint(0, 14).matrixTransform(m) : null;
+    return { rope: on ? path : null, from: d && d.length >= 4 ? toScreen(+d[0], +d[1]) : null, to: d && d.length >= 4 ? toScreen(+d[2], +d[3]) : null,
+             hand: grip ? { x: grip.x, y: grip.y } : null, mouth: on ? pet.ropeEnd() : null };
+  }
+
+  /**
+   * KÉO CO (đợt 40 A): giữ đầu kia của sợi dây thừng con chó `pet` đang ngậm (`tugOfWar(person)` của rig chó, cùng lúc — tools/scene.py tự thêm cho bước
+   * `["tugOfWar", "@người"]`): cúi tay xuống nắm dây (dây hiện ra căng từ tay tới mõm nó), rồi `hold` giây (1…8) giằng co — người ngả theo từng nhịp
+   * giật của con chó (0,45 s một nhịp: nó giật ngược, người bị lôi tới; rồi người kéo lại, nó chúi theo), mặt gồng cười —, cuối cùng buông dây.
+   * Hai bên cách nhau đúng một sợi dây: `pet.tugPlan(person)` cho chỗ con chó đứng, tay người đặt theo đó.
+   */
+  pullToy(pet, hold = 2.4) {
+    if (!pet || pet instanceof RigSVG || typeof pet.tugPlan !== 'function' || !pet.el || !pet.el.dau) throw new Error('[character] pullToy(pet): pet must be a dog rig (createPet(...).rig) — it does tugOfWar(person) at the same time');
+    const t = this.tl(), s = this.s, N = this.NGHI, h = clamp(+hold || 2.4, 1, 8), plan = pet.tugPlan(this, h);
+    const Pet = pet.constructor, R = Pet.TUG_ROPE, half = Pet.TUG_HALF, side = plan.side;
+    // Tay cầm dây ở TRƯỚC người, phía con chó (`side` là phía NGƯỜI so với con chó, nên con chó ở phía −side), ngang đùi (toạ độ khung người, không phụ thuộc con chó đang ở đâu); tay dời theo độ giật của đầu dây bên kia.
+    const sv = this.svg.getBoundingClientRect(), unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;
+    const A = { x: s.x + HONG.x - side * R.reach * KHUNG.h * 0.96, y: s.y + DOI_Y + HONG.y + 95 };
+    const reach = this.#reachLow(A, null, 'body', 0.5), { k, crouch } = reach, dxB = plan.swing.dx / unit, dyB = plan.swing.dy / unit;
+    const arms = { A: reach, B: reach.solve(reach.tx + dxB, reach.ty + dyB) };
+    this.tugPet40 = pet; this.tugHand40 = k;
+    pet.ropeHolders40 = pet.ropeHolders40 || new Set(); pet.ropeHolders40.add(this);
+    if (!pet.onDraw || !pet.onDraw.rope40) {
+      const before = pet.onDraw, draw = () => { if (before) before(); for (const who of pet.ropeHolders40) who.#drawRope40(); };
+      draw.rope40 = true; pet.onDraw = draw;
+    }
+    const at0 = Math.max(0, plan.lead - 0.7), end = plan.lead + Math.max(2, Math.round(h / half)) * half, away = (phase) => (phase === 'A' ? side * 3.5 : -side * 4.5);
+    t.to(s, { ['aim' + k]: 1, duration: 0.3, ease: 'sine.inOut' }, at0);
+    t.set(s, { ['tay' + k]: 'nam' }, at0 + 0.02);
+    if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, at0);
+    t.to(s, { ['bat' + k]: arms.A.upper, ['cang' + k]: arms.A.fore, than: N.than + away('A'), dau: N.dau + away('A') * 0.6, dauY: 6, nhinX: -side * 2.4, nhinY: 2.2, cuoi: 0.9, mieng: 0.2, mayL: 0.5, mayR: 0.5, duration: 0.5, ease: 'power2.out' }, at0);
+    t.set(s, { rope: 1 }, plan.lead);
+    for (let i = 0, n = Math.max(2, Math.round(h / half)); i < n; i++) {
+      const ph = i % 2 ? 'B' : 'A';
+      t.to(s, { ['bat' + k]: arms[ph].upper, ['cang' + k]: arms[ph].fore, than: N.than + away(ph), dau: N.dau + away(ph) * 0.6, duration: half, ease: 'sine.inOut' }, plan.lead + i * half);
+    }
+    t.set(s, { rope: 0 }, end);
+    this.#khep(t, 0.5, end);
     return t;
   }
 
@@ -8425,12 +8507,26 @@ const NGHI = Object.freeze({
   duoi: 0, duoiCong: 0,
   nuoc: 0,                 // 0…1 các giọt nước văng ra quanh thân (`shakeOff`)
   ballMouth: 0,            // 1 = ngậm quả bóng (`fetch`)
+  // ĐỢT 40 A — đồ chơi trong mõm (`toy`: 0 không, 1 dây thừng, 2 khúc xương — `carryToy`, `tugOfWar`), đồ chơi đã nhả xuống sàn (`toyF`: loại, `toyFA`: độ hiện,
+  // `toyFX`: chỗ), tiếng tru (`howl` 0…1, `howlT` pha sóng), đất bới văng ra sau (`dirtA` 0…1, `dirt` pha — mỗi 1 là một lượt cục đất bay hết quãng).
+  toy: 0, toyF: 0, toyFA: 0, toyFX: 0, howl: 0, howlT: 0, dirtA: 0, dirt: 0,
   tnX: 0, tnY: 0, tnNhac: 0, tnGoc: 0, txX: 0, txY: 0, txNhac: 0, txGoc: 0,
   snX: 0, snY: 0, sxX: 0, sxY: 0,
   lan: 0,                  // 0…1 LĂN NGỬA (`rollOver`): thân, chân, đuôi lật úp lên trời, lưng chạm sàn — đầu vẫn ngửa mặt ra người xem
+  // ĐỢT 40 B — mèo & thỏ: các kênh mới (đều về 0 khi nghỉ)
+  phong: 0,                // 0…1 LÔNG DỰNG (`archBack`): viền lông xù răng cưa quanh lưng, đuôi xù thêm
+  nghieng: 0,              // độ NGHIÊNG cả con vật quanh chân (dương = ngửa mũi lên, theo hướng đang quay) — `binky` xoay mình, `flop` ngã nghiêng
+  yarn: 0, toyX: 0, toyY: 0, toyR: 0,   // đợt 40 B: `yarn` (không phải `toy` — kênh đồ chơi chó ngậm của đợt 40 A) — cuộn len (`batToy`): hiện 0…1, cách tâm thân (đơn vị khung, + = phía đầu), cao khỏi sàn, góc lăn (độ)
+  box: 0, boxX: 0,         // hộp các-tông (`sitInBox`): cỡ 0…1 (>1 là nảy), dời ngang so với tâm khung
+  gp: 0,                   // 0…1 bàn chân trước gần vẽ ĐÈ LÊN mặt (`groomFace`): chân đang quệt qua má, tai
+  nose: 0, ria: 0, twitch: 0,   // thỏ (`noseTwitch`): mũi giật 0…1, ria hất (độ), độ rõ 0…1 (ria dày lên, mũi to ra)
+  flop: 0,                 // THẾ GIỮ (như `nam`): thỏ nằm vật ra, bốn chân duỗi — `standUp` để dậy
   rise: 0,                 // NÂNG CẢ CON VẬT LẪN BÓNG (đơn vị khung, dương = lên) — xa máy hơn trên sàn, không phải nhảy (đợt 35, lượt ba)
   spin: 0, spinA: 0, spinX: 0, spinR: 0,   // VỆT CHẠY VÒNG (đợt 35, lượt ba — `chaseTail`): độ hiện, góc hiện tại (rad), tâm (x khung), bán kính (dấu = hướng)
   sua: 0,                  // 0…1 VẠCH TIẾNG SỦA trước mõm (`bark`, đợt 35, lượt bốn) — tiếng sủa thấy được trên hình
+  // ĐỢT 40 C — thú ở phòng khám
+  vung: 0,                 // −1…1 cú giật khi vùng vẫy (`struggle`): người đang BẾ đọc nó mỗi lần vẽ để hai tay lắc theo (rig-svg.js, `đợt 40 C`)
+  crumb: 0,                // 0…1 VỤN cà rốt rơi từ miệng sau mỗi miếng gặm (`eatCarrot`) — pha rơi; 0 = không có
   liem: 0, liemGoc: 0,     // LIẾM (đợt 35, lượt hai): lưỡi dài thêm tới 120 % và xoay `liemGoc` độ về phía trước (dương) — tới tay / mặt người
   carrot: 0,               // 0…1 củ cà rốt trong miệng (`eatCarrot`) — độ dài còn lại; 0 = không có
   gape: 0,                 // 0…1 HÁ MIỆNG LỚN (đợt 36): hàm dưới hạ hẳn xuống dưới cằm, thấy lưỡi và răng nanh — đọc được ở góc trung
@@ -8449,7 +8545,22 @@ const nhanMat = (p, b, x, y) => { const g = b === 'L' ? 1 : -1; return `
  * dài còn lại (`carrot`), lá xanh ở đầu to. */
 const carrotSVG = (p) => `<g id="${p}-carrot" style="display:none"><path id="${p}-carrotLeaf" stroke="#4caf50" stroke-width="3.400" fill="none" stroke-linecap="round"/>
         <path id="${p}-carrotBody" fill="#f08a24" stroke="#b85c12" stroke-width="1.300" stroke-linejoin="round"/>
-        <path id="${p}-carrotRidge" stroke="#c8661a" stroke-width="1.300" fill="none" stroke-linecap="round"/></g>`;
+        <path id="${p}-carrotRidge" stroke="#c8661a" stroke-width="1.300" fill="none" stroke-linecap="round"/>
+        <path id="${p}-carrotCut" stroke="#ffd9a0" stroke-width="2.600" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="${p}-carrotCrumb" style="display:none">${[0, 1, 2, 3, 4].map((n) => `<rect data-crumb="${n}" x="-1.600" y="-1.200" width="3.200" height="2.400" rx="0.800" fill="#f08a24" stroke="#b85c12" stroke-width=".6"/>`).join('')}</g>`;
+
+/* ĐỒ CHƠI (đợt 40 A, `carryToy` / `tugOfWar`): dây thừng thắt nút hai đầu (loại 1) và khúc xương (loại 2), nằm ngang, tâm ở gốc toạ độ, dài 56. Trong mõm
+ * (`toyM`) đặt ở nét môi dưới; đầu dây phía +x là chỗ dây kéo của người buộc vào (`toyEnd`). */
+const toyShapeSVG = (kind, tag) => kind === 1 ? `
+      <g data-toy="1${tag}"><path d="M -24 0 Q 0 3 24 0" stroke="#7a4a1c" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M -24 0 Q 0 3 24 0" stroke="#e0a85a" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M -16 -3.400 l 3.400 6.800 M -8 -3.400 l 3.400 6.800 M 0 -2.800 l 3.400 6.800 M 8 -3.400 l 3.400 6.800 M 16 -3.400 l 3.400 6.800" stroke="#8a5a22" stroke-width="1.400" stroke-linecap="round"/>
+        <circle cx="-26" cy="0" r="5" fill="#d6453d" stroke="#7a2520" stroke-width="1.200"/><circle cx="26" cy="0" r="5" fill="#d6453d" stroke="#7a2520" stroke-width="1.200"/></g>` : `
+      <g data-toy="2${tag}"><rect x="-22" y="-3.600" width="44" height="7.200" rx="3" fill="#f6ecd0" stroke="#a08a58" stroke-width="1.200"/>
+        ${[[-24, -4.600], [-24, 4.600], [24, -4.600], [24, 4.600]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#f6ecd0" stroke="#a08a58" stroke-width="1.200"/>`).join('')}
+        <rect x="-21" y="-3" width="42" height="6" rx="3" fill="#f6ecd0"/></g>`;
+const toyMouthSVG = (p, nv) => `
+      <g id="${p}-toyM" style="display:none" transform="translate(0 ${(nv.mom.y + 6).toFixed(1)})"><g id="${p}-toyMRope" style="display:none">${toyShapeSVG(1, 'M')}</g><g id="${p}-toyMBone" style="display:none">${toyShapeSVG(2, 'M')}</g>
+        <circle id="${p}-toyEnd" cx="30" cy="0" r="1" fill="none"/></g>`;
 
 /* ───────────────────────────────────────────────────────────── ĐẦU CHÓ
  * Toạ độ tâm đầu. Tai cụp, mõm sáng, hai đốm mày, lưỡi thè được.
@@ -8536,8 +8647,9 @@ const dauTho = (p, m) => `
   </g>
   <rect x="-3.800" y="14.500" width="3.500" height="5" rx="1" fill="#ffffff" stroke="${m.vienNet}" stroke-width=".7"/>
   <rect x="0.300" y="14.500" width="3.500" height="5" rx="1" fill="#ffffff" stroke="${m.vienNet}" stroke-width=".7"/>
-  <path d="M -3.500 7.500 Q 0 6 3.500 7.500 Q 2 11 0 11.500 Q -2 11 -3.500 7.500 Z" fill="${m.mui}"/>
-  <path d="M -10 12 l -14 -3 M -10 15 l -15 1 M 10 12 l 14 -3 M 10 15 l 15 1" stroke="${m.vienNet}" stroke-width=".7" stroke-linecap="round" opacity=".5"/>`;
+  <path id="${p}-nose" d="M -3.500 7.500 Q 0 6 3.500 7.500 Q 2 11 0 11.500 Q -2 11 -3.500 7.500 Z" fill="${m.mui}"/>
+  <path id="${p}-riaL" d="M -10 12 l -14 -3 M -10 15 l -15 1" stroke="${m.vienNet}" stroke-width=".7" stroke-linecap="round" opacity=".5"/>
+  <path id="${p}-riaR" d="M 10 12 l 14 -3 M 10 15 l 15 1" stroke="${m.vienNet}" stroke-width=".7" stroke-linecap="round" opacity=".5"/>`;
 
 /* ─────────────────────────────────────────────────────────────── LOÀI
  * H0 / S0: hông và vai lúc ĐỨNG. chanT / chanS: hai đốt chân trước / sau (a = đốt
@@ -8684,10 +8796,16 @@ class RigThu {
   static NGHI = NGHI;
   static LOAI = LOAI;
   static DONG_TAC = {
-    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS, 'express', 'rollOver', 'chaseTail', 'lick', 'hide'],
+    dog: ['idle', 'wagTail', 'bark', 'sit', 'tiltHead', 'jump', 'beg', 'givePaw', 'sniff', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS, 'express', 'rollOver', 'chaseTail', 'lick', 'hide',
+          'playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar'],      // đợt 40 A
     cat: ['idle', 'meow', 'purr', 'lickPaw', 'stretch', 'hiss', 'tailSwish', 'tiltHead', 'pounce', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS, 'express', 'rollOver', 'knead', 'lick', 'hide'],
     rabbit: ['idle', 'hop', 'thump', 'tiltHead', 'unwell', 'walk', 'enter', 'exit', ...SYMPTOMS.filter((name) => name !== 'fetch' && name !== 'greet'), 'express', 'hide', 'eatCarrot'],
   };
+  static {
+    // đợt 40 B: mèo — rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn đồ chơi, cong lưng, chui hộp; thỏ — nhảy vui, nằm vật, đứng hai chân, giật mũi
+    RigThu.DONG_TAC.cat.push('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox');
+    RigThu.DONG_TAC.rabbit.push('binky', 'flop', 'periscope', 'noseTwitch');      // `flop` là thế giữ (như lieDown) nhưng chỉ của thỏ nên nằm trong danh sách thỏ, không trong STANCE chung
+  }
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
   static traNgau(state) { if (state !== null && hatHienTai !== null) hatHienTai = state; }
@@ -8726,6 +8844,8 @@ class RigThu {
   // không sao, `apDung` chỉ là hàm của trạng thái.
   #choVe = false;
   #legNear = null;
+  #dongBo = false;                 // đợt 40 C: đang vẽ lại người bế (chặn đệ quy)
+  #vungCu = 0;                     // đợt 40 C: `vung` ở lần vẽ trước
   #theoDoi(o) {
     return new Proxy(o, { set: (dich, k, v) => {
       dich[k] = v;
@@ -8748,9 +8868,11 @@ class RigThu {
     const q = (n) => this.svg.querySelector('#' + this.id + '-' + n);
     this.el = Object.fromEntries(['goc', 'bong', 'chanXa', 'chanGan', 'duoi', 'duoiDau', 'than', 'thanE', 'mong', 'nguc', 'gu', 'bung', 'ucSang', 'van', 'co', 'vong', 'the',
       'dau', 'taiL', 'taiR', 'matL', 'matR', 'nguoiL', 'nguoiR', 'dongTuL', 'dongTuR', 'ham', 'luoi', 'luoiNet', 'moi', 'nanh', 'lanhL', 'lanhR', 'nhanL', 'nhanR',
-      'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', 'lan', 'carrot', 'carrotBody', 'carrotRidge', 'carrotLeaf', 'trail', 'sua', 'jaw', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
+      'duiN', 'duiX', 'nuoc', 'ballM', 'cone', 'bang', 'bangP', 'bangNet', 'lan', 'carrot', 'carrotBody', 'carrotRidge', 'carrotLeaf', 'trail', 'sua', 'jaw', 'toyM', 'toyMRope', 'toyMBone', 'toyEnd', 'howlG', 'dirtG', 'toyFG', ...['tn', 'tx', 'sn', 'sx'].flatMap((k) => [k, k + 'Ban'])].map((n) => [n, q(n)]));
     // Dấu cảm xúc: góc trên, PHÍA SAU đầu (về phía gáy), trên chóp tai. Đợt 36: phía trước (về phía mõm) là phía người đối diện con vật —
     // trái tim nổi đè lên miệng bác sĩ đứng sát bàn khám (Gemini, a.mp4 00:35).
+    // ĐỢT 40 B: phần tử của cuộn len, hộp, bàn chân vẽ đè lên mặt, mũi và ria thỏ
+    Object.assign(this.el, Object.fromEntries(['toy', 'toyBall', 'boxB', 'boxF', 'gPaw', 'gArm', 'gBan', 'nose', 'riaL', 'riaR', 'phong'].map((n) => [n, q(n)])));
     this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? -30 : -26, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
     this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
     this.apDung();
@@ -8771,9 +8893,13 @@ class RigThu {
       <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
   <g id="${p}-trail" style="display:none">${Array.from({ length: 16 }, (_, n) => `<ellipse rx="7" ry="3.2" fill="#ffffff" stroke="#b9ad9c" stroke-width="1"/>`).join('')}</g>
+  <!-- ĐỢT 40 B: hộp các-tông (sitInBox) — mặt trong phía sau vẽ TRƯỚC con vật, mặt trước vẽ SAU (che thân, chỉ đầu và tai thò ra) -->
+  <g id="${p}-boxB" style="display:none"><path d="M -58 -80 L 58 -80 L 62 -22 L -62 -22 Z" fill="#9a6c38" stroke="#6e4a22" stroke-width="2" stroke-linejoin="round"/></g>
   <g id="${p}-goc">
     <ellipse id="${p}-bong" cy="${DAT + 1}" ry="7" fill="#000" opacity=".26"/>
     <!-- NHÓM LẬT (lăn ngửa, kênh lan): thân, bốn chân, đuôi — lật dọc quanh sống lưng; đầu, vòng cổ ở ngoài, vẫn ngửa mặt lên. -->
+    <!-- ĐỢT 40 A: hố đào và cục đất văng ra sau (dig) — vẽ SAU bóng, TRƯỚC thân: cục đất lọt giữa hai chân sau, dưới bụng. -->
+    <g id="${p}-dirtG" style="display:none"><ellipse data-hole="1" rx="30" ry="6" fill="#5a3d22" stroke="#3e2914" stroke-width="1.400"/>${Array.from({ length: 8 }, (_, n) => `<g data-clod="${n}"><circle r="${(5.2 + (n % 3) * 1.6).toFixed(1)}" fill="${n % 2 ? '#8a5e34' : '#6f4a28'}" stroke="#3e2914" stroke-width="1.200"/></g>`).join('')}</g>
     <g id="${p}-lan">
     <g id="${p}-chanXa"${V}>
       <circle id="${p}-duiX" r="${nv.chanS.dui * 0.9}" fill="${m.longToi}"/>
@@ -8782,6 +8908,7 @@ class RigThu {
     <g${V}><path id="${p}-duoi" stroke="${m.long}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
       <path id="${p}-duoiDau" stroke="${nv.loai === 'cat' ? m.dom : m.longSang}" fill="none" stroke-linecap="round"/></g>
     <g id="${p}-than"${V}>
+      <path id="${p}-phong" fill="${m.long}" stroke="${m.long}" stroke-width="1.500" stroke-linejoin="round" style="display:none"/>
       <circle id="${p}-mong" r="${nv.dayThan + 1}" fill="${m.long}"/>
       <circle id="${p}-gu" r="${nv.dayThan * 0.92}" fill="${m.long}"/>
       <ellipse id="${p}-thanE" fill="${m.long}"/>
@@ -8803,6 +8930,11 @@ class RigThu {
         <path id="${p}-bangNet" stroke="#ffffff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
     </g>
     </g>
+    <!-- ĐỢT 40 B: cuộn len (batToy), nằm TRÊN sàn trước chân trước; vị trí do apDung đặt -->
+    <g id="${p}-toy" style="display:none"><g id="${p}-toyBall"><path d="M -10 5 Q -24 14 -40 8" stroke="#d94a6c" stroke-width="2.200" fill="none" stroke-linecap="round"/>
+      <circle r="11.500" fill="#ec6a8a" stroke="#a82a4c" stroke-width="1.600"/>
+      <path d="M -9 -4 Q 0 -9 9 -2 M -10 2 Q 0 -4 10 4 M -6 8 Q 2 3 8 9" stroke="#a82a4c" stroke-width="1.400" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-3.500" cy="-5" rx="3" ry="2" fill="#fff" opacity=".55"/></g></g>
     <g${V}>
       <path id="${p}-vong" stroke="${m.vongCo}" stroke-width="6" fill="none" stroke-linecap="round"/>
       <circle id="${p}-the" r="4.200" fill="${m.the}" stroke="${m.vienNet}" stroke-width="0.900"/>
@@ -8817,8 +8949,20 @@ class RigThu {
       <g id="${p}-ballM" style="display:none" transform="translate(0 ${(nv.mom.y + 7).toFixed(1)})"><circle r="10" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.4"/>
         <path d="M -9 -3 Q 0 4 9 -3 M -9 4 Q 0 -3 9 4" stroke="#ffffff" stroke-width="1.6" fill="none" opacity=".9"/></g>
       ${carrotSVG(p)}
-      <g id="${p}-sua" style="display:none">${[12, 20, 28].map((r) => `<path d="M ${(16 + r * Math.cos(-0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(-0.7)).toFixed(1)} A ${r} ${r} 0 0 1 ${(16 + r * Math.cos(0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(0.7)).toFixed(1)}" stroke="#ffffff" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M ${(16 + r * Math.cos(-0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(-0.7)).toFixed(1)} A ${r} ${r} 0 0 1 ${(16 + r * Math.cos(0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(0.7)).toFixed(1)}" stroke="#e53935" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('')}</g></g>
+      <g id="${p}-sua" style="display:none">${[12, 20, 28].map((r) => `<path d="M ${(16 + r * Math.cos(-0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(-0.7)).toFixed(1)} A ${r} ${r} 0 0 1 ${(16 + r * Math.cos(0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(0.7)).toFixed(1)}" stroke="#ffffff" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M ${(16 + r * Math.cos(-0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(-0.7)).toFixed(1)} A ${r} ${r} 0 0 1 ${(16 + r * Math.cos(0.7)).toFixed(1)} ${(nv.mom.y + r * Math.sin(0.7)).toFixed(1)}" stroke="#e53935" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('')}</g>
+      ${toyMouthSVG(p, nv)}
+      <g id="${p}-howlG" style="display:none">${[0, 1, 2].map(() => `<path fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" stroke="#e53935" stroke-width="3.400" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}</g></g>
+    <!-- ĐỢT 40 A: đồ chơi đã nhả xuống sàn (carryToy) — ở hệ của cả con vật, sau đầu. -->
+    <g id="${p}-toyFG" style="display:none">${toyShapeSVG(1, 'F')}${toyShapeSVG(2, 'F')}</g>
   </g>
+    <g id="${p}-gPaw" style="display:none" filter="url(#${p}-vien)"><path id="${p}-gArm" stroke="${m.long}" stroke-width="${nv.chanT.rong}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse id="${p}-gBan" rx="${(nv.chanT.rong * 0.74).toFixed(1)}" ry="${(nv.chanT.rong * 0.52).toFixed(1)}" fill="${m.longSang}"/></g>
+  </g>
+  <g id="${p}-boxF" style="display:none"><path d="M -62 -66 L -90 -50 L -84 -38 L -62 -52 Z M 62 -66 L 90 -50 L 84 -38 L 62 -52 Z" fill="#d9ad6c" stroke="#8a6330" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M -62 -66 L 62 -66 L 66 6 L -66 6 Z" fill="#c99a5b" stroke="#8a6330" stroke-width="2.400" stroke-linejoin="round"/>
+    <path d="M -62 -66 L 62 -66 L 62 -58 L -62 -58 Z" fill="#dcb274"/>
+    <path d="M -9 -66 L 9 -66 L 9 -26 L -9 -26 Z" fill="#efdfc0" opacity=".85"/>
+    <path d="M -46 -30 h 22 M -46 -22 h 14 M 28 -22 h 20" stroke="#8a6330" stroke-width="2" stroke-linecap="round" opacity=".55"/></g>
 </svg>`;
   }
 
@@ -8866,7 +9010,7 @@ class RigThu {
     // SVG vào tay. Để phần dời lại thì vị trí trong tay phụ thuộc thứ tự cập nhật: tua nhảy tới giữa cảnh, người bế đặt con mèo
     // theo `s.x` cũ của nó, rồi con mèo mới dời hình đi — nó lệch hẳn khỏi tay (đợt 29, b1 lúc 11,4 s).
     const away = this.isCarried();
-    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x + this.dropX())} ${fx(away ? 0 : s.y - (s.rise || 0))}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)}) translate(-200 ${-DAT})`);
+    e.goc.setAttribute('transform', `translate(${fx(away ? 0 : s.x + this.dropX())} ${fx(away ? 0 : s.y - (s.rise || 0))}) translate(200 ${DAT}) scale(${fx(s.co * flip)} ${fx(s.co)})${s.nghieng ? ` rotate(${fx(-s.nghieng)})` : ''} translate(-200 ${-DAT})`);
     e.goc.setAttribute('opacity', s.mo);
     const cao = clamp(-s.y / 50, 0, 1);
     e.bong.setAttribute('cx', fx((H.x + S.x) / 2 + 6));
@@ -8992,9 +9136,72 @@ class RigThu {
     if (e.carrot) this.#veCarrot();
     if (e.trail) this.#veTrail();
     if (e.sua) { const v = clamp(s.sua || 0, 0, 1); e.sua.style.display = v > 0.03 ? '' : 'none'; if (v > 0.03) { e.sua.setAttribute('opacity', v.toFixed(2)); e.sua.setAttribute('transform', `translate(${(4 * v).toFixed(2)} 0) scale(${(0.8 + 0.3 * v).toFixed(3)})`); } }
+    if (e.toyM) this.#veDo40(H, S);
+    this.#veDot40(s, H, S, ng);       // đợt 40 B
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
+    // đợt 40 C: đang vùng vẫy trong tay người bế (`vung` đổi) thì người bế vẽ lại — hai tay lắc theo (rig-svg.js `squirm`). Chặn đệ quy: người vẽ lại có thể gọi `apDung` của con vật.
+    if (held && this.carrier && !this.#dongBo && (+s.vung || 0) !== this.#vungCu) {
+      this.#vungCu = +s.vung || 0; this.#dongBo = true;
+      try { this.carrier.apDung(); } finally { this.#dongBo = false; }
+    } else if (!held) this.#vungCu = 0;
     // Ai đó cần vẽ lại theo con vật (dây dắt của người dắt nó — `leash` của rig người) thì gọi họ sau mỗi lần vẽ.
     if (this.onDraw) this.onDraw();
+  }
+
+  // ĐỢT 40 A — vẽ đồ chơi trong mõm / trên sàn, sóng tru, hố đào và cục đất văng ra sau. `H`, `S`: hông và vai của khung vừa tính.
+  #veDo40(H, S) {
+    const s = this.s, e = this.el, nv = this.nv, f = (v) => v.toFixed(2), show = (el, on) => { el.style.display = on ? '' : 'none'; };
+    // đồ chơi trong mõm: 1 = dây thừng, 2 = khúc xương
+    const kind = s.toy >= 1.5 ? 2 : s.toy >= 0.5 ? 1 : 0;
+    show(e.toyM, kind > 0); show(e.toyMRope, kind === 1); show(e.toyMBone, kind === 2);
+    // đồ chơi đã nhả xuống sàn
+    const fk = s.toyF >= 1.5 ? 2 : s.toyF >= 0.5 ? 1 : 0, fa = clamp(s.toyFA, 0, 1);
+    show(e.toyFG, fk > 0 && fa > 0.02);
+    if (fk > 0 && fa > 0.02) {
+      [...e.toyFG.children].forEach((g, n) => show(g, n + 1 === fk));
+      e.toyFG.setAttribute('opacity', f(fa));
+      e.toyFG.setAttribute('transform', `translate(${f(s.toyFX)} ${f(DAT - 5)})`);
+    }
+    // sóng tru: ba đường lượn bay lên từ mõm, luôn đứng thẳng (xoay ngược với đầu), lan ra theo `howl`, trôi theo pha `howlT`
+    const hw = clamp(s.howl, 0, 1);
+    show(e.howlG, hw > 0.03);
+    if (hw > 0.03) {
+      e.howlG.setAttribute('opacity', f(Math.min(1, hw * 1.6)));
+      e.howlG.setAttribute('transform', `translate(${f(nv.mom.co * 16 + 6)} ${f(nv.mom.y - 8)}) rotate(${f(-s.dau)})`);
+      const waves = [...e.howlG.children];
+      for (let k = 0; k < 3; k++) {
+        const L = (34 + k * 16) * hw, A = 4.5 + k * 1.4, ox = 6 + k * 15, pts = [];
+        for (let i = 0; i <= 10; i++) { const u = i / 10; pts.push(`${f(ox + u * L * 0.32 + A * Math.sin((u * 1.6 - s.howlT * (0.7 + k * 0.1) + k * 0.4) * Math.PI * 2))} ${f(-u * L)}`); }
+        const d = 'M ' + pts.join(' L ');
+        waves[k * 2].setAttribute('d', d); waves[k * 2 + 1].setAttribute('d', d);
+      }
+    }
+    // hố đào + cục đất: bay từ chỗ bàn chân trước cào, vòng cung qua bụng, rơi sau hông; mờ dần ở cuối
+    const da = clamp(s.dirtA, 0, 1);
+    show(e.dirtG, da > 0.03);
+    if (da > 0.03) {
+      const x0 = S.x + 30, x1 = H.x - 78, hole = e.dirtG.firstElementChild;
+      hole.setAttribute('cx', f(x0 - 2)); hole.setAttribute('cy', f(DAT - 1)); hole.setAttribute('opacity', f(da));
+      const clods = [...e.dirtG.children].slice(1), n = clods.length;
+      clods.forEach((c, i) => {
+        const raw = s.dirt + i / n, p = raw - Math.floor(raw), arc = 40 + (i % 3) * 10;
+        const x = x0 + (x1 - x0) * p + (i % 2 ? 5 : -5);
+        c.setAttribute('transform', `translate(${f(x)} ${f(DAT - 8 - arc * Math.sin(Math.PI * Math.min(1, p * 1.05)))})`);
+        c.setAttribute('opacity', f(da * (p > 0.82 ? (1 - p) / 0.18 : 1)));
+      });
+    }
+  }
+
+  /** ĐỢT 40 A: chỗ buộc dây kéo ở đầu đồ chơi trong mõm, theo dáng ĐANG VẼ — điểm trên màn hình (`{ x, y }`, px), hay null khi chưa có hình. `pose`: dáng giả định
+   * (kênh → giá trị) để đo trước khi tween chạy: tính xong thì trả lại trạng thái cũ. Người kéo (`pullToy` của rig người) vẽ dây từ tay tới đây. */
+  ropeEnd(pose = null) {
+    if (!this.el || !this.el.dau || !this.svg || !this.svg.getScreenCTM) return null;
+    const keep = pose ? Object.fromEntries(Object.keys(pose).map((k) => [k, this.s[k]])) : null;
+    if (pose) { Object.assign(this.s, pose); this.apDung(); }
+    const ctm = this.el.dau.getScreenCTM();
+    const q = ctm ? new DOMPoint(30, this.nv.mom.y + 6).matrixTransform(ctm) : null;
+    if (pose) { Object.assign(this.s, keep); this.apDung(); }
+    return q ? { x: q.x, y: q.y } : null;
   }
 
   // Mõm: nét môi hình chữ "w" dưới mũi, hàm mở ra phía dưới, lưỡi nằm trong hàm rồi thè ra.
@@ -9014,7 +9221,7 @@ class RigThu {
     const sau = mo * 21 * k;
     e.ham.setAttribute('d', mo < 0.02 ? '' : `M ${f(-w * 0.82)} ${f(y0 + 2.4 * k)} Q 0 ${f(y0 + 2.4 * k + sau * 1.5)} ${f(w * 0.82)} ${f(y0 + 2.4 * k)} Q 0 ${f(y0 + 5.5 * k)} ${f(-w * 0.82)} ${f(y0 + 2.4 * k)} Z`);
     // Lưỡi: dài theo `luoi` (thè ra ngoài), tối thiểu nằm lọt trong hàm khi miệng mở.
-    const lk = clamp(s.liem || 0, 0, 1), dai = Math.max(clamp(s.luoi, 0, 1) * 17 * k * (1 + 1.2 * lk), mo * 9 * k), r = 4.6 * k;
+    const lk = clamp(s.liem || 0, 0, 1), dai = Math.max(clamp(s.luoi, 0, 1) * 17 * k * (1 + RigThu.LICK_REACH * lk), mo * 9 * k), r = 4.6 * k;
     if (dai < 1.2) { e.luoi.setAttribute('d', ''); e.luoiNet.setAttribute('d', ''); return; }
     const ty = y0 + 3.6 * k, day = ty + Math.max(dai - r, 0.1);
     // Lưỡi liếm (đợt 35, lượt hai): xoay quanh gốc lưỡi về phía trước — tới bàn tay chìa ra, hay hất lên tới má người bế.
@@ -9046,7 +9253,7 @@ class RigThu {
     e.jaw.setAttribute('d', cave(hw + rim * 0.8, yt + 1, D + rim, 0));
     // lưỡi nằm dưới đáy khoang; `luoi` lớn (thè ra) thì dài thêm ra khỏi miệng
     const lk = clamp(s.liem || 0, 0, 1), r = Math.max(4.6 * k, hw * 0.58), ty = yt + D * 0.42;
-    const day = Math.max(yt + D - r * 0.85, ty + 0.1) + clamp(s.luoi, 0, 1) * 17 * k * (1 + 1.2 * lk);
+    const day = Math.max(yt + D - r * 0.85, ty + 0.1) + clamp(s.luoi, 0, 1) * 17 * k * (1 + RigThu.LICK_REACH * lk);
     const turn = lk > 0.01 ? `rotate(${f(-(s.liemGoc || 0) * lk)} 0 ${f(ty)})` : '';
     e.luoi.setAttribute('transform', turn); e.luoiNet.setAttribute('transform', turn);
     e.luoi.setAttribute('d', `M ${f(-r)} ${f(ty)} L ${f(-r)} ${f(day)} A ${f(r)} ${f(r)} 0 0 0 ${f(r)} ${f(day)} L ${f(r)} ${f(ty)} Z`);
@@ -9086,17 +9293,44 @@ class RigThu {
     });
   }
 
-  // CỦ CÀ RỐT trong miệng (`carrot` = độ dài còn lại): đầu nhọn ở miệng, chĩa xuống phía trước, ngắn dần khi bị gặm.
+  // CỦ CÀ RỐT trong miệng (`carrot` = độ dài còn lại): đầu nhọn ở miệng, chĩa xuống phía trước. Đợt 40 C: củ TO hơn (đọc được ở ~1 khung / giây)
+  // và bị GẶM thật — phần mất là phần đầu nhọn nên đầu củ ở miệng thành mặt cắt phẳng (viền sáng) có các vết cắn lõm, củ vẫn dày như cũ mà
+  // ngắn lại (không phải thu nhỏ đều); vụn cà rốt (`crumb`) rơi từ miệng sau mỗi miếng.
+  static CARROT_LONG = 92;       // độ dài củ nguyên (đơn vị cỡ miệng `k`)
+  static CARROT_WIDE = 13;       // nửa bề ngang đầu to
   #veCarrot() {
     const e = this.el, c = clamp(this.s.carrot || 0, 0, 1), f = (v) => v.toFixed(2);
+    const k = this.nv.mom.co / 0.6, a = 62 * RAD, d = { x: Math.cos(a), y: Math.sin(a) }, n = { x: -d.y, y: d.x };
+    const M = { x: 2 * k, y: this.nv.mom.y + 1.5 * k };
+    // vụn rơi: năm mẩu bay ra khỏi miệng rồi rơi, mờ dần
+    const crumbs = e.carrotCrumb || (e.carrotCrumb = this.svg.querySelector('#' + this.id + '-carrotCrumb')), u = clamp(this.s.crumb || 0, 0, 1);
+    if (crumbs) {
+      crumbs.style.display = u > 0.02 && u < 0.99 ? '' : 'none';
+      if (u > 0.02) [...crumbs.children].forEach((bit, i) => {
+        const vx = [-9, -3, 5, 11, 17][i] * k, vy = [-6, -11, -8, -5, -9][i] * k;
+        bit.setAttribute('transform', `translate(${f(M.x + 6 * k + vx * u * 1.6)} ${f(M.y + 4 * k + vy * u * 1.6 + 46 * k * u * u)}) rotate(${f(i * 70 + u * 260)})`);
+        bit.setAttribute('opacity', f(1 - u * u));
+      });
+    }
     e.carrot.style.display = c > 0.02 ? '' : 'none';
     if (c <= 0.02) return;
-    const k = this.nv.mom.co / 0.6, a = 62 * RAD, d = { x: Math.cos(a), y: Math.sin(a) }, n = { x: -d.y, y: d.x };
-    const M = { x: 2 * k, y: this.nv.mom.y + 1.5 * k }, L = (10 + 58 * c) * k, w = (5 + 6 * c) * k, B = { x: M.x + d.x * L, y: M.y + d.y * L };
+    const cut = e.carrotCut || (e.carrotCut = this.svg.querySelector('#' + this.id + '-carrotCut'));
+    const Lfull = RigThu.CARROT_LONG * k, L = Lfull * (0.16 + 0.84 * c), wB = RigThu.CARROT_WIDE * k;
+    const B = { x: M.x + d.x * L, y: M.y + d.y * L };
+    const eaten = clamp(1 - L / Lfull, 0, 0.9), wM = 1.4 * k + (wB - 1.4 * k) * eaten;         // nửa bề ngang tại mặt cắt: củ thon dần về đầu nhọn nên cụt đoạn nào thì mặt cắt rộng chừng ấy
     const P = (o, along, side) => `${f(o.x + d.x * along + n.x * side)} ${f(o.y + d.y * along + n.y * side)}`;
-    e.carrotBody.setAttribute('d', `M ${P(M, -1.2 * k, 1.4 * k)} L ${P(B, 0, w)} Q ${P(B, w * 1.1, 0)} ${P(B, 0, -w)} L ${P(M, -1.2 * k, -1.4 * k)} Z`);
-    e.carrotRidge.setAttribute('d', [0.35, 0.62].map((t) => `M ${P(M, L * t, w * t * 0.8)} L ${P(M, L * t + 2 * k, -w * t * 0.5)}`).join(' '));
-    e.carrotLeaf.setAttribute('d', [-28, 0, 26].map((g) => { const r = (62 + g) * RAD; return `M ${P(B, w * 0.6, 0)} l ${f(Math.cos(r) * 17 * k)} ${f(Math.sin(r) * 17 * k)}`; }).join(' '));
+    if (eaten < 0.02) e.carrotBody.setAttribute('d', `M ${P(M, -1.2 * k, 1.4 * k)} L ${P(B, 0, wB)} Q ${P(B, wB * 1.1, 0)} ${P(B, 0, -wB)} L ${P(M, -1.2 * k, -1.4 * k)} Z`);
+    else {
+      // mặt cắt: ba vết cắn lõm (đáy tròn vào trong củ), cái giữa sâu nhất
+      const scallops = [0, 1, 2].map((i) => { const x1 = -wM + (2 * wM / 3) * (i + 1), mid = -wM + (2 * wM / 3) * (i + 0.5), dep = Math.min(wM * 0.55, 5 * k) * (i === 1 ? 1.25 : 0.85);
+        return `Q ${P(M, dep * 2, mid)} ${P(M, 0, x1)}`; }).join(' ');
+      e.carrotBody.setAttribute('d', `M ${P(M, 0, wM)} L ${P(B, 0, wB)} Q ${P(B, wB * 1.1, 0)} ${P(B, 0, -wB)} L ${P(M, 0, -wM)} ${scallops} Z`);
+      // viền sáng của mặt cắt (thịt củ) chạy theo các vết cắn — chỉ có khi đã bị gặm
+      if (cut) cut.setAttribute('d', `M ${P(M, 0, -wM)} ${scallops}`);
+    }
+    if (eaten < 0.02 && cut) cut.setAttribute('d', '');
+    e.carrotRidge.setAttribute('d', [0.35, 0.62].map((t) => `M ${P(M, L * t, wB * t * 0.8)} L ${P(M, L * t + 2 * k, -wB * t * 0.5)}`).join(' '));
+    e.carrotLeaf.setAttribute('d', [-28, 0, 26].map((g) => { const r = (62 + g) * RAD; return `M ${P(B, wB * 0.6, 0)} l ${f(Math.cos(r) * 20 * k)} ${f(Math.sin(r) * 20 * k)}`; }).join(' '));
   }
 
   /** Đổi MÀU — dựng lại SVG từ bảng màu mới. `long` đổi thì `longToi` (chân xa, tai) tự tối theo. */
@@ -9157,8 +9391,14 @@ class RigThu {
     shakeOff: 'Rũ nước', sneeze: 'Hắt hơi', pant: 'Thở hổn hển', yawn: 'Ngáp',
     express: 'Biểu cảm', mood: 'Giữ nét mặt',
     chew: 'Nhai', scratchItch: 'Gãi ngứa', limp: 'Đi khập khiễng', tremble: 'Run sợ', eat: 'Ăn', drink: 'Uống nước', cough: 'Ho', openMouth: 'Há miệng',
+    playBow: 'Chổng mông rủ chơi', howl: 'Tru', dig: 'Đào đất', carryToy: 'Tha đồ chơi', leanOnLeg: 'Dựa chân', tugOfWar: 'Kéo co',   // đợt 40 A
     rollOver: 'Lăn ngửa', chaseTail: 'Đuổi đuôi', knead: 'Nhào', lick: 'Liếm', hide: 'Chạy nấp', eatCarrot: 'Gặm cà rốt',
+    groomFace: 'Rửa mặt', loaf: 'Nằm ổ bánh mì', slowBlink: 'Chớp mắt chậm', batToy: 'Vờn đồ chơi', archBack: 'Cong lưng dựng lông', sitInBox: 'Chui hộp',   // đợt 40 B
+    binky: 'Nhảy vui', flop: 'Nằm vật ra', periscope: 'Đứng hai chân', noseTwitch: 'Giật mũi',   // đợt 40 B
   };
+  // đợt 40 C — bốn động tác thú ở phòng khám, cho cả ba loài; `pawAtCone` cần đang đeo loa nên không chạy trơn (như WITH_ITEM của rig người)
+  static WITH_WEAR = ['pawAtCone'];
+  static { for (const kind of Object.keys(this.DONG_TAC)) this.DONG_TAC[kind].push('shiverAtVet', 'struggle', 'groggy', 'pawAtCone'); Object.assign(this.TEN_DONG_TAC, { shiverAtVet: 'Sợ run ở phòng khám', struggle: 'Vùng vẫy', groggy: 'Lừ đừ sau thuốc mê', pawAtCone: 'Cào loa' }); }
 
   /* ------------------------------------------------------------ tiện ích */
 
@@ -9175,6 +9415,8 @@ class RigThu {
     // Đang NẰM (hoặc động tác này đặt nằm xuống): khép về dáng nằm, không ngồi — trừ khoá nào động tác tự giữ.
     const lying = (giu.nam ?? so.nam) > 0.5;
     if (lying) Object.assign(so, LIE, { ngoi: 0 });
+    so.flop = this.s.flop;
+    if ((giu.flop ?? so.flop) > 0.5) Object.assign(so, RigThu.FLOP);       // đợt 40 B: thỏ nằm vật ra — khép về dáng ấy chứ không về dáng nằm thường
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     return t;
   }
@@ -9461,10 +9703,10 @@ class RigThu {
   sitDown() { return this.#khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
 
   /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). Đang nằm thì cũng đứng dậy. */
-  standUp() { return this.#khep(this.tl(), this.s.nam > 0.5 ? 0.55 : 0.35, 0, { ngoi: 0, nam: 0 }); }
+  standUp() { return this.#khep(this.tl(), this.s.nam > 0.5 ? 0.55 : 0.35, 0, { ngoi: 0, nam: 0, flop: 0 }); }
 
   /** NẰM XUỐNG và ở yên trong dáng nằm: các động tác sau (vẫy đuôi, gừ gừ, nghiêng đầu…) diễn khi đang nằm. `standUp` để dậy. */
-  lieDown() { return this.#khep(this.tl(), 0.6, 0, { nam: 1, ngoi: 0 }); }
+  lieDown() { return this.#khep(this.tl(), 0.6, 0, { nam: 1, ngoi: 0, flop: 0 }); }
 
   /**
    * NGỦ `dur` giây: nằm xuống (nếu chưa nằm), gục đầu, nhắm mắt, tai thả, thở chậm và sâu, đuôi cuộn vào thân. Xong thì
@@ -9478,7 +9720,7 @@ class RigThu {
     for (let a = 0.9; a + 1.6 <= 0.9 + dur; a += 1.6) {
       t.to(s, { tho: 1, dauY: 17.5, duration: 0.8, ease: 'sine.inOut' }, a).to(s, { tho: 0, dauY: 16, duration: 0.8, ease: 'sine.inOut' }, a + 0.8);
     }
-    this.#khep(t, 0.5, 0.9 + dur, { nam: 1 });
+    this.#khep(t, 0.5, 0.9 + dur, { nam: 1, flop: 0 });
     return t;
   }
 
@@ -9585,6 +9827,132 @@ class RigThu {
     at = this.#di(t, at + 0.15, chuKy, 0.65, { quang, x0, A: 10, cao: 7, bob: 3.2 });
     this.#khep(t, 0.4, at, quang ? { x: x0 + quang, huong: dir } : {});
     if (dir !== held) t.to(s, { huong: held, duration: 0.22, ease: 'power1.inOut' }, '>');
+    return t;
+  }
+
+  // ĐỢT 40 C — THÚ Ở PHÒNG KHÁM: sợ run trên bàn khám, vùng vẫy trong tay người bế, lừ đừ sau thuốc mê, cào cái loa chống liếm.
+
+  /**
+   * SỢ RUN Ở PHÒNG KHÁM `hold` giây (khác `tremble`: đó là RUN — còn đây là cả DÁNG SỢ rồi mới run): thụp sát bàn, vai rụt lại, tai ép
+   * hẳn ra sau, đuôi cụp giữa hai chân, mắt long lanh mở TO ngước lên, miệng hé rên khẽ, giọt mồ hôi lạnh trên đầu; cả người rung nhanh,
+   * nhỏ (0,05 s một nhịp — ở 30 khung / giây là 3 khung một chu kỳ, không bị lệch pha) suốt lúc ấy. Thấy rõ ở ~1 khung / giây: thấp hơn hẳn dáng đứng, mắt to, tai ra sau.
+   */
+  shiverAtVet(hold = 2) {
+    const t = this.tl(), s = this.s;
+    const up = this.#dung(t, 0);
+    const pose = { truocY: 21, sauY: 24, truocX: -6, dauY: 15, dauX: -7, dau: 8, taiL: -1.9, taiR: -1.9, dongTu: 1.9, matY: -0.2, nhinY: -1.7, lanh: 1, cuoi: -1, mieng: 0.12, ...this.#duoiCua('scared') };
+    t.to(s, { ...pose, duration: 0.35, ease: 'power2.out' }, up);
+    const from = up + 0.35;
+    if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'sweat', from, Math.max(0.4, hold - 0.6));
+    // rung: lệch qua lại ~3 đơn vị, 0,05 s một nhịp, ngực nảy lên xuống nửa đơn vị, tai run theo
+    for (let a = from, i = 0; a < from + hold - 1e-6; a += 0.05, i++) {
+      const g = i % 2 ? -1 : 1;
+      t.to(s, { sauX: g * 3, truocX: pose.truocX - g * 2.6, dauX: pose.dauX - g * 1.4, truocY: pose.truocY + (i % 4 < 2 ? 1 : -1), taiL: pose.taiL + g * 0.12, taiR: pose.taiR - g * 0.12, duration: 0.05, ease: 'none' }, a);
+    }
+    // rên khẽ: miệng hé ra khép lại chậm (0,5 s) — vẫn thấy được dưới lúc rung
+    for (let a = from + 0.1, i = 0; a + 0.5 <= from + hold; a += 0.5, i++) t.to(s, { mieng: i % 2 ? 0.05 : 0.3, duration: 0.5, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.45, from + hold);
+    return t;
+  }
+
+  /**
+   * VÙNG VẪY `hold` giây: đang được BẾ (`carry` của rig người) thì bốn chân đạp trong không khí, thân vặn qua lại, đầu quay đi, miệng kêu;
+   * người bế giữ chặt — hai tay lắc theo (con vật ghi `vung`, `rig-svg.js` đọc ở `#placeCarried` / `apDung` của người). Đứng dưới sàn thì
+   * LẶN NGƯỜI: bàn chân đứng yên, thân và đầu ngoáy qua lại. `{ carried: true }` báo đang trong tay (tools/scene.py tự thêm; lúc dựng
+   * bước, hình con vật có thể chưa nằm trong tay — như `lick`).
+   */
+  struggle(hold = 1.6, { carried = null } = {}) {
+    const t = this.tl(), s = this.s, held = carried === null ? this.isCarried() : !!carried, dog = this.nv.loai === 'dog', cat = this.nv.loai === 'cat';
+    const up = held ? 0 : this.#dung(t, 0);
+    t.to(s, { taiL: -1.5, taiR: -1.5, dongTu: 1.8, matY: -0.1, nhinX: -1.5, nhinY: -0.4, cuoi: -0.8, mieng: 0.5, dau: 20, dauX: -6, ...this.#duoiCua('scared'), duration: 0.25, ease: 'power2.out' }, up);
+    if (RigThu.AUTO_MARKS && !held) markTweens(t, this.m, '!', up, Math.max(0.4, hold - 0.6));        // trong tay người bế: dấu "!" đè lên mặt người ấy — bỏ
+    const half = 0.14, n = Math.max(2, Math.round((hold - 0.25) / half));
+    for (let i = 0; i < n; i++) {
+      const a = up + 0.25 + i * half, g = i % 2 ? -1 : 1;
+      const body = { truocX: g * 9, sauX: -g * 9, cong: i % 2 ? 0.6 : 0.05, dau: 20 + g * 18, dauX: -6 + g * 5, mieng: i % 3 ? 0.55 : 0.3, duration: half, ease: 'sine.inOut' };
+      if (held) Object.assign(body, { tnNhac: 1, txNhac: 1, tnGoc: 50 + g * 45, txGoc: 50 - g * 45, snY: g > 0 ? 24 : 2, sxY: g > 0 ? 2 : 24, snX: g * 10, sxX: -g * 10, vung: g });
+      else Object.assign(body, { sauX: -g * 10, truocX: g * 9 });
+      if (cat) body.duoi = g * 40;
+      t.to(s, body, a);
+    }
+    this.#khep(t, 0.35, up + 0.25 + n * half);
+    return t;
+  }
+
+  /**
+   * LỪ ĐỪ SAU THUỐC MÊ `hold` giây: nằm (đang nằm thì giữ) hay ngồi, đầu gục xuống rồi giật lên, tai cụp, mắt hé một nửa chớp thật chậm,
+   * con ngươi nhỏ, thân đung đưa chậm, dấu chóng mặt trên đầu — chưa tỉnh thuốc. Đầu rũ SÂU: đọc được ở ~1 khung / giây.
+   */
+  groggy(hold = 2.4) {
+    const t = this.tl(), s = this.s, N = this.NGHI, dog = this.nv.loai === 'dog', lying = s.nam > 0.5;
+    let at = 0;
+    if (!lying) { t.to(s, { ngoi: 1, duration: 0.35, ease: 'power2.inOut' }, 0); at = 0.35; }
+    const tail = dog ? { duoi: -70, duoiCong: -0.2 } : this.nv.loai === 'cat' ? { duoi: N.duoi - 30, duoiCong: 0.25 } : {};
+    t.to(s, { dauY: 25, dau: 15, dauX: 5, taiL: -1.1, taiR: -1.1, matY: 0.62, nhinY: 1.4, dongTu: 0.75, cuoi: -0.2, mieng: dog ? 0.1 : 0, luoi: dog ? 0.25 : 0, ...tail, duration: 0.5, ease: 'sine.inOut' }, at);
+    const from = at + 0.5;
+    if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'dizzy', from, Math.max(0.5, hold - 0.4));
+    // gật gù: đầu sụp dần (0,9 s), giật lên một cái (0,18 s), rũ lại (0,4 s) — chu kỳ 1,5 s
+    let end = from + hold + 1.2;                                // chu kỳ gật cuối có thể dài quá `hold`: khép về nghỉ SAU nó (không thì tween chồng lên `#khep`)
+    for (let a = from, i = 0; a < from + hold - 0.3; a += 1.5, i++) {
+      end = Math.max(end, a + 1.5);
+      t.to(s, { dauY: 34, dau: 27, dauX: 6, duration: 0.9, ease: 'sine.in' }, a)
+       .to(s, { dauY: 28, dau: 8, dauX: 3, duration: 0.18, ease: 'power2.out' }, a + 0.9)
+       .to(s, { dauY: 25, dau: 15, dauX: 5, duration: 0.42, ease: 'sine.inOut' }, a + 1.08);
+    }
+    // chớp thật chậm: nhắm hẳn 0,5 s, hé lại 0,6 s — mỗi 1,3 s
+    for (let a = from + 0.2; a < from + hold - 0.4; a += 1.3) t.to(s, { matY: 0.97, duration: 0.5, ease: 'sine.in' }, a).to(s, { matY: 0.62, duration: 0.6, ease: 'sine.out' }, a + 0.55);
+    // đung đưa chậm (nằm: ít hơn)
+    const sway = lying ? 1.6 : 3.2;
+    for (let a = from, i = 0; a < from + hold; a += 0.8, i++) t.to(s, { truocX: i % 2 ? -sway : sway, sauX: i % 2 ? sway * 0.4 : -sway * 0.4, duration: 0.8, ease: 'sine.inOut' }, a);
+    this.#khep(t, 0.5, end);
+    return t;
+  }
+
+  // Góc treo chân trước (`tnGoc`) để bàn chân chạm VÀNH loa (đợt 40 C): vành là elip 70 × 63 quanh tâm đầu, trong hệ của nhóm đầu — tính theo
+  // dáng đầu và vai đã định (`pose`: truocX/Y, dau, dauX/Y), thử từng góc, lấy góc có đầu chân sát vành nhất ở NỬA DƯỚI của vành.
+  #coneAngle(pose) {
+    const nv = this.nv, T = nv.chanT, dai = (T.a + T.b) * 0.8, hs = nv.headScale || 1, dd = nv.dau;
+    const S = { x: nv.S0.x + (pose.truocX || 0), y: nv.S0.y + (pose.truocY || 0) }, R = { x: S.x - 1, y: S.y + 4 };
+    const head = { x: S.x + dd.dx + (pose.dauX || 0), y: S.y + dd.dy + (pose.dauY || 0) }, rot = -(pose.dau || 0) * RAD;
+    let best = { g: 80, miss: Infinity };
+    for (let g = 20; g <= 170; g += 1) {
+      const tip = { x: R.x + dai * Math.sin(g * RAD), y: R.y + dai * Math.cos(g * RAD) };
+      const dx = (tip.x - head.x) / hs, dy = (tip.y - head.y) / hs, px = dx * Math.cos(rot) - dy * Math.sin(rot), py = dx * Math.sin(rot) + dy * Math.cos(rot);
+      const miss = Math.abs(Math.hypot(px / 70, py / 63) - 1.1) + (py < 0 ? 1 : 0);        // 1,1: đầu chân hơi NGOÀI vành — vành vẽ đè lên chân, ra ngoài một chút thì bàn chân còn thấy
+      if (miss < best.miss) best = { g, miss };
+    }
+    return best.g;
+  }
+
+  /**
+   * CÀO LOA `times` lượt (cần ĐANG ĐEO loa chống liếm — `wear('cone')` / `createPet({ wear: ['cone'] })` / sau `putCone` của người): đứng
+   * dậy, giơ chân trước cào vào MÉP loa quanh đầu (ba nhát), lắc đầu lắc tai như muốn hất ra; hết `times` lượt thì bỏ cuộc — hạ chân,
+   * ngồi xuống, mặt buồn, đầu gục trong cái loa — giữ gần 1,5 s rồi đứng lại.
+   */
+  pawAtCone(times = 3) {
+    if (!(this.wearing.has('cone') || this.coneAsked || this.careLevel('petCone') > 0.5)) throw new Error('[character] pawAtCone: the pet is not wearing the cone — wear("cone") or createPet({ wear: ["cone"] }), or let a person putCone(pet) first');
+    const t = this.tl(), s = this.s, N = this.NGHI, n = clamp(Math.round(times), 1, 6), rabbit = this.nv.loai === 'rabbit';
+    let at = this.#dung(t, 0);
+    const lean = { truocY: 4, truocX: 2, dauY: 12, dauX: -4, dau: 0 }, g0 = this.#coneAngle(lean);
+    t.to(s, { ...lean, tnNhac: 1, tnGoc: g0, taiL: -0.5, taiR: -0.5, matY: 0.25, cuoi: -0.5, nhinY: 0.6, duration: 0.35, ease: 'power2.out' }, at);
+    at += 0.35;
+    for (let i = 0; i < n; i++) {
+      // ba nhát cào dọc vành (chân quét lên xuống ±11°), đầu nghiêng theo
+      for (let j = 0; j < 3; j++) t.to(s, { tnGoc: g0 + (j % 2 ? -16 : 16), dau: j % 2 ? -3 : 3, duration: 0.16, ease: 'sine.inOut' }, at + j * 0.16);
+      at += 0.52;
+      // lắc đầu: hai cú sang hai bên, tai bay theo — loa lắc cùng đầu
+      for (let j = 0; j < 4; j++) t.to(s, { dau: j % 2 ? -17 : 17, dauX: lean.dauX + (j % 2 ? -4 : 4), taiL: j % 2 ? -1.3 : 0.4, taiR: j % 2 ? 0.4 : -1.3, tnGoc: g0 - 6, duration: 0.11, ease: 'sine.inOut' }, at + j * 0.11);
+      t.to(s, { dau: 0, dauX: lean.dauX, tnGoc: g0, taiL: -0.5, taiR: -0.5, duration: 0.14, ease: 'sine.out' }, at + 0.44);
+      at += 0.6;
+    }
+    // bỏ cuộc: hạ chân, ngồi, buồn
+    t.to(s, { tnNhac: 0, tnGoc: 0, truocY: 0, truocX: 0, duration: 0.35, ease: 'power2.inOut' }, at);
+    t.to(s, { ngoi: 1, ...RigThu.EXPRESSIONS.sad, ...this.#duoiCua('sad'), dauY: 13, dau: 8, dauX: 0, duration: 0.5, ease: 'sine.inOut' }, at + 0.1);
+    at += 0.6;
+    t.to(s, { tho: 1, duration: 0.7, ease: 'sine.inOut' }, at + 0.1).to(s, { tho: 0, duration: 0.7, ease: 'sine.inOut' }, at + 0.8);
+    if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'sweat', at, 0.9);
+    at += 1.5;
+    this.#khep(t, 0.5, at, { ngoi: s.ngoi });
     return t;
   }
 
@@ -9698,6 +10066,259 @@ class RigThu {
     t.set(s, { ballMouth: 0 }, at);
     this.#khep(t, 0.35, at, { x: x0, huong: dir });
     return t;
+  }
+
+  // ĐỢT 40 A
+  /* ------------------------------------------------ ĐỢT 40 A — sáu động tác của CHÓ
+   * chổng mông rủ chơi (`playBow`), tru (`howl`), đào đất (`dig`), tha đồ chơi (`carryToy`), dựa vào chân người (`leanOnLeg`) và kéo co
+   * (`tugOfWar` — đi cặp với `pullToy` của rig người). Đồ chơi: kênh `toy` (trong mõm), `toyF` (đã nhả xuống sàn); sóng tru `howl`; đất `dirt`. */
+  static TOY_KINDS = { rope: 1, bone: 2, squeaky: 2 };   // tên → loại đồ chơi (1 dây thừng, 2 khúc xương)
+  // KÉO CO: thế chân CHỐNG (cố định suốt lúc kéo — bàn chân không trượt) và hai thế thân: A = nó giật ngược lại (ngả ra sau), B = bị người kéo tới (chúi theo dây).
+  static TUG_STANCE = { tnX: 12, txX: 8, snX: -12, sxX: -6, toy: 1, mieng: 0, matY: 0.45, cuoi: 0.2, taiL: -0.3, taiR: -0.3, duoi: 20, nhinY: 0 };
+  static TUG_A = { truocX: -13, sauX: -9, truocY: 9, sauY: 5, dauY: 21, dauX: 9 };
+  static TUG_B = { truocX: 2, sauX: 1, truocY: 5, sauY: 3, dauY: 21, dauX: 15 };
+  static TUG_HALF = 0.45;      // giây mỗi nhịp kéo (một lần giật hay một lần bị lôi) — người chấm xem thưa (~1 khung / giây) thấy được cả hai thế
+  static TUG_ROPE = { along: 0.15, reach: 0.14 };   // × chiều cao người: dây dài ngang chừng ấy từ tay tới mõm; tay người cầm dây ở trước người chừng ấy — mõm cách giữa người `along + reach`
+  static LEAN_EDGE = 0.085;    // dựa chân: ngực con chó nằm cách giữa người chừng ấy × chiều cao người (mép ngoài ống chân ~0,09 — ép sát chân)
+
+  // Số đo của người `person` từ phía con vật: x giữa người trên màn hình, chiều cao người (đơn vị khung của con vật), tỉ lệ px / đơn vị khung của con vật.
+  #personMetrics(person, name) {
+    const frame = this.svg.getBoundingClientRect(), scale = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+    const real = person && person.live ? person.live : person;        // mỏ neo của `conversation()` ({ centerX, live }) — cỡ lấy từ người thật
+    const node = real && real.svg ? real.svg : real, box = node && node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+    const cx = person && typeof person.centerX === 'function' ? person.centerX() : box ? box.left + box.width / 2 : null;
+    if (cx === null || !box) throw new Error(`[character] ${name}(person): needs a person rig (createCharacter(...).rig) or an element`);
+    const unit = Math.min(box.width / 400, box.height / 470);        // khung người 400 × 470 (rig-svg.js)
+    return { cx, H: unit * 470 * 0.96, scale };
+  }
+
+  // Quay về phía người (`side`: 1 phải màn hình, −1 trái) — thêm vào `t` tại `at`; trả về thời điểm xong.
+  #quayVe(t, at, side) {
+    if ((this.s.huong < 0 ? -1 : 1) === side) return at;
+    t.to(this.s, { huong: side, duration: 0.22, ease: 'power1.inOut' }, at);
+    return at + 0.22;
+  }
+
+  // Bước `dx` đơn vị khung (có dấu: + sang phải màn hình) tới chỗ đứng; trả về thời điểm xong. Dưới 3 đơn vị thì khỏi đi.
+  #buocToi(t, at, dx, x0) {
+    if (Math.abs(dx) < 3) return at;
+    return this.#di(t, at, Math.max(2, Math.round(Math.abs(dx) / 40)), 0.5, { quang: dx, x0 });
+  }
+  #buocThoiGian(dx) { return Math.abs(dx) < 3 ? 0 : Math.max(2, Math.round(Math.abs(dx) / 40)) * 0.5; }
+
+  // Như `#di` nhưng cộng thêm `add` (kênh → lượng) lên dáng bước: đầu ngẩng, đuôi dựng, ngực ưỡn khi tha đồ chơi đi (`#di` ghi đè các kênh `truocY`, `sauY`,
+  // `dauY`, `duoi` mỗi khung, nên không đặt được dáng bằng tween riêng).
+  #diThem(t, at, chuKy, h, { quang = 0, x0 = 0, A = 15, cao = 10 } = {}, add = {}) {
+    const s = this.s, bao = (c) => mem(c / 0.5) * mem((chuKy - c) / 0.5);
+    const M = 60, n = Math.round(chuKy * M), X = [0];
+    for (let i = 1; i <= n; i++) X.push(X[i - 1] + (2 * A / 0.6) * bao(i / M) / M);
+    const tiLe = quang ? Math.abs(quang) / X[n] : 0, dau = quang < 0 ? -1 : 1;
+    const pr = { _c: 0, get c() { return this._c; }, set c(v) {
+      this._c = v;
+      const a = bao(v), step = this.owner.#buoc(v, a, A * (tiLe ? clamp(tiLe, 0.5, 1.35) : 1), cao);
+      for (const k of Object.keys(add)) step[k] = (step[k] || 0) + add[k] * Math.min(1, a * 3);
+      Object.assign(s, step);
+      if (quang) { const q = clamp(v, 0, chuKy) * M, i = Math.min(n - 1, Math.floor(q)); s.x = x0 + dau * tiLe * (X[i] + (X[i + 1] - X[i]) * (q - i)); }
+    } };
+    pr.owner = this;
+    t.to(pr, { c: chuKy, duration: chuKy * h, ease: 'none' }, at);
+    return at + chuKy * h;
+  }
+
+  /**
+   * CHỔNG MÔNG RỦ CHƠI (chó): hai chân trước duỗi dài ra trước, ngực sát sàn, mông nhổm cao, đuôi dựng vẫy nhanh, miệng há như sắp sủa — "chơi
+   * với tao đi" — giữ `hold` giây (0,6…6), hai tiếng sủa ngắn. Rồi đứng dậy.
+   */
+  playBow(hold = 1.2) {
+    this.#only('playBow', ['dog']);
+    const t = this.tl(), s = this.s, h = clamp(+hold || 1.2, 0.6, 6);
+    let at = this.#dung(t, 0);
+    t.to(s, { truocY: 33, truocX: 8, sauY: -16, sauX: -2, tnX: 34, txX: 32, dauY: 12, dauX: 4, dau: 8, cuoi: 1, mieng: 0.6, gape: 0.35, luoi: 0.9, matY: 0.2, taiL: 0.9, taiR: 0.9,
+              duoi: 34, duoiCong: 0.5, duration: 0.4, ease: 'power2.out' }, at);
+    at += 0.4;
+    const beats = Math.max(6, Math.round(h / 0.1));
+    this.#vay(t, at, beats, 40, h / beats, 34);                                                    // đuôi vẫy nhanh
+    for (let i = 0; i < beats; i++) t.to(s, { sauX: i % 2 ? -5 : 1, duration: h / beats, ease: 'sine.inOut' }, at + i * h / beats);      // lắc mông theo
+    for (const f of h > 1.6 ? [0.15, 0.62] : [0.3]) {
+      t.to(s, { mieng: 0.95, gape: 0.8, sua: 0.8, dauY: 8, dau: 4, duration: 0.12, ease: 'power2.out' }, at + h * f)
+       .to(s, { mieng: 0.6, gape: 0.35, sua: 0, dauY: 12, dau: 8, duration: 0.25, ease: 'power2.in' }, at + h * f + 0.3);
+    }
+    at += h;
+    this.#khep(t, 0.4, at);
+    return t;
+  }
+
+  /**
+   * TRU (chó): ngồi, ngửa đầu hết cỡ — mõm hướng lên trời, miệng tròn như chữ O, mắt nhắm —, ngực phập phồng, và `hold` giây (0,8…8) tiếng tru dài: ba
+   * đường lượn sóng bay lên từ mõm (như vạch tiếng sủa của `bark` nhưng hướng lên và uốn lượn). Rồi hạ đầu xuống, đứng dậy.
+   */
+  howl(hold = 1.6) {
+    this.#only('howl', ['dog']);
+    const t = this.tl(), s = this.s, h = clamp(+hold || 1.6, 0.8, 8);
+    t.to(s, { ngoi: 1, duoi: -22, cuoi: 0.2, taiL: -0.2, taiR: -0.2, duration: 0.45, ease: 'back.out(1.2)' }, 0);
+    let at = 0.45;
+    t.to(s, { dau: -38, dauY: -9, dauX: 7, truocY: -4, mieng: 0.7, gape: 0.6, matY: 1, luoi: 0, howl: 1, duration: 0.6, ease: 'power2.out' }, at);
+    at += 0.6;
+    t.fromTo(s, { howlT: 0 }, { howlT: h * 1.1, duration: h, ease: 'none', immediateRender: false }, at);
+    for (let a = at, i = 0; a < at + h - 0.2; a += 0.55, i++) {            // ngực phập phồng, đầu rung nhẹ theo hơi tru
+      t.to(s, { tho: i % 2 ? 0 : 1, dau: i % 2 ? -38 : -42, dauY: i % 2 ? -9 : -11, duration: 0.55, ease: 'sine.inOut' }, a);
+    }
+    at += h;
+    t.to(s, { howl: 0, duration: 0.25, ease: 'power1.in' }, at - 0.1);
+    t.to(s, { mieng: 0.15, gape: 0, dau: 0, dauY: 0, dauX: 0, matY: 1, duration: 0.35, ease: 'power2.inOut' }, at);
+    this.#khep(t, 0.4, at + 0.35);
+    return t;
+  }
+
+  /**
+   * ĐÀO ĐẤT (chó): mõm chúi xuống, hai chân trước cào sàn thật nhanh, lần lượt từng chân (`times` lượt mỗi chân, 0,34 s một lượt) — mỗi lượt cào lùi
+   * dọc sàn rồi nhấc lên đưa tới —, một hố tối hiện ra dưới chân, cục đất văng ra sau qua giữa hai chân sau, đuôi vẫy.
+   */
+  dig(times = 4) {
+    this.#only('dig', ['dog']);
+    const t = this.tl(), s = this.s, n = clamp(Math.round(+times || 4), 1, 12), beat = 0.34;
+    let at = this.#dung(t, 0);
+    t.to(s, { truocY: 14, truocX: 5, sauY: -5, dauY: 24, dauX: 9, dau: 16, mieng: 0.1, matY: 0.5, taiL: 0.2, taiR: 0.2, cuoi: 0.8, duoi: 16, dirtA: 1, duration: 0.35, ease: 'power2.out' }, at);
+    at += 0.35;
+    const total = n * beat + beat / 2;
+    t.fromTo(s, { dirt: 0 }, { dirt: total / 0.55, duration: total, ease: 'none', immediateRender: false }, at);
+    for (let i = 0; i < n; i++) for (const [k, off] of [['tn', 0], ['tx', beat / 2]]) {
+      const a = at + i * beat + off;
+      t.to(s, { [k + 'X']: -16, [k + 'Y']: 0, duration: beat * 0.55, ease: 'power1.in' }, a)                 // cào lùi trên sàn
+       .to(s, { [k + 'X']: 22, [k + 'Y']: 12, duration: beat * 0.45, ease: 'power1.out' }, a + beat * 0.55);       // nhấc lên, đưa tới
+    }
+    for (let i = 0; i < n * 2; i++) t.to(s, { truocY: i % 2 ? 16 : 12, sauX: i % 2 ? 2 : -2, duration: beat / 2, ease: 'sine.inOut' }, at + i * beat / 2);       // thân nhún theo từng cú cào
+    this.#vay(t, at, Math.max(2, Math.round(total / 0.18)), 26, 0.18, 22);
+    at += total;
+    t.to(s, { tnX: 0, tnY: 0, txX: 0, txY: 0, dirtA: 0, duration: 0.35, ease: 'power2.inOut' }, at);
+    this.#khep(t, 0.4, at + 0.2);
+    return t;
+  }
+
+  /**
+   * THA ĐỒ CHƠI (chó): cúi ngậm đồ chơi (`{ kind }`: 'rope' dây thừng, thắt nút hai đầu — mặc định —, hay 'bone' / 'squeaky' khúc xương cao su), rồi KIỆU đi
+   * `distance` đơn vị (0, mặc định: tại chỗ) về phía đang quay mặt — đầu ngẩng cao, ngực ưỡn, đuôi dựng, đắc ý — và nhả nó xuống sàn trước mặt. `carryToy(person)` hay
+   * `{ target: person }`: kiệu tới người ấy và thả đồ chơi dưới chân họ (nhìn lên, vẫy đuôi), đồ chơi nằm ở đó chừng một giây rồi mờ đi.
+   */
+  carryToy(distance = 0, { kind = 'rope', target = null } = {}) {
+    this.#only('carryToy', ['dog']);
+    if (distance && typeof distance === 'object') { target = distance; distance = null; }
+    const toy = RigThu.TOY_KINDS[kind];
+    if (!toy) throw new Error(`[character] carryToy: no toy "${kind}" (available: ${Object.keys(RigThu.TOY_KINDS).join(', ')})`);
+    const t = this.tl(), s = this.s, x0 = s.x, held = s.huong < 0 ? -1 : 1;
+    let side = held, dx;
+    if (target) {
+      const { cx, H, scale } = this.#personMetrics(target, 'carryToy');
+      side = cx - this.centerX() < 0 ? -1 : 1;
+      // mõm dừng cách giữa người 0,2 × chiều cao (đồ chơi rơi ngay chân họ)
+      const snout = this.centerX() + (this.nv.S0.x + this.nv.dau.dx + 30 - 200) * side * scale;
+      dx = ((cx - side * 0.13 * H) - snout) / scale;
+      if (dx * side < 0) dx = 0;
+    } else dx = +distance > 0 ? held * Math.max(60, +distance) : 0;          // không đích, không quãng: kiệu tại chỗ
+    const dir = dx < 0 ? -1 : dx > 0 ? 1 : side;
+    let at = this.#dung(t, 0);
+    at = this.#quayVe(t, at, target ? side : dir);
+    // Cúi nhặt: đầu chúi xuống, đồ chơi hiện trong mõm, ngẩng lên đắc ý.
+    t.to(s, { truocY: 12, dauY: 26, dauX: 14, dau: 14, mieng: 0.5, duration: 0.25, ease: 'power2.in' }, at);
+    t.set(s, { toy }, at + 0.25);
+    const proud = { dauY: -9, dauX: 5, dau: -7, truocY: -3, duoi: 38, duoiCong: 0.55, cuoi: 1, taiL: 0.9, taiR: 0.9, mieng: 0.1, matY: 0.25 };
+    t.to(s, { ...proud, duration: 0.3, ease: 'power2.out' }, at + 0.28);
+    at += 0.6;
+    {
+      const far = Math.abs(dx) >= 6 ? Math.abs(dx) : 0, cycles = far ? Math.max(3, Math.round(far / 46)) : 4;          // quãng 0: kiệu tại chỗ 4 nhịp
+      at = this.#diThem(t, at, cycles, 0.4, { quang: far ? dx : 0, x0, A: 15, cao: 10 }, { dauY: proud.dauY, truocY: proud.truocY, duoi: proud.duoi - 4 });
+      t.set(s, proud, at - 0.01);                       // hết bước: giữ dáng đắc ý
+    }
+    t.to(s, { ...proud, duration: 0.1 }, at);
+    at += 0.35;
+    // Nhả đồ chơi xuống sàn trước mõm, nhìn lên (người / phía trước), vẫy đuôi.
+    t.to(s, { truocY: 12, dauY: 28, dauX: 16, dau: 14, duration: 0.25, ease: 'power2.in' }, at);
+    t.set(s, { toy: 0, toyF: toy, toyFA: 1, toyFX: this.nv.S0.x + this.nv.dau.dx + 20 }, at + 0.25);
+    t.to(s, { truocY: 0, dauY: -4, dauX: 2, dau: -8, mieng: 0.35, luoi: 0.7, matY: 0.3, duration: 0.35, ease: 'power2.out' }, at + 0.3);
+    at += 0.65;
+    this.#vay(t, at, 8, 38, 0.11, 30);
+    at += 0.95;
+    t.to(s, { toyFA: 0, duration: 0.3, ease: 'power1.in' }, at);
+    t.set(s, { toyF: 0 }, at + 0.3);
+    this.#khep(t, 0.4, at + 0.3, { x: x0 + dx, huong: target ? side : dir });
+    return t;
+  }
+
+  /**
+   * DỰA VÀO CHÂN (chó): đi tới người `person` đang đứng, dừng sát cạnh họ và tì sườn vào chân họ — thân nghiêng về phía người (bốn bàn chân đứng yên, vai và
+   * hông ngả sang chân họ), ngực áp vào ống chân —, ngẩng đầu nhìn lên họ, mắt lim dim, đuôi vẫy chậm, `hold` giây (mặc định 2). Ở lại chỗ đó,
+   * quay mặt về phía người ấy sau khi xong. Cần người đứng cùng mặt phẳng (cùng độ sâu) với con vật.
+   */
+  leanOnLeg(person = null, hold = 2) {
+    this.#only('leanOnLeg', ['dog']);
+    if (person !== null && typeof person !== 'object') throw new Error('[character] leanOnLeg(person): needs the standing person to lean on (a person rig)');
+    const t = this.tl(), s = this.s, x0 = s.x, held = s.huong < 0 ? -1 : 1, h = clamp(+hold || 2, 0.8, 8);
+    const { cx, H, scale } = person ? this.#personMetrics(person, 'leanOnLeg') : { cx: this.centerX() + held, H: 1, scale: 1 };       // không có người: dựa vào khoảng không, tại chỗ
+    const side = cx - this.centerX() < 0 ? -1 : 1, lean = { truocX: 14, sauX: 10 };
+    // ngực (mép trước thân) tới mép ống chân: tính ở dáng nghiêng, tại chỗ hiện tại
+    const chest = this.centerX() + (this.nv.S0.x + lean.truocX + this.nv.dayThan + 2 - 200) * side * scale;
+    let dx = person ? ((cx - side * RigThu.LEAN_EDGE * H) - chest) / scale : 0;
+    if (Math.abs(dx) < 3) dx = 0;
+    let at = this.#dung(t, 0);
+    at = this.#quayVe(t, at, side);
+    at = this.#buocToi(t, at, dx, x0);
+    t.to(s, { ...lean, truocY: 3, dau: -16, dauY: -4, dauX: -6, matY: 0.55, nhinY: -1.6, cuoi: 1, mieng: 0.2, luoi: 0.25, taiL: -0.15, taiR: -0.15, duoi: 18, duoiCong: 0.3, duration: 0.5, ease: 'power2.out' }, at);
+    at += 0.5;
+    const beats = Math.max(2, Math.round(h / 0.45));
+    this.#vay(t, at, beats, 20, h / beats, 26);                                              // đuôi vẫy chậm
+    for (let a = at, i = 0; a + 0.9 <= at + h; a += 0.9, i++) t.to(s, { tho: i % 2 ? 0 : 1, duration: 0.9, ease: 'sine.inOut' }, a);
+    this.#chop(t, at + h * 0.5);
+    at += h;
+    this.#khep(t, 0.45, at, { x: x0 + dx, huong: side });
+    return t;
+  }
+
+  /**
+   * KÉO CO (chó) với người `person` (cùng lúc người ấy `pullToy(pet)`): đứng cách người một sợi dây (mõm cách giữa người chừng 0,3 × chiều cao người — tools/scene.py tự đưa nó tới đó), cúi ngậm một đầu DÂY THỪNG, rồi `hold` giây (1…8) giằng co
+   * — nó chống bốn chân (bàn chân đứng yên), giật ngả ra sau rồi bị lôi chúi tới, lắc đầu liên tục, đuôi vẫy; dây luôn căng giữa mõm và tay người
+   * (người vẽ: `pullToy`). Rồi nhả dây, đứng dậy. `tugPlan(person)` cho thời điểm bắt đầu kéo và độ giật — rig người dùng nó để đặt tay.
+   */
+  tugOfWar(person = null, hold = 2.4) {
+    this.#only('tugOfWar', ['dog']);
+    if (person !== null && typeof person !== 'object') throw new Error('[character] tugOfWar(person): needs the person holding the other end (a person rig — they pullToy(pet) at the same time)');
+    const t = this.tl(), s = this.s, h = clamp(+hold || 2.4, 1, 8), plan = this.tugPlan(person, h);
+    const { A, B } = { A: RigThu.TUG_A, B: RigThu.TUG_B }, half = RigThu.TUG_HALF;
+    let at = this.#dung(t, 0);
+    at = this.#quayVe(t, at, plan.side);
+    // Cúi ngậm đầu dây, nhấc lên, chống chân.
+    t.to(s, { truocY: 10, dauY: 26, dauX: 14, dau: 12, mieng: 0.5, duration: 0.25, ease: 'power2.in' }, at);
+    t.set(s, { toy: 1 }, at + 0.25);
+    const stance = { ...RigThu.TUG_STANCE };
+    delete stance.toy;
+    t.to(s, { ...stance, ...A, duration: 0.3, ease: 'power2.out' }, at + 0.28);
+    at += 0.6;
+    const n = Math.max(2, Math.round(h / half));
+    for (let i = 0; i < n; i++) t.to(s, { ...(i % 2 ? B : A), duration: half, ease: 'sine.inOut' }, at + i * half);        // giật ngược / bị lôi
+    // lắc đầu liên tục (mỗi nhịp một cú) — `dau` / `dauX` chỉ ở đây, không tranh với hai thế thân
+    for (let a = at, j = 0; a < at + n * half; a += 0.13, j++) t.to(s, { dau: 12 + (j % 2 ? 11 : -11), dauX: 12 + (j % 2 ? 3 : -3), duration: 0.13, ease: 'sine.inOut' }, a);
+    this.#vay(t, at, Math.max(4, Math.round(n * half / 0.12)), 30, 0.12, 22);
+    at += n * half;
+    t.set(s, { toy: 0 }, at);                    // nhả dây
+    this.#khep(t, 0.45, at, { huong: plan.side });
+    return t;
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 40 A, `set.careProbe` → `p40`): trạng thái chính và các phần tử đang hiện (đồ chơi trong mõm / trên sàn, cục đất, sóng tru), đầu dây kéo co (px màn hình). */
+  pet40Probe() {
+    const e = this.el, s = this.s, on = (el) => (el && el.style.display !== 'none' ? el : null), keys = ['toy', 'toyF', 'truocX', 'truocY', 'sauY', 'dauY', 'dau', 'gape', 'mieng', 'matY', 'ngoi', 'howl', 'dirtA'];
+    return { s: Object.fromEntries(keys.map((k) => [k, +(+s[k] || 0).toFixed(3)])), toy: on(e.toyM), floor: on(e.toyFG), howl: on(e.howlG),
+             dirt: on(e.dirtG) ? [...e.dirtG.children].slice(1).filter((c) => +c.getAttribute('opacity') > 0.3) : [], end: s.toy >= 0.5 ? this.ropeEnd() : null };
+  }
+
+  /**
+   * KẾ HOẠCH KÉO CO với người `person` (đợt 40 A) — rig người đọc để đặt tay: `{ side, lead, swing: { dx, dy } }`. `side`: người ở bên nào (1 phải màn hình, −1 trái);
+   * `lead`: giây từ lúc bắt đầu tới lúc nó ngậm dây xong (bắt đầu giằng co); `swing`: chỗ buộc dây (`ropeEnd`) dời bao nhiêu px trên màn hình giữa thế giật ngược (A)
+   * và thế bị lôi (B) — tay người dời đúng chừng ấy nên dây luôn căng.
+   */
+  tugPlan(person, hold = 2.4) {
+    const held = this.s.huong < 0 ? -1 : 1, side = person ? (this.#personMetrics(person, 'tugOfWar').cx - this.centerX() < 0 ? -1 : 1) : held;        // không có người: giằng co với sợi dây trong không khí, theo hướng đang quay
+    const a = this.ropeEnd({ huong: side, ...RigThu.TUG_STANCE, ...RigThu.TUG_A }), b = this.ropeEnd({ huong: side, ...RigThu.TUG_STANCE, ...RigThu.TUG_B });
+    return { side, lead: (this.s.ngoi ? 0.32 : 0) + (held !== side ? 0.22 : 0) + 0.6, swing: a && b ? { dx: b.x - a.x, dy: b.y - a.y } : { dx: 0, dy: 0 } };
   }
 
   /**
@@ -10012,6 +10633,301 @@ class RigThu {
     return t;
   }
 
+  /* ------------------------------------------------------------------------------------------------------------------
+   * ĐỢT 40 B — MÈO: rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn đồ chơi, cong lưng dựng lông, chui hộp;
+   *            THỎ: nhảy vui, nằm vật ra, đứng hai chân, giật mũi.
+   * Người xem thưa (~1 khung / giây): mỗi dáng chính GIỮ ≥ 1 s; `scene.py` cho các động tác này góc cận (PET_CLOSE).
+   * ------------------------------------------------------------------------------------------------------------------ */
+
+  static GROOM_BEAT = 0.9;       // giây mỗi lần quệt chân lên mặt (lên + xuống), chậm cho người xem thưa
+  static GROOM_REACH = 176;      // góc treo của chân trước lúc quệt tới tai (độ; liếm chân là 112)
+  static LOAF = { truocY: 30, sauY: 30, tnX: -10, txX: -6, snX: 4, sxX: -2, dauY: 14, dauX: -9, dau: -3, matY: 0.55, cuoi: 1, taiL: -0.2, taiR: -0.2, duoi: -30, duoiCong: 0.9, dongTu: 1.15 };
+  static BLINK_BEAT = 2.6;       // giây mỗi lần chớp chậm: nhắm 0,8 — giữ 1,0 — mở 0,8
+  static TOY_X = 74;             // cuộn len nằm cách tâm thân chừng ấy (đơn vị khung, về phía đầu)
+  static TOY_HOP = 15;           // mỗi cú vờn cuộn len nảy xa thêm chừng ấy
+  static BOX_X = 112;            // hộp cách tâm thân chừng ấy lúc hiện ra
+  static FLOP = { truocY: 44, sauY: 40, tnX: 62, txX: 52, snX: -34, sxX: -42, dauY: 22, dauX: 6, dau: 62, matY: 0.72, taiL: -1.2, taiR: -1.2, cuoi: 0.9, duoi: -62, dongTu: 1.1 };
+
+  // Vẽ phần thêm của đợt 40 B: viền lông dựng, cuộn len, hộp, bàn chân đè lên mặt, mũi và ria thỏ.
+  #veDot40(s, H, S, ng) {
+    const e = this.el, nv = this.nv, f = (v) => v.toFixed(2);
+    // LÔNG DỰNG: một vòng viền răng cưa phủ lên lưng, cao hơn thân nửa thân — cả hình to ra, không chỉ cái gù.
+    if (e.phong) {
+      const pv = clamp(s.phong || 0, 0, 1);
+      e.phong.style.display = pv > 0.02 ? '' : 'none';
+      if (pv > 0.02) {
+        const day = nv.dayThan, dx = S.x - H.x, dy = S.y - H.y, len = Math.hypot(dx, dy) || 1, tx = dx / len, ty = dy / len, nx = ty, ny = -tx;
+        const A = { x: H.x - tx * day * 0.8, y: H.y - ty * day * 0.8 }, B = { x: S.x + tx * day * 0.7, y: S.y + ty * day * 0.7 };
+        const apex = (day * 0.3 + Math.max(0, s.cong) * day * 0.8) * pv, N = 18, up = [];
+        const at = (u, h) => ({ x: pha(A.x, B.x, u) + nx * h, y: pha(A.y, B.y, u) + ny * h });
+        const top = (u) => day * 0.78 + apex * 4 * u * (1 - u);
+        for (let i = 0; i <= N; i++) {
+          const u = i / N, q = at(u, top(u));
+          up.push(q);
+          if (i < N) { const um = (i + 0.5) / N; up.push(at(um, top(um) + (6 + 4 * Math.sin(i * 2.3)) * pv)); }
+        }
+        const low = (u) => at(u, -day * 0.55);
+        e.phong.setAttribute('d', 'M ' + up.map((q) => `${f(q.x)} ${f(q.y)}`).join(' L ') + ` L ${f(low(1).x)} ${f(low(1).y)} L ${f(low(0).x)} ${f(low(0).y)} Z`);
+      }
+    }
+    if (e.toy) {
+      const v = clamp(s.yarn || 0, 0, 1.2);
+      e.toy.style.display = v > 0.02 ? '' : 'none';
+      if (v > 0.02) { e.toy.setAttribute('transform', `translate(${f(200 + s.toyX)} ${f(DAT - 15 * v - s.toyY)}) scale(${f(v * 1.3)})`); e.toyBall.setAttribute('transform', `rotate(${f(s.toyR)})`); }
+    }
+    if (e.boxB) {
+      const v = clamp(s.box || 0, 0, 1.3), on = v > 0.02;
+      for (const g of [e.boxB, e.boxF]) { g.style.display = on ? '' : 'none'; if (on) g.setAttribute('transform', `translate(${f(200 + s.boxX)} ${DAT}) scale(${f(v)})`); }
+    }
+    if (e.gPaw) {
+      const on = clamp(s.gp || 0, 0, 1) > 0.5 && !!this.#legNear;
+      e.gPaw.style.display = on ? '' : 'none';
+      if (on) {
+        const { J, ban } = this.#legNear, c = nv.chanT;
+        e.gArm.setAttribute('d', `M ${f(J.x)} ${f(J.y)} L ${f(ban.x)} ${f(ban.y)}`);
+        e.gBan.setAttribute('transform', `translate(${f(ban.x + c.rong * 0.22)} ${f(ban.y)})`);
+      }
+    }
+    if (e.nose) {
+      const n = clamp(s.nose || 0, 0, 1), w = clamp(s.twitch || 0, 0, 1);
+      e.nose.setAttribute('transform', `translate(0 ${f(9.4 - 1.4 * n)}) scale(${f(1 + 0.5 * n * w + 0.15 * w)} ${f(1 - 0.35 * n * w)}) translate(0 -9.4)`);
+      for (const [el, g] of [[e.riaL, 1], [e.riaR, -1]]) {
+        el.setAttribute('transform', `rotate(${f(g * (s.ria || 0))} ${g * -10} 13.500)`);
+        el.setAttribute('stroke-width', f(0.7 + 0.9 * w)); el.setAttribute('opacity', f(0.5 + 0.45 * w));
+      }
+    }
+  }
+
+  /**
+   * RỬA MẶT (mèo): ngồi, liếm một chân trước hai cái, rồi quệt chân lên má, lên tai `times` lần (1–6): chân giơ khỏi mặt tới tận tai, đầu
+   * nghiêng theo, mắt nhắm híp. Bàn chân vẽ ĐÈ lên mặt (`gp`) — không thì mặt che mất chân.
+   */
+  groomFace(times = 3) {
+    this.#only('groomFace', ['cat']);
+    const t = this.tl(), s = this.s, n = clamp(Math.round(times), 1, 6), beat = RigThu.GROOM_BEAT, N = this.NGHI;
+    t.to(s, { ngoi: 1, duration: 0.25, ease: 'power2.inOut' }, 0);
+    t.to(s, { tnNhac: 1, tnGoc: 112, gp: 1, dau: 13, dauX: -3, dauY: 9, matY: 0.6, nhinY: 1.5, taiL: -0.2, taiR: -0.2, duration: 0.4, ease: 'power2.out' }, 0.15);
+    // liếm lòng chân hai cái
+    for (let i = 0; i < 2; i++) {
+      const a = 0.6 + i * 0.45;
+      t.to(s, { luoi: 0.8, mieng: 0.3, dauY: 11, duration: 0.15, ease: 'power1.out' }, a).to(s, { luoi: 0, mieng: 0.05, dauY: 8, duration: 0.2, ease: 'power1.in' }, a + 0.2);
+    }
+    // quệt: chân đưa lên qua má tới tai (đầu nghiêng đón chân, tai bên ấy gập), giữ trên cao một nhịp, rồi hạ về miệng
+    let at = 1.55;
+    for (let i = 0; i < n; i++) {
+      t.to(s, { tnGoc: RigThu.GROOM_REACH, dau: -9, dauX: 4, dauY: 5, matY: 0.92, taiR: 0.5, taiL: -0.3, duration: beat * 0.4, ease: 'sine.inOut' }, at)
+       .to(s, { tnGoc: 150, duration: beat * 0.2, ease: 'sine.inOut' }, at + beat * 0.4)
+       .to(s, { tnGoc: 112, dau: 13, dauX: -3, dauY: 9, matY: 0.6, taiR: -0.2, taiL: -0.2, duration: beat * 0.4, ease: 'sine.inOut' }, at + beat * 0.6);
+      if (i < n - 1 && i % 2 === 1) t.to(s, { luoi: 0.7, mieng: 0.25, duration: 0.12 }, at + beat).to(s, { luoi: 0, mieng: 0.05, duration: 0.15 }, at + beat + 0.12);
+      at += beat;
+    }
+    t.to(s, { gp: 0, duration: 0.01 }, at + 0.25);
+    this.#khep(t, 0.45, at + 0.3, { gp: N.gp });
+    return t;
+  }
+
+  /**
+   * NẰM Ổ BÁNH MÌ (mèo, `hold` giây — mặc định 2; KHÔNG phải thế giữ, xong thì ngồi dậy như lúc nghỉ): hạ người sát sàn, chân trước
+   * và chân sau gập dưới bụng, đuôi quấn sát thân, đầu rụt vào vai — một khối tròn gọn như ổ bánh mì; mắt lim dim, thở chậm.
+   */
+  loaf(hold = 2) {
+    this.#only('loaf', ['cat']);
+    const t = this.tl(), s = this.s, h = Math.max(0.8, hold);
+    t.to(s, { ngoi: 0, ...RigThu.LOAF, duration: 0.7, ease: 'power2.inOut' }, 0);
+    for (let a = 0.8, i = 0; a < 0.7 + h; a += 0.7, i++) t.to(s, { tho: i % 2 ? 0 : 1, duration: 0.7, ease: 'sine.inOut' }, a);      // thở chậm
+    this.#khep(t, 0.55, 0.7 + h);
+    return t;
+  }
+
+  /**
+   * CHỚP MẮT CHẬM (mèo, `times` lần — mặc định 2): nhìn người, từ từ nhắm mắt (0,8 s), GIỮ nhắm 1 s, từ từ mở (0,8 s) — dấu hiệu tin cậy
+   * của mèo. Tai thả lỏng, nét mặt cười; mắt nhắm hẳn nên người xem thưa thấy được.
+   */
+  slowBlink(times = 2) {
+    this.#only('slowBlink', ['cat']);
+    const t = this.tl(), s = this.s, n = clamp(Math.round(times), 1, 4), beat = RigThu.BLINK_BEAT, N = this.NGHI;
+    t.to(s, { dau: 5, dauY: -1, nhinX: 1.2, cuoi: 1, taiL: 0.25, taiR: 0.25, duration: 0.35, ease: 'power2.out' }, 0);
+    for (let i = 0; i < n; i++) {
+      const a = 0.5 + i * beat;
+      t.to(s, { matY: 1, duration: 0.8, ease: 'sine.inOut' }, a).to(s, { matY: N.matY, duration: 0.8, ease: 'sine.inOut' }, a + 1.8);
+      if (RigThu.AUTO_MARKS && i === 0) markTweens(t, this.m, 'heart', a + 0.7, 1.4);
+    }
+    this.#khep(t, 0.4, 0.5 + n * beat - 0.2);
+    return t;
+  }
+
+  /**
+   * VỜN ĐỒ CHƠI (mèo, `times` cú — mặc định 3): thụp người, lắc mông, một cuộn len hiện ra trước mặt; mỗi cú chân trước quệt trúng thì
+   * cuộn len nảy lên, lăn xa thêm một đoạn (TOY_HOP), mèo chồm theo; xong cuộn len lăn mất.
+   */
+  batToy(times = 3) {
+    this.#only('batToy', ['cat']);
+    const t = this.tl(), s = this.s, n = clamp(Math.round(times), 1, 6), x0 = RigThu.TOY_X, hop = RigThu.TOY_HOP;
+    let at = this.#dung(t, 0);
+    t.set(s, { toyX: x0, toyY: 0, toyR: 0 }, at);
+    t.to(s, { truocY: 16, sauY: 5, tnX: 8, dauY: 7, dauX: 10, taiL: 0.9, taiR: 0.9, dongTu: 1.9, duoi: -34, nhinX: 2, nhinY: 1, cuoi: 0, duration: 0.35, ease: 'power2.out' }, at);
+    t.fromTo(s, { yarn: 0 }, { yarn: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, at + 0.05);
+    at += 0.45;
+    const per = 1.15;
+    for (let i = 0; i < n; i++) {
+      const a = at + i * per, hit = a + 0.62;
+      for (let k = 0; k < 3; k++) t.to(s, { sauX: k % 2 ? -3 : 3, duoi: k % 2 ? -40 : -28, duration: 0.1, ease: 'sine.inOut' }, a + k * 0.1);      // lắc mông
+      // giơ chân lên, vồ tới, trúng thì thu lại; vai chồm dần về phía cuộn len
+      t.to(s, { tnNhac: 1, tnGoc: 28, truocX: 3 + 4 * i, truocY: 18, duration: 0.28, ease: 'power2.out' }, a + 0.3)
+       .to(s, { tnGoc: 78 + 3 * i, truocY: 20, duration: 0.1, ease: 'power3.in' }, hit - 0.1)
+       .to(s, { tnGoc: 36, duration: 0.22, ease: 'power2.out' }, hit + 0.1);
+      t.to(s, { toyX: x0 + hop * (i + 1), duration: 0.5, ease: 'power1.out' }, hit)
+       .to(s, { toyY: 26, duration: 0.2, ease: 'power2.out' }, hit).to(s, { toyY: 0, duration: 0.22, ease: 'bounce.out' }, hit + 0.2)
+       .to(s, { toyR: 170 * (i + 1), duration: 0.5, ease: 'power1.out' }, hit);
+      t.to(s, { nhinX: 2.4, dauX: 12 + 2 * i, duration: 0.25 }, hit);
+    }
+    at += n * per;
+    t.to(s, { toyX: x0 + hop * (n + 1.5), toyR: 170 * (n + 1.5), yarn: 0, duration: 0.5, ease: 'power1.out' }, at);
+    this.#khep(t, 0.45, at + 0.2);
+    return t;
+  }
+
+  /**
+   * CONG LƯNG DỰNG LÔNG (mèo, `hold` giây — mặc định 1,4): đứng nghiêng người, lưng cong vồng cao, lông dựng răng cưa (hình to ra), đuôi dựng
+   * lên xù như bàn chải, chân cứng nhón lên, tai ép ra sau, khè. Khác `hiss` ở chỗ cả THÂN to ra, không chỉ gương mặt.
+   */
+  archBack(hold = 1.4) {
+    this.#only('archBack', ['cat']);
+    const t = this.tl(), s = this.s, h = Math.max(0.8, hold);
+    let at = this.#dung(t, 0);
+    // giật mình nhảy tại chỗ, rồi đáp xuống thành thế cong lưng
+    t.to(s, { y: -14, cong: 1, phong: 0.6, xu: 1, duration: 0.14, ease: 'power2.out' }, at)
+     .to(s, { y: 0, duration: 0.14, ease: 'power2.in' }, at + 0.14);
+    t.to(s, { cong: 2.6, phong: 1, xu: 1.5, truocY: -10, sauY: -12, tnX: -6, snX: 6, duoi: 28, duoiCong: 0.95, taiL: -2.6, taiR: -2.6, dongTu: 0.35, matY: 0.3, cuoi: -0.8, dau: -6, dauY: 6,
+              duration: 0.3, ease: 'back.out(1.6)' }, at);
+    t.to(s, { mieng: 0.85, nanh: 1, duration: 0.15 }, at + 0.25);
+    for (let i = 0; i < Math.round(h / 0.1); i++) t.to(s, { dauX: i % 2 ? -1.4 : 1.4, duoi: i % 2 ? 24 : 32, phong: i % 2 ? 0.92 : 1, duration: 0.1 }, at + 0.45 + i * 0.1);      // lông rung
+    at += 0.45 + h;
+    t.to(s, { mieng: 0.1, nanh: 0, duration: 0.15 }, at);
+    this.#khep(t, 0.6, at + 0.1);
+    return t;
+  }
+
+  /**
+   * CHUI HỘP (mèo, `hold` giây — mặc định 2): một cái hộp các-tông hiện ra ngay trước mặt, mèo thụp người nhắm rồi nhảy vào, ngồi gọn trong
+   * hộp — chỉ đầu và tai thò lên khỏi miệng hộp, mắt lim dim, gừ gừ, đuôi vẩy — rồi nhảy ra, hộp biến mất.
+   */
+  sitInBox(hold = 2) {
+    this.#only('sitInBox', ['cat']);
+    const t = this.tl(), s = this.s, h = Math.max(0.8, hold), x0 = s.x, dir = s.huong < 0 ? -1 : 1, bx = x0 + dir * RigThu.BOX_X, N = this.NGHI;
+    t.set(s, { boxX: bx }, 0);
+    t.fromTo(s, { box: 0 }, { box: 1, duration: 0.4, ease: 'back.out(2.2)', immediateRender: false }, 0);
+    let at = this.#dung(t, 0.1);
+    // ngó cái hộp, thụp người lấy đà, lắc mông
+    t.to(s, { truocY: 14, sauY: 6, dauY: 5, dauX: 8, nhinX: 2, taiL: 0.8, taiR: 0.8, dongTu: 1.7, duoi: -30, duration: 0.3, ease: 'power2.out' }, at);
+    for (let k = 0; k < 4; k++) t.to(s, { sauX: k % 2 ? -3 : 3, duoi: k % 2 ? -38 : -26, duration: 0.1, ease: 'sine.inOut' }, at + 0.3 + k * 0.1);
+    at += 0.8;
+    // nhảy vào: một vòng cung qua miệng hộp, đáp xuống ngồi
+    t.to(s, { x: bx, duration: 0.5, ease: 'sine.inOut' }, at);
+    t.to(s, { y: -62, truocY: -6, sauY: -2, tnX: 12, txX: 12, snX: -8, duration: 0.25, ease: 'power2.out' }, at).to(s, { y: 6, truocY: 0, sauY: 0, tnX: 0, txX: 0, snX: 0, duration: 0.25, ease: 'power2.in' }, at + 0.25);
+    t.to(s, { ngoi: 1, duoi: 0, dongTu: 1, nhinX: 0, dauX: 0, dauY: -3, dau: 0, duration: 0.3 }, at + 0.3);
+    at += 0.6;
+    // ngồi gọn trong hộp: lim dim, cười, gừ gừ
+    t.to(s, { matY: 0.85, cuoi: 1, taiL: 0.2, taiR: 0.2, duration: 0.35, ease: 'power2.out' }, at);
+    if (RigThu.AUTO_MARKS) markTweens(t, this.m, 'heart', at + 0.3, Math.max(0.4, h - 0.5));
+    for (let a = at + 0.2, i = 0; a < at + h; a += 0.1, i++) t.to(s, { tho: i % 2 ? 0 : 1, duration: 0.1, ease: 'sine.inOut' }, a);
+    t.to(s, { dau: 4, dauX: 2, duration: 0.7, ease: 'sine.inOut', yoyo: true, repeat: 1 }, at + 0.3);
+    at += h;
+    // nhảy ra
+    t.to(s, { matY: N.matY, duration: 0.15 }, at);
+    t.to(s, { x: x0, duration: 0.5, ease: 'sine.inOut' }, at + 0.1);
+    t.to(s, { y: -58, truocY: -6, tnX: 12, txX: 12, duration: 0.25, ease: 'power2.out' }, at + 0.1).to(s, { y: 0, truocY: 3, tnX: 0, txX: 0, duration: 0.25, ease: 'power2.in' }, at + 0.35);
+    t.to(s, { box: 0, duration: 0.35, ease: 'back.in(2)' }, at + 0.75);
+    this.#khep(t, 0.4, at + 0.65, { x: x0 });
+    return t;
+  }
+
+  /**
+   * NHẢY VUI (thỏ, `times` cú — mặc định 2): thụp, bật cao, GIỮA KHÔNG TRUNG xoay mình — thân nghiêng, bề ngang hẹp lại như vặn người —
+   * hai chân sau đá tung ra sau, tai bay, rồi đáp xuống; cú sau vặn về phía ngược lại.
+   */
+  binky(times = 2) {
+    this.#only('binky', ['rabbit']);
+    const t = this.tl(), s = this.s, n = clamp(Math.round(times), 1, 5), held = s.huong;
+    let at = this.#dung(t, 0);
+    for (let i = 0; i < n; i++) {
+      const g = i % 2 ? -1 : 1;
+      t.to(s, { sauY: 8, truocY: 6, dauY: 4, taiL: 0.3, taiR: 0.3, duration: 0.16, ease: 'power2.in' }, at);
+      t.to(s, { y: -62, sauY: -4, truocY: -8, tnX: 14, txX: 14, snX: -34, sxX: -42, snY: 26, sxY: 32, nghieng: 20 * g, huong: held * 0.45, dau: -14 * g, taiL: -0.8, taiR: -0.8, matY: 0.5, cuoi: 1,
+                mieng: 0.3, duoi: 0, duration: 0.3, ease: 'power2.out' }, at + 0.16);
+      t.to(s, { snX: -44, sxX: -34, nghieng: -16 * g, huong: held * 0.6, duration: 0.2, ease: 'sine.inOut' }, at + 0.46);       // vặn nốt, đá cú thứ hai
+      t.to(s, { y: 0, snX: 0, sxX: 0, snY: 0, sxY: 0, tnX: 0, txX: 0, nghieng: 0, huong: held, sauY: 5, truocY: 4, dau: 0, taiL: 0.2, taiR: 0.2, mieng: 0, duration: 0.24, ease: 'power2.in' }, at + 0.66);
+      t.to(s, { sauY: 0, truocY: 0, dauY: 0, matY: 0, duration: 0.2 }, at + 0.9);
+      at += 1.2;
+    }
+    this.#khep(t, 0.4, at, { huong: held });
+    return t;
+  }
+
+  /**
+   * NẰM VẬT RA (thỏ, THẾ GIỮ — `standUp()` để dậy, như `lieDown`): đột ngột đổ nghiêng, bẹp xuống sàn, bốn chân duỗi ra hai phía, đầu
+   * gục nghiêng, tai xoè phẳng, mắt lim dim — thoải mái hết cỡ. Các động tác sau (nghiêng đầu, giật mũi…) vẫn diễn khi đang nằm vật.
+   */
+  flop() {
+    this.#only('flop', ['rabbit']);
+    const t = this.tl(), s = this.s;
+    let at = this.#dung(t, 0);
+    t.to(s, { nghieng: -7, truocY: -3, taiL: -0.3, taiR: -0.3, duration: 0.2, ease: 'power2.out' }, at);       // chao đảo trước khi đổ
+    t.set(s, { nam: 1, flop: 1 }, at + 0.2);
+    t.to(s, { y: -5, duration: 0.1, ease: 'power2.out' }, at + 0.2).to(s, { y: 0, duration: 0.15, ease: 'bounce.out' }, at + 0.3);
+    this.#khep(t, 0.4, at + 0.2, { nam: 1, flop: 1, ngoi: 0 });
+    t.to(s, { nghieng: 0, duration: 0.3, ease: 'power2.out' }, at + 0.35);
+    // nằm thả lỏng thêm ~1,5 s (người xem thưa phải thấy dáng này): thở chậm, một tai khẽ giật
+    for (let a = at + 0.7, i = 0; i < 2; a += 0.8, i++) t.to(s, { tho: 1 - i % 2, duration: 0.8, ease: 'sine.inOut' }, a);
+    t.to(s, { taiR: -0.8, duration: 0.15, yoyo: true, repeat: 1 }, at + 1.5).to(s, { tho: 0, duration: 0.2 }, at + 2.3);
+    return t;
+  }
+
+  /**
+   * ĐỨNG HAI CHÂN (thỏ, `hold` giây — mặc định 1,6): vươn thẳng người trên hai chân sau, hai chân trước co gọn trước ngực, tai dựng cao, ngóng
+   * sang trái rồi sang phải — như kính tiềm vọng — rồi hạ xuống ngồi.
+   */
+  periscope(hold = 1.6) {
+    this.#only('periscope', ['rabbit']);
+    const t = this.tl(), s = this.s, h = Math.max(0.8, hold);
+    let at = this.#dung(t, 0);
+    t.to(s, { truocY: -34, truocX: -22, sauY: -9, sauX: -4, snX: 6, sxX: 6, tnNhac: 1, txNhac: 1, tnGoc: 38, txGoc: 28, dauY: -4, dau: 0, taiL: -0.3, taiR: -0.3, matY: -0.1, nhinY: -0.6, dongTu: 1.2,
+              duration: 0.45, ease: 'power2.out' }, at);
+    at += 0.55;
+    // ngóng: đầu quay qua lại, mắt liếc theo
+    const look = [[-7, -1.4], [7, 1.4], [-5, -1], [5, 1]];
+    const k = Math.max(2, Math.floor(h / 0.6));
+    for (let i = 0; i < k; i++) { const [d, nx] = look[i % 4]; t.to(s, { dau: d, nhinX: nx, dauX: d * 0.6, duration: 0.3, ease: 'sine.inOut' }, at + i * (h / k)); }
+    at += h;
+    t.to(s, { dau: 0, nhinX: 0, dauX: 0, duration: 0.2 }, at);
+    this.#khep(t, 0.5, at + 0.1);
+    return t;
+  }
+
+  /**
+   * GIẬT MŨI (thỏ, `hold` giây — mặc định 1,6; cận cảnh): mũi hồng giật liên tục (phình ra, nhích lên), ria hất lên hất xuống, hai tai xoay
+   * mỗi bên một hướng như dò âm thanh, miệng nhóp nhép khẽ.
+   */
+  noseTwitch(hold = 1.6) {
+    this.#only('noseTwitch', ['rabbit']);
+    const t = this.tl(), s = this.s, h = Math.max(0.8, hold);
+    let at = this.#dung(t, 0);
+    t.to(s, { twitch: 1, dauY: -2, dau: 3, nhinY: 0.6, dongTu: 1.15, taiL: 0.3, taiR: -0.25, duration: 0.3, ease: 'power2.out' }, at);
+    at += 0.3;
+    const beat = 0.12, n = Math.floor(h / beat);
+    for (let i = 0; i < n; i++) {
+      const on = i % 2 === 0;
+      t.to(s, { nose: on ? 1 : 0, ria: on ? 11 : -3, mieng: on ? 0.16 : 0.02, duration: beat, ease: 'sine.inOut' }, at + i * beat);
+    }
+    // tai xoay dò âm thanh: mỗi bên một hướng, đổi bên giữa chừng
+    t.to(s, { taiL: -0.3, taiR: 0.45, duration: 0.4, ease: 'sine.inOut' }, at + h * 0.45);
+    t.to(s, { dau: -3, dauX: -2, duration: 0.5, ease: 'sine.inOut' }, at + h * 0.3);
+    at += h;
+    t.to(s, { nose: 0, ria: 0, twitch: 0, mieng: 0, duration: 0.2 }, at);
+    this.#khep(t, 0.4, at + 0.1);
+    return t;
+  }
+
   /**
    * NHAI: vừa đớp được bánh thưởng / viên thuốc — hàm nhóp nhép `times` nhịp, mắt híp khoái chí, rồi liếm mép hai cái.
    * `scene.py` tự cho con vật nhai khi người `giveTreat` nó.
@@ -10158,7 +11074,8 @@ class RigThu {
 
   // DÁNG LIẾM (đợt 35, lượt hai): dưới sàn — quay mặt về bàn tay, mõm hơi chúi, lưỡi dài chĩa chéo xuống về phía trước; trong
   // vòng tay — rướn hẳn lên, lưỡi hất ngược lên tới má người bế.
-  static LICK_BEAT = 0.8;      // giây mỗi cái liếm (đợt 35, lượt ba: 0,4)
+  static LICK_BEAT = 1.0;      // giây mỗi cái liếm (đợt 35, lượt ba: 0,4; đợt 40 C: 0,8 → 1,0 — cái liếm có đoạn giữ trên đích)
+  static LICK_REACH = 1.9;     // lưỡi thè tối đa dài thêm bấy nhiêu lần (đợt 40 C: 1,2 → 1,9) — tools/scene.py dùng cùng số này cho bàn tay chìa ra
   static LICK_FLOOR = { dau: 8, dauX: 12, dauY: 0, liem: 1, liemGoc: 66 };
   static LICK_HELD = { dau: -18, dauX: 10, dauY: -62, liem: 1, liemGoc: 150 };
   // Người ĐỨNG (không quỳ): con vật chồm lên, hai chân trước tì lên chân người ấy, rướn mõm liếm bàn tay chìa ra ngang hông.
@@ -10176,7 +11093,7 @@ class RigThu {
     const s = this.#view(), nv = this.nv, { S, ng } = this.#khung(), P = rear ? RigThu.LICK_REAR : RigThu.LICK_FLOOR, k = nv.mom.co, sc = nv.headScale || 1;
     const sx = S.x + (P.truocX || 0) - (s.truocX || 0), sy = S.y + (P.truocY || 0) - (s.truocY || 0);
     const head = { x: sx + nv.dau.dx + P.dauX, y: sy + nv.dau.dy + P.dauY - ng * 2 };
-    const ty = nv.mom.y + 3.6 * k, len = 17 * k * 2.2 - 4.6 * k, g = P.liemGoc * RAD;
+    const ty = nv.mom.y + 3.6 * k, len = 17 * k * (1 + RigThu.LICK_REACH) - 4.6 * k, g = P.liemGoc * RAD;
     const tip = { x: Math.sin(g) * len, y: ty + Math.cos(g) * len }, a = P.dau * RAD;
     const bx = head.x + sc * (tip.x * Math.cos(a) - tip.y * Math.sin(a)), by = head.y + sc * (tip.x * Math.sin(a) + tip.y * Math.cos(a));
     const flip = side ? (side < 0 ? -1 : 1) : s.huong < 0 ? -1 : 1, away = this.isCarried();
@@ -10189,7 +11106,7 @@ class RigThu {
    * ấy `offerHand(pet)` cùng lúc (tools/scene.py tự thêm), lòng bàn tay ở đầu lưỡi (`lickPoint()`). Lưỡi dài thè ra thụt vào, mắt
    * híp, chó vẫy đuôi.
    */
-  lick(target = null, times = 4, { face = null } = {}) {
+  lick(target = null, times = 5, { face = null } = {}) {
     this.#only('lick', ['dog', 'cat']);
     // `face: true`: đang trong vòng tay `target` — liếm MẶT (tools/scene.py báo; lúc dựng bước, hình nó có thể chưa nằm trong tay).
     const t = this.tl(), s = this.s, carried = face === null ? this.isCarried() : !!face, dog = this.nv.loai === 'dog', held = s.huong < 0 ? -1 : 1;
@@ -10208,10 +11125,13 @@ class RigThu {
     at += 0.3;
     const beat = RigThu.LICK_BEAT;
     for (let i = 0; i < times; i++) {
-      // mỗi cái liếm: lưỡi thè dài hết cỡ và GIỮ trên tay / má một nhịp, đầu đẩy tới một chút; rồi thụt nửa chừng
+      // Đợt 40 C — người chấm bảo liếm "đọc nhỏ": mỗi cái liếm là lưỡi thè DÀI hết cỡ (`LICK_REACH`), GIỮ trên tay / má gần nửa nhịp
+      // và quệt qua lại hai lần (đầu nhích), rồi mới thụt nửa chừng — ở ~1 khung / giây khung nào cũng thấy lưỡi nằm trên đích.
       const a = at + i * beat;
-      t.to(s, { luoi: 1, mieng: 0.6, dauX: pose.dauX + 3, dauY: pose.dauY - 2, duration: 0.2, ease: 'power2.out' }, a)
-       .to(s, { luoi: 0.45, mieng: 0.4, dauX: pose.dauX, dauY: pose.dauY, duration: 0.22, ease: 'power2.in' }, a + beat * 0.65);
+      t.to(s, { luoi: 1, mieng: 0.6, dauX: pose.dauX + 4, dauY: pose.dauY - 2, dau: pose.dau - 2, duration: 0.18, ease: 'power2.out' }, a)
+       .to(s, { dauX: pose.dauX + 1, dau: pose.dau + 3, duration: 0.26, ease: 'sine.inOut' }, a + 0.22)
+       .to(s, { dauX: pose.dauX + 4, dau: pose.dau - 2, duration: 0.26, ease: 'sine.inOut' }, a + 0.48)
+       .to(s, { luoi: 0.4, mieng: 0.4, dauX: pose.dauX, dauY: pose.dauY, dau: pose.dau, duration: 0.22, ease: 'power2.in' }, a + beat * 0.76);
     }
     if (dog) this.#vay(t, at, times * 3, 36, beat / 3);
     else t.to(s, { duoi: this.NGHI.duoi + 16, duoiCong: this.NGHI.duoiCong + 0.35, duration: 0.5, ease: 'sine.inOut' }, at);
@@ -10277,24 +11197,36 @@ class RigThu {
     t.to(s, { ngoi: 1, duration: 0.25, ease: 'power2.inOut' }, 0);
     t.to(s, { tnNhac: 1, txNhac: 1, tnGoc: 132, txGoc: 122, truocY: -5, dau: 5, dauY: 3, nhinY: 1, matY: 0.25, cuoi: 0.6, taiL: 0.15, taiR: 0.15, duration: 0.35, ease: 'power2.out' }, 0.1);
     t.fromTo(s, { carrot: 0 }, { carrot: 1, duration: 0.12, ease: 'none', immediateRender: false }, 0.3);
-    // Củ cà rốt NGUYÊN giữ 1 s cho thấy rõ, rồi mỗi miếng (bite giây): nhóp nhép ba cú, đầu nhấp xuống; cuối miếng củ CỤT hẳn một
-    // khúc (1 / n độ dài) và đứng yên tới miếng sau — người chấm xem thưa thấy củ ngắn dần theo từng bậc.
-    let at = 1.3;
+    // Củ cà rốt NGUYÊN giữ 1 s cho thấy rõ, rồi mỗi miếng (`BITE` giây): hai cú cắn, củ CỤT hẳn một khúc ở mặt cắt có vết cắn (xem `#veCarrot`),
+    // vụn rơi từ miệng, nhai hai nhịp — và củ ĐỨNG YÊN ở độ dài mới tới hết miếng (đợt 40 C: người chấm xem thưa, ~1 khung / giây, thấy
+    // một bậc ngắn lại cho từng khung). Miếng cuối còn một ĐOẠN CỤT, giữ trong tay gần 1 s (nhai) rồi mới được nhét vào miệng và nuốt.
+    let at = 1.4;
+    const stub = 0.1, last = n - 1;
     for (let i = 0; i < n; i++) {
-      for (let j = 0; j < 3; j++) {
-        const a = at + j * 0.16;
-        t.to(s, { mieng: 0.45, dauY: 6, duration: 0.07, ease: 'sine.out' }, a).to(s, { mieng: 0.05, dauY: 3, duration: 0.08, ease: 'sine.in' }, a + 0.08);
+      for (let j = 0; j < 2; j++) {
+        const a = at + j * 0.2;
+        t.to(s, { mieng: 0.5, gape: 0.4, dauY: 7, duration: 0.08, ease: 'sine.out' }, a).to(s, { mieng: 0.05, gape: 0, dauY: 3, duration: 0.1, ease: 'sine.in' }, a + 0.1);
       }
-      t.to(s, { carrot: i === n - 1 ? 0 : 1 - (i + 1) / n, tnGoc: 132 - (i + 1) * 6 / n, duration: 0.1, ease: 'power1.out' }, at + 0.45);
+      t.to(s, { carrot: i === last ? stub : 1 - (i + 1) * (1 - stub) / n, tnGoc: 132 - (i + 1) * 5 / n, duration: 0.1, ease: 'power1.out' }, at + 0.34)
+       .fromTo(s, { crumb: 0 }, { crumb: 1, duration: 0.85, ease: 'none', immediateRender: false }, at + 0.34);
+      for (let j = 0; j < 2; j++) t.to(s, { mieng: 0.22, dauY: 4, duration: 0.12, ease: 'sine.inOut' }, at + 0.55 + j * 0.28).to(s, { mieng: 0.04, dauY: 3, duration: 0.14, ease: 'sine.inOut' }, at + 0.67 + j * 0.28);
       at += bite;
     }
+    // đoạn cuối: nhai (củ cụt vẫn trong tay), rồi nhét cả vào miệng — thụt dần vào, không biến mất tức thì
+    for (let j = 0; j < 3; j++) t.to(s, { mieng: 0.25, dauY: 4, duration: 0.14, ease: 'sine.inOut' }, at + j * 0.3).to(s, { mieng: 0.04, dauY: 3, duration: 0.16, ease: 'sine.inOut' }, at + 0.14 + j * 0.3);
+    at += 0.95;
+    t.to(s, { mieng: 0.55, gape: 0.5, dauY: 8, duration: 0.1, ease: 'sine.out' }, at).to(s, { carrot: 0.03, tnGoc: 128, duration: 0.55, ease: 'none' }, at + 0.05)
+     .to(s, { mieng: 0.05, gape: 0, dauY: 3, duration: 0.14, ease: 'sine.in' }, at + 0.5)
+     .fromTo(s, { crumb: 0 }, { crumb: 1, duration: 0.7, ease: 'none', immediateRender: false }, at + 0.5);
+    at += 0.65;
     t.set(s, { carrot: 0 }, at);
+    t.set(s, { crumb: 0 }, at + 0.6);                  // vụn cuối đã rơi hết — về 0 TRƯỚC khi `#khep` kéo các kênh về nghỉ (không thì vụn bay ngược lên)
     t.to(s, { tnNhac: 0, txNhac: 0, tnGoc: 0, txGoc: 0, truocY: 0, duration: 0.3, ease: 'power2.inOut' }, at);
     for (let i = 0; i < 2; i++) t.to(s, { luoi: 0.5, mieng: 0.2, duration: 0.1, ease: 'power2.out' }, at + 0.15 + i * 0.28).to(s, { luoi: 0, mieng: 0, duration: 0.13, ease: 'power2.in' }, at + 0.27 + i * 0.28);
     this.#khep(t, 0.35, at + 0.75);
     return t;
   }
-  static BITE = 1.1;           // giây mỗi miếng gặm (đợt 35, lượt ba)
+  static BITE = 1.35;          // giây mỗi miếng gặm (đợt 35, lượt ba: 1,1; đợt 40 C: 1,35 — củ đứng yên ở độ dài mới lâu hơn)
 
 
   /* ------------------------------------------------------------ BIỂU CẢM
@@ -14194,6 +15126,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           facing: rig.s ? +(rig.s.huong || 0).toFixed(3) : null,                       // người và con vật (đếm vòng đuổi đuôi)
           tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
           carrot: !person && e.carrot && e.carrot.style.display !== 'none' && e.carrotBody ? rect(drawnRect(e.carrotBody)) : null,
+          // ĐỢT 40 B: cuộn len (`batToy`), hộp (mặt trước — `sitInBox`), mắt (`slowBlink`), mũi thỏ (`noseTwitch`), chân trước vẽ đè lên mặt (`groomFace`)
+          toy: !person && e.toy && e.toy.style.display !== 'none' ? rect(drawnRect(e.toyBall)) : null, box: !person && e.boxF && e.boxF.style.display !== 'none' ? rect(drawnRect(e.boxF)) : null,
+          eye: !person && e.matL ? rect(drawnRect(e.matL)) : null, nose: !person && e.nose ? rect(drawnRect(e.nose)) : null,
+          gpaw: !person && e.gPaw && e.gPaw.style.display !== 'none' ? rect(drawnRect(e.gBan)) : null,
           headBox: person && e.dau ? rect(drawnRect(e.dau)) : null,                    // khung đầu người (mặt người bế — liếm mặt)
           // HƯỚNG ĐẦU (đợt 36, `lookAt`): quay (đơn vị `huong`, thân + đầu — đã gồm phần bù góc máy), cúi (`headPitch`), nghiêng; tâm và chiều
           // cao KHUÔN MẶT trên màn hình — tools/acting_check.py dựng tia nhìn từ đó.
@@ -14244,6 +15180,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
           const head = centre(e.dau), mouthP = centre(e.mieng);
           out[name] = { person: true, eyes, gadgets, head, mouthP, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+          // ĐỢT 40 A: dây kéo co (`rig.pull40Probe()`) — hai đầu dây, tay cầm, đầu dây ở mõm (px trong `view`).
+          if (typeof rig.pull40Probe === 'function') { const q = rig.pull40Probe(), pt = (p) => p && { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; out[name].p40 = { from: pt(q.from), to: pt(q.to), hand: pt(q.hand), mouth: pt(q.mouth), rope: !!q.rope }; }
         } else {
           // Đợt 35, lượt ba: cỡ TRÊN KHUNG — chiều cao đầu (`face`), bề ngang nét môi (`lipsW`), độ mở hàm (`jaw`, px).
           const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
@@ -14251,6 +15189,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // Đợt 36: độ há theo HÌNH HỌC trong khung của đầu — chiều cao khoang miệng (`ham`) / chiều cao bầu đầu (không tính tai, không
           // phụ thuộc đầu nghiêng hay cỡ cảnh).
           if (e.ham && typeof rig.skullHeight === 'function') { let h = 0; try { h = e.ham.getBBox().height; } catch (err) { h = 0; } out[name].jawRatio = h / rig.skullHeight(); }
+          // ĐỢT 40 A: số đo của sáu động tác chó (`rig.pet40Probe()`) — phần tử → tâm và cỡ trên màn hình, điểm → px trong `view`.
+          if (typeof rig.pet40Probe === 'function') { const q = rig.pet40Probe(); out[name].p40 = { s: q.s, toy: centre(q.toy), floor: centre(q.floor), howl: centre(q.howl), dirt: q.dirt.map(centre).filter(Boolean), end: q.end && { x: (q.end.x - box.left) * sx, y: (q.end.y - box.top) * sy } }; }
         }
       }
       // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
@@ -14543,6 +15483,84 @@ const COMBOS = {
       "wave"
     ],
     "vi": ["trả thú", "trả về", "giao thú", "xuất viện", "trả bé về"]
+  },
+  "groomingSession": {
+    "params": ["pet"],
+    "about": "a grooming session: trim the nails, put eye drops in, clean the ear, then a thumbs up (a final stroke leaves the pet half hidden behind the person when it stands on the exam table)",
+    "steps": [
+      ["clipNails", "$pet"],
+      ["eyeDrops", "$pet"],
+      ["cleanEars", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["chăm sóc tổng hợp", "spa thú cưng", "làm đẹp cho thú"]
+  },
+  "prepForExam": {
+    "params": [],
+    "about": "get ready to examine: wash the hands, put on gloves (they stay on afterwards)",
+    "steps": [["washHands", 2], "putOnGloves"],
+    "vi": ["chuẩn bị khám", "rửa tay đeo găng", "rửa tay mang găng"]
+  },
+  "assistedVaccination": {
+    "params": ["pet", "nurse"],
+    "about": "a vaccination with a helper: wash hands, gloves on, inject while the nurse holds the pet (restrain at the same time), gloves off, a treat",
+    "steps": [
+      ["washHands", 2],
+      "putOnGloves",
+      { "step": ["inject", "$pet"], "with": { "$nurse": [["restrain", "$pet"]] } },
+      "takeOffGloves",
+      ["giveTreat", "$pet"]
+    ],
+    "vi": ["tiêm có người giữ", "tiêm có phụ tá giữ", "tiêm có y tá giữ"]
+  },
+  "checkoutCounter": {
+    "params": ["customer"],
+    "about": "the cashier's side of paying: the customer scans the QR code while the cashier waits, change is handed back, the loyalty card is stamped, a wave",
+    "steps": [
+      { "step": ["idle", 2.6], "with": { "$customer": [["payByQR"]] } },
+      ["giveChange", "$customer"],
+      "stampCard",
+      "wave"
+    ],
+    "vi": ["thanh toán tại quầy", "tính tiền tại quầy", "thu ngân tính tiền"]
+  },
+  "farewellOwner": {
+    "params": ["owner"],
+    "about": "see an owner off: hand over the medicine bag, a pat on the shoulder, a wave",
+    "steps": [
+      ["handOverBag", "$owner"],
+      ["patShoulder", "$owner"],
+      "wave"
+    ],
+    "vi": ["tiễn khách", "dặn dò ra về", "tiễn chủ về"]
+  },
+  "celebrateWithKid": {
+    "params": ["kid"],
+    "about": "celebrate with a child: a high five, a cheer, a thumbs up",
+    "steps": [
+      ["highFive", "$kid"],
+      "cheer",
+      "thumbsUp"
+    ],
+    "vi": ["ăn mừng cùng bé", "ăn mừng với bé", "mừng với bé"]
+  },
+  "happyDog": {
+    "params": [],
+    "about": "a happy dog: a play bow, a wag, then trots off with a toy and drops it",
+    "steps": [["playBow", 1.2], "wagTail", ["carryToy", 120]],
+    "vi": ["chó vui", "chó vui vẻ", "chó rủ chơi"]
+  },
+  "cozyCat": {
+    "params": [],
+    "about": "a relaxed cat: washes its face, settles into a loaf, slow-blinks",
+    "steps": [["groomFace", 3], ["loaf", 2], ["slowBlink", 1]],
+    "vi": ["mèo thư giãn", "mèo thảnh thơi", "mèo lim dim"]
+  },
+  "happyBunny": {
+    "params": [],
+    "about": "a happy rabbit: a binky leap, stands up to look around, twitches its nose",
+    "steps": [["binky", 2], ["periscope", 1.6], ["noseTwitch", 1.6]],
+    "vi": ["thỏ vui", "thỏ vui vẻ", "thỏ tung tăng"]
   }
 };
 // END COMBOS
@@ -14948,7 +15966,7 @@ const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.80.0';
+const VERSION = '0.81.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
