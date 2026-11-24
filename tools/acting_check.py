@@ -1531,6 +1531,7 @@ def check_care38(folder, c, shots, scales):
         row('the chip number shown on a big card', bool(ok),
             f'"{c["id"]}" shown at {sum(1 for x in texts if x == c["id"])} of {len(texts)} moments; text ' + (f'{min(big) * 100:.1f} %' if big else '—') + f' of the frame height (least {CARD_TEXT * 100:g} %); covers '
             + (f'{max(over) * 100:.0f} %' if over else '—') + f' of {pet_n}\'s head and {max(over_face or [0]) * 100:.0f} % of {who_n}\'s face (limit {CARD_OVER * 100:g} % each); ' + (f'{min(inside) * 100:.0f} % in the frame' if inside else ''))
+    return out
 
 
 PAIR_HANDS = 0.04     # đợt 38 C — đập tay / đưa túi: hai lòng bàn tay cách nhau ≤ 4 % chiều cao người thấp hơn ở MỌI lúc đo

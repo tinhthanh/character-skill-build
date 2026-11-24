@@ -1245,6 +1245,27 @@ with tempfile.TemporaryDirectory() as work:
                                  ('bad hold', [{'who': 'y_ta', 'do': [['restrain', '@cho', 'long']]}], 'hold (0.5…12 s)'),
                                  ('pet restrains', [{'who': 'cho', 'do': [['restrain', '@cho']]}], 'done by a person')]:
         bad = dict(team, id='bad38', script=script)
+        path = os.path.join(os.path.dirname(stage), '_check_bad38.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad38'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'restrain ({name}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # Kịch bản chữ: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm", "[rửa tay, đeo găng]", "[tháo găng tay]".
+    text = os.path.join(work, 'team38.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · y tá (nurse) · chó (corgi, trên bàn)\n\nbác sĩ: [rửa tay, đeo găng]\n'
+                                            'cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm\ny tá → chó: giữ chặt\nbác sĩ: [tháo găng tay]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py restrain / gloves: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'team38.scene.json'), encoding='utf-8'))
+        flat = [step for entry in made['script'] for turn in (entry.get('together') or [entry]) for step in (turn.get('do') or [])]
+        for want in ('washHands', 'putOnGloves', ['restrain', '@cho'], ['inject', '@cho'], 'takeOffGloves'):
+            if want not in flat: problems.append(f'script.py restrain / gloves: {want} missing from {flat}')
+        if not any('together' in entry and any(['restrain', '@cho'] in (t.get('do') or []) for t in entry['together']) for entry in made['script']):
+            problems.append('script.py restrain / gloves: "cùng lúc: y tá → chó: giữ | …" did not make a together turn')
+
     # ĐỢT 38 C — HAI NGƯỜI VỚI NHAU. pairs38 (quầy lễ tân, cùng độ sâu): bác sĩ đưa túi thuốc cho bà (bà tự có túi đang cất), vỗ vai bà (bà
     # quay lại nhìn), đập tay bé trai (bác sĩ quỳ xuống — tay trẻ con chibi chỉ tới ngang vai), bé ôm bác sĩ, bác sĩ thì thầm với bé.
     # exam38 (phòng khám, hai độ sâu −560 / −580, một bé gái nhỏ hơn): y tá thì thầm với chủ nuôi, chủ nuôi ôm y tá, y tá đưa túi thuốc rồi
@@ -1299,20 +1320,6 @@ with tempfile.TemporaryDirectory() as work:
             done = build(path, os.path.join(work, 'bad38'))
         finally:
             if os.path.exists(path): os.remove(path)
-        if done.returncode == 0 or needle not in done.stderr: problems.append(f'restrain ({name}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
-    # Kịch bản chữ: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm", "[rửa tay, đeo găng]", "[tháo găng tay]".
-    text = os.path.join(work, 'team38.txt')
-    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · y tá (nurse) · chó (corgi, trên bàn)\n\nbác sĩ: [rửa tay, đeo găng]\n'
-                                            'cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm\ny tá → chó: giữ chặt\nbác sĩ: [tháo găng tay]\n')
-    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py restrain / gloves: ' + (done.stderr or done.stdout).strip()[-300:])
-    else:
-        made = json.load(open(os.path.join(work, 'team38.scene.json'), encoding='utf-8'))
-        flat = [step for entry in made['script'] for turn in (entry.get('together') or [entry]) for step in (turn.get('do') or [])]
-        for want in ('washHands', 'putOnGloves', ['restrain', '@cho'], ['inject', '@cho'], 'takeOffGloves'):
-            if want not in flat: problems.append(f'script.py restrain / gloves: {want} missing from {flat}')
-        if not any('together' in entry and any(['restrain', '@cho'] in (t.get('do') or []) for t in entry['together']) for entry in made['script']):
-            problems.append('script.py restrain / gloves: "cùng lúc: y tá → chó: giữ | …" did not make a together turn')
         if done.returncode == 0 or needle not in done.stderr: problems.append(f'two people ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
     # Kịch bản chữ: "đưa túi thuốc" (bác sĩ tự có túi), "an ủi", "đập tay", "ôm", "thì thầm".
     text = os.path.join(work, 'pairs38.txt')
