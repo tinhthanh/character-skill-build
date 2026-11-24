@@ -583,6 +583,93 @@ THROUGH = 0.03         # nấp: chạy ngang qua chân người mà đường s�
                        # (đợt 35, lượt hai: con shiba xa hơn cô bé 30 đơn vị — 1,6 %, Gemini thấy đi xuyên; xa hơn 100 — 5,3 %)
 
 
+PET_ACTS_40_NAMES = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
+# ĐỢT 40 B — mèo & thỏ: các phép đo riêng (xem check_pet40). Người chấm xem thưa (~1 khung / giây): dáng chính phải GIỮ ≥ 1 s.
+CLOSE_ACTS += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
+AIR_40 = ('binky', 'sitInBox')       # đợt 40 B: động tác có cú nhảy — bàn chân rời sàn là đúng
+HOLD_40 = 1.0          # dáng giữ ≥ 1 s
+LOAF_FLAT = 0.6        # nằm ổ bánh mì / nằm vật: đỉnh lưng cách sàn ≤ 60 % lúc đầu (đo theo chiều cao thân người xem thấy — máy quay có thể đổi cỡ giữa chừng)
+BLINK_SHUT = 0.3       # chớp mắt chậm: mắt nhắm khi cao ≤ 30 % lúc mở, nhắm liền ≥ 0,6 s
+ARCH_BIG = 1.25        # cong lưng: đỉnh lưng (cả lông dựng) cao ≥ 1,25 lần lúc đầu, giữ ≥ 1 s
+TOY_AWAY = 0.12        # vờn: cuộn len đi xa dần ≥ 12 % chiều cao con vật
+BOX_OVER = 0.25        # chui hộp: đầu chìm xuống dưới miệng hộp ≤ 25 % chiều cao đầu
+LIFT_40 = 0.12         # nhảy vui: bàn chân thấp nhất cách sàn ≥ 12 % chiều cao con vật (`tall`); đứng hai chân: bàn chân trước cách sàn ≥ 8 %
+TWITCH_N = 4           # giật mũi: mũi đổi chiều (phình / xẹp) ≥ 4 lần, biên độ ≥ 15 % bề ngang mũi
+
+
+def check_pet40(folder, c, track, what):
+    """Phép đo riêng cho mười động tác đợt 40 B (track = các khung mỗi 0,1 s suốt bước)."""
+    name, who, times = c['name'], c['who'], c.get('samples', [])
+    fr = [f[who] for f in track if f.get(who)]
+    if not fr or len(fr) != len(times) or not all(f.get('parts') for f in fr): return []
+    h = lambda b: b['y1'] - b['y0']
+    drawn = lambda a: max(b['y1'] for b in a['parts'].values()) - min(b['y0'] for b in a['parts'].values())
+    span = [drawn(a) for a in fr]
+    def run(flags):          # đoạn liền dài nhất (giây) mà điều kiện đúng
+        best = cur = 0.0
+        for k, ok in enumerate(flags):
+            cur = cur + (times[k] - times[k - 1] if k else 0.1) if ok else 0.0
+            best = max(best, cur)
+        return best
+    ok_ = lambda label, ok, note: [{'scene': folder, 'what': f'{what} — {label}', 'ok': bool(ok), 'note': note}]
+    if name == 'groomFace':
+        head = [a['parts'].get('head') for a in fr]
+        pw = [a.get('gpaw') for a in fr]
+        inside = [bool(p and hd and hd['x0'] <= (p['x0'] + p['x1']) / 2 <= hd['x1'] and hd['y0'] <= (p['y0'] + p['y1']) / 2 <= hd['y1']) for p, hd in zip(pw, head)]
+        ys = [(p['y0'] + p['y1']) / 2 for p, ins in zip(pw, inside) if p and ins]      # chỉ lúc chân đã trên mặt: nhấc chân từ sàn lên không tính là một cú quệt
+        mid = (max(ys) + min(ys)) / 2 if ys else 0
+        passes = sum(1 for a, b in zip(ys, ys[1:]) if a > mid >= b)
+        travel = (max(ys) - min(ys)) / max(span) if ys else 0      # biên độ quệt so với cả hình con vật
+        return ok_('the paw wipes over the face, stroke after stroke', sum(inside) >= 5 and passes >= 2 and travel >= 0.08,
+                   f'the paw is over the head in {sum(inside)} of {len(fr)} frames (least 5), {passes} strokes up (least 2), travels {travel * 100:.0f} % of the cat (least 8 %)')
+    top = [(a['ground'] - a['parts']['back']['y0']) / (a.get('tall') or 1) if a['parts'].get('back') else 0 for a in fr]      # đỉnh lưng cách sàn, theo `tall`
+    if name in ('loaf', 'flop'):
+        got = run([v <= LOAF_FLAT * top[0] for v in top])
+        return ok_('a low, compact shape, held', got >= HOLD_40, f'the top of the back is ≤ {LOAF_FLAT * 100:.0f} % of its first height for {got:.1f} s running (least {HOLD_40:g} s; lowest {min(top) / top[0] * 100:.0f} %)')
+    if name == 'slowBlink':
+        eye = [h(a['eye']) if a.get('eye') else None for a in fr]
+        if None in eye: return []
+        top = max(eye)
+        got = run([v <= BLINK_SHUT * top for v in eye])
+        return ok_('eyes close slowly and stay shut', got >= 0.6 and eye[0] > 0.7 * top, f'eyes shut ({BLINK_SHUT * 100:.0f} % of open) for {got:.1f} s running (least 0.6 s); open at the start: {eye[0] > 0.7 * top}')
+    if name == 'batToy':
+        toy = [a.get('toy') for a in fr]
+        xs = [(b['x0'] + b['x1']) / 2 * (1 if a.get('facing', 1) >= 0 else -1) for a, b in zip(fr, toy) if b]
+        ys = [(b['y0'] + b['y1']) / 2 for b in toy if b]
+        if len(xs) < 5: return ok_('the toy rolls away', False, f'the yarn ball is drawn in only {len(xs)} frames')
+        away = (max(xs) - xs[0]) / max(span)
+        hop = (max(ys) - min(ys)) / max(span)
+        return ok_('the toy bounces away', away >= TOY_AWAY and hop >= 0.05, f'the ball moves {away * 100:.0f} % of the cat\'s height away (least {TOY_AWAY * 100:g} %), bounces {hop * 100:.0f} % high (least 5 %) over {len(xs)} frames')
+    if name == 'archBack':
+        got = run([v >= ARCH_BIG * top[0] for v in top])
+        return ok_('back arched, fur puffed up, held', got >= HOLD_40, f'the top of the back is ≥ {ARCH_BIG:g} × its resting height for {got:.1f} s running (least {HOLD_40:g}); highest {max(top) / top[0]:.2f} ×')
+    if name == 'sitInBox':
+        flags = []
+        for a in fr:
+            hd, bx = a['parts'].get('head'), a.get('box')
+            flags.append(bool(hd and bx and (hd['x0'] + hd['x1']) / 2 >= bx['x0'] and (hd['x0'] + hd['x1']) / 2 <= bx['x1'] and (hd['y1'] - bx['y0']) <= BOX_OVER * h(hd) and hd['y0'] < bx['y0'] - 0.5 * h(hd)))
+        got = run(flags)
+        return ok_('head and ears out of the box, held', got >= HOLD_40, f'the head sits above the box rim, inside its width, for {got:.1f} s running (least {HOLD_40:g})')
+    if name == 'binky':
+        lift = max((a['ground'] - max(p['y1'] for p in a['paws'])) / (a.get('tall') or 1) for a in fr if a.get('paws')) if any(a.get('paws') for a in fr) else 0
+        widths = [a['parts']['back']['x1'] - a['parts']['back']['x0'] for a in fr if a['parts'].get('back')]
+        twist = min(widths) / max(widths) if widths else 1
+        return ok_('jumps clear of the floor with a twist', lift >= LIFT_40 and twist <= 0.85, f'highest lift {lift * 100:.0f} % of its height (least {LIFT_40 * 100:g} %), body width narrows to {twist * 100:.0f} % in the twist (at most 85 %)')
+    if name == 'periscope':
+        flags = [bool(a.get('front') and all((a['ground'] - p['y1']) / (a.get('tall') or 1) >= 0.08 for p in a['front'].values()) and v >= 1.1 * top[0]) for a, v in zip(fr, top)]
+        got = run(flags)
+        return ok_('stands up on the hind legs, front paws off the floor, held', got >= HOLD_40, f'front paws ≥ 8 % of its height off the floor and the back ≥ 1.1 × higher for {got:.1f} s running (least {HOLD_40:g})')
+    if name == 'noseTwitch':
+        w = [a['nose']['x1'] - a['nose']['x0'] for a in fr if a.get('nose')]
+        if len(w) < 8: return ok_('the nose twitches', False, f'the nose is measured in only {len(w)} frames')
+        mean = sum(w) / len(w)
+        d = [b - a for a, b in zip(w, w[1:]) if abs(b - a) > 0.02 * mean]
+        flips = sum(1 for a, b in zip(d, d[1:]) if (a > 0) != (b > 0))
+        amp = (max(w) - min(w)) / mean
+        return ok_('the nose twitches fast', flips >= TWITCH_N and amp >= 0.15, f'the nose swells and shrinks {flips} times (least {TWITCH_N}), by {amp * 100:.0f} % of its width (least 15 %) over {len(w)} frames')
+    return []
+
+
 def check_pet_act(folder, c, frames, seen=None, track=None):
     """ĐỘNG TÁC THÚ (đợt 35) ở lúc được hỏi: (1) ≥ 70 % khung thân con vật trong khung hình; (2) bàn chân thấp nhất trên sàn (± 4 %
     chiều cao con vật) — lăn ngửa: LƯNG trên sàn và cả bốn bàn chân cao hơn giữa thân (chổng trời); đang được bế thì thôi; (3) nấp: đầu
@@ -607,7 +694,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             up = all((p['y0'] + p['y1']) / 2 < (back['y0'] + back['y1']) / 2 for p in paws)
             out.append({'scene': folder, 'what': f'{what} — back on the floor, paws up', 'ok': abs(off) <= PAW_FLOOR + 0.02 and up,
                         'note': f'the back {off * 100:+.1f} % of its height off the floor (limit ±{(PAW_FLOOR + 0.02) * 100:g} %), ' + ('all four paws above the middle of the body' if up else 'a paw below the middle of the body') + f' at {t:g} s'})
-        else:
+        elif c['name'] not in AIR_40:
             worst = None
             for k, f in enumerate(frames):
                 a = f.get(c['who'])
@@ -630,6 +717,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         share = (span[1] - span[0]) / H if span else 0
         out.append({'scene': folder, 'what': f'{what} — big enough in the frame', 'ok': share >= PET_SHARE,
                     'note': f'{c["who"]} is {share * 100:.0f} % of the frame height at {t:g} s (least {PET_SHARE * 100:g} %)'})
+    if c['name'] in PET_ACTS_40_NAMES and track: out.extend(check_pet40(folder, c, track, what))       # đợt 40 B
     if c['name'] == 'chaseTail' and track:
         sides = [1 if f[c['who']]['facing'] >= 0 else -1 for f in track if f[c['who']].get('facing') is not None]
         flips = sum(1 for a, b in zip(sides, sides[1:]) if a != b)
