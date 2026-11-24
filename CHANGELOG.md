@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.79.0
+
+Added: 15 person actions (wave 38, three agents in parallel). Each one works as a rig method, in `sequence()`, in scene files
+(the partner's or pet's part added by itself), in Vietnamese scripts and in the action catalog, and is measured by
+`tools/acting_check.py`. 104 person actions in all.
+
+- **Vet care, hands on the pet** (A): `clipNails(pet)` lifts a front paw and clips three times; `eyeDrops(pet)` raises the
+  chin, a drop falls into the eye, the pet shuts its eyes; `cleanEars(pet)` wipes inside the ear with a cotton pad, then the
+  pet shakes its head; `scanChip(pet, { id })` passes a chip scanner over the neck, beeps, and a card shows the number.
+  - The person turns side-on to the pet, holds it with one hand and uses the tool with the other (gadgets 10–13). The head
+    turns to the work.
+  - The pet's paw, chin, eyes and head follow the person's hands (`petPaw`, `petChin`, `petBlink`, `petShake`), so the pet
+    never moves without a hand on it and needs no step of its own.
+  - Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai", "quét chip <số>".
+- **Teamwork and preparation** (B):
+  - `restrain(pet, hold)`: a nurse holds the pet with both hands, on the side opposite the person working on it. It plays
+    `together` with `inject`, `examine`, `takeTemp`…, and scene.py fits the hold to the partner's work.
+  - `washHands()`: rubbing with soap foam, then shaking the hands dry.
+  - `putOnGloves()` / `takeOffGloves()`: gloves are now per-hand timeline state (`gloveL/R`), shown as the other hand pulls
+    them on, and they stay on between steps. `wear('gloves')` sets the same state.
+  - Scripts: "giữ" (in a `cùng lúc:` line), "rửa tay", "đeo găng", "tháo găng".
+- **Two people together** (C): `highFive`, `hug`, `patShoulder`, `whisper` (the listener's `hearWhisper`: lean in, then
+  wide eyes and a nod) and `handOverBag` / `takeBag`, with a new held item `'bag'` (a medicine bag).
+  - They meet at a point that suits both heights; an adult kneels or crouches to a child.
+  - In 3D sets, the one in front is drawn over the other (`pairFront`).
+  - `lookAt` has a new `up` option.
+  - In `conversation()`, a `together` with one of these actions starts every part at the same moment.
+  - The catalog can now put a second person beside a person row.
+  - Scripts: "đập tay", "ôm", "vỗ vai" / "an ủi", "thì thầm", "đưa túi thuốc".
+- **CI**: scenes `care38`, `team38`, `pairs38` and `exam38`, plus refused scene files for each group and script tests.
+
+Trial film: `/Users/vetgo/Movies/character-skill-trials/dot38/dot38-actions.mp4`. It has three scenes (preparing and injecting with a
+nurse restraining, grooming and chip, the reception desk), which pass `acting_check` 39 / 39, 57 / 57 and 39 / 39.
+
+Fixed (merging the three branches)
+- `check_care38` lost its `return` in the merge, so it crashed on the care scene. The CI blocks of B and C were interleaved.
+  Both were rebuilt from the branch files, and every block a branch inserted was checked to be intact in the merged files.
+
+Known
+- A child kneeling to clip a dog's nails on the floor does not bend its head down far enough (the ray misses the clipper by
+  75 %). A cat's head is only just in view during `cleanEars` (62 %, least 60 %).
+- A chibi child's arm is short, so a child's high five meets at shoulder height. A child patting an adult touches the arm.
+- With two adults, the arms in a `hug` look stiff. In flat 2D scenes the "drawn in front" order of `pairFront` is not
+  applied.
+- Under the window light shaft of the exam preset, a person's arms look washed out (this was already so before wave 38).
+- The `takeTemp` card can overlap the restrainer's head when both stand close.
+- The reception close shot of the vet and the boy has a dark green line at the right edge (the set's plant, cut close).
+- Running several tools at once can make two dev servers race for the same port, so `peek.sh` captured another worktree's
+  scene. Use a random `PORT`.
+- Not reviewed by Gemini on the rendered film.
+
 ## 0.78.0
 
 Added: combos (wave 37), one step for a whole short scene, built from the actions that already exist
