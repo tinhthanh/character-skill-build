@@ -97,13 +97,17 @@ const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
 };
 
 /** Cốc giấy có nắp (cà phê mang đi), bàn tay nắm ngang thân cốc: bốn ngón ôm phía trước cốc (`grip: false` để bỏ). */
-export function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true } = {}) {
+// Đợt 39 A: `open: true` — cốc THUỶ TINH không nắp, đầy cà phê (cốc `pourDrink` rót vào). Rig đổi cốc nào cũng thành dáng ấy khi
+// kênh `brewL/R` > 0 (mức nước = kênh): `data-cup`, `data-cupbody`, `data-level` (mặt nước), `data-sleeve`, `data-lid`, `data-mouth` (miệng cốc).
+export function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true, open = false, full = false } = {}) {
   const line = lineOf(c);
   return `
-        <g transform="translate(0 12) rotate(90) scale(${size})">
-          <path d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${color}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
-          <path d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}"/>
-          <path d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round"/>
+        <g data-cup="${open || full ? 'open' : 'lid'}"${full ? ' data-full="1"' : ''} transform="translate(0 12) rotate(90) scale(${size})">
+          <path data-cupbody="${color}" d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${open || full ? '#e3f1f7' : color}" fill-opacity="${open || full ? 0.6 : 1}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
+          <path data-level="1" d="${open || full ? 'M -8.3 -15 L 8.3 -15 L 6.5 13 Q 0 15 -6.5 13 Z' : ''}" fill="#8a5432" style="${open || full ? '' : 'display:none'}"/>
+          <path data-sleeve="1" d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}" style="${open || full ? 'display:none' : ''}"/>
+          <path data-lid="1" d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round" style="${open || full ? 'display:none' : ''}"/>
+          <circle data-mouth="1" cx="0" cy="-17" r="0.6" fill="none"/>
         </g>${grip ? gripFingers(c) : ''}`;
 }
 
@@ -122,6 +126,14 @@ export function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true
         </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
 }
 
+
+// Đợt 39 A — "TING": dấu tick xanh trong vòng tròn + hai cung âm thanh, bật bởi kênh `ting` (`payByQR` / `payByCard`). Đặt trong hệ của MÓN ĐỒ
+// (đứng thẳng như món đồ), lệch lên phía trên (x dương) — `data-ting` để rig vẽ độ hiện / cỡ.
+const tingBadge = (x = 27) => `
+        <g data-ting="1" style="display:none"><g transform="translate(${x} 10)"><circle r="8.6" fill="#2fbf71" stroke="#16794a" stroke-width="1.2"/>
+          <path d="M 4 -3 L -1.2 3.8 L -4.6 0" transform="rotate(90)" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 0 -12.5 q 8 -2 14 0 M 0 12.5 q 8 2 14 0" stroke="#2fbf71" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".85"/></g></g>`;
+
 /**
  * Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ).
  * `image`: ảnh hiện trên màn hình (đường dẫn hay data URL — giao diện app chẳng hạn), lấp đầy màn hình, cắt theo góc bo.
@@ -138,7 +150,7 @@ export function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, 
           <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
           <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
           <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
-        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}`;
+        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}${tingBadge()}`;
 }
 let phoneClipCount = 0;
 
@@ -198,4 +210,55 @@ export function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff',
           <circle cx="0" cy="19" r="7.5" fill="${band}"/>
           <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
         </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
+}
+
+/**
+ * ĐỢT 39 A — THẺ NGÂN HÀNG (`payByCard`): thẻ nhựa xanh có chip vàng, cầm dọc mép dưới (ngón cái ở mặt trước). `data-card` để rig
+ * nhận ra. Hệ toạ độ như điện thoại.
+ */
+export function card(c, { color = '#2f6fd0', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-card="1" transform="translate(0 10) rotate(90)">
+          <rect x="-15" y="-21" width="30" height="20" rx="2.6" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <path d="M -15 -9 H 15" stroke="#ffffff" stroke-width="1.6" opacity=".35"/>
+          <rect x="-11" y="-18" width="7" height="5.4" rx="1.2" fill="#f2c94c" stroke="#a88424" stroke-width=".6"/>
+          <path d="M -11 -5 h 9 M 3 -5 h 7" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+          <path d="M 7 -17 q 2 2 0 4 M 9.5 -18.5 q 3.4 3.5 0 7" stroke="#ffffff" stroke-width="1" fill="none" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}${tingBadge(26)}`;
+}
+
+/**
+ * ĐỢT 39 A — THẺ TÍCH ĐIỂM / SỔ TIÊM (`stampCard`): thẻ trắng dải màu phòng khám, tám ô tròn — ba ô đã có dấu chân, ô thứ tư nhận
+ * DẤU ĐỎ (`data-ink`, rig bật theo kênh `inkL/R`; `stamped: true` = đã đóng sẵn). `data-stampcard` để rig nhận ra.
+ */
+export function stampcard(c, { color = '#ffffff', band = '#2f9e8f', stamped = false, grip = true } = {}) {
+  const line = lineOf(c);
+  const ring = (x, y, done) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${band}" stroke-width=".8" opacity=".8"/>${done ? `<circle cx="${x}" cy="${y}" r="2" fill="${band}" opacity=".7"/>` : ''}`;
+  return `
+        <g data-stampcard="1" transform="translate(0 10) rotate(90)"><circle data-stampspot="1" cx="13.5" cy="-16" r="0.6" fill="none"/>
+          <rect x="-20" y="-28" width="40" height="27" rx="2.4" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <rect x="-20" y="-28" width="40" height="7" rx="2.4" fill="${band}"/><path d="M -15 -24.5 h 12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+          ${[-13.5, -4.5, 4.5, 13.5].map((x, n) => ring(x, -16, n < 3)).join('')}${[-13.5, -4.5, 4.5, 13.5].map((x) => ring(x, -7, false)).join('')}
+          <g data-stampink="${stamped ? 'always' : '1'}" style="${stamped ? '' : 'display:none'}" transform="translate(13.5 -16)">
+            <circle r="5.6" fill="#e8f0f0" fill-opacity=".2" stroke="#d1263b" stroke-width="1.6"/><circle r="3.4" fill="none" stroke="#d1263b" stroke-width=".9"/>
+            <path d="M -2 1.4 h 4 M -1.2 -0.6 l 1.2 -1.6 l 1.2 1.6" stroke="#d1263b" stroke-width="1" fill="none" stroke-linecap="round"/></g>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+
+// Một tờ tiền (hệ cục bộ: tâm ở gốc, nằm ngang 30 × 14): giấy xanh nhạt, viền đậm, ô chân dung, hai dòng số — đủ rõ ở cảnh trung.
+export const banknote = (fill = '#bfe3c6', edge = '#2f7a4f', mark = '#2f7a4f') => `
+          <rect x="-15" y="-7" width="30" height="14" rx="1.6" fill="${fill}" stroke="${edge}" stroke-width="1"/>
+          <rect x="-12.6" y="-4.8" width="25.2" height="9.6" rx="1" fill="none" stroke="${mark}" stroke-width=".6" opacity=".7"/>
+          <circle cx="-5" cy="0" r="3.3" fill="${mark}" opacity=".55"/><path d="M 1.5 -2.4 h 8 M 1.5 0.4 h 6 M 1.5 3 h 8" stroke="${mark}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`;
+
+/**
+ * ĐỢT 39 A — XẤP TIỀN (`giveChange` / `takeChange`): vài tờ tiền xếp chồng, xoè lệch nhau, cầm ở một đầu (ngón cái đè lên mặt trước).
+ * `data-cash` để rig nhận ra. Hệ toạ độ như điện thoại.
+ */
+export function cash(c, { grip = true } = {}) {
+  return `
+        <g data-cash="1" transform="translate(0 10) rotate(90)">
+          <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
+        </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
 }

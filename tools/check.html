@@ -1595,6 +1595,92 @@ try {
       }
       stage.remove();
     }
+    // ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ: quét QR / quẹt thẻ tới đúng mã / máy rồi "ting", thối tiền (từng tờ sang tay, xấp tiền sang người nhận),
+    // đóng dấu (dấu đỏ ở lại), rót nước (dòng nước, mức nước dâng, cốc còn trong tay), lau quầy; mỗi cái qua sequence(), kết thúc ở dáng nghỉ; lỗi rõ.
+    {
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:900px;width:900px;height:300px'; document.body.appendChild(stage);
+      const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
+      const mk = (left, id, items, hidden) => L.createCharacter(spot(`left:${left}px;top:0;width:200px;height:235px`), { id, items, itemsHidden: hidden }).rig;
+      const unit = (rig) => rig.svg.getScreenCTM().a;
+      const at = (rig, el) => { const p = new DOMPoint(0, 0).matrixTransform(el.getScreenCTM()); const q = new DOMPoint(el.getAttribute('cx') ? +el.getAttribute('cx') : 0, el.getAttribute('cy') ? +el.getAttribute('cy') : 0).matrixTransform(el.getScreenCTM()); return [q.x, q.y]; };
+      const atRest = (rig, label, keep = []) => { for (const k of Object.keys(rig.NGHI)) if (typeof rig.NGHI[k] === 'number' && k !== 'x' && !['seat', 'huong', 'kneel', 'itemL', 'itemR', 'omRise', 'om'].includes(k) && !keep.includes(k) && Math.abs(rig.s[k] - rig.NGHI[k]) > 0.01) hong(label, `not back at rest — ${k} is ${rig.s[k].toFixed ? rig.s[k].toFixed(2) : rig.s[k]}, not ${rig.NGHI[k]}`); };
+      const refuse = (label, call, want) => { let message = ''; try { call(); } catch (error) { message = error.message; } if (!message.includes(want)) hong(label, `a bad call should be refused with "${want}" (got "${message || 'no error'}")`); };
+      L.seed(7);
+      // 1. Quét QR / quẹt thẻ: điện thoại cạnh mã QR, thẻ trên máy quẹt, tick xanh bật lên; tiết kiệm: đang cất thì lấy ra rồi cất lại.
+      for (const [name, item, part, near] of [['payByQR', 'phone', 'qr', 24], ['payByCard', 'card', 'reader', 16]]) {
+        const rig = mk(0, 'granny', { R: item }, false), stand = L.createProp(spot('left:40px;top:0;width:200px;height:235px'), 'paystand', { on: 112 });
+        const target = { x: stand[part].x + 80, y: stand[part].y }, line = L.sequence(rig, ['idle', [name, target, 1.2]], { breathe: false }), st = line.data.steps[1];
+        let seenTick = false, closest = 1e9;
+        for (let time = st.start; time <= st.start + st.duration; time += 1 / 30) {
+          line.time(time); rig.apDung();
+          const phone = rig.el.itemR.getBoundingClientRect(), pt = stand.svg.querySelector(`[data-pay-${part}]`).getBoundingClientRect();
+          if (rig.s.ting > 0.5) { seenTick = true; if (rig.el.itemR.querySelector('[data-ting]').style.display === 'none') hong(name, 'ting is set but the tick is not drawn'); }
+          if (!seenTick) closest = Math.min(closest, Math.hypot((phone.left + phone.right) / 2 - (pt.left + pt.right) / 2, (phone.top + phone.bottom) / 2 - (pt.top + pt.bottom) / 2) / unit(rig));
+        }
+        if (!seenTick) hong(name, 'no green tick after the scan');
+        if (closest > near) hong(name, `${item} never comes within ${near} units of the ${part === 'qr' ? 'QR code' : 'card reader'} (closest ${closest.toFixed(0)})`);
+        line.time(line.duration()); rig.apDung(); atRest(rig, name); line.kill();
+        const stowed = mk(0, 'granny', { R: item }, true), l2 = L.sequence(stowed, [[name, target, 1]], { breathe: false });
+        l2.time(l2.duration() * 0.5); stowed.apDung(); if (!(stowed.s.itemR > 0.5)) hong(name, 'a put-away item is not taken out for the scan');
+        l2.time(l2.duration()); stowed.apDung(); if (stowed.s.itemR > 0.01) hong(name, 'a put-away item is not put away again after the scan'); l2.kill();
+      }
+      refuse('payByQR', () => mk(0, 'granny', null, false).payByQR(), 'phone'); refuse('payByCard', () => mk(0, 'granny', null, false).payByCard(), 'bank card');
+      // 2. Thối tiền: từng tờ hiện trong tay kia (1 → 4), xấp tiền sang người nhận đúng lúc, cả hai về nghỉ.
+      {
+        const giver = mk(0, 'receptionist', { R: 'cash' }, false), taker = mk(100, 'granny', { R: 'cash' }, true);
+        const a = L.sequence(giver, [['giveChange', taker]], { breathe: false }), b = L.sequence(taker, [['takeChange', giver]], { breathe: false });
+        let notes = 0, max = 0, passed = null;
+        for (let time = 0; time <= Math.max(a.duration(), b.duration()); time += 1 / 30) {
+          a.time(time); b.time(time); giver.apDung(); taker.apDung();
+          const n = Math.round(giver.s.fanL) + Math.round(giver.s.fanR); if (n < notes) { /* gộp lại cuối cùng */ } else notes = n; max = Math.max(max, n);
+          if (passed === null && giver.s.itemR < 0.5 && taker.s.itemR < 0.5 && time > 3) passed = false;
+        }
+        if (max !== L.RigSVG.COUNT_NOTES) hong('giveChange', `${max} notes were counted into the hand, expected ${L.RigSVG.COUNT_NOTES}`);
+        a.time(a.duration()); b.time(b.duration()); giver.apDung(); taker.apDung();
+        if (giver.s.itemR > 0.01 || !(taker.s.itemR > 0.99)) hong('giveChange', `the notes do not end up in ${'the taker'}'s hand (giver ${giver.s.itemR.toFixed(2)}, taker ${taker.s.itemR.toFixed(2)})`);
+        if (giver.s.fanL || giver.s.gadgetL) hong('giveChange', 'a note or the counting hand is left over');
+        atRest(giver, 'giveChange', ['batR', 'cangR']); atRest(taker, 'takeChange', ['batR', 'cangR', 'headTurn', 'headPitch', 'headTilt']);        // tay đã trao đồ buông lỏng (không giữ dáng cầm); người nhận còn nhìn người đưa (thế `lookAt`) a.kill(); b.kill();
+        refuse('giveChange', () => mk(0, 'receptionist', null, false).giveChange(taker), 'banknotes'); refuse('takeChange', () => mk(0, 'granny', null, false).takeChange(giver), 'put-away banknotes');
+      }
+      // 3. Đóng dấu: dấu đỏ hiện lúc ấn và Ở LẠI trên thẻ; có người nhận thì thẻ sang tay họ.
+      {
+        const rig = mk(0, 'receptionist', { L: 'stampcard' }, false), line = L.sequence(rig, [['stampCard']], { breathe: false });
+        let pressed = 0, inkAt = null;
+        for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); rig.apDung(); if (Math.round(rig.s.gadgetR) === 21) pressed += 1 / 30; if (inkAt === null && rig.s.inkL > 0.5) inkAt = time; }
+        if (pressed < 1.5) hong('stampCard', `the stamp is in the hand for only ${pressed.toFixed(2)} s`);
+        if (!(rig.s.inkL > 0.99) || rig.el.itemL.querySelector('[data-stampink]').style.display === 'none') hong('stampCard', 'the red mark does not stay on the card');
+        if (inkAt === null || inkAt < 1.2) hong('stampCard', `the red mark appears at ${inkAt} s — before the stamp is pressed`);
+        if (Math.round(rig.s.gadgetR) !== 0) hong('stampCard', 'the stamp stays in the hand at the end'); atRest(rig, 'stampCard', ['inkL']); line.kill();
+        const giver = mk(0, 'receptionist', { L: 'stampcard' }, false), taker = mk(100, 'granny', { R: { kind: 'stampcard', stamped: true } }, true);
+        const a = L.sequence(giver, [['stampCard', taker]], { breathe: false }), b = L.sequence(taker, [['takeCard', giver]], { breathe: false });
+        a.time(a.duration()); b.time(b.duration()); giver.apDung(); taker.apDung();
+        if (giver.s.itemL > 0.01 || !(taker.s.itemR > 0.99)) hong('stampCard', 'the card does not pass to the other person'); a.kill(); b.kill();
+        refuse('stampCard', () => mk(0, 'receptionist', null, false).stampCard(), 'stamp card'); refuse('takeCard', () => mk(0, 'granny', null, false).takeCard(giver), 'stamp card');
+      }
+      // 4. Rót nước: dòng nước thấy được, mức nước dâng đều, xong cốc ĐẦY vẫn trong tay và đưa được (`handOver`).
+      {
+        const rig = mk(0, 'receptionist', { L: 'cup' }, false), line = L.sequence(rig, [['pourDrink']], { breathe: false }), cup = rig.el.itemL.querySelector('[data-cup]');
+        let last = 0, rising = true, streamSeen = 0;
+        for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); rig.apDung(); if (rig.s.brewL < last - 1e-6 && time < 3.2) rising = false; last = rig.s.brewL; if (rig.s.pourR > 0.5 && rig.el.gadgetR.querySelector('[data-stream]').style.display !== 'none') streamSeen += 1 / 30; }
+        if (!rising) hong('pourDrink', 'the level drops while pouring'); if (streamSeen < 1.4) hong('pourDrink', `the stream shows for only ${streamSeen.toFixed(2)} s`);
+        if (!(rig.s.brewL > 0.99) || !(rig.s.itemL > 0.99)) hong('pourDrink', `the full cup is not left in the hand (level ${rig.s.brewL.toFixed(2)}, item ${rig.s.itemL.toFixed(2)})`);
+        if (cup.getAttribute('data-cup') === 'open' && false) hong('pourDrink', 'unreachable');
+        if (rig.el.itemL.querySelector('[data-level]').style.display === 'none') hong('pourDrink', 'the liquid is not drawn in the full cup');
+        if (rig.s.gadgetR || rig.s.pourR) hong('pourDrink', 'the pitcher / stream is left over'); atRest(rig, 'pourDrink', ['brewL']);
+        try { line.kill(); rig.handOver(null).kill(); } catch (error) { hong('pourDrink', 'the poured cup cannot be handed over: ' + error.message); }
+        refuse('pourDrink', () => mk(0, 'receptionist', null, false).pourDrink(), 'cup');
+      }
+      // 5. Lau quầy: khăn trong tay, lướt ngang ≥ 20 đơn vị, gấp lại, xong hết khăn.
+      {
+        const rig = mk(0, 'receptionist', null, false), line = L.sequence(rig, [['wipeCounter', 2]], { breathe: false }), st = line.data.steps[0];
+        let lo = 1e9, hi = -1e9, folded = false;
+        for (let time = st.start + 0.6; time <= st.start + st.duration; time += 1 / 30) { line.time(time); rig.apDung(); const g = Math.round(rig.s.gadgetR) === 20 ? rig.el.gadgetR : Math.round(rig.s.gadgetL) === 20 ? rig.el.gadgetL : null; if (!g) continue; if (time < st.start + 2.4) { const r = g.getBoundingClientRect(); lo = Math.min(lo, r.left); hi = Math.max(hi, r.right); } if (g.querySelector('[data-folded]').style.display !== 'none') folded = true; }
+        if ((hi - lo) / unit(rig) < 40) hong('wipeCounter', `the cloth sweeps only ${((hi - lo) / unit(rig)).toFixed(0)} units sideways`); if (!folded) hong('wipeCounter', 'the cloth is never folded');
+        line.time(line.duration()); rig.apDung(); if (rig.s.gadgetR || rig.s.gadgetL) hong('wipeCounter', 'the cloth is left in the hand'); atRest(rig, 'wipeCounter'); line.kill();
+        refuse('wipeCounter', () => mk(0, 'receptionist', { R: 'cup', L: 'phone' }, false).wipeCounter(), 'free hand');
+      }
+      stage.remove();
+    }
     // QUA sequence() PHẢI GIỐNG GỌI TRỰC TIẾP — với MỌI động tác trong tools/action-catalog.json (bản mẫu mà
     // tools/actions.sh và tools/reel.py dùng). Một động tác đứng SAU một bước khác trong chuỗi (như trong cảnh thật) phải
     // đi qua đúng các trạng thái như khi gọi một mình: lệnh `set` ở mốc 0 của bước bị bỏ qua, tween ghi nhớ sai giá trị
@@ -1613,8 +1699,10 @@ try {
         // HAI NGƯỜI (đợt 38 C): hàng người có `person` — đặt người ấy bên phải, như tools/actions.html (ô cao 235 px).
         const tall = 235 * (entry.personScale || 1), partner = entry.person && !(id in RigThu.LOAI)
           ? L.createCharacter(spot(`left:${left + 100 + (entry.personGap || 84) - tall * 200 / 470}px;top:${235 - tall}px;width:${tall * 400 / 470}px;height:${tall}px`), { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig : null;
+        // ĐỢT 39 A — đế thanh toán (`entry.stand`: lệch `dx` đơn vị khung, mặt quầy cao `on`): `@qr` / `@reader` là mã QR / máy quẹt thẻ của nó, như tools/actions.html.
+        const stand = entry.stand ? L.createProp(spot(`left:${left + entry.stand.dx * 0.5}px;top:0;width:200px;height:235px`), 'paystand', { on: entry.stand.on }) : null;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        return { rig, name, args: args.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg)) };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
+        return { rig, name, args: args.map((arg) => (arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg)) };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
       };
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
@@ -2331,7 +2419,7 @@ try {
       const box = prop.svg.getBoundingClientRect(), drawn = [...prop.svg.children].map((el) => el.getBoundingClientRect());
       const bottom = Math.max(...drawn.map((r) => r.bottom)) - box.top;
       // Máy tính đứng trên MẶT BÀN cao `on` (mặc định 150 — đúng mặt bàn, mặt quầy mặc định), không trên sàn.
-      const rests = ['laptop', 'monitor'].includes(kind) ? 458 - 150 : 458;
+      const rests = ['laptop', 'monitor', 'paystand'].includes(kind) ? 458 - 150 : 458;      // đợt 39 A: quầy quét mã cũng đặt trên mặt quầy
       if (Math.abs(bottom - rests) > 6) hong(`prop ${kind}`, `does not stand on its ${rests === 458 ? 'floor line' : 'table top'} (bottom at ${bottom.toFixed(0)}, expected ${rests})`);
       propHost.remove();
     }

@@ -168,6 +168,8 @@ clips for every voice file.
    by themselves (nothing to add for the pet). Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai" / "lau tai", "quét chip <số>".
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
+   Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),
+   `["giveChange", "@customer"]` (counts notes, hands them over), `["stampCard"]` / `["stampCard", "@customer"]`, `["pourDrink"]`, `["wipeCounter", 2]`.
    The other person's part is added at the same time and the two step to the right distance; an adult kneels or crouches to a child.
    Script words: "đập tay", "ôm", "vỗ vai" / "an ủi", "thì thầm" / "nói nhỏ", "đưa túi thuốc" / "đưa thuốc".
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.

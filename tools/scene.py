@@ -43,7 +43,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
            "cutouts": [ { "kind": "plant", "x": -640, "z": 110 } ],        flat props or pictures; near the camera = a foreground
                       kinds: plant, chair, stool, table, counter, laptop, monitor ("screen": "app.png", laptop "facing"),
                       bowl ("fill": "food" | "water" | "empty"), scale ("reading": "4.2 kg"), carrier ("door": "right" | "left"), tree, lamp,
-                      scooter ("facing": "right" | "left"), xray (an X-ray viewer, "spot", "screen"); any cutout may "drive": { "from": -1500, "dur": 3.2, "ease" } in
+                      scooter ("facing": "right" | "left"), xray (an X-ray viewer, "spot", "screen"), paystand (QR stand + card reader — "y" is the counter height); any cutout may "drive": { "from": -1500, "dur": 3.2, "ease" } in
                       at the start (the conversation waits until it stops; a scooter's wheels turn)
            panels also take "image": "dash.png" (a TV / wall screen, a poster, an X-ray)
            "preset": "reception" | "exam" | "pharmacy" | "living-room" | "park" | "street" — a ready-made room or an
@@ -65,9 +65,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                `enter`: "left" | "right" | true — walks in from outside the frame to `x` before the script;
                true picks the NEARER edge, so the character does not cross the others on its way in.
                `seated`: true, or "chair" / "stool" to also draw that seat. `faces`: another character's name.
-               `holds`: "cup" | "clipboard" | "phone" | "syringe" | "pills" | "leash" | "bag" (right hand), { "L": "cup" }, or
+               `holds`: "cup" | "clipboard" | "phone" | "syringe" | "pills" | "leash" | "bag" | "card" | "stampcard" | "cash" (right hand), { "L": "cup" }, or
                { "R": { "kind": "phone", "image": "app.png" } } (a picture on the screen) — gives a person that item
-               to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"].
+               to hold. `"holdsHidden": true` keeps it put away, ready to be received with ["take", "@giver"]; `["L"]` keeps just that hand's item away.
   script       one entry per turn, played in order. `say` (+ `audio`, or `dur` seconds) speaks;
                `do` is a list of steps as in `sequence()` — "wave", ["walk", 4, 120], ["face", "@boy"]
                ("@name" refers to another character). Interaction steps: "drink", "write", ["stroke", "@pet"]
@@ -142,6 +142,12 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                then react and nod), ["handOverBag", "@owner"] (needs "holds": "bag": a medicine bag held out in both hands, they
                take it). The other person's part is added at the same time (alone in the turn, no "say"), and the two step to
                the right distance first; an adult kneels or crouches to a child. The receiver of the bag gets a put-away bag.
+               Cashier / café (items "phone", "card", "cash", "stampcard", "cup" — {"kind": "cup", "open": true}; put-away items are taken out by the action):
+               ["payByQR"] / ["payByCard"] (hold a phone / bank card to the QR code / reader of a "paystand" cutout — on a "reception" / "pharmacy" preset
+               one is put on the counter top for you — then a green tick; the payer walks up to it), ["giveChange", "@customer"] (counts banknotes hand to
+               hand, hands them over; the customer gets put-away notes), ["stampCard"] / ["stampCard", "@customer"] (stamp pressed, a red mark stays;
+               with a customer the card is handed over), ["pourDrink"] (stream into the cup, level rises, the full cup stays in hand — then "handOver"),
+               ["wipeCounter", 2]. The counter of the set is used when there is one (hands above it; the cloth on its top).
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -360,6 +366,29 @@ CUTOUT_KINDS = ('plant', 'chair', 'stool', 'table', 'counter', 'laptop', 'monito
 SCREEN_KINDS = ('laptop', 'monitor')                     # đạo cụ có màn hình: nhận `screen` (ảnh) — laptop thêm `facing`
 FLOOR_KINDS = ('bowl', 'scale', 'carrier', 'tree', 'lamp', 'floorlamp', 'tv', 'scooter')                           # đồ thú y đặt trên sàn: bát (`fill`), cân (`reading`)
 ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
+# ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ: quét QR / quẹt thẻ (cần một đế thanh toán `paystand` trên quầy — cảnh dựng sẵn tự thêm), thối tiền, đóng
+# dấu thẻ (đưa cho người kia nếu có đích), rót đồ uống, lau quầy. `giveChange` / `stampCard` với đích là bước HAI NGƯỜI (như đưa túi thuốc): người
+# kia nhận (`takeChange` / `takeCard`) cùng lúc, có sẵn món đồ đang cất.
+ITEM_KINDS = ITEM_KINDS + ('card', 'stampcard', 'cash')
+CUTOUT_KINDS = CUTOUT_KINDS + ('paystand',)
+DESK_39 = ('payByQR', 'payByCard', 'giveChange', 'stampCard', 'pourDrink', 'wipeCounter')
+DESK_PAY = ('payByQR', 'payByCard')
+DESK_ITEM = {'payByQR': 'phone', 'payByCard': 'card', 'giveChange': 'cash', 'stampCard': 'stampcard', 'pourDrink': 'cup'}      # món đồ phải đang cầm
+DESK_NOUN = {'phone': 'a phone', 'card': 'a bank card', 'cash': 'banknotes', 'stampcard': 'a stamp card', 'cup': 'a cup'}
+DESK_OPTIONS = {'open', 'full', 'stamped'}                 # tuỳ chọn của món đồ cầm: cốc thuỷ tinh (đầy), thẻ tích điểm đã đóng dấu
+PAY_REACH = 0.17                                           # người trả tiền đứng cách đế thanh toán chừng này × chiều cao (tay chibi ngắn)
+PAIR_38.update({'giveChange': 'takeChange', 'stampCard': 'takeCard'})
+PAIR_PARTS = PAIR_PARTS + ('takeChange', 'takeCard')
+PAIR_GAP.update({'giveChange': 0.4, 'stampCard': 0.4})
+REACH_ACTIONS.update({'payByQR': 'desk', 'payByCard': 'desk', 'pourDrink': 'desk', 'wipeCounter': 'desk'})        # chỉ để moments.json lấy giờ thật của bước
+PAIR_ASK.update({'giveChange': 'Is {who} counting banknotes from one hand to the other and then handing them to {target}?',
+                 'stampCard': 'Is {who} pressing a stamp onto a card (a red mark stays) and then handing the card to {target}?'})
+DESK_ASK = {'payByQR': 'Is {who} holding a phone up to the QR code on the stand, with a green tick showing afterwards?',
+            'payByCard': 'Is {who} tapping a bank card on the card reader, with a green tick showing afterwards?',
+            'stampCard': 'Is {who} pressing a stamp onto a card held in the other hand, with a red mark left on the card?',
+            'pourDrink': 'Is {who} pouring a drink from a pitcher into a cup, a stream visible and the cup filling up?',
+            'wipeCounter': 'Is {who} wiping the counter top with a cloth, head bent towards it?',
+            'giveChange': 'Is {who} counting banknotes from one hand to the other and then handing them over?'}
 CAMERA_KEYS = ('yaw', 'pitch', 'distance', 'lens', 'x', 'y', 'z', 'zoom', 'blur')
 # Tốc độ lia dễ chịu (mỗi giây) — vượt quá thì hình dời quá xa mỗi khung, ở 30 khung/giây mắt thấy giật cục.
 CAMERA_SPEED = {'x': 220, 'y': 160, 'z': 220, 'yaw': 18, 'pitch': 8, 'distance': 420, 'zoom': 0.4}
@@ -646,6 +675,40 @@ def care_window(kind, length):
     return [round(a + 0.15 * n, 2) for n in range(int((b - a) / 0.15) + 1)]
 
 
+def desk39_plan(name, t0, span, hold):
+    """ĐỢT 39 A — lúc đo của một bước quầy thu ngân / cà phê (giây tuyệt đối): `times` (mọi lúc cần chụp), `phases` (lúc nào đo gì), `samples` (mỗi 1/30 s).
+    Số liệu trùng RigSVG (runtime/rig-svg.js): quét 0,6 s + 0,45 s tiến sát + hold; đếm 0,6 + 0,62 × 4 tờ; ấn dấu 1,35 s; rót 1,25 s + 1,9 s; lau 0,55 s + hold."""
+    r = lambda *v: [round(t0 + x, 2) for x in v if x < span - 0.1]
+    phases = {}
+    def put(label, times):
+        for t in times: phases[str(t)] = label
+        return times
+    if name in DESK_PAY:
+        hold = hold if hold is not None else (1.4 if name == 'payByQR' else 1.2)
+        at1 = 0.6 if name == 'payByQR' else 1.1
+        scanned = at1 + 0.45 + hold
+        near = put('near', r(at1 + 0.5, at1 + 0.45 + hold * 0.5, scanned - 0.1))
+        tick = put('tick', r(scanned + 0.4, scanned + 0.7, scanned + 1.0))
+        return {'times': near + tick, 'phases': phases}
+    if name == 'stampCard':
+        press = put('press', r(1.55, 1.85, 2.05)); mark = put('mark', r(2.5, 2.9))
+        out = {'times': press + mark, 'phases': phases, 'samples': r(*[1.55 + n / 30 for n in range(16)])}
+        return out
+    if name == 'giveChange':
+        count = [0.6 + 0.62 * n + 0.248 for n in range(4)]
+        touch = put('count', r(*count)); notes = put('notes', r(*[c + 0.2 for c in count]))
+        give = 0.6 + 0.62 * 4 + 1.05
+        return {'times': touch + notes, 'phases': phases, 'samples': r(*[give + 0.4 + n / 30 for n in range(21)]), 'counted': 4}
+    if name == 'pourDrink':
+        pour = put('pour', r(1.6, 2.2, 2.9)); full = put('full', r(4.5))
+        return {'times': pour + full, 'phases': phases}
+    if name == 'wipeCounter':
+        hold = hold if hold is not None else 2
+        wipe = put('wipe', r(*[0.55 + hold * f for f in (0.1, 0.25, 0.4, 0.55, 0.7, 0.85)]))
+        return {'times': wipe, 'phases': phases}
+    return None
+
+
 def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, names):
     """NHỮNG KHOẢNH KHẮC ÁNH SÁNG của cảnh, kèm câu hỏi có / không mà câu trả lời đúng là "có" — cho tools/light_audit.py
     chụp ảnh tĩnh đúng lúc ấy và hỏi từng điều cụ thể (chấm cả video thì người / máy chấm nói ngược với hình: đợt 21)."""
@@ -764,6 +827,17 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if plan38:
                 moments.append({'t': plan38['times'][1], 'what': f'{op["who"]} {op["kind"]} {op["target"]} — the tool at work', 'ask': plan38['ask'], 'check': plan38['check']})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
+        if op['kind'] == 'desk39' or (op['kind'] == 'pair' and op['name'] in DESK_39):
+            # ĐỢT 39 A — quầy thu ngân / cà phê: lúc đo theo nhịp của rig (RigSVG.PAY_* / COUNT_* / STAMP_* / POUR_* …), tools/acting_check.py `desk39`.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            plan = desk39_plan(op['name'], float(step['start']), float(step['duration']), op.get('hold'))
+            if not plan: continue
+            check = dict({'kind': 'desk39', 'name': op['name'], 'who': op['who'], 'target': op.get('target')}, **plan)
+            moments.append({'t': plan['times'][len(plan['times']) // 2], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op.get('target') else ''),
+                            'ask': [(DESK_ASK if op['kind'] == 'desk39' else PAIR_ASK)[op['name']].format(who=op['who'], target=op.get('target'))], 'check': check})
+            continue
         if op['kind'] == 'pair':
             # HAI NGƯỜI (đợt 38 C): đo ở nhiều lúc trong bước (tools/acting_check.py `pair`), hỏi ở lúc giữa; người kia (và người làm) quay
             # đầu nhìn nhau — trừ khi ôm (hai mặt áp má, hướng ra người xem).
@@ -1312,6 +1386,15 @@ def main():
         bag_turns = [t for entry in (scene.get('script') or []) for t in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry])]
         if not pet and 'holds' not in who and any(isinstance(t, dict) and isinstance(t.get('do'), list) and any(isinstance(step, list) and len(step) > 1 and step[0] == 'handOverBag' and step[1] == '@' + name for step in t['do']) for t in bag_turns):
             who['holds'], who['holdsHidden'] = 'bag', True
+        # ĐỢT 39 A: người được `["giveChange", "@người này"]` / `["stampCard", "@người này"]` mà không cầm gì thì có sẵn xấp tiền / thẻ tích điểm ĐANG CẤT.
+        for kind, item in (('giveChange', 'cash'), ('stampCard', {'kind': 'stampcard', 'stamped': True})):
+            if not pet and any(isinstance(t, dict) and isinstance(t.get('do'), list) and any(isinstance(step, list) and len(step) > 1 and step[0] == kind and step[1] == '@' + name for step in t['do']) for t in bag_turns):
+                if 'holds' not in who: who['holds'], who['holdsHidden'] = {'R': item}, True
+                elif not who.get('holdsHidden') and (isinstance(who['holds'], str) or isinstance(who['holds'], dict) and len(who['holds']) == 1 and not set(who['holds']) - {'L', 'R'}):
+                    # Đang cầm một món khác (điện thoại): xấp tiền / thẻ nhận được đặt ở TAY KIA, đang cất (`holdsHidden: ["L"]`).
+                    mine = {'R': who['holds']} if isinstance(who['holds'], str) else dict(who['holds'])
+                    free = 'L' if 'R' in mine else 'R'
+                    who['holds'] = dict(mine, **{free: item}); who['holdsHidden'] = [free]
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
@@ -1332,13 +1415,13 @@ def main():
                 held = {side: held}
             # Một món đồ: tên, hoặc { "kind": "phone", "image": "app.png" } (ảnh trên màn hình điện thoại).
             def item_ok(item):
-                if isinstance(item, dict): return item.get('kind') in ITEM_KINDS and set(item) <= {'kind', 'image'} and (not item.get('image') or item['kind'] == 'phone')
+                if isinstance(item, dict): return item.get('kind') in ITEM_KINDS and set(item) <= {'kind', 'image'} | DESK_OPTIONS and (not item.get('image') or item['kind'] == 'phone')
                 return item in ITEM_KINDS
             if not isinstance(held, dict) or not held or any(side not in ('L', 'R') or not item_ok(item) for side, item in held.items()):
                 fail(f'character "{name}": "holds" must be one of {", ".join(ITEM_KINDS)}, an object such as {{"L": "cup"}}, or {{"R": {{"kind": "phone", "image": "app.png"}}}} — got {js(who.get("holds"))}')
             for item in held.values():
                 if isinstance(item, dict) and item.get('image') and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(args.scene)), item['image'])): fail(f'character "{name}": holds image not found: {item["image"]}')
-            if who.get('holdsHidden') not in (None, False, True): fail(f'character "{name}": "holdsHidden" must be true or false')
+            if who.get('holdsHidden') not in (None, False, True) and not (isinstance(who['holdsHidden'], list) and who['holdsHidden'] and set(who['holdsHidden']) <= {'L', 'R'}): fail(f'character "{name}": "holdsHidden" must be true, false or a list of hands such as ["L"]')
             who['holds'] = held
         # `wears`: phụ kiện của thú — "cone" (loa chống liếm), "bandage" (băng chân), hay một danh sách.
         if 'wears' in who:
@@ -1375,6 +1458,24 @@ def main():
     # ── kịch bản ──
     script = scene.get('script')
     if not isinstance(script, list) or not script: fail('"script" must be a non-empty list of turns')
+    # ĐỢT 39 A — QUẦY THU NGÂN: lượt quét QR / quẹt thẻ cần một đế thanh toán (`paystand`: mã QR + máy quẹt thẻ). Bối cảnh 3D chưa có thì tự đặt một cái lên
+    # MẶT QUẦY (hộp tên "counter" — cảnh dựng sẵn "reception" / "pharmacy") ở đầu quầy gần người trả tiền nhất, sát mép TRƯỚC (phía khách đứng — khách vẽ ĐÈ lên đế, thấy điện thoại trên mã QR).
+    def desk_steps():
+        for entry in script:
+            for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+                if not isinstance(turn, dict): continue
+                for step in (turn.get('do') or []) if isinstance(turn.get('do'), list) else []:
+                    name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+                    if name in DESK_39: yield turn, step, name
+    payers = [turn.get('who') for turn, step, name in desk_steps() if name in DESK_PAY]
+    if payers and stage_set is not None and payers[0] in names and not any(item.get('kind') == 'paystand' for item in stage_set.get('cutouts', [])):
+        counters = [box for box in stage_set.get('boxes', []) if 'counter' in str(box.get('name', ''))]
+        if not counters: fail('"payByQR" / "payByCard" need a pay stand on a counter: add a cutout { "kind": "paystand", "x": …, "z": …, "y": <counter height> } to "set", or use "preset": "reception" / "pharmacy" (they have a counter — the stand is added for you)')
+        payer = names[payers[0]]
+        box = min(counters, key=lambda b: abs(float(b['x']) + float(b['width']) / 2 - float(payer['x'])))
+        right = float(payer['x']) >= float(box['x']) + float(box['width']) / 2
+        stage_set.setdefault('cutouts', []).append({'kind': 'paystand', 'name': 'paystand', 'x': round(float(box['x']) + float(box['width']) - 70) if right else round(float(box['x']) + 70),
+                                                    'z': round(float(box['z']) - 24), 'y': float(box['height'])})
     # AI CÓ CON VẬT NẤP SAU LƯNG (đợt 35, lượt bốn): người ấy nói thì múa tay phía KIA — tay phía con vật vẽ đè lên cái đầu nó đang ló ra.
     hiders = {}
     for entry in script:
@@ -1438,6 +1539,65 @@ def main():
         if me.get('faces') in names and not names[me['faces']]['_pet']: return me['faces']
         others = [w for w in names.values() if w['name'] != actor and not w['_pet']]
         return min(others, key=lambda w: abs(float(w.get('x', 0)) - float(me.get('x', 0))))['name'] if others else None
+
+    # ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ: kiểm tra đối số, viết bước. Quét QR / quẹt thẻ: đích là mã QR / máy quẹt thẻ của đế `paystand` (bối cảnh 3D: cutout
+    # — `set.targetPoint`; cảnh 2D: đạo cụ "paystand" trong "props"); lau quầy: một điểm trên mặt quầy gần người lau; rót nước, đóng dấu: không cần đích.
+    def desk_holds(actor, kind):
+        holds = names[actor].get('holds')
+        # Món đồ đang CẤT cũng được (xấp tiền, thẻ tích điểm…): rig tự lấy ra lúc làm (`#heldWith`) và cất lại sau — như `readChart`.
+        return any((item if isinstance(item, str) else (item or {}).get('kind')) == kind for item in (holds.values() if isinstance(holds, dict) else [holds]))
+
+    def desk_stand(who, label):
+        """(x trong phòng, mã bộ phận, hàm điểm) của đế thanh toán gần người `who` nhất; None nếu không có."""
+        if stage_set is not None:
+            stands = [(n, c) for n, c in enumerate(stage_set.get('cutouts', [])) if c.get('kind') == 'paystand' and (label is None or c.get('name') == label)]
+            if not stands: return None
+            n, c = min(stands, key=lambda it: abs(float(it[1]['x']) - float(who['x'])))
+            unit = float(c.get('height', round(person_default * 0.74))) / 470
+            return float(c['x']), lambda part: f"set.targetPoint({who['name']}, [{float(c['x']):g} + (cutout{n + 1}Prop.{part}.x - 200) * {unit:.5f}, {float(c.get('y', 0)):g} + (458 - cutout{n + 1}Prop.{part}.y) * {unit:.5f}, {float(c['z']):g}])"
+        stands = [prop for prop in scene.get('props', []) if isinstance(prop, dict) and prop.get('kind') == 'paystand' and (label is None or prop.get('name') == label) and 'x' in prop]
+        if not stands: return None
+        prop = min(stands, key=lambda it: abs(float(it['x']) - float(who['x'])))
+        top = 458 - float(prop.get('tabletop', 150)); unit_prop = float(prop.get('height', person_default)) / 470
+        at = {'qr': (175, top - 33), 'reader': (226, top - 47)}
+        return float(prop['x']), lambda part: f"{{ x: {200 + (float(prop['x']) + (at[part][0] - 200) * unit_prop - float(who['x'])) / who['_unit']:.1f}, y: {at[part][1]:.1f} }}"
+
+    def desk_counter(who):
+        """Hộp quầy (3D) / đạo cụ quầy (2D) gần người `who` nhất: điểm trên MẶT quầy, phía người ấy đứng; None nếu không có."""
+        if stage_set is not None:
+            boxes = [box for box in stage_set.get('boxes', []) if 'counter' in str(box.get('name', ''))]
+            if not boxes: return None
+            box = min(boxes, key=lambda b: max(0, float(b['x']) - float(who['x']), float(who['x']) - float(b['x']) - float(b['width'])))
+            x = min(max(float(who['x']), float(box['x']) + 40), float(box['x']) + float(box['width']) - 40)
+            behind = float(who.get('z', -300)) < float(box['z']) - float(box['depth']) / 2
+            z = float(box['z']) - float(box['depth']) + 34 if behind else float(box['z']) - 34
+            return x, (box, f"set.targetPoint({who['name']}, [{x:g}, {float(box['height']):g}, {z:g}])")
+        counters = [prop for prop in scene.get('props', []) if isinstance(prop, dict) and prop.get('kind') == 'counter' and 'x' in prop]
+        if not counters: return None
+        prop = min(counters, key=lambda it: abs(float(it['x']) - float(who['x'])))
+        x = float(prop['x'])
+        return x, (prop, f"{{ x: {200 + (min(max(float(who['x']), x - float(prop.get('width', 300)) / 2 + 30), x + float(prop.get('width', 300)) / 2 - 30) - float(who['x'])) / who['_unit']:.1f}, y: {458 - float(prop.get('tabletop', 150)):.1f} }}")
+
+    def desk_code(step, name, where, actor):
+        who = names[actor]
+        if who['_pet']: fail(f'{where}: "{name}" is done by a person, not a pet')
+        args = list(step[1:]) if isinstance(step, list) else []
+        need = DESK_ITEM.get(name)
+        if need and not desk_holds(actor, need):
+            fail(f'{where}: "{name}" needs {DESK_NOUN[need]} in hand — give "{actor}" "holds": {js(need)} (script lines get it for you)')
+        hold = args.pop() if args and isinstance(args[-1], (int, float)) and not isinstance(args[-1], bool) else None
+        label = args.pop(0) if args and isinstance(args[0], str) and not args[0].startswith('@') else None
+        if args: fail(f'{where}: "{name}" takes ' + {'payByQR': '["payByQR", "<paystand name>", seconds]', 'payByCard': '["payByCard", "<paystand name>", seconds]', 'wipeCounter': '["wipeCounter", seconds]'}.get(name, f'just "{name}"') + f' — got {js(step)}')
+        if hold is not None and not (name in DESK_PAY + ('wipeCounter',) and 0.5 <= hold <= 12): fail(f'{where}: "{name}" seconds must be 0.5…12 (quét / lau only) — got {js(step)}')
+        if name in ('pourDrink', 'stampCard', 'giveChange'):
+            counter = desk_counter(who)
+            return js(name) if not counter else f"['pourDrink', {{ top: {counter[1][1]} }}]" if name == 'pourDrink' else f"['stampCard', null, {{ top: {counter[1][1]} }}]"
+        if name in DESK_PAY:
+            found = desk_stand(who, label)
+            if found is None: fail(f'{where}: "{name}" needs a pay stand — a set.cutouts item {{ "kind": "paystand", "x": …, "z": …, "y": <counter height> }} (3D), or a props item {{ "kind": "paystand", "x": … }} (2D)' + (f' named "{label}"' if label else ''))
+            return '[' + ', '.join([js(name), found[1]('qr' if name == 'payByQR' else 'reader')] + ([js(hold)] if hold is not None else [])) + ']'
+        counter = desk_counter(who)
+        return '[' + ', '.join(["'wipeCounter'", js(hold if hold is not None else 2)] + ([counter[1][1]] if counter else [])) + ']'
 
     def step_code(step, where, actor=None):
         if isinstance(step, (int, float)): return js(step)
@@ -1512,8 +1672,21 @@ def main():
                 if listener and not (len(step) > 3 and isinstance(step[3], dict) and 'to' in step[3]): extra.append(f"{{ to: {listener}, gaze: set.target({actor}, {listener}, 'head') }}")
                 elif len(step) > 3: extra.append(js(step[3]).replace('"@', '').replace('"', '') if isinstance(step[3], dict) and str(step[3].get('to', '')).startswith('@') else js(step[3]))
                 return '[' + ', '.join(["'showXray'", spot] + extra) + ']'
+        # ĐỢT 39 A — quầy thu ngân: bước một mình (quét QR, quẹt thẻ, rót nước, đóng dấu, lau quầy); thối tiền / đóng dấu với đích là người kia: người đưa phải cầm đồ.
+        desk = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+        if desk in DESK_39 and actor in names and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')): return desk_code(step, desk, where, actor)
+        if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and not desk_holds(actor, DESK_ITEM[desk]):
+            fail(f'{where}: "{desk}" needs {"banknotes" if desk == "giveChange" else "a stamp card"} in hand — give "{actor}" "holds": {js(DESK_ITEM[desk])}')
+        if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and names[step[1][1:]]['_pet']:
+            fail(f'{where}: "{desk}" needs the other person: ["{desk}", "@<person name>"] — a pet cannot take {"banknotes" if desk == "giveChange" else "a card"}; got {js(step)}')
+        if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and not names[step[1][1:]]['_pet']:
+            got, hidden = names[step[1][1:]].get('holds'), names[step[1][1:]].get('holdsHidden')
+            if not any((item if isinstance(item, str) else (item or {}).get('kind')) == DESK_ITEM[desk] and (hidden is True or (isinstance(hidden, list) and side in hidden)) for side, item in (got.items() if isinstance(got, dict) else [('R', got)])):
+                fail(f'{where}: "{step[1][1:]}" has no free hand to receive the {"banknotes" if desk == "giveChange" else "stamp card"} from "{actor}" (two hands: they already hold other things) — give them "holds": {{"L": {js(DESK_ITEM[desk])}}} with "holdsHidden": ["L"], or let them put the other item away first')
+        if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and desk_counter(names[actor]):
+            return f"[{js(desk)}, {step[1][1:]}, {{ top: {desk_counter(names[actor])[1][1]} }}]"      # mặt quầy: tay và đồ vật nằm trên quầy, không khuất sau nó
         # HAI NGƯỜI (đợt 38 C): đích là một NGƯỜI khác ("@tên"); đưa túi thuốc cần túi trong tay, nhận túi cần túi đang cất.
-        if care in tuple(PAIR_38) + PAIR_PARTS and actor in names:
+        if care in tuple(PAIR_38) + PAIR_PARTS and actor in names and step != 'stampCard':
             if names[actor]['_pet']: fail(f'{where}: "{care}" is done by a person — a pet cannot {care}')
             if not (isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and not names[step[1][1:]]['_pet'] and step[1][1:] != actor):
                 fail(f'{where}: "{care}" needs the other person: ["{care}", "@<person name>"] — got {js(step)}')
@@ -1834,11 +2007,14 @@ def main():
             if height > width * 1.2 and targets and names[targets[0]]['_pet']: return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='medium', mid=True)
             # Bắt tay / đưa đồ giữa hai người: hai bàn tay gặp nhau ngang hông — cỡ trung cắt ngang đúng chỗ ấy (đợt 28).
             # Cân (đợt 35): con vật đặt lên cân dưới SÀN — góc toàn (thấy chân người, bệ cân).
-            low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh') for step in turn.get('do', []))
+            low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh', 'giveChange', 'stampCard') for step in turn.get('do', []))
             # Cho thuốc / đo nhiệt độ (đợt 35, lượt ba): GÓC CẬN người + con vật — viên thuốc, miệng con vật, mặt người nhìn nhiệt kế chỉ
             # vài pixel ở góc trung hai người (Gemini đọc ~1 khung / giây).
             if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') + CARE_38 for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
                 return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='close')
+            # ĐỢT 39 A: quầy thu ngân / cà phê một mình — góc trung (tờ tiền, thẻ, con dấu, bình rót, khăn chỉ vài pixel ở góc toàn).
+            if not targets and any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in DESK_39 for step in turn.get('do', [])):
+                return dict(span, subjects=[who['name']], size='full' if any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in DESK_PAY + ('wipeCounter',) for step in turn.get('do', [])) else 'medium')
             # Rửa tay, đeo / tháo găng (đợt 38 B): góc trung một mình người ấy — bọt, găng ở hai bàn tay trước ngực chỉ vài pixel ở góc toàn.
             if not targets and any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in PREP_ACTIONS for step in turn.get('do', [])):
                 return dict(span, subjects=[who['name']], size='medium')
@@ -1886,6 +2062,23 @@ def main():
                    and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
+            # ĐỢT 39 A: quét QR / quẹt thẻ — đứng cách đế thanh toán `PAY_REACH` × chiều cao (phía mình đang đứng); lau quầy — đứng trước mặt quầy (trong bề ngang của nó).
+            for step in (turn.get('do') or []) if isinstance(turn.get('do'), list) else []:
+                nm = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+                if nm not in DESK_PAY + ('wipeCounter',) or who.get('seated') or (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')): continue
+                if nm in DESK_PAY:
+                    found = desk_stand(who, step[1] if isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None)
+                    if not found: continue
+                    wanted_x = found[0] + (1 if float(who['x']) >= found[0] else -1) * PAY_REACH * who['_host_height']
+                else:
+                    counter = desk_counter(who)
+                    if not counter: continue
+                    wanted_x = counter[0]
+                move = wanted_x - float(who['x'])
+                if abs(move) > 0.04 * who['_host_height']:
+                    turns.append((f'  // {who["name"]} steps up to the {"pay stand" if nm in DESK_PAY else "counter"} for "{nm}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                    emitted[0] += 1
+                    who['x'] = float(who['x']) + move
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_35 + CARE_ACTIONS + tuple(PAIR_38) and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
@@ -2126,6 +2319,10 @@ def main():
                 if name in PREP_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': 'prep', 'name': name, 'who': turn.get('who'), 'target': None,
                                      'hold': float(step[1]) if name == 'washHands' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], (int, float)) else 2.0})
+                # ĐỢT 39 A: quầy thu ngân / cà phê một mình — moments.json đo tick / dấu đỏ / dòng nước / khăn (acting_check `desk39`).
+                if name in DESK_39 and turn.get('who') in names and not names[turn['who']]['_pet'] and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')):
+                    nums = [item for item in (step[1:] if isinstance(step, list) else []) if isinstance(item, (int, float)) and not isinstance(item, bool)]
+                    gear_ops.append({'turn': emitted[0], 'kind': 'desk39', 'name': name, 'who': turn.get('who'), 'target': None, 'hold': float(nums[-1]) if nums else None})
                 # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ trước ngực, trong khung; tay chỉ trúng điểm trên phim (acting_check).
                 if name in CHART_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': name, 'name': name, 'who': turn.get('who'), 'target': step[1] if name == 'showXray' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) else None,
@@ -2314,7 +2511,7 @@ def main():
     # ── đạo cụ ──
     props = []
     for index, prop in enumerate(scene.get('props', [])):
-        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale, carrier, tree, lamp, scooter) and "x"')
+        if not isinstance(prop, dict) or prop.get('kind') not in ('chair', 'stool', 'table', 'counter', 'paystand') + FLOOR_KINDS or 'x' not in prop: fail(f'props[{index}] needs "kind" (chair, stool, table, counter, bowl, scale, carrier, tree, lamp, scooter) and "x"')
         if 'facing' in prop and (prop['kind'] != 'scooter' or prop['facing'] not in ('right', 'left')): fail(f'props[{index}].facing must be "right" or "left" (scooter only)')
         if 'fill' in prop and (prop['kind'] != 'bowl' or prop['fill'] not in ('food', 'water', 'empty')): fail(f'props[{index}].fill must be "food", "water" or "empty" (bowl only)')
         if 'reading' in prop and (prop['kind'] != 'scale' or not isinstance(prop['reading'], str)): fail(f'props[{index}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
@@ -2457,6 +2654,7 @@ def main():
             spot = f"const cutout{n + 1}Spot = " if item.get('drive') or rider else ''
             if item.get('kind'):
                 options = {'color': item.get('color')}
+                if item['kind'] == 'paystand': options['on'] = 0            # đợt 39 A: đứng trên mặt quầy (`y` của cutout), không trên sàn khung
                 if item['kind'] in SCREEN_KINDS:
                     # Đứng trên mặt hộp (`y`) hay trên sàn: đạo cụ tự đặt ở sàn khung của nó (on: 0), cutout lo phần nâng.
                     options['on'] = 0
@@ -2679,7 +2877,7 @@ def main():
                 name = copy_asset(base, out, item['image'], copied)
                 item = dict(item, image=name)
             held[side] = item
-        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])}" + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (', itemsHidden: true' if who.get('holdsHidden') else '') if who.get('holds') else '') + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })"
+        make = f"VGCharacter.createPet({mount}, {{ species: {js(who['species'])}" + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })" if who['_pet'] else f"VGCharacter.createCharacter({mount}, {{ id: {js(who['id'])}" + (f", items: {js(held)}" + (f", itemsHidden: {js(who['holdsHidden'])}" if who.get('holdsHidden') else '') if who.get('holds') else '') + (f", wear: {js(who['wears'])}" if who.get('wears') else '') + " })"
         setup.append(f"    const {who['name']} = {make}.rig;")
         if stage_set is not None:
             boxes = [box.get('name') for box in stage_set.get('boxes', [])]
@@ -2725,6 +2923,7 @@ def main():
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
                    'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door'),
                    'facing': prop['options'].get('facing')}
+        if prop['kind'] == 'paystand' and options.get('height') is not None: options['on'] = options.pop('height')            # đợt 39 A: mặt quầy cao `tabletop`
         setup.append(f"    VGCharacter.createProp($('{prop['element']}'), {js(prop['kind'])}, {js({k: v for k, v in options.items() if v is not None})});")
     for who in names.values():
         if who.get('_seat') and stage_set is not None:
