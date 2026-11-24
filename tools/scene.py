@@ -134,6 +134,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                ["knead", 6] (cats), ["lick", "@boy"] (dogs, cats: the boy kneels and holds out a hand at the same time — added for you;
                a pet the boy carries licks his face — he bends his cheek to it, "offerCheek"), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet
                a z 60–120 further than the vet's so it runs behind the vet, not through the legs), ["eatCarrot", 4] (the rabbit).
+               Dog actions (wave 40): "playBow" (play bow, rump up), ["howl", 1.6] (sits, head back, wavy sound lines), ["dig", 4] (paws scrape, dirt flies back),
+               ["carryToy", 120, { "kind": "rope" | "bone" }] (trots with a toy in its mouth; no distance = on the spot) or ["carryToy", "@boy", { "kind": "bone" }]
+               (trots to him and drops it at his feet), ["leanOnLeg", "@boy"] (walks up and leans against his leg), ["tugOfWar", "@boy", 2.4] (the dog is walked a rope's length
+               from him and the boy pulls the other end of the rope at the same time — his ["pullToy", "@dog"], added for you). Give the dog and the person the same z.
                In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot, lick or bark (and no "view") cuts to a close
                shot of the pet for that turn — the pet ≥ 35 % of the frame height, others may be cropped — then back.
                Two people together: ["highFive", "@boy"] (both slap raised hands between them), ["hug", "@owner"] (step in, arms
@@ -289,6 +293,13 @@ PET_ACT_ASK = {'rollOver': 'Is the animal lying on its back, belly up, with its 
                'hide': 'Is the animal hiding behind someone, only its head peeking out, scared?',
                'eatCarrot': 'Is the rabbit holding a carrot to its mouth with its front paws, nibbling it?',
                'bark': 'Is the dog barking — mouth wide open, head tossed up, bark lines in front of its mouth?'}
+PET_ACTS += ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')     # đợt 40 A — sáu động tác của chó
+PET_ACT_ASK.update({'playBow': 'Is the dog in a play bow — front legs stretched out, chest on the floor, rump up, tail wagging, mouth open?',
+                    'howl': 'Is the dog sitting and howling — head thrown back, muzzle up, mouth in an O, eyes shut, wavy sound lines rising?',
+                    'dig': 'Is the dog digging — nose down, front paws scraping the floor in turns, dirt flying back between its hind legs?',
+                    'carryToy': 'Is the dog trotting with a toy (a rope or a bone) in its mouth, head high and proud — or dropping it on the floor?',
+                    'leanOnLeg': 'Is the dog leaning its side against the person\'s leg, looking up at them with half-closed eyes?',
+                    'tugOfWar': 'Is the dog in a tug of war — gripping a rope in its mouth, braced, pulling back and shaking its head, the rope taut to the person\'s hand?'})
 CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
@@ -411,6 +422,9 @@ VIEW_KEYS = CAMERA_KEYS + ('dur', 'ease', 'cut', 'wide', 'on', 'size', 'back', '
 # khung, lưỡi và chân trước chỉ vài điểm ảnh. `alone`: được lẹm người khác; `fill`: phần chiều cao khung con vật chiếm.
 PET_CLOSE = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
 PET_CLOSE_FILL = 0.62
+PET_CLOSE += ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')      # đợt 40 A — góc cận con vật (dựa chân / kéo co: chân và tay người, đầu dây vẫn lọt vào khung)
+TUG_STAND = 0.29             # đợt 40 A: mõm con chó cách giữa người bấy nhiêu × chiều cao người lúc kéo co (runtime/rig-thu.js TUG_ROPE: along + reach)
+TUG_SNOUT = 84               # … đầu dây ở mõm cách giữa khung con chó chừng ấy đơn vị khung của nó (thế giật ngược)
 VIEW_SIZES = ('close', 'medium', 'full')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
 # vòng xa hơn thì không có mặt sau để xoay tới.
@@ -994,7 +1008,9 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                      else [round(t0 + (t1 - t0) * f, 2) for f in ((0.25, 0.4, 0.5) if op['name'] == 'chaseTail' else (0.4, 0.55, 0.7))])
             # DẢI MỐC (đợt 35, lượt hai): đuổi đuôi — mỗi 1/15 s suốt quãng chạy vòng (đếm số lần đổi hướng); nhào — mỗi 0,06 s (biên độ
             # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
-            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 1 / 30), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2)}.get(op['name'])
+            span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 1 / 30), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2),
+                    'playBow': (t0 + 0.5, t1 - 0.5, 0.2), 'howl': (t0 + 1.1, t1 - 0.7, 0.2), 'dig': (t0 + 0.4, t1 - 0.5, 0.06), 'carryToy': (t0 + 0.7, t1 - 0.3, 0.2),
+                    'leanOnLeg': (t0 + 0.6, t1 - 0.5, 0.2), 'tugOfWar': (t0 + 0.9, t1 - 0.6, 0.1)}.get(op['name'])      # đợt 40 A
             samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
                             'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},
@@ -2120,6 +2136,32 @@ def main():
         # LẠI GẦN trước khi vuốt ve / đưa đồ: tay nhân vật ngắn (với tới chừng 0,2 × chiều cao host). Đích đứng xa hơn tầm
         # ấy thì chèn một lượt bước tới trước — người vuốt ve dừng cách con vật 0,24 × chiều cao, người đưa đồ dừng cách
         # người nhận 0,45 × chiều cao (hai cánh tay cùng vươn). Chỗ đứng mới được ghi lại cho các lượt sau.
+        # ĐỢT 40 A — KÉO CO: con chó đi tới cách người một sợi dây (mõm cách giữa người `TUG_STAND` × chiều cao) rồi mới ngậm dây; đứng sai chỗ thì dây
+        # quá dài hay con chó chồm lên chân người.
+        for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            if not isinstance(turn, dict) or turn.get('who') not in names or not names[turn['who']]['_pet'] or not isinstance(turn.get('do'), list): continue
+            for step in turn['do']:
+                # Động tác TỰ đi của con chó (dựa chân, tha đồ chơi tới người / đi một quãng): ghi lại chỗ nó đứng sau đó, cho lượt kéo co sau nó tính đúng.
+                if isinstance(step, list) and step and step[0] in ('leanOnLeg', 'carryToy'):
+                    pet, aim = names[turn['who']], (names.get(step[1][1:]) if len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None)
+                    if aim and not aim['_pet']:
+                        px = float(aim['x']) + aim.get('_drop', 0)
+                        side = 1 if px >= float(pet['x']) + pet.get('_drop', 0) else -1
+                        pet['x'] = px - side * (0.085 * 0.96 * aim['_host_height'] + 78 * pet['_unit']) if step[0] == 'leanOnLeg' else px - side * (0.13 * 0.96 * aim['_host_height'] + 88 * pet['_unit'])
+                    elif step[0] == 'carryToy' and len(step) > 1 and isinstance(step[1], (int, float)) and not isinstance(step[1], bool):
+                        face = names.get(pet.get('faces')) if pet.get('faces') else None
+                        pet['x'] = float(pet['x']) + (1 if not face or float(face['x']) >= float(pet['x']) else -1) * float(step[1]) * pet['_unit']
+                if not (isinstance(step, list) and len(step) > 1 and step[0] == 'tugOfWar' and isinstance(step[1], str) and step[1][1:] in names): continue
+                pet, person = names[turn['who']], names[step[1][1:]]
+                if person['_pet']: fail(f'{where}: "tugOfWar" is with a person who holds the other end of the rope — "{step[1]}" is a pet')
+                px = float(person['x']) + person.get('_drop', 0)
+                side = 1 if px >= float(pet['x']) + pet.get('_drop', 0) else -1
+                want = px - side * TUG_STAND * 0.96 * person['_host_height'] - side * TUG_SNOUT * pet['_unit']
+                move = want - (float(pet['x']) + pet.get('_drop', 0))
+                if abs(move) > 0.03 * person['_host_height']:
+                    turns.append((f'  // {pet["name"]} goes a rope\'s length from {person["name"]} for the "tugOfWar"', f"[{pet['name']}, ['walk', 4, {round(move / pet['_unit'])}]]"))
+                    emitted[0] += 1
+                    pet['x'] = float(pet['x']) + move
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
             if not isinstance(turn, dict) or turn.get('who') not in names: continue
             who = names[turn['who']]
@@ -2455,7 +2497,7 @@ def main():
             if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
                 licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
                 entry['view'] = ({'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
-                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
+                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.94 if 'leanOnLeg' in acts else 0.88 if ('tugOfWar' in acts or 'leanOnLeg' in acts or ('carryToy' in acts and any(isinstance(st, list) and st and st[0] == 'carryToy' and len(st) > 1 and isinstance(st[1], str) for st in entry.get('do') or []))) else 0.9 if ('playBow' in acts or 'dig' in acts or 'carryToy' in acts) else 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
             view_of(entry, where)
             if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
@@ -2568,6 +2610,19 @@ def main():
                     code = '{ together: [' + pet_code + f", [{person['name']}, " + ("'kneel', " if low else '') + hand + (", 'standUp'" if low else '') + ']] }'
                     gear_ops.append({'turn': emitted[0] + 1, 'kind': 'offerHand', 'who': person['name'], 'target': entry['who']})
                     emitted[0] += 1
+            # ĐỢT 40 A — `["tugOfWar", "@người"]` một mình: người ấy giữ đầu kia sợi dây cùng lúc (`pullToy`); lỗi rõ khi đích không phải người.
+            tugged = [step for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in ('tugOfWar', 'leanOnLeg') and isinstance(step[1], str)] if isinstance(entry, dict) and isinstance(entry.get('do'), list) else []
+            for step in tugged:
+                if not names[entry['who']]['_pet']: fail(f'{where}: "{step[0]}" is a dog\'s action — "{entry["who"]}" is a person')
+                person = names.get(step[1][1:]) if step[1].startswith('@') else None
+                if not person or person['_pet']: fail(f'{where}: "{step[0]}" needs a person: ["{step[0]}", "@<person name>"] — got {js(step)}')
+                if stage_set is not None and abs(float(person.get('z', -300)) - float(names[entry['who']].get('z', -300))) > 60:
+                    reach_notes.append(f'{where}: "{entry["who"]}" does "{step[0]}" with "{step[1][1:]}", which stands at z {float(person.get("z", -300)):g} — {abs(float(person.get("z", -300)) - float(names[entry["who"]].get("z", -300))):g} units nearer or further than the dog (z {float(names[entry["who"]].get("z", -300)):g}); the dog and the person are drawn in separate planes: give them the same z (within 60)')
+            if tugged and tugged[0][0] == 'tugOfWar' and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
+                person = names[tugged[0][1][1:]]
+                hold = tugged[0][2] if len(tugged[0]) > 2 and isinstance(tugged[0][2], (int, float)) and not isinstance(tugged[0][2], bool) else 2.4
+                code = '{ together: [' + code + f", [{person['name']}, ['pullToy', {names[entry['who']]['name']}, {js(hold)}]]] }}"
+                emitted[0] += 1
             turns.append((None, code))
             emitted[0] += 1
         for pet, who in turned_back:

@@ -80,6 +80,11 @@ PERSON_MOODS = {'vui': 'happy', 'buồn': 'sad', 'ngạc nhiên': 'surprised', '
                 'buồn ngủ': 'sleepy'}
 PET_MOODS = {'vui': 'happy', 'hào hứng': 'excited', 'phấn khích': 'excited', 'buồn': 'sad', 'sợ': 'scared', 'sợ hãi': 'scared', 'giận': 'angry', 'tò mò': 'curious',
              'hối lỗi': 'guilty', 'có lỗi': 'guilty', 'đau': 'pain', 'buồn ngủ': 'sleepy'}
+# ĐỢT 40 A — sáu động tác của chó (gộp vào ACTIONS / TARGETED ngay sau khi hai bảng ấy được định nghĩa). "rủ chơi" giờ là `playBow` (chổng mông, một mình);
+# "chó → bé: kéo co" / "dựa chân" / "tha đồ chơi" cần người làm đích.
+ACTIONS_40A = {'rủ chơi': 'playBow', 'chổng mông': 'playBow', 'tru': 'howl', 'hú': 'howl', 'đào': 'dig', 'đào đất': 'dig', 'bới': 'dig',
+               'ngậm đồ chơi': 'carryToy', 'tha đồ chơi': 'carryToy'}; TARGETED_40A = {'kéo co': ('tugOfWar', None), 'dựa chân': ('leanOnLeg', None), 'dựa vào chân': ('leanOnLeg', None),
+               'tha đồ chơi': ('carryToy', None), 'ngậm đồ chơi': ('carryToy', None)}
 ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc đầu': 'shake', 'vỗ tay': 'clap', 'giơ ngón cái': 'thumbsUp', 'like': 'thumbsUp',
            'suy nghĩ': 'ponder', 'khoanh tay': 'crossArms', 'chống nạnh': 'handsOnHips', 'nhún vai': 'shrug', 'reo': 'cheer', 'ăn mừng': 'cheer',
            'cúi chào': 'bow', 'gãi đầu': 'scratchHead', 'xem đồng hồ': 'checkWatch', 'giới thiệu': 'introduce', 'gọi': 'callOut', 'thở phào': 'relief',
@@ -96,6 +101,7 @@ ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc �
            # đợt 35: hồ sơ & phim X-quang (người)
            'đọc bệnh án': 'readChart', 'xem bệnh án': 'readChart', 'đọc hồ sơ': 'readChart', 'xem hồ sơ': 'readChart',
            'chỉ phim': 'showXray', 'chỉ phim x-quang': 'showXray', 'xem phim x-quang': 'showXray', 'chỉ x-quang': 'showXray'}
+ACTIONS.update(ACTIONS_40A)       # đợt 40 A
 # ĐỢT 39 B — sáu cử chỉ thường ngày không đạo cụ. "cười" vẫn là TÂM TRẠNG ("tên (cười): lời"); "[cười lớn]" / "[cười ha hả]" trong ngoặc
 # vuông là ĐỘNG TÁC cười cả người (`laugh`: ngửa đầu, vai rung, tay ôm bụng) — xem BRACKET_FIRST. "(cười lớn)" trong ngoặc tròn vẫn là nét mặt.
 ACTIONS.update({'cười lớn': 'laugh', 'cười ha hả': 'laugh', 'lau nước mắt': 'wipeTears', 'chùi nước mắt': 'wipeTears', 'che mặt': 'facepalm',
@@ -110,6 +116,7 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'băng chân': ('bandage', None), 'băng bó': ('bandage', None), 'quấn băng': ('bandage', None), 'băng': ('bandage', None),
             'đeo loa': ('putCone', None), 'đeo vòng chống liếm': ('putCone', None), 'đeo vòng cổ chống liếm': ('putCone', None),
             'liếm': ('lick', None), 'liếm tay': ('lick', None), 'liếm mặt': ('lick', None), 'nấp': ('hide', None), 'trốn': ('hide', None), 'nấp sau': ('hide', None)}
+TARGETED.update(TARGETED_40A)      # đợt 40 A
 # ĐỢT 39 A — quầy thu ngân & quầy cà phê: trả tiền (quét mã QR / quẹt thẻ), thối tiền, đóng dấu thẻ, rót nước, lau quầy. Người làm tự có đồ cần cầm
 # (điện thoại, thẻ ngân hàng, xấp tiền, thẻ tích điểm, cốc) — xem `needs` bên dưới; người nhận có sẵn món đồ đang cất (tools/scene.py).
 TARGETED.update({'thối tiền': ('giveChange', None), 'trả tiền thừa': ('giveChange', None), 'đóng dấu': ('stampCard', None), 'đóng dấu thẻ': ('stampCard', None)})

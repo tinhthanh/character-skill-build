@@ -1255,6 +1255,36 @@ with tempfile.TemporaryDirectory() as work:
     if done.returncode != 0: problems.append('script.py barista: ' + (done.stderr or done.stdout).strip()[-300:])
     elif 'cup' not in open(os.path.join(work, 'drink39.scene.json'), encoding='utf-8').read(): problems.append('script.py barista: "rót nước" did not give a cup')
 
+    # ĐỢT 40 A — sáu động tác của chó: chổng mông rủ chơi, tru, đào đất, tha đồ chơi (dây thừng / xương, tới người), dựa chân người, kéo co (người `pullToy` cùng lúc,
+    # tools/scene.py tự thêm và đưa con chó tới cách người một sợi dây). pets40a: phòng khách, bé trai và con chó; pets40b: công viên, bác sĩ và husky. acting_check đo
+    # dáng, đồ chơi trong mõm, chân áp vào chân người, sợi dây căng giữa mõm và bàn tay.
+    pets40 = {'pets40a': {'id': 'pets40a', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -330, 'z': -500, 'faces': 'be'}],
+                        'script': [{'who': 'cho', 'do': [['playBow', 1.4]]}, {'who': 'cho', 'do': [['howl', 1.8]]}, {'who': 'cho', 'do': [['dig', 5]]}, {'who': 'cho', 'do': [['carryToy', 90, {'kind': 'rope'}]]},
+                                   {'who': 'cho', 'do': [['carryToy', '@be', {'kind': 'bone'}]]}, {'who': 'cho', 'do': [['leanOnLeg', '@be', 2]]}, {'who': 'cho', 'do': [['tugOfWar', '@be', 2.4]]}]},
+               'pets40b': {'id': 'pets40b', 'camera': 'auto', 'set': {'preset': 'park'}, 'characters': [{'name': 'vet', 'id': 'vet', 'x': 0, 'z': -500}, {'name': 'husky', 'species': 'husky', 'x': -300, 'z': -500, 'faces': 'vet'}],
+                        'script': [{'who': 'husky', 'do': [['playBow', 1.2]]}, {'who': 'husky', 'do': [['leanOnLeg', '@vet', 2]]}, {'who': 'husky', 'do': [['tugOfWar', '@vet', 2.4]]}, {'who': 'husky', 'do': [['howl', 1.6]]}]}}
+    for key, scene in pets40.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{key}.json')
+        try:
+            json.dump(scene, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, key))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{key}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, key, 'index.html'), encoding='utf-8').read()
+        if "{ together: [[" + scene['script'][-1 if key == 'pets40a' else 2]['who'] + ", [\"tugOfWar\"" not in html or "['pullToy'," not in html: problems.append(f'{key}: the person is not given the other end of the rope (pullToy together with tugOfWar)')
+        if "goes a rope's length" not in html: problems.append(f'{key}: the dog is not walked a rope\'s length from the person before the tug')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, key)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{key}: ' + (done.stdout.strip() or done.stderr.strip())[-600:]); continue
+        who = 'cho' if key == 'pets40a' else 'husky'; person = 'be' if key == 'pets40a' else 'vet'
+        for needle in (f'{who} playBow — chest low, rump up', f'{who} playBow — pose held', f'{who} howl — sitting, head back, mouth an O, eyes shut', f'{who} howl — sound lines rising', f'{who} howl — howl held',
+                       f'{who} leanOnLeg {person} — side against the leg', f'{who} leanOnLeg {person} — leaning, looking up, eyes half shut', f'{who} leanOnLeg {person} — feet planted',
+                       f'{who} tugOfWar {person} — rope drawn', f'{who} tugOfWar {person} — rope ends at the mouth', f'{who} tugOfWar {person} — rope starts at the hand', f'{who} tugOfWar {person} — rope taut, a sensible length',
+                       f'{who} tugOfWar {person} — rope held in the mouth', f'{who} tugOfWar {person} — shakes its head', f'{who} tugOfWar {person} — feet planted',
+                       f'{who} playBow — big enough in the frame', f'{who} howl — big enough in the frame', f'{who} tugOfWar — big enough in the frame')\
+                + ((f'{who} dig — tn paw scrapes', f'{who} dig — dirt flying', f'{who} carryToy — toy in its mouth', f'{who} carryToy {person} — toy dropped at their feet') if key == 'pets40a' else ()):
+            if needle not in done.stdout: problems.append(f'{key}: acting_check did not measure {needle!r}')
+
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
     # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.
     ride = os.path.join(ROOT, 'examples', 'scene-ride', 'scene.json')

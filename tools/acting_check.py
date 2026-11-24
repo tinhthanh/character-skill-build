@@ -564,6 +564,7 @@ KNEAD_BEAT = 0.5       # … mỗi lần ấn ≥ 0,5 s
 PET_SHARE = 0.35       # (lượt ba) lượt động tác riêng của thú: hình con vật cao ≥ 35 % khung ở lúc được hỏi — ở góc toàn nó chỉ ~1/12 khung
 TONGUE_LONG = 0.25     # lưỡi lúc chạm đích dài ≥ 1/4 chiều cao đầu
 CLOSE_ACTS = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
+CLOSE_ACTS += ('playBow', 'howl', 'dig', 'carryToy', 'tugOfWar')       # đợt 40 A
 PET_JUMP = 0.05            # (lượt bốn) giữa hai khung liền nhau (1/30 s) con vật được bế / bàn tay chìa cho liếm dời ≤ 5 % chiều cao người, ĐO SO VỚI
                        # NGƯỜI ẤY (máy quay lia / đổi cỡ thì cả hai cùng dời) — nhấc lên ngực trong 0,6 s nhanh nhất ~4 %; dịch tức thời thì hơn nhiều
 HAND_ON_FACE = 0.15    # … bàn tay chìa cho liếm che ≤ 15 % khung đầu con vật (không đè lên mặt nó)
@@ -758,6 +759,156 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
                     off = (person['feet'] - person['ground']) / person['tall'] if person.get('feet') is not None else None
                     out.append({'scene': folder, 'what': f'{c["target"]} holds out a hand standing — feet on the floor', 'ok': off is not None and abs(off) <= FEET,
                                 'note': f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)' if off is not None else 'feet not seen'})
+    return out
+
+
+
+# ĐỢT 40 A — sáu động tác của chó (số đo từ `set.careProbe()` → `p40` của con vật và của người kéo, cùng `actingProbe` — hình thể).
+TARGETS_40A = set()              # người là đích của một động tác chó đợt 40 A trong cảnh (góc cận con vật cắt họ ở mép)
+PET_40A = ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')
+BOW_CHEST, BOW_RUMP = 20, 6      # chổng mông: vai hạ ≥ 20 đơn vị, hông nhổm ≥ 6 đơn vị so với lúc đứng
+HOLD_POSE = 1.0                  # … và giữ dáng ≥ 1 s (người chấm xem thưa ~1 khung / giây)
+HOWL_HEAD = 25                   # tru: đầu ngửa ≥ 25°
+DIG_TRAVEL = 0.12                # đào: mỗi bàn chân trước cào lùi / đưa tới ≥ 12 % chiều cao con vật; ≥ 3 lượt mỗi chân (đợt 40 A: 4 lượt mặc định)
+LEAN_GAP = 0.025                 # dựa chân: thân / đầu con chó cách ống chân người ≤ 2,5 % chiều cao người (chạm — không hở)
+ROPE_END = 0.025                 # kéo co: đầu dây cách mõm / bàn tay ≤ 2,5 % chiều cao người
+ROPE_LEN = (0.08, 0.6)           # … và dây dài 8 – 60 % chiều cao người (không ngắn cũn, không rùng rình thành sợi dây dắt)
+ROPE_STEADY = 0.3                # … dài không đổi quá 30 % giữa các mốc (căng: không chùng rồi giật)
+FOOT_SLIDE = 0.04                # kéo co / dựa chân: bàn chân (khung hình) dời ≤ 4 % chiều cao con vật trong lúc giằng co — chân không trượt
+
+
+def check_pet40(folder, c, frames, track):
+    """ĐỢT 40 A: cái làm nên chữ "đọc được" của từng động tác chó — dáng chổng mông / ngửa đầu tru / bới đất / đồ chơi trong mõm / ngực áp chân người /
+    dây kéo co căng giữa mõm và tay người — ở lúc được hỏi và suốt các mốc dày (`samples`)."""
+    name, who_n, to_n = c['name'], c['who'], c.get('target')
+    care = lambda t: SCALES.get(('care', float(t))) or {}
+    pet_at = lambda t: (care(t).get(who_n) or {}).get('p40') or {}
+    t_mid = c['times'][len(c['times']) // 2]
+    what = lambda text: f'{who_n} {name}' + (f' {to_n}' if to_n else '') + f' — {text}'
+    samples = [float(t) for t in c.get('samples', [])] or [float(t) for t in c['times']]
+    out = []
+    state = lambda t, key: (pet_at(t).get('s') or {}).get(key)
+    def held_for(test, lo=None):
+        """Quãng dài nhất (giây) các mốc liên tiếp thoả `test(t)`."""
+        best, run, start = 0, 0, None
+        for t in samples:
+            if test(t):
+                start = t if start is None else start; run = t - start
+                best = max(best, run)
+            else: start = None
+        return best
+    hold_need = min(HOLD_POSE, max(0.4, (samples[-1] - samples[0]) * 0.6)) if len(samples) > 1 else 0
+    if name == 'playBow':
+        t = t_mid
+        chest, rump = state(t, 'truocY'), -(state(t, 'sauY') or 0)
+        out.append({'scene': folder, 'what': what('chest low, rump up'), 'ok': chest is not None and chest >= BOW_CHEST and rump >= BOW_RUMP,
+                    'note': f'shoulders down {chest} (least {BOW_CHEST}), hips up {rump:g} (least {BOW_RUMP}) at {t:g} s'})
+        held = held_for(lambda u: (state(u, 'truocY') or 0) >= BOW_CHEST and -(state(u, 'sauY') or 0) >= BOW_RUMP)
+        out.append({'scene': folder, 'what': what('pose held'), 'ok': held >= hold_need, 'note': f'the bow is held {held:.2f} s over the samples (least {hold_need:.2f} s)'})
+    if name == 'howl':
+        t = t_mid
+        s = lambda k: state(t, k) or 0
+        pet = care(t).get(who_n) or {}
+        out.append({'scene': folder, 'what': what('sitting, head back, mouth an O, eyes shut'), 'ok': s('ngoi') >= 0.5 and -s('dau') >= HOWL_HEAD and max(s('gape'), s('mieng')) >= 0.4 and s('matY') >= 0.9,
+                    'note': f'sitting {s("ngoi"):.1f}, head back {-s("dau"):.0f}° (least {HOWL_HEAD}), mouth {max(s("gape"), s("mieng")):.2f}, eyes shut {s("matY"):.2f} at {t:g} s'})
+        out.append({'scene': folder, 'what': what('sound lines rising'), 'ok': bool(pet_at(t).get('howl')), 'note': 'wavy howl lines drawn' if pet_at(t).get('howl') else 'no howl lines at the moment asked about'})
+        held = held_for(lambda u: -(state(u, 'dau') or 0) >= HOWL_HEAD and bool(pet_at(u).get('howl')))
+        out.append({'scene': folder, 'what': what('howl held'), 'ok': held >= hold_need, 'note': f'head back with the lines drawn for {held:.2f} s (least {hold_need:.2f} s)'})
+    if name == 'dig' and track:
+        for key in ('tnBan', 'txBan'):
+            xs = [(f[who_n]['front'][key]['x0'] + f[who_n]['front'][key]['x1']) / 2 for f in track if f.get(who_n) and (f[who_n].get('front') or {}).get(key)]
+            talls = [(lambda r: r[1] - r[0])((min(b['y0'] for b in f[who_n]['parts'].values()), max(b['y1'] for b in f[who_n]['parts'].values()))) for f in track if f.get(who_n) and f[who_n].get('parts')]
+            tall = max(talls, default=1)
+            if not xs: continue
+            mean = (max(xs) + min(xs)) / 2
+            sweeps = sum(1 for a, b in zip(xs, xs[1:]) if (a < mean) != (b < mean)) // 2
+            out.append({'scene': folder, 'what': what(f'{key[:2]} paw scrapes'), 'ok': (max(xs) - min(xs)) / tall >= DIG_TRAVEL and sweeps >= 3,
+                        'note': f'travels {(max(xs) - min(xs)) / tall * 100:.0f} % of the dog (least {DIG_TRAVEL * 100:g} %), {sweeps} scrapes (least 3) over {len(xs)} frames'})
+        n = len((pet_at(t_mid).get('dirt') or []))
+        out.append({'scene': folder, 'what': what('dirt flying'), 'ok': n >= 2 and (state(t_mid, 'dauY') or 0) >= 14, 'note': f'{n} clods in the air (least 2), nose down {state(t_mid, "dauY")} (least 14) at {t_mid:g} s'})
+    if name == 'carryToy':
+        # lúc ngậm đồ chơi (mốc dày hoặc lúc được hỏi): có hình đồ chơi nằm trong khung đầu con vật, đầu ngẩng cao
+        carrying = [u for u in sorted(set(samples + [float(x) for x in c['times']])) if pet_at(u).get('toy')]
+        t = carrying[len(carrying) // 2] if carrying else t_mid
+        out.append({'scene': folder, 'what': what('toy in its mouth'), 'ok': bool(carrying), 'note': f'the toy is in the mouth at {len(carrying)} moments (e.g. {t:g} s)' if carrying else 'no toy in the mouth at any moment'})
+        trot = [u for u in carrying if (state(u, 'toy') or 0) >= 0.5 and (state(u, 'dauY') or 0) <= -3]
+        out.append({'scene': folder, 'what': what('head high, proud'), 'ok': bool(trot), 'note': f'head raised (offset ≤ −3) with the toy at {len(trot)} of {len(carrying)} moments'})
+        if to_n and frames[-1].get(to_n):
+            end_t = float(c['times'][-1])
+            floor = None
+            for u in samples:
+                f = pet_at(u).get('floor')
+                if f: floor = (u, f)
+            person = frames[-1][to_n]
+            if floor and person.get('tall'):
+                d = abs(floor[1]['x'] - (person['body']['x0'] + person['body']['x1']) / 2) / person['tall'] if person.get('body') else None
+                out.append({'scene': folder, 'what': what('toy dropped at their feet'), 'ok': d is not None and d <= 0.45, 'note': f'the toy lies {d * 100:.0f} % of {to_n}\'s height from them (most 45 %)' if d is not None else 'person not measured'})
+            else:
+                out.append({'scene': folder, 'what': what('toy dropped at their feet'), 'ok': False, 'note': 'no toy seen on the floor'})
+    if name == 'leanOnLeg':
+        person_f = lambda f: f.get(to_n)
+        best = None
+        for u, f in zip(samples, track or []):
+            a, q = f.get(who_n), f.get(to_n)
+            if not a or not q or not q.get('tall') or not q.get('legs'): continue
+            boxes = [b for b in ((a.get('parts') or {}).get('back'), (a.get('parts') or {}).get('head')) if b]
+            d = None
+            for leg in q['legs']:
+                for b in boxes:
+                    # khung ↔ đoạn thẳng (đùi / ống chân, bán kính r): khoảng cách từ tâm đoạn tới hộp, trừ bán kính
+                    pts = [(leg['a']['x'] + (leg['b']['x'] - leg['a']['x']) * k / 8, leg['a']['y'] + (leg['b']['y'] - leg['a']['y']) * k / 8) for k in range(9)]
+                    g = min(max(0, b['x0'] - px, px - b['x1']) ** 2 + max(0, b['y0'] - py, py - b['y1']) ** 2 for px, py in pts) ** 0.5 - leg['r']
+                    d = g if d is None or g < d else d
+            if d is not None and (best is None or d / q['tall'] < best[1]): best = (u, d / q['tall'])
+        out.append({'scene': folder, 'what': what('side against the leg'), 'ok': best is not None and best[1] <= LEAN_GAP,
+                    'note': f'{best[1] * 100:.1f} % of {to_n}\'s height between the dog and their leg at {best[0]:g} s (limit {LEAN_GAP * 100:g} %)' if best else 'leg not measured'})
+        leaning = [u for u in samples if (state(u, 'truocX') or 0) >= 8]
+        tm = leaning[len(leaning) // 2] if leaning else t_mid
+        s = lambda k: state(tm, k) or 0
+        H_ = frame_size(folder)[1]
+        shares = []
+        for u, f in zip(samples, track or []):
+            a = f.get(who_n)
+            if a and a.get('parts') and (state(u, 'truocX') or 0) >= 8: shares.append((max(b['y1'] for b in a['parts'].values()) - min(b['y0'] for b in a['parts'].values())) / H_)
+        out.append({'scene': folder, 'what': what('big enough in the frame'), 'ok': bool(shares) and max(shares) >= PET_SHARE, 'note': f'{who_n} is up to {max(shares, default=0) * 100:.0f} % of the frame height while leaning (least {PET_SHARE * 100:g} %) over {len(shares)} frames'})
+        out.append({'scene': folder, 'what': what('leaning, looking up, eyes half shut'), 'ok': s('truocX') >= 8 and -s('dau') >= 8 and 0.3 <= s('matY') <= 0.9 and held_for(lambda u: (state(u, 'truocX') or 0) >= 8) >= hold_need,
+                    'note': f'leans {s("truocX"):g} (least 8), head up {-s("dau"):g}° (least 8), eyes {s("matY"):.2f} shut (0.3–0.9) at {tm:g} s, held {held_for(lambda u: (state(u, "truocX") or 0) >= 8):.2f} s (least {hold_need:.2f})'})
+    if name == 'tugOfWar':
+        ropes, lens, hands, mouths = [], [], [], []
+        for u in samples:
+            q = (care(u).get(to_n) or {}).get('p40') or {}
+            e = pet_at(u).get('end')
+            fr = {a['name']: a for a in []}
+            ropes.append((u, q, e))
+        tall = (frames[len(c['times']) // 2].get(to_n) or {}).get('tall') or 1
+        shown = [(u, q, e) for u, q, e in ropes if q.get('rope') and q.get('to') and q.get('from') and e]
+        out.append({'scene': folder, 'what': what('rope drawn'), 'ok': len(shown) >= max(1, len(ropes) * 0.5), 'note': f'the rope is drawn in {len(shown)} of {len(ropes)} samples'})
+        if shown:
+            worst_m = max(((q['to']['x'] - e['x']) ** 2 + (q['to']['y'] - e['y']) ** 2) ** 0.5 for u, q, e in shown) / tall
+            worst_h = max(((q['hand']['x'] - q['from']['x']) ** 2 + (q['hand']['y'] - q['from']['y']) ** 2) ** 0.5 for u, q, e in shown if q.get('hand')) / tall
+            out.append({'scene': folder, 'what': what('rope ends at the mouth'), 'ok': worst_m <= ROPE_END, 'note': f'the rope ends at most {worst_m * 100:.1f} % of {to_n}\'s height from the dog\'s mouth (limit {ROPE_END * 100:g} %)'})
+            out.append({'scene': folder, 'what': what('rope starts at the hand'), 'ok': worst_h <= 0.03 + 9 * 0.0, 'note': f'the rope starts at most {worst_h * 100:.1f} % of height from the gripping hand (limit 3 %)'})
+            lens = [((q['to']['x'] - q['from']['x']) ** 2 + (q['to']['y'] - q['from']['y']) ** 2) ** 0.5 / tall for u, q, e in shown]
+            out.append({'scene': folder, 'what': what('rope taut, a sensible length'), 'ok': ROPE_LEN[0] <= min(lens) and max(lens) <= ROPE_LEN[1] and (max(lens) - min(lens)) / max(lens) <= ROPE_STEADY,
+                        'note': f'rope {min(lens) * 100:.0f}–{max(lens) * 100:.0f} % of height (allowed {ROPE_LEN[0] * 100:g}–{ROPE_LEN[1] * 100:g} %), varying {(max(lens) - min(lens)) / max(lens) * 100:.0f} % (limit {ROPE_STEADY * 100:g} %)'})
+        toy = pet_at(t_mid).get('toy')
+        out.append({'scene': folder, 'what': what('rope held in the mouth'), 'ok': bool(toy), 'note': 'the rope toy is in the mouth' if toy else 'no toy in the mouth'})
+        xs = [state(u, 'truocX') for u in samples if state(u, 'truocX') is not None]
+        swing = (max(xs) - min(xs)) if xs else 0
+        out.append({'scene': folder, 'what': what('pulls back, gets dragged forward'), 'ok': swing >= 10, 'note': f'the dog\'s shoulders swing {swing:.0f} units between pulling back and being dragged (least 10)'})
+        shakes = [state(u, 'dau') for u in samples if state(u, 'dau') is not None]
+        mean = sum(shakes) / len(shakes) if shakes else 0
+        flips = sum(1 for a, b in zip(shakes, shakes[1:]) if (a < mean) != (b < mean))
+        out.append({'scene': folder, 'what': what('shakes its head'), 'ok': flips >= 4, 'note': f'{flips} head swings over {len(shakes)} samples (least 4)'})
+    if name in ('tugOfWar', 'leanOnLeg') and track:
+        # chân không trượt: bàn chân (khung hình, theo bốn chân) giữ yên trong lúc giằng co / đứng dựa
+        lo = hi = None
+        slide = 0
+        for key in ('tnBan', 'txBan'):
+            xs = [(f[who_n]['front'][key]['x0'] + f[who_n]['front'][key]['x1']) / 2 for u, f in zip(samples, track) if (state(u, 'truocX') or 0) >= 8 and f.get(who_n) and (f[who_n].get('front') or {}).get(key)] if name == 'leanOnLeg' else [(f[who_n]['front'][key]['x0'] + f[who_n]['front'][key]['x1']) / 2 for u, f in zip(samples, track) if (state(u, 'toy') or 0) >= 0.5 and f.get(who_n) and (f[who_n].get('front') or {}).get(key)]
+            tallv = max([(lambda r: r[1] - r[0])((min(b['y0'] for b in f[who_n]['parts'].values()), max(b['y1'] for b in f[who_n]['parts'].values()))) for f in track if f.get(who_n) and f[who_n].get('parts')], default=1)
+            if xs: slide = max(slide, (max(xs) - min(xs)) / tallv)
+        out.append({'scene': folder, 'what': what('feet planted'), 'ok': slide <= FOOT_SLIDE, 'note': f'the front paws move at most {slide * 100:.1f} % of the dog\'s height while it holds (limit {FOOT_SLIDE * 100:g} %)'})
     return out
 
 
@@ -1436,6 +1587,7 @@ def check_people_framed(folder, moments, shots):
             # Người làm NỀN trong góc cận riêng con vật (đợt 35 · s3: chó lăn ngửa, đuổi đuôi — góc cận được cắt người khác): đầu đã
             # ra ngoài mép trên thì người ấy không phải chủ thể của khung — không tính là "lẹm mép" (gộp đợt 35).
             if a.get('headBox') and a['headBox']['y1'] <= 0: continue
+            if a['name'] in TARGETS_40A and (str(m.get('what', '')).endswith(' ' + a['name']) or str(m.get('what', '')).endswith(' reacts')): continue      # đợt 40 A: người là ĐÍCH của dựa chân / kéo co / tha đồ chơi — góc cận con vật cắt họ ở mép (chân, bàn tay cầm dây vẫn trong khung)
             seen = (min(b['x1'], W) - max(b['x0'], 0)) / (b['x1'] - b['x0'])
             if PERSON_CUT[0] <= seen <= PERSON_CUT[1]: cut.append(f'{a["name"]} {seen * 100:.0f} % ({"left" if b["x0"] < 0 else "right"} edge)')
         out.append({'scene': folder, 'what': f'people inside the frame at {m["t"]:g} s ({m.get("what", "")})', 'ok': not cut, 'note': '; '.join(cut) or 'nobody cut by the left / right edge'})
@@ -1921,6 +2073,8 @@ def check_scene(folder):
     hide_jobs = [(c['times'][len(c['times']) // 2], c['who'], c.get('target') or c['who']) for c in checks if c['kind'] == 'petAct' and c['name'] == 'hide']
     hidden = pet_pixels_sharp(folder, hide_jobs, KEEP and os.path.join(KEEP, 'hide')) if hide_jobs else None
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
+    global TARGETS_40A
+    TARGETS_40A = {c['target'] for c in checks if c.get('kind') == 'petAct' and c.get('name') in PET_40A and c.get('target')}
     results += check_people_framed(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
@@ -2018,6 +2172,7 @@ def check_scene(folder):
             continue
         if c['kind'] == 'petAct':
             results.extend(check_pet_act(folder, c, frames, hidden, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))
+            if c['name'] in PET_40A: results.extend(check_pet40(folder, c, frames, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):

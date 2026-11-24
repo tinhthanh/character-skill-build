@@ -2242,6 +2242,48 @@ try {
         if (!nope.includes('not for a rabbit')) hong('rollOver', 'a rabbit rolling over should be refused');
         bun.svg.remove();
       }
+      // Đợt 40 A — sáu động tác của chó: chổng mông rủ chơi, tru, đào đất, tha đồ chơi, dựa chân người, kéo co (+ `pullToy` của người); loài khác bị từ chối rõ.
+      {
+        const dog = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog' }).rig;
+        const boy = L.createCharacter(spot('left:330px;top:0;width:240px;height:282px'), { id: 'boy' }).rig;
+        const kitten = L.createPet(spot('left:600px;top:0;width:300px;height:248px'), { species: 'cat' }).rig;
+        for (const name of ['playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar']) {
+          let nope = ''; try { kitten[name](boy); } catch (error) { nope = error.message; }
+          if (!nope.includes('not a cat') && !nope.includes('not for')) hong(name, `a cat doing ${name} should be refused with a clear message (got "${nope}")`);
+        }
+        const seen = (steps, at, probe, label) => { const run = L.sequence(dog, steps, { breathe: false }); run.time(run.duration() * at); const v = probe(); run.progress(1); const rest = Math.abs(dog.s.toy) + Math.abs(dog.s.toyF) + Math.abs(dog.s.howl) + Math.abs(dog.s.dirtA); run.kill(); if (rest > 1e-6) hong(label, 'the toy / howl / dirt channels do not go back to rest'); dog.datNghi(); return v; };
+        const bow = seen([['playBow', 1.2]], 0.5, () => [dog.s.truocY, dog.s.sauY], 'playBow');
+        if (!(bow[0] > 20 && bow[1] < -6)) hong('playBow', `half way the chest is not low and the rump up (shoulders ${bow[0].toFixed(1)}, hips ${bow[1].toFixed(1)})`);
+        const how = seen([['howl', 1.6]], 0.5, () => [dog.s.ngoi, dog.s.dau, dog.s.matY, dog.s.howl], 'howl');
+        if (!(how[0] > 0.9 && how[1] < -25 && how[2] > 0.9 && how[3] > 0.9)) hong('howl', `half way the dog is not sitting, head back, eyes shut, howling (${how.map((v) => v.toFixed(2)).join(' / ')})`);
+        const dug = seen([['dig', 4]], 0.5, () => [dog.s.dirtA, dog.s.dauY, dog.el.dirtG.style.display], 'dig');
+        if (!(dug[0] > 0.9 && dug[1] > 14 && dug[2] !== 'none')) hong('dig', 'half way there is no dirt flying with the nose down');
+        const toy = seen([['carryToy', 120, { kind: 'bone' }]], 0.4, () => [dog.s.toy, dog.el.toyM.style.display, dog.el.toyMBone.style.display], 'carryToy');
+        if (!(toy[0] === 2 && toy[1] !== 'none' && toy[2] !== 'none')) hong('carryToy', 'the bone is not drawn in the mouth while trotting');
+        let bad = ''; try { dog.carryToy(120, { kind: 'frisbee' }); } catch (error) { bad = error.message; }
+        if (!bad.includes('no toy')) hong('carryToy', 'an unknown toy kind should be refused');
+        let none = ''; try { boy.pullToy(null); } catch (error) { none = error.message; }
+        if (!none.includes('pullToy(pet)')) hong('pullToy', 'pullToy without a dog should be refused with a clear message');
+        // kéo co: dây căng giữa mõm và tay người ở mọi nhịp, hai đầu khớp; xong thì dây biến mất
+        dog.svg.parentNode.style.left = '140px';
+        const pull = L.sequence(boy, [['pullToy', dog, 2.4]], { breathe: false }), tug = L.sequence(dog, [['tugOfWar', boy, 2.4]], { breathe: false });
+        for (const at of [0.4, 0.5, 0.6, 0.7]) {
+          pull.time(pull.duration() * at); tug.time(tug.duration() * at);
+          const rope = boy.pull40Probe();
+          if (!rope.rope) { hong('tugOfWar', `no rope drawn at ${(at * 100).toFixed(0)} % of the tug`); continue; }
+          const end = dog.ropeEnd(), miss = Math.hypot(rope.to.x - end.x, rope.to.y - end.y);
+          if (miss > 4) hong('tugOfWar', `the rope does not end at the dog's mouth (${miss.toFixed(1)} px off at ${(at * 100).toFixed(0)} %)`);
+          if (!(dog.s.toy === 1)) hong('tugOfWar', 'the dog is not gripping the rope toy while tugging');
+        }
+        pull.progress(1); tug.progress(1);
+        if (boy.el.rope.style.display !== 'none' || dog.s.toy) hong('tugOfWar', 'the rope stays after the tug');
+        pull.kill(); tug.kill(); dog.datNghi(); boy.datNghi();
+        const lean = L.sequence(dog, [['leanOnLeg', boy, 2]], { breathe: false });
+        lean.time(lean.duration() * 0.6);
+        if (!(dog.s.truocX > 8 && dog.s.dau < -8)) hong('leanOnLeg', 'the dog does not lean into the person and look up');
+        lean.kill(); dog.datNghi();
+        dog.svg.remove(); boy.svg.remove(); kitten.svg.remove();
+      }
       // Đợt 9 — thông báo trên màn hình đạo cụ: thẻ hiện khi giữ, chữ nằm gọn trong thẻ, tắt khi xong; laptop quay lưng thì báo lỗi.
       {
         const deskHost = spot('left:0;top:0;width:200px;height:235px'), screenProp = L.createProp(deskHost, 'monitor', {});

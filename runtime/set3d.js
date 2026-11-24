@@ -1772,6 +1772,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const r = shown && shown.getBoundingClientRect(); return c ? { side, kind, ...c, h: r.height * sy } : null; }).filter(Boolean);
           const head = centre(e.dau), mouthP = centre(e.mieng);
           out[name] = { person: true, eyes, gadgets, head, mouthP, turn: rig.s.huong || 0, tilt: (rig.s.dau || 0) - ((rig.NGHI && rig.NGHI.dau) || 0), drop: (rig.s.dauY || 0) - ((rig.NGHI && rig.NGHI.dauY) || 0), tall: (actor.height || 0) * set.project(actor.where, actor.spot.y, actor.spot.z).scale };
+          // ĐỢT 40 A: dây kéo co (`rig.pull40Probe()`) — hai đầu dây, tay cầm, đầu dây ở mõm (px trong `view`).
+          if (typeof rig.pull40Probe === 'function') { const q = rig.pull40Probe(), pt = (p) => p && { x: (p.x - box.left) * sx, y: (p.y - box.top) * sy }; out[name].p40 = { from: pt(q.from), to: pt(q.to), hand: pt(q.hand), mouth: pt(q.mouth), rope: !!q.rope }; }
         } else {
           // Đợt 35, lượt ba: cỡ TRÊN KHUNG — chiều cao đầu (`face`), bề ngang nét môi (`lipsW`), độ mở hàm (`jaw`, px).
           const f = e.dau && e.dau.getBoundingClientRect(), j = e.ham && e.ham.getBoundingClientRect(), l = e.moi && e.moi.getBoundingClientRect();
@@ -1779,6 +1781,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // Đợt 36: độ há theo HÌNH HỌC trong khung của đầu — chiều cao khoang miệng (`ham`) / chiều cao bầu đầu (không tính tai, không
           // phụ thuộc đầu nghiêng hay cỡ cảnh).
           if (e.ham && typeof rig.skullHeight === 'function') { let h = 0; try { h = e.ham.getBBox().height; } catch (err) { h = 0; } out[name].jawRatio = h / rig.skullHeight(); }
+          // ĐỢT 40 A: số đo của sáu động tác chó (`rig.pet40Probe()`) — phần tử → tâm và cỡ trên màn hình, điểm → px trong `view`.
+          if (typeof rig.pet40Probe === 'function') { const q = rig.pet40Probe(); out[name].p40 = { s: q.s, toy: centre(q.toy), floor: centre(q.floor), howl: centre(q.howl), dirt: q.dirt.map(centre).filter(Boolean), end: q.end && { x: (q.end.x - box.left) * sx, y: (q.end.y - box.top) * sy } }; }
         }
       }
       // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
