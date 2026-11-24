@@ -214,6 +214,15 @@ CARE_35 = ('weigh', 'takeTemp', 'givePill')              # động tác phòng k
 CARE_ACTIONS = ('bandage', 'putCone')                    # tay tới con vật + đồ đeo còn trên nó sau động tác (acting_check `worn`)
 PILL_HEAD = 0.15                                         # đợt 36: givePill — giữa thân tới đầu con chó / thỏ, × chiều cao host của nó
 CAT_SPECIES = ('cat', 'orange_cat', 'black_cat', 'white_cat', 'calico')
+# ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip: hai tay trên con vật (tay xa giữ chân / cằm / lưng, tay gần cầm dụng cụ nhỏ). Con vật
+# tự động theo tay người (chân nhấc, cằm nâng, nhắm mắt, lắc đầu — kênh của người, RigThu.#careView): không cần ghép bước riêng cho nó.
+CARE_38 = ('clipNails', 'eyeDrops', 'cleanEars', 'scanChip')
+CARE_35 = CARE_35 + CARE_38                              # cùng các danh sách "với tới con vật" (lại gần, chiều sâu, care_code)
+REACH_ACTIONS.update({'clipNails': 'body', 'eyeDrops': 'face', 'cleanEars': 'face', 'scanChip': 'body'})
+CARE_38_OPTIONS = {'clipNails': {'paw', 'hold'}, 'eyeDrops': {'hold'}, 'cleanEars': {'hold'}, 'scanChip': {'id', 'hold'}}
+CARE_38_HOLD = {'clipNails': (0.6, 6, 1.8), 'eyeDrops': (0.5, 5, 1.2), 'cleanEars': (0.8, 6, 1.8), 'scanChip': (0.8, 6, 1.6)}     # (ít nhất, nhiều nhất, mặc định) — rig-svg.js
+CARE_38_GAP = {'clipNails': 0.17, 'eyeDrops': 0.2, 'cleanEars': 0.18, 'scanChip': 0.11}    # đứng cách ĐẦU con vật bấy nhiêu chiều cao người (ở phía đầu nó, như băng chân)
+CARE_38_HEAD = 0.2                                       # … đầu con vật cách giữa thân nó chừng ấy chiều cao host của nó (mèo ngồi: 0,08)
 CONE_BACK = 0.12                                         # đợt 36: đeo loa xong lùi ra bấy nhiêu chiều cao người
 CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ sơ trước ngực / tay chỉ trúng điểm trên phim
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
@@ -512,6 +521,45 @@ def place_sounds(html, timings, sounds, base, out, copied):
     return html.replace(marker, '\n  <!-- "sounds": one clip each time the action plays -->\n' + '\n'.join(clips) + marker, 1), len(clips)
 
 
+def care38_plan(op, t0):
+    """ĐỢT 38 A: các lúc đo của cắt móng / nhỏ mắt / lau tai / quét chip, tính từ đầu bước `t0` theo đúng nhịp của runtime/rig-svg.js
+    (`hold` của bước). `times`: ba lúc tay ở trên con vật (lúc giữa là lúc được hỏi); `gaze`: đầu hướng về đâu; `check`: số đo riêng của
+    acting_check (`care38`) — kìm khép / mở và chân nhấc, giọt thuốc rơi vào mắt và mắt nhắm, bông ở gốc tai và đầu lắc, máy quét rà trên gáy
+    và thẻ mã chip."""
+    kind, hold = op['kind'], float(op.get('hold') or CARE_38_HOLD[op['kind']][2])
+    r = lambda a: round(t0 + a, 2)
+    every = lambda a, b, d=0.1: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
+    who, pet = op['who'], op['target']
+    if kind == 'clipNails':
+        n = max(2, round(hold / 0.62)); per = max(0.62, hold / n); c0, e = 1.1, 1.1 + n * per
+        closed = [r(c0 + i * per + 0.38) for i in range(n)]
+        times = [closed[0], closed[len(closed) // 2], closed[-1]]
+        check = {'closed': closed, 'open': [r(c0 + i * per + 0.12) for i in range(n)] + [r(c0 + (i + 1) * per - 0.03) for i in range(n)], 'lifted': every(c0, e - 0.05),
+                 'down': [r(0.3), r(e + 1.0)], 'gadget': 10}
+        gaze = [{'times': times, 'aim': 'gadget', 'gadget': 10, 'what': 'the nail clipper'}]
+        ask = [f'Is {who} holding up a front paw of the animal ({pet}) with one hand and cutting its nails with a small clipper in the other?']
+    elif kind == 'eyeDrops':
+        d0 = 1.0 + hold * 0.5; hit = d0 + 0.9
+        times = [r(1.1), r((1.1 + d0 + 0.6) / 2), r(d0 + 0.6)]
+        check = {'hanging': every(d0 + 0.3, d0 + 0.6), 'falling': [r(d0 + 0.75), r(d0 + 0.84)], 'hit': r(hit), 'blink': every(hit + 0.1, hit + 0.7), 'chin': times, 'gadget': 11}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet}\'s head'}]
+        ask = [f'Is {who} holding a small dropper bottle just above the eye of the animal ({pet}), with a drop falling into the eye, and the other hand under its chin?']
+    elif kind == 'cleanEars':
+        shake = 0.65 + hold + 0.35
+        times = [r(0.8), r(0.65 + hold / 2), r(0.55 + hold)]
+        check = {'wipe': every(0.75, 0.6 + hold), 'shake': every(shake, shake + 0.9, 0.05), 'free': [r(shake + 0.1), r(shake + 0.5)], 'gadget': 12}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet}\'s head'}]
+        ask = [f'Is {who} wiping inside the ear of the animal ({pet}) with a white cotton pad while holding its head?']
+    else:
+        beep = 2.85
+        times = [r(1.0), r(1.7), r(2.5)]
+        card = [r(beep + 0.45), r(beep + 0.45 + hold / 2), r(beep + 0.35 + hold)]
+        check = {'scan': every(0.95, 2.5), 'card': card, 'gadget': 13, 'id': op.get('id') or '900 123 456 789'}
+        gaze = [{'times': times, 'aim': 'gadget', 'gadget': 13, 'what': 'the chip scanner'}, {'times': card, 'aim': 'readout', 'what': 'the chip number shown'}]
+        ask = [f'Is {who} passing a handheld scanner over the back of the neck of the animal ({pet})?', 'Is a big card with the chip number shown above the animal?']
+    return {'times': times, 'gaze': gaze, 'check': dict(check, kind='care38', name=kind, who=who, target=pet, times=times), 'ask': ask}
+
+
 def care_window(kind, length):
     """Đợt 35: các giây (tính từ đầu bước) hai tay đang ở trên con vật — `bandage`: các vòng quấn (0,6 s … trước khi khép),
     `putCone`: loa đã sang con vật → cài khoá dưới cằm (1,8 … 2,3 s, trước cái gật; trước đó vòng còn trong tay — `holds the cone` đo)."""
@@ -584,6 +632,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                           for step in timings['reaches'][n] if step['name'] == op['kind']), None)
             if reach: t0, t1 = float(reach['start']), float(reach['start']) + float(reach['duration'])
             times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.35, 0.82, 0.95) if op['kind'] == 'carry' else REACH_TIMES.get(op['kind'], (0.4, 0.55, 0.7)))]
+            plan38 = care38_plan(op, t0) if op['kind'] in CARE_38 and reach and pet else None          # đợt 38 A: lúc đo theo nhịp của động tác
+            if plan38: times = plan38['times']
             pet = pet_of(op['target'])
             ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
@@ -594,6 +644,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           **({'samples': [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]} if op['kind'] == 'carry' else {}),
                                           # SOI (đợt 37): đầu quay / cúi về đầu con vật lúc soi tai, mắt, răng — không nhìn ra máy quay.
                                           **({'gaze': [{'times': times, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}]} if op['kind'] == 'examine' and pet else {}),
+                                          **({'gaze': plan38['gaze']} if plan38 else {}),
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}),
@@ -625,6 +676,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           'gaze': [{'times': pill, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}],
                                           # NHAI (đợt 36): độ há mỗi 0,1 s suốt quãng con vật nhai sau khi khép miệng (bước + 2,2 … 4,8 s; miệng khép xong lúc ~2,1 s)
                                           'chew': [round(float(reach['start']) + 2.2 + i * 0.1, 2) for i in range(27)]}})
+            if plan38:
+                moments.append({'t': plan38['times'][1], 'what': f'{op["who"]} {op["kind"]} {op["target"]} — the tool at work', 'ask': plan38['ask'], 'check': plan38['check']})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
         if op['kind'] == 'weigh':
             # CÂN (đợt 35): lúc bế lên (0,3 / 0,4 / 0,48 s — tay tới thân con vật) và lúc đọc số (con vật đứng trên bệ cân, thẻ số đã
@@ -1234,10 +1287,20 @@ def main():
             if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
                 fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
         if name == 'givePill' and len(step) > 2: fail(f'{where}: "givePill" takes just the pet: ["givePill", "@pet"] — got {js(step)}')
+        if name in CARE_38:
+            # ĐỢT 38 A: ["clipNails", "@pet", { "hold": 1.8 }], ["eyeDrops", "@pet"], ["cleanEars", "@pet"], ["scanChip", "@pet", { "id": "900 …" }].
+            options = step[2] if len(step) > 2 else {}
+            lo, hi, _ = CARE_38_HOLD[name]
+            usage = {'clipNails': '{ "hold": 1.8 }', 'eyeDrops': '{ "hold": 1.2 }', 'cleanEars': '{ "hold": 1.8 }', 'scanChip': '{ "id": "900 123 456 789", "hold": 1.6 }'}[name]
+            if len(step) > 3 or not isinstance(options, dict) or set(options) - CARE_38_OPTIONS[name]: fail(f'{where}: "{name}" takes ["{name}", "@pet", {usage}] — got {js(step)}')
+            if 'hold' in options and not (isinstance(options['hold'], (int, float)) and lo <= options['hold'] <= hi): fail(f'{where}: "{name}" hold must be {lo:g}…{hi:g} seconds — got {js(options["hold"])}')
+            if 'paw' in options and options['paw'] != 'front': fail(f'{where}: "clipNails" paw must be "front" (the near front paw) — got {js(options["paw"])}')
+            if 'id' in options and not (isinstance(options['id'], str) and options['id'].strip() and len(options['id']) <= 24): fail(f'{where}: "scanChip" id is the chip number as text of up to 24 characters, such as "900 123 456 789" — got {js(options["id"])}')
         other = names[pet]
         walked = (float(other['x']) - float(other['_x0'])) / other['_unit'] if other.get('_unit') and other.get('_x0') is not None else 0
         at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
         aim = f"set.target({actor}, {pet}, {js('rear' if name == 'takeTemp' else 'lips')}{at})" if stage_set is not None else pet
+        if name in CARE_38 and stage_set is not None: aim = f"set.target({actor}, {pet}, 'head'{at})"      # đợt 38 A: giữa mặt con vật — rig đo các chỗ khác trên hình nó
         return '[' + ', '.join([js(name), aim] + [js(item) for item in step[2:]]) + ']'
 
     def showxray_listener(actor):
@@ -1615,7 +1678,7 @@ def main():
             low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh') for step in turn.get('do', []))
             # Cho thuốc / đo nhiệt độ (đợt 35, lượt ba): GÓC CẬN người + con vật — viên thuốc, miệng con vật, mặt người nhìn nhiệt kế chỉ
             # vài pixel ở góc trung hai người (Gemini đọc ~1 khung / giây).
-            if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
+            if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') + CARE_38 for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
                 return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='close')
             return dict(span, subjects=[who['name']] + [name for name in targets if name != who['name']][:1], size='full' if low_hands or not targets else 'medium')
         moods = [turn for turn in group if names[turn['who']]['_pet'] and turn.get('mood')]
@@ -1657,7 +1720,7 @@ def main():
             # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
             # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
             steps = turn.get('do') if isinstance(turn.get('do'), list) else []
-            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush', 'takeTemp', 'givePill') + CARE_ACTIONS
+            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush', 'takeTemp', 'givePill') + CARE_ACTIONS + CARE_38
                    and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
@@ -1704,6 +1767,17 @@ def main():
                     wanted += PILL_HEAD * target['_host_height']
                 # BĂNG CHÂN (đợt 35, lượt hai): đứng ngang CHÂN TRƯỚC con vật (về phía đầu nó, ~0,2 × chiều cao host của nó), không ngang
                 # giữa thân — tay phía xa của người chibi không với tới chân trước, bàn tay giữ dừng ở bụng con chó (đo trên ảnh).
+                # ĐỢT 38 A: cắt móng / nhỏ mắt / lau tai / quét chip — đứng ở PHÍA ĐẦU con vật (như băng chân), sát đầu nó: hai tay cùng tới
+                # chân trước, cằm, tai, gáy mà không vắt qua thân nó.
+                if step[0] in CARE_38 and target['_pet'] and not who.get('seated'):
+                    head = -1 if target.get('faces') in names and float(names[target['faces']]['x']) < float(target['x']) else 1
+                    reach_x = float(target['x']) + target.get('_drop', 0) + head * (0.08 if str(target.get('species', '')) in CAT_SPECIES else CARE_38_HEAD) * target['_host_height']
+                    move = reach_x + head * CARE_38_GAP[step[0]] * (1 if target.get('on') else 0.6) * who['_host_height'] - float(who['x'])      # quỳ với con vật dưới sàn: vai thấp, tay ngắn — sát hơn
+                    if abs(move) > 0.03 * who['_host_height']:
+                        turns.append((f'  // {who["name"]} goes to the head end of {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                        emitted[0] += 1
+                        who['x'] = float(who['x']) + move
+                    continue
                 if step[0] == 'bandage' and target['_pet'] and not who.get('seated'):
                     # Lượt ba: đứng ở PHÍA ĐẦU con vật (sang bên ấy nếu đang ở phía đuôi) — từ phía đuôi hai cánh tay vắt qua thân nó (người
                     # vẽ trước con vật): con chó chỉ thấy 57 % (cảnh CI `care`); lượt hai đưa con vật lên trước thì tay "lồng ra sau nó".
@@ -1847,7 +1921,8 @@ def main():
             for step in turn['do']:
                 # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
                 if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
-                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:], **({'hold': step[2]} if step[0] == 'takeTemp' and len(step) > 2 else {})})
+                    gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:], **({'hold': step[2]} if step[0] == 'takeTemp' and len(step) > 2 else {}),
+                                     **({'hold': step[2].get('hold', CARE_38_HOLD[step[0]][2]), 'id': step[2].get('id')} if step[0] in CARE_38 and len(step) > 2 and isinstance(step[2], dict) else {})})
                 # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
                 # CÂN (đợt 35): con vật đứng trên bệ cân lúc đọc số; tay tới nó lúc bế lên.

@@ -1768,6 +1768,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
       }
       // Màn hình các cái cân (chữ trên đó) — đồng bộ với con vật đứng trên bệ (`weigh`).
+      // ĐỢT 38 A: số đo của cắt móng / nhỏ mắt / lau tai / quét chip (`rig.care38Probe()` — phần tử → tâm và cỡ trên màn hình, số giữ nguyên).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.care38Probe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v);
+        out[name].c38 = Object.fromEntries(Object.entries(rig.care38Probe()).map(([key, v]) => [key, Array.isArray(v) ? v.map(one) : one(v)]));
+      }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;

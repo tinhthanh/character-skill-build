@@ -42,6 +42,7 @@ const NGHI = Object.freeze({
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
   gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`), 5 = đèn pin (`shine`), 6 = nhiệt kế (`takeTemp`), 7 = viên thuốc to (`givePill`), 8 = cuộn băng (`bandage`), 9 = loa cầm tay (`putCone`)
+                                // … đợt 38 A: 10 = kìm cắt móng (`clipNails`), 11 = lọ nhỏ mắt (`eyeDrops`), 12 = bông lau tai (`cleanEars`), 13 = máy quét chip (`scanChip`)
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
@@ -74,6 +75,11 @@ const NGHI = Object.freeze({
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
   // ĐỢT 36 — NHÌN THEO MỘT ĐIỂM (`lookAt`): đầu quay riêng so với thân (cùng đơn vị `huong`), cúi (1) / ngẩng (−1), nghiêng thêm (độ).
   headTurn: 0, headPitch: 0, headTilt: 0,
+  // ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip. Bốn kênh `pet…` là việc tay người làm trên con vật đang được giữ — con vật
+  // đọc lại mỗi lần vẽ (RigThu.#careView): chân trước nhấc lên, cằm nâng lên, mắt nhắm sau giọt thuốc, lắc đầu (−1…1).
+  petPaw: 0, petChin: 0, petBlink: 0, petShake: 0,
+  snipL: 0, snipR: 0,           // 0…1 kìm cắt móng trong tay ấy KHÉP lại (gadget 10)
+  dropL: 0, dropR: 0,           // 0…1 giọt thuốc rơi từ đầu lọ nhỏ mắt (gadget 11) tới mắt con vật; 0 = chưa / không có giọt
 });
 
 const MAU_MAC_DINH = {
@@ -776,7 +782,8 @@ export class RigSVG {
                      'call', 'typing', 'listen', 'clap', 'countFingers', 'checkWatch', 'scratchHead', 'headInHands', 'bow', 'wai',
                      'examine', 'giveTreat', 'shine', 'ponder', 'crossArms', 'handsOnHips', 'introduce', 'callOut', 'relief', 'startle', 'lookAround',
                      'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign', 'brush', 'throwBall', 'takeTemp',
-                     'bandage', 'putCone', 'showXray', 'offerHand', 'offerCheek'];
+                     'bandage', 'putCone', 'showXray', 'offerHand', 'offerCheek',
+                     'clipNails', 'eyeDrops', 'cleanEars', 'scanChip'];          // đợt 38 A
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -1058,6 +1065,26 @@ export class RigSVG {
               <g data-gadget="9"><ellipse cx="0" cy="${10 + CONE_GRIP}" rx="${CONE_GRIP}" ry="${CONE_GRIP * 0.9}" fill="#e6f3fa" fill-opacity=".72" stroke="#8fb8cf" stroke-width="2.4"/>
                 <ellipse cx="0" cy="${10 + CONE_GRIP}" rx="${CONE_GRIP * 0.68}" ry="${CONE_GRIP * 0.62}" fill="none" stroke="#8fb8cf" stroke-width="1.3" opacity=".6"/>
                 <path d="M ${-CONE_GRIP * 0.9} ${10 + CONE_GRIP * 0.6} Q ${-CONE_GRIP * 0.7} ${10 + CONE_GRIP * 0.1} ${-CONE_GRIP * 0.3} ${10 + CONE_GRIP * 0.05}" stroke="#ffffff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/></g>
+              <!-- ĐỢT 38 A. KÌM CẮT MÓNG (\`clipNails\`): hai cán cam, đầu kìm thép ở đầu ngón; má trên (\`data-snip\`) xoay quanh chốt, khép theo \`snip\`. -->
+              <g data-gadget="10"><path d="M -1.5 21 L -8.5 -2" stroke="#d9472f" stroke-width="5" stroke-linecap="round"/>
+                <path d="M -1.2 20 Q -6 29 -1.6 41 L 1.6 40 Q -1 30 1 21 Z" fill="#c9d1d9" stroke="#2f3a45" stroke-width="1.2" stroke-linejoin="round"/>
+                <g data-snip="1"><path d="M 1.5 21 L 8.5 -2" stroke="#e8553f" stroke-width="5" stroke-linecap="round"/>
+                  <path d="M 1.2 20 Q 6 29 1.6 41 L -1.6 40 Q 1 30 -1 21 Z" fill="#e3e8ec" stroke="#2f3a45" stroke-width="1.2" stroke-linejoin="round"/></g>
+                <circle cx="0" cy="21" r="2.4" fill="#8a929e" stroke="#2f3a45" stroke-width="1"/></g>
+              <!-- LỌ NHỎ MẮT (\`eyeDrops\`): lọ trắng nhãn xanh, vòi nhỏ chúc theo hướng bàn tay; GIỌT THUỐC (\`data-drop\`) rơi từ đầu vòi theo \`drop\`. -->
+              <g data-gadget="11"><rect x="-7" y="-7" width="14" height="22" rx="3.5" fill="#f7fafc" stroke="#2f3a45" stroke-width="1.3"/>
+                <rect x="-7" y="-1" width="14" height="9" fill="#2f9e8f"/><path d="M -4 2.5 h 8 M -4 5 h 5" stroke="#ffffff" stroke-width="1.2"/>
+                <path d="M -5 15 L -1.8 28 Q 0 30.5 1.8 28 L 5 15 Z" fill="#ffffff" stroke="#2f3a45" stroke-width="1.3" stroke-linejoin="round"/>
+                <path data-drop="1" d="M 0 -5.5 Q 5 1.5 0 5 Q -5 1.5 0 -5.5 Z" fill="#4fb3f0" stroke="#17588a" stroke-width="1.3" style="display:none"/></g>
+              <!-- BÔNG LAU TAI (\`cleanEars\`): miếng bông tròn trắng kẹp ở đầu ngón. -->
+              <g data-gadget="12"><circle cx="0" cy="25" r="8.5" fill="#ffffff" stroke="#b8c2cc" stroke-width="1.6"/>
+                <path d="M -5 22 q 3 -3 6 0 q 3 3 5 0 M -6 27 q 3 -3 6 0 q 3 3 5 0" stroke="#d6dde4" stroke-width="1.3" fill="none" stroke-linecap="round"/></g>
+              <!-- MÁY QUÉT CHIP (\`scanChip\`): cán xám trong nắm tay, đầu đọc tròn xanh có màn hình; vạch "bíp" (\`data-beep\`) bật khi đọc được. -->
+              <g data-gadget="13"><rect x="-4.5" y="-6" width="9" height="24" rx="3" fill="#3b414b" stroke="#1d2128" stroke-width="1.1"/>
+                <rect x="-12" y="17" width="24" height="26" rx="10" fill="#2f7fd0" stroke="#173f66" stroke-width="1.4"/>
+                <rect x="-7.5" y="21" width="15" height="9" rx="2" fill="#16232b"/><path d="M -5 25.5 h 10" stroke="#7dffb0" stroke-width="1.6"/>
+                <circle cx="0" cy="36" r="3.4" fill="#e8f4ff" stroke="#173f66" stroke-width="1"/>
+                <g data-beep="1" style="display:none" stroke="#38c172" stroke-width="2.4" fill="none" stroke-linecap="round"><path d="M 15 22 q 5 8 0 16 M 20 18 q 8 12 0 24"/><path d="M -15 22 q -5 8 0 16 M -20 18 q -8 12 0 24"/></g></g>
             </g></g>
         </g>
       </g>`;
@@ -1916,6 +1943,7 @@ export class RigSVG {
       if (spin) box.setAttribute('transform', `rotate(${(side === 'L' ? -spin : spin).toFixed(2)} 0 10)`); else box.removeAttribute('transform');
       for (const child of box.children) child.style.display = +child.getAttribute('data-gadget') === kind ? '' : 'none';
     }
+    this.#drawTools38();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
     const gripping = { L: false, R: false };
     for (const side of ['L', 'R']) if (this.holds[side]) {
       // Mốc là −90° cho CẢ HAI tay: hình tay trái được soi gương sẵn bên trong, còn hình tay phải vẽ nguyên — ở dáng
@@ -2122,7 +2150,15 @@ export class RigSVG {
     }
     const text = e.readout.querySelector('[data-readout]');
     if (text.textContent !== r.text) text.textContent = r.text;
-    e.readout.setAttribute('transform', `translate(${(r.side ? x : clamp(x, 70, KHUNG.w - 70)).toFixed(1)} ${(y - 6 * k).toFixed(1)}) scale(${(0.45 + 0.55 * k).toFixed(3)})`);
+    // Đợt 38 A: thẻ RỘNG theo chữ (`w` — mã chip của `scanChip`); không có thì cỡ cũ (ô số 116).
+    const half = (r.w || 116) / 2 + 8;
+    if (e.readout.getAttribute('data-half') !== String(half)) {
+      const [card, screen] = e.readout.children, a = half - 8;
+      card.setAttribute('d', `M ${-a} -50 H ${a} Q ${half} -50 ${half} -42 V -12 Q ${half} -4 ${a} -4 H 9 L 0 8 L -9 -4 H ${-a} Q ${-half} -4 ${-half} -12 V -42 Q ${-half} -50 ${-a} -50 Z`);
+      screen.setAttribute('x', -a); screen.setAttribute('width', 2 * a);
+      e.readout.setAttribute('data-half', String(half));
+    }
+    e.readout.setAttribute('transform', `translate(${(r.side || r.w ? x : clamp(x, half + 4, KHUNG.w - half - 4)).toFixed(1)} ${(y - 6 * k).toFixed(1)}) scale(${(0.45 + 0.55 * k).toFixed(3)})`);
     e.readout.style.opacity = Math.min(1, k * 1.6).toFixed(2);
     e.readout.style.display = '';
   }
@@ -4691,6 +4727,330 @@ export class RigSVG {
        .to(s, { ['bat' + other]: chinUp.bat, ['cang' + other]: chinUp.cang, duration: 0.18, ease: 'sine.inOut' }, up + 0.48 + i * 0.36);
     }
     this.#khep(t, 0.5, up + 1.05);
+    return t;
+  }
+
+  /* ------------------------------------------------------------ ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip
+   * Bốn động tác HAI TAY trên con vật: quay gần nghiêng hẳn về nó (như `givePill`) cho hai tay cùng vươn ra trước — một tay GIỮ (chân
+   * trước, cằm, lưng), tay kia cầm một dụng cụ nhỏ (gadget 10–13). Việc bàn tay làm lên con vật (nhấc chân, nâng cằm, nhắm mắt, lắc
+   * đầu) là kênh của người (`petPaw`, `petChin`, `petBlink`, `petShake`) — con vật đọc lại khi vẽ (RigThu.#careView, tập `heldBy38`),
+   * nên nó chỉ động lúc bàn tay ở đó. Chỗ đặt tay đo trên hình con vật (`RigThu.carePoint`). Đầu người quay / cúi về chỗ tay làm.
+   */
+  static CARE38_TURN = 0.8;        // quay về phía con vật (như PILL_TURN 0,85): hai vai dồn một chỗ, hai tay cùng ra trước
+  static CLIP_TIP = 39;            // đầu kìm cách cổ tay bấy nhiêu đơn vị khung theo bàn tay (gadget 10)
+  static DROP_TIP = 30;            // đầu vòi lọ nhỏ mắt (gadget 11) …
+  static PAD_AT = 25;              // tâm miếng bông (gadget 12) …
+  static SCAN_AT = 30;             // tâm đầu đọc máy quét (gadget 13) …
+  static DROP_GAP = 20;            // đầu vòi lọ thuốc ở trên mắt con vật bấy nhiêu đơn vị — giọt thuốc rơi thẳng xuống quãng ấy
+  static SNIP_OPEN = 24;           // kìm mở: má trên xoay ra bấy nhiêu độ
+  static CLIP_EVERY = 0.62;        // giây mỗi lần cắt (kìm tới móng, khép 0,22 s, mở) — người chấm xem thưa ~1 khung / giây
+  static CHIP_ID = '900 123 456 789';
+
+  // Vẽ theo trạng thái (gọi trong `apDung`): má kìm khép theo `snip`, giọt thuốc theo `drop`, vạch "bíp" khi thẻ số đọc chip hiện.
+  #drawTools38() {
+    const e = this.el, s = this.s;
+    for (const side of ['L', 'R']) {
+      const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
+      if (!box || kind < 10 || kind > 13) continue;
+      if (kind === 10) { const jaw = box.querySelector('[data-snip]'); if (jaw) jaw.setAttribute('transform', `rotate(${(-(1 - clamp(s['snip' + side] || 0, 0, 1)) * RigSVG.SNIP_OPEN).toFixed(2)} 0 21)`); }
+      if (kind === 11) {
+        const drop = box.querySelector('[data-drop]'), f = s['drop' + side] || 0;
+        if (drop) {
+          drop.style.display = f > 0.001 && f < 0.995 ? '' : 'none';
+          // 0…0,1: giọt đọng ở đầu vòi; 0,1…1: rơi thẳng (dụng cụ đã xoay cho vòi chúc thẳng xuống) tới mắt.
+          const fall = clamp((f - 0.1) / 0.9, 0, 1);
+          drop.setAttribute('transform', `translate(0 ${(RigSVG.DROP_TIP + 4 + fall * (RigSVG.DROP_GAP - 4)).toFixed(2)}) scale(${(0.75 + 0.5 * Math.min(1, f * 10)).toFixed(3)})`);
+        }
+      }
+      if (kind === 13) { const beep = box.querySelector('[data-beep]'); if (beep) beep.style.display = s.readout > 0.3 ? '' : 'none'; }
+    }
+    // Con vật đang được giữ (kênh `pet…`): vẽ lại theo người — như `caring` (băng, loa).
+    for (const pet of this.held38 || []) if (pet.el && !(this.caring && this.caring.has(pet))) pet.apDung();
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 38 A, `set.careProbe`): dụng cụ 10–13 đang cầm (phần tử), độ khép kìm, giọt thuốc, thẻ số. */
+  care38Probe() {
+    const e = this.el, s = this.s, side = ['L', 'R'].find((k) => Math.round(s['gadget' + k]) >= 10 && Math.round(s['gadget' + k]) <= 13) || null;
+    const kind = side ? Math.round(s['gadget' + side]) : 0, tool = side ? [...e['gadget' + side].children].find((child) => +child.getAttribute('data-gadget') === kind) : null;
+    const drop = tool && kind === 11 ? tool.querySelector('[data-drop]') : null, shown = e.readout && e.readout.style.display !== 'none';
+    return { kind, side, tool, snip: side ? +clamp(s['snip' + side] || 0, 0, 1).toFixed(3) : 0, drop: drop && drop.style.display !== 'none' ? drop : null,
+             card: shown ? e.readout.querySelector('rect') : null, text: shown ? e.readout.querySelector('[data-readout]').textContent : null, cardText: shown ? e.readout.querySelector('[data-readout]') : null };
+  }
+
+  // Rig con vật của đích, ghi hai chiều (người ↔ con vật) để nó đọc các kênh `pet…` của người này. Đích là rig / set.target mà không
+  // phải con vật: báo lỗi rõ.
+  #holdPet(target, name) {
+    const pet = this.#petOf(target);
+    if (!pet && target && typeof target === 'object' && (target.el || target.rig)) throw new Error(`[character] ${name}(pet): the target must be a pet rig (createPet(...).rig) or set.target(person, pet)`);
+    if (pet) { (this.held38 || (this.held38 = new Set())).add(pet); (pet.heldBy38 || (pet.heldBy38 = new Set())).add(this); }
+    return pet;
+  }
+
+  // Chỗ `which` trên con vật (RigThu.carePoint) trong hệ của `#reachLow` (x, y). `base`: `#reachLow(target, …, 'head')` — giữa đầu
+  // con vật. Đích là một ĐIỂM có `rig` (bối cảnh 3D: `set.target(người, con vật)`, giữa khung mặt nó): dời theo tỉ lệ khung con vật /
+  // khung người quanh điểm ấy (`span` = bề ngang khung mặt nó trong khung người). Rig thú: qua màn hình như `#reachLow`. Không có con
+  // vật (đích là một điểm, hay null): ước theo `base`. `key` / `level`: đo ở dáng con vật khi kênh ấy của người là `level` (chân đã
+  // nhấc, cằm đã nâng) — đặt tạm rồi trả lại.
+  #petSpot(target, pet, which, base, key = null, level = 1) {
+    const s = this.s, side = base.tx >= HONG.x ? -1 : 1;
+    if (!pet) {
+      const w = base.span || 56, off = { paw: [0.05, 0.95], eye: [0.16 * side, -0.04], ear: [0.3 * side, -0.36], chin: [0, 0.42], crown: [0, -0.46], scruff: [-0.6 * side, 0.18], back: [-1.15 * side, 0.32] }[which] || [0, 0];
+      return { x: base.tx + off[0] * w, y: base.ty + off[1] * w - (key === 'petChin' ? 3 * level : 0) - (key === 'petPaw' && which === 'paw' ? 22 * level : 0) };
+    }
+    const was = key ? s[key] : null;
+    if (key) { s[key] = level; }
+    try {
+      const q = pet.carePoint(which, side);
+      if (target && !target.el && typeof target.x === 'number' && typeof target.span === 'number' && typeof pet.shotBox === 'function') {
+        const box = pet.shotBox('face'), r = target.span / (box.width || 1);
+        return { x: base.tx + (q.x - (box.x + box.width / 2)) * r, y: base.ty + (q.y - (box.y + box.height * 0.5)) * r };
+      }
+      const p = new DOMPoint(q.x, q.y).matrixTransform(pet.svg.getScreenCTM()), sv = this.svg.getBoundingClientRect();
+      const unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1, ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+      return { x: (p.x - ox) / unit - s.x, y: (p.y - oy) / unit - s.y - DOI_Y };
+    } finally {
+      if (key) { s[key] = was; pet.apDung(); }
+    }
+  }
+
+  // Vào thế chung: cất đồ đang cầm, quay gần nghiêng về con vật, cúi theo nó. Trả về tay GẦN (`k`, phía con vật — cầm dụng cụ), tay XA
+  // (`o` — giữ con vật), hướng quay, hàm `spot` (chỗ trên con vật) và hàm `arm` (góc hai đốt tay để ĐIỂM cách cổ tay `reachIn` đơn vị
+  // theo bàn tay tới (x, y) — vai thật khi đã quay, khuỷu chúc xuống; như `givePill`).
+  #care38(t, target, name, minCrouch = 0) {
+    const s = this.s, N = this.NGHI, keep = {};
+    for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) { t.to(s, { ['item' + side]: 0, ['carry' + side]: 0, duration: 0.15 }, 0); keep['item' + side] = 1; }
+    const pet = this.#holdPet(target, name), base = this.#reachLow(target, null, 'head');
+    const k = base.tx < HONG.x ? 'L' : 'R', o = k === 'L' ? 'R' : 'L', dir = k === 'R' ? 1 : -1;
+    // Khuỵu gối ít nhất `minCrouch` (cắt móng: mặt xuống gần bàn chân) — đang ngồi / quỳ thì thôi.
+    const crouch = s.seat > 0.5 || s.kneel > 0.5 ? 0 : Math.max(base.crouch || 0, minCrouch);
+    const turn = dir * RigSVG.CARE38_TURN, drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const upperLen = DAI.canhTay * this.nv.daiCanhTay, foreLen = DAI.cangTay * this.nv.daiCangTay;
+    // Trả thêm `u`: hướng cẳng tay (vector đơn vị trên màn hình) — xoay dụng cụ cho thẳng đứng (`gadgetTurn`); `wx`, `wy`: cổ tay.
+    const cB = this.nv.coBanTay || 1;
+    const shoulderOf = (side) => { const was = s.huong; s.huong = turn; const q = { x: this.#shoulderX(side), y: this.#shoulderY() + drop }; s.huong = was; return q; };
+    const solve = (side, x, y, reachIn) => {
+      const shoulder = shoulderOf(side);
+      let wx = x, wy = y, u = { x: 0, y: 1 };
+      for (let n = 0; n < 6; n++) {
+        const dx = wx - shoulder.x, dy = wy - shoulder.y, d = Math.min(Math.hypot(dx, dy), (upperLen + foreLen) * 0.98) || 1, angle = Math.atan2(dy, dx);
+        const alpha = Math.acos(clamp((upperLen * upperLen + d * d - foreLen * foreLen) / (2 * upperLen * d), -1, 1));
+        const e = [angle + alpha, angle - alpha].map((a) => ({ x: shoulder.x + upperLen * Math.cos(a), y: shoulder.y + upperLen * Math.sin(a) })).sort((p, q) => q.y - p.y)[0];
+        const ux = wx - e.x, uy = wy - e.y, ul = Math.hypot(ux, uy) || 1;
+        u = { x: ux / ul, y: uy / ul };
+        wx = x - u.x * reachIn; wy = y - u.y * reachIn;
+      }
+      const pose = this.#armToTurned(side, wx, wy, turn, drop);
+      return { bat: pose.bat, cang: pose.cang, short: pose.short, u, wx, wy };
+    };
+    // ĐO LẠI TRÊN HÌNH (lượt hai): mô hình hai đốt tay không khớp hẳn hình vẽ (thân co, vai dời khi quay, bàn tay `coBanTay` — cậu bé:
+    // kìm dừng cách bàn chân 2,5 % chiều cao). Đặt tạm dáng ấy, vẽ, đo ĐIỂM của bàn tay (`(hx, hy)` trong hệ cổ tay) rồi dời đích bù
+    // chỗ lệch — hai lần. Chưa vẽ được (chưa gắn vào trang) thì giữ lời giải mô hình.
+    const keys = ['bat' + 'L', 'bat' + 'R', 'cang' + 'L', 'cang' + 'R', 'aimL', 'aimR', 'huong', 'seat', 'than', 'vai', 'carryL', 'carryR'];
+    const measure = (side, pose, hx, hy) => {
+      const el = this.el && this.el['coTay' + side];
+      if (!el || !el.getScreenCTM || !this.svg.getScreenCTM()) return null;
+      const was = Object.fromEntries(keys.map((key) => [key, s[key]]));
+      Object.assign(s, { ['bat' + side]: pose.bat, ['cang' + side]: pose.cang, ['aim' + side]: 1, ['carry' + side]: 0, huong: turn, than: N.than - dir * 2, vai: N.vai + 3 }, crouch ? { seat: crouch } : {});
+      try {
+        this.apDung();
+        const m = this.svg.getScreenCTM().inverse().multiply(el.getScreenCTM()), q = new DOMPoint(hx, hy).matrixTransform(m);
+        return Number.isFinite(q.x) && Number.isFinite(q.y) ? { x: q.x - s.x, y: q.y - (s.y || 0) - DOI_Y } : null;
+      } catch (error) { return null; } finally { Object.assign(s, was); this.apDung(); }
+    };
+    const fit = (side, x, y, make, at) => {
+      let tx = x, ty = y, p = make(tx, ty);
+      for (let n = 0; n < 2; n++) {
+        const q = measure(side, p, ...at(p));
+        if (!q || Math.hypot(x - q.x, y - q.y) < 0.5) break;
+        tx += x - q.x; ty += y - q.y; p = make(tx, ty);
+      }
+      return p;
+    };
+    const arm = (side, x, y, reachIn) => fit(side, x, y, (a, b) => solve(side, a, b, reachIn * cB), () => [0, reachIn]);
+    // Dụng cụ CHÚC THẲNG XUỐNG (lọ nhỏ mắt, máy quét): cổ tay đặt sao cho điểm `along` của dụng cụ (sau khi xoay quanh lòng bàn tay
+    // (0, 10) cho trục nó thẳng đứng) tới (x, y); trả thêm `spin` — góc xoay (`gadgetTurn`, độ trên màn hình; tay trái vẽ soi gương).
+    const down = (side, a, b, along) => { const p = solve(side, a, b - (along - 10) * cB, 10 * cB); return { ...p, spin: chuanHoaGoc(90 - Math.atan2(p.u.y, p.u.x) * 180 / Math.PI) }; };
+    const armDown = (side, x, y, along) => fit(side, x, y, (a, b) => down(side, a, b, along), (p) => {
+      const r = (side === 'L' ? -p.spin : p.spin) * Math.PI / 180;
+      return [-Math.sin(r) * (along - 10), 10 + Math.cos(r) * (along - 10)];
+    });
+    const spot = (which, key = null, level = 1) => this.#petSpot(target, pet, which, base, key, level);
+    // Cúi theo con vật (như `#leanTo`: khuỵu gối nếu nó thấp), hai tay ở góc trên màn hình, quay về nó — 0,45 s: dài hơn tween `#openUp`.
+    this.#openUp(t);
+    if (crouch) t.to(s, { seat: crouch, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { aimL: 1, aimR: 1, ['carry' + o]: 0, ['carry' + k]: 0, huong: turn, than: N.than - dir * 2, dau: N.dau + dir * 4, vai: N.vai + 3, duration: 0.45, ease: 'sine.inOut' }, 0);
+    t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'xoe' }, 0.02);
+    // Nhìn tới một điểm, tính ở dáng đã khuỵu (mặt thấp hơn lúc dựng).
+    const look = (point, at, options = {}) => { const was = s.seat; if (crouch) s.seat = crouch; this.#lookTo(t, point, at, { huong: turn, ...options }); s.seat = was; };
+    return { pet, base, k, o, dir, turn, keep, spot, arm, armDown, look, crouch, hand: cB };
+  }
+
+  /**
+   * CẮT MÓNG: quay nghiêng về con vật `target`, cúi xuống; tay xa đỡ dưới BÀN CHÂN TRƯỚC (phía người xem) và NHẤC nó lên, tay gần đưa
+   * cái kìm cắt móng (hiện trong tay) tới đầu bàn chân, cắt 2–3 lần (kìm khép lại thấy rõ) — rồi cất kìm, hạ chân xuống, vuốt gáy nó hai
+   * cái, cười, gật. `hold`: giây cắt (≈ 0,6 s một lần). `paw`: 'front' (chân trước phía người xem — chân duy nhất nhấc được).
+   */
+  clipNails(target = null, { paw = 'front', hold = 1.8 } = {}) {
+    if (paw !== 'front') throw new Error(`[character] clipNails: paw must be 'front' (the near front paw), got ${JSON.stringify(paw)}`);
+    if (!(Number.isFinite(hold) && hold >= 0.6 && hold <= 6)) throw new Error(`[character] clipNails: hold must be 0.6…6 seconds of clipping, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this.#care38(t, target, 'clipNails', 0.3), { k, o, dir, turn } = c;
+    const P0 = c.spot('paw'), P1 = c.spot('paw', 'petPaw', 1), S = c.spot('back'), E = c.spot('eye');
+    // Lòng bàn tay xa ĐỠ DƯỚI bàn chân; đầu kìm ở mép bàn chân phía người (móng), sẵn sàng thì lùi ra một chút.
+    const hold0 = c.arm(o, P0.x + dir * 6, P0.y + 9, 15), hold1 = c.arm(o, P1.x + dir * 6, P1.y + 9, 15);      // lòng bàn tay dưới–sau bàn chân: bàn chân lộ ra giữa tay và kìm
+    const ready0 = c.arm(k, P0.x - dir * 20, P0.y - 12, RigSVG.CLIP_TIP), ready1 = c.arm(k, P1.x - dir * 18, P1.y - 8, RigSVG.CLIP_TIP);
+    const at = (i) => c.arm(k, P1.x - dir * 2, P1.y + (i % 2 ? 2.5 : -1.5), RigSVG.CLIP_TIP);
+    // 1. Hai tay tới bàn chân (kìm hiện trong tay), đầu cúi nhìn nó.
+    t.to(s, { ['bat' + k]: ready0.bat, ['cang' + k]: ready0.cang, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, dauY: 8, cuoi: 0.6, chum: 0.15, mayL: 0.3, mayR: 0.3, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 10, ['snip' + k]: 0 }, 0.1);
+    c.look(P0, 0.05, { d: 0.45 });
+    // 2. NHẤC CHÂN: bàn tay đỡ nâng lên, chân con vật lên theo (cùng một tween).
+    t.to(s, { petPaw: 1, ['bat' + o]: hold1.bat, ['cang' + o]: hold1.cang, ['bat' + k]: ready1.bat, ['cang' + k]: ready1.cang, duration: 0.45, ease: 'sine.inOut' }, 0.6);
+    c.look(P1, 0.6, { d: 0.45 });
+    // 3. CẮT: mỗi lần kìm tới móng, khép (giữ 0,22 s), mở — đổi móng giữa hai lần. Tay đỡ siết nhẹ theo nhịp.
+    const c0 = 1.1, n = Math.max(2, Math.round(hold / RigSVG.CLIP_EVERY)), per = Math.max(RigSVG.CLIP_EVERY, hold / n);
+    for (let i = 0; i < n; i++) {
+      const a = c0 + i * per, p = at(i);
+      t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: 0.16, ease: 'sine.out' }, a);
+      t.to(s, { ['snip' + k]: 1, mieng: 0.1, chum: 0.35, duration: 0.09, ease: 'power2.in' }, a + 0.2);
+      t.to(s, { ['snip' + k]: 0, chum: 0.15, duration: 0.12, ease: 'power2.out' }, a + 0.2 + 0.09 + 0.22);
+      t.to(s, { ['cang' + o]: hold1.cang + dir * 2, duration: 0.15, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a + 0.18);
+    }
+    // 4. Xong: kìm lùi ra rồi cất (trong tay), hạ chân xuống cùng bàn tay đỡ, vuốt gáy hai cái, cười, gật.
+    // Vuốt LƯNG (không vuốt gáy: bàn tay ở gáy che mất đầu con vật — lượt hai).
+    const e = c0 + n * per, stroke0 = c.arm(k, S.x + dir * 8, S.y - 1, 15), stroke1 = c.arm(k, S.x - dir * 8, S.y + 1, 15);
+    t.to(s, { ['bat' + k]: ready1.bat, ['cang' + k]: ready1.cang, mieng: 0, chum: 0, duration: 0.22, ease: 'power2.out' }, e);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'xoe' }, e + 0.25);
+    t.to(s, { petPaw: 0, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, duration: 0.45, ease: 'sine.inOut' }, e + 0.2);
+    t.to(s, { ['bat' + k]: stroke0.bat, ['cang' + k]: stroke0.cang, duration: 0.3, ease: 'power2.out' }, e + 0.3);
+    for (let i = 0; i < 2; i++) {
+      t.to(s, { ['bat' + k]: stroke1.bat, ['cang' + k]: stroke1.cang, duration: 0.22, ease: 'sine.inOut' }, e + 0.62 + i * 0.44)
+       .to(s, { ['bat' + k]: stroke0.bat, ['cang' + k]: stroke0.cang, duration: 0.22, ease: 'sine.inOut' }, e + 0.84 + i * 0.44);
+    }
+    c.look(E, e + 0.3, { d: 0.4 });
+    t.to(s, { cuoi: 1, mayL: 0.6, mayR: 0.6, duration: 0.25 }, e + 0.35);
+    t.to(s, { dauY: 13, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, e + 1.0);
+    this.#khep(t, 0.5, e + 1.55, c.keep);
+    return t;
+  }
+
+  /**
+   * NHỎ MẮT: quay nghiêng về con vật `target`; tay xa đỡ dưới CẰM và nâng nó ngửa đầu lên, tay gần giơ lọ thuốc nhỏ mắt (hiện trong
+   * tay) chúc thẳng xuống ngay trên con mắt phía người, giữ `hold` giây — một giọt thuốc đọng ở đầu vòi rồi rơi xuống mắt, con vật nhắm
+   * tịt mắt lại, chớp. Cất lọ, hạ cằm, vuốt cằm hai cái, cười.
+   */
+  eyeDrops(target = null, { hold = 1.2 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 0.5 && hold <= 5)) throw new Error(`[character] eyeDrops: hold must be 0.5…5 seconds, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, c = this.#care38(t, target, 'eyeDrops'), { k, o, dir, turn } = c;
+    const C0 = c.spot('chin'), C1 = c.spot('chin', 'petChin', 1), E1 = c.spot('eye', 'petChin', 1);
+    const hold0 = c.arm(o, C0.x, C0.y + 4, 16), hold1 = c.arm(o, C1.x, C1.y + 4, 16);
+    // Lọ chúc thẳng xuống: đầu vòi ngay trên mắt `DROP_GAP` đơn vị (lúc sẵn sàng: cao hơn 14).
+    const aim = c.armDown(k, E1.x, E1.y - RigSVG.DROP_GAP, RigSVG.DROP_TIP), ready = c.armDown(k, E1.x - dir * 3, E1.y - RigSVG.DROP_GAP - 7, RigSVG.DROP_TIP);
+    // 1. Tay xa tới dưới cằm, lọ thuốc hiện trong tay gần, xoay chúc xuống.
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, ['gadgetTurn' + k]: ready.spin, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, dauY: 8, cuoi: 0.55, chum: 0.2, mayL: 0.3, mayR: 0.3, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 11, ['drop' + k]: 0 }, 0.1);
+    c.look(E1, 0.05, { d: 0.45 });
+    // 2. NÂNG CẰM: con vật ngửa đầu theo bàn tay; lọ thuốc tới ngay trên mắt.
+    t.to(s, { petChin: 1, ['bat' + o]: hold1.bat, ['cang' + o]: hold1.cang, ['bat' + k]: aim.bat, ['cang' + k]: aim.cang, ['gadgetTurn' + k]: aim.spin, duration: 0.45, ease: 'sine.inOut' }, 0.55);
+    // 3. Giữ lọ trên mắt; giọt thuốc đọng ở đầu vòi (0,6 s — thấy được ở 1 khung / giây), rồi rơi xuống mắt.
+    const d0 = 1.0 + hold * 0.5, hit = d0 + 0.6 + 0.3;
+    t.to(s, { ['drop' + k]: 0.1, duration: 0.25, ease: 'sine.out' }, d0);
+    t.to(s, { ['drop' + k]: 1, duration: 0.3, ease: 'power2.in' }, d0 + 0.6);
+    t.set(s, { ['drop' + k]: 0 }, hit + 0.01);
+    // 4. Con vật nhắm tịt mắt (giữ 0,7 s), hé ra, chớp lần nữa.
+    t.to(s, { petBlink: 1, duration: 0.07, ease: 'power1.in' }, hit);
+    t.to(s, { petBlink: 0.35, duration: 0.15 }, hit + 0.75).to(s, { petBlink: 1, duration: 0.07 }, hit + 1.15).to(s, { petBlink: 0, duration: 0.12 }, hit + 1.3);
+    t.to(s, { cuoi: 0.9, mayL: 0.55, mayR: 0.55, chum: 0, duration: 0.25 }, hit + 0.1);
+    // 5. Cất lọ, hạ cằm (tay đỡ hạ theo), vuốt cằm hai cái.
+    // Lọ lên khỏi mắt một chút rồi cất; tay ấy hạ về bên người (lượt hai: về dáng "sẵn sàng" thì bàn tay không lướt qua mặt người).
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, duration: 0.2, ease: 'power2.out' }, hit + 0.35);
+    t.set(s, { ['gadget' + k]: 0, ['gadgetTurn' + k]: 0, ['tay' + k]: 'mo' }, hit + 0.58);
+    t.to(s, { ['bat' + k]: this.NGHI['bat' + k], ['cang' + k]: this.NGHI['cang' + k], ['aim' + k]: 0, duration: 0.4, ease: 'power2.inOut' }, hit + 0.6);
+    t.to(s, { petChin: 0, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, duration: 0.4, ease: 'sine.inOut' }, hit + 0.5);
+    for (let i = 0; i < 2; i++) {
+      t.to(s, { ['bat' + o]: hold0.bat + 3, ['cang' + o]: hold0.cang - 5, duration: 0.18, ease: 'sine.inOut' }, hit + 0.95 + i * 0.36)
+       .to(s, { ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, duration: 0.18, ease: 'sine.inOut' }, hit + 1.13 + i * 0.36);
+    }
+    t.to(s, { dauY: 12, cuoi: 1, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, hit + 1.1);
+    this.#khep(t, 0.5, hit + 1.75, c.keep);
+    return t;
+  }
+
+  /**
+   * VỆ SINH TAI: quay nghiêng về con vật `target`; tay xa đỡ dưới cằm giữ đầu, tay gần cầm miếng bông (hiện trong tay) lau trong gốc
+   * tai phía người thành những vòng nhỏ suốt `hold` giây. Rồi buông hai tay, con vật LẮC ĐẦU (tai vẫy) — người lùi đầu ra, cười.
+   */
+  cleanEars(target = null, { hold = 1.8 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 0.8 && hold <= 6)) throw new Error(`[character] cleanEars: hold must be 0.8…6 seconds of wiping, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this.#care38(t, target, 'cleanEars'), { k, o, dir, turn } = c;
+    const A = c.spot('ear'), C = c.spot('chin'), E = c.spot('eye');
+    const hold0 = c.arm(o, C.x, C.y + 10, 16);       // dưới cằm, thấp: không che miệng, mắt (mèo nhỏ: đầu thấy 59 % với +7)
+    const wipe = (q) => { const a = q * Math.PI / 2; return c.arm(k, A.x + Math.cos(a) * 4, A.y + Math.sin(a) * 3.2, RigSVG.PAD_AT); };
+    const ready = c.arm(k, A.x - dir * 14, A.y - 8, RigSVG.PAD_AT), first = wipe(0);
+    // 1. Tay đỡ cằm, miếng bông tới gốc tai.
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, dauY: 8, cuoi: 0.55, chum: 0.2, mayL: 0.3, mayR: 0.3, duration: 0.45, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 12 }, 0.1);
+    t.to(s, { ['bat' + k]: first.bat, ['cang' + k]: first.cang, duration: 0.2, ease: 'sine.out' }, 0.45);
+    c.look(A, 0.05, { d: 0.45 });
+    // 2. LAU: những vòng nhỏ trong gốc tai (mỗi vòng 0,44 s).
+    const loops = Math.max(2, Math.round(hold / 0.44)), step = hold / loops / 4;
+    for (let w = 0, at = 0.65; w < loops; w++) for (let q = 1; q <= 4; q++, at += step) { const p = wipe(q); t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: step, ease: 'sine.inOut' }, at); }
+    // 3. Buông: bông cất, hai tay lùi ra; con vật LẮC ĐẦU (8 nhịp, nhỏ dần) — người ngả đầu ra, cười.
+    const e = 0.65 + hold;
+    // Hai tay về hẳn bên người (dáng nghỉ) — con vật tự lắc đầu, không bàn tay nào ở gần nó (lượt hai: tay còn sát đầu nó, 1 % chiều cao).
+    t.to(s, { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], aimL: 0, aimR: 0, than: N.than + dir * 3, duration: 0.35, ease: 'power2.out' }, e);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo', ['tay' + o]: 'mo' }, e + 0.25);
+    const shake = e + 0.35;
+    for (let i = 0; i < 8; i++) t.to(s, { petShake: (i % 2 ? -1 : 1) * (1 - i / 10), duration: 0.11, ease: 'sine.inOut' }, shake + i * 0.11);
+    t.to(s, { petShake: 0, duration: 0.12, ease: 'sine.out' }, shake + 0.88);
+    t.to(s, { than: N.than + dir * 2, dau: N.dau - dir * 4, dauY: 2, cuoi: 1, mieng: 0.35, mayL: 0.75, mayR: 0.75, chum: 0, duration: 0.3, ease: 'power2.out' }, shake);
+    c.look(E, shake, { d: 0.35 });
+    this.#khep(t, 0.5, shake + 1.05, c.keep);
+    return t;
+  }
+
+  /**
+   * QUÉT CHIP: quay nghiêng về con vật `target`; tay xa đặt lên lưng nó giữ yên, tay gần cầm máy quét chip (hiện trong tay) chúc xuống,
+   * rà CHẬM hai lượt trên gáy / vai — máy "bíp" và một thẻ số lớn bật lên trên lưng con vật với mã chip `id`, người nhìn thẻ `hold` giây,
+   * gật. Thẻ dùng chung hệ thẻ số đo (`readout`, như `weigh` / `takeTemp`), rộng theo mã.
+   */
+  scanChip(target = null, { id = RigSVG.CHIP_ID, hold = 1.6 } = {}) {
+    if (typeof id !== 'string' || !id.trim() || id.length > 24) throw new Error(`[character] scanChip: id must be the chip number as a string of up to 24 characters, such as '900 123 456 789', got ${JSON.stringify(id)}`);
+    if (!(Number.isFinite(hold) && hold >= 0.8 && hold <= 6)) throw new Error(`[character] scanChip: hold must be 0.8…6 seconds, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, c = this.#care38(t, target, 'scanChip'), { k, o, dir, turn } = c;
+    const S = c.spot('scruff'), B = c.spot('back'), H = c.spot('crown'), fwd = H.x >= S.x ? 1 : -1;
+    // Đầu đọc lơ lửng ngay trên lông (12 đơn vị trên gáy), rà từ sau đầu về vai; tay xa úp trên lưng.
+    const lift = 13, pass = [c.armDown(k, S.x + fwd * 2, S.y - lift, RigSVG.SCAN_AT), c.armDown(k, S.x - fwd * 32, S.y - lift + 3, RigSVG.SCAN_AT)];
+    const mid = c.armDown(k, S.x - fwd * 14, S.y - lift + 1, RigSVG.SCAN_AT), ready = c.armDown(k, S.x - fwd * 8, S.y - lift - 16, RigSVG.SCAN_AT);
+    const rest = c.arm(o, B.x - fwd * 18, B.y + 24, 15);       // lòng bàn tay úp bên sườn — dưới đường máy quét đi (lượt ba: trên lưng thì máy che mất bàn tay)
+    // 1. Tay xa úp lên lưng, máy quét hiện trong tay gần, chúc xuống trên gáy.
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, ['gadgetTurn' + k]: ready.spin, ['bat' + o]: rest.bat, ['cang' + o]: rest.cang, dauY: 8, cuoi: 0.5, chum: 0.15, mayL: 0.3, mayR: 0.3, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 13, ['tay' + o]: 'xoe' }, 0.1);
+    // Bối cảnh 3D: con vật vẽ TRƯỚC người lúc rà (như `putCone`) — cánh tay cầm máy vươn qua đầu nó nằm sau nó, chỉ hai bàn tay (bản chép,
+    // `onTop`) vẽ trên nó. Người vẽ trước thì cánh tay che hơn nửa đầu con vật (lượt một: đầu thấy 42 %).
+    if (c.pet) { (this.caring || (this.caring = new Set())).add(c.pet); t.to(s, { onTopL: 1, onTopR: 1, careFront: 1, duration: 0.02 }, 0.12); }
+    // 2. Rà chậm: trước → sau → trước (0,8 s mỗi lượt), mắt theo máy.
+    const go = (p, at, d) => t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, ['gadgetTurn' + k]: p.spin, duration: d, ease: 'sine.inOut' }, at);
+    go(pass[0], 0.55, 0.35); go(pass[1], 0.9, 0.8); go(pass[0], 1.7, 0.8); go(mid, 2.5, 0.3);
+    const tool = (p) => ({ x: p.wx + p.u.x * 10 * c.hand, y: p.wy + (p.u.y * 10 + RigSVG.SCAN_AT - 10) * c.hand });
+    c.look(tool(pass[0]), 0.05, { d: 0.45 });
+    c.look(tool(pass[1]), 0.95, { d: 0.75 });
+    c.look(tool(pass[0]), 1.75, { d: 0.75 });
+    // 3. BÍP: thẻ số với mã chip bật lên trên lưng con vật (lệch về phía đuôi — không che đầu nó), người nhìn thẻ, gật.
+    const beep = 2.85, w = Math.max(116, Math.round(id.length * 12.6 + 26));
+    // Thẻ trên LƯNG con vật, lệch về phía đuôi, thấp ngay trên lưng — không che đầu nó, không che mặt người cúi sát (lượt hai).
+    const card = { x: B.x - fwd * 72, y: Math.min(B.y - 30, S.y - lift - RigSVG.SCAN_AT - 12) };
+    t.to(s, { readoutN: this.#reading({ text: id, x: card.x + s.x, y: card.y + (s.y || 0) + DOI_Y, w }), duration: 0.02 }, beep - 0.05);
+    t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, beep);
+    const look = { x: card.x, y: card.y - 26 }, angles = this.#lookAngles(look, { huong: turn });
+    c.look(look, beep + 0.1, { d: 0.4 });
+    t.to(s, { cuoi: 1, mayL: 0.7, mayR: 0.7, chum: 0, duration: 0.3 }, beep + 0.2);
+    t.to(s, { headPitch: angles.headPitch + 0.4, duration: 0.22, ease: 'sine.out', yoyo: true, repeat: 1 }, beep + 0.45 + hold * 0.55);
+    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, beep + 0.45 + hold);
+    // 4. Cất máy, nhấc tay khỏi lưng.
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, duration: 0.25, ease: 'power2.out' }, beep + 0.55 + hold);
+    t.set(s, { ['gadget' + k]: 0, ['gadgetTurn' + k]: 0, ['tay' + o]: 'mo' }, beep + 0.8 + hold);
+    if (c.pet) t.to(s, { onTopL: 0, onTopR: 0, careFront: 0, duration: 0.02 }, beep + 0.8 + hold);
+    this.#khep(t, 0.5, beep + 0.8 + hold, c.keep);
     return t;
   }
 
