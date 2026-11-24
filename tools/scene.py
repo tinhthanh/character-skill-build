@@ -148,6 +148,13 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                hand, hands them over; the customer gets put-away notes), ["stampCard"] / ["stampCard", "@customer"] (stamp pressed, a red mark stays;
                with a customer the card is handed over), ["pourDrink"] (stream into the cup, level rises, the full cup stays in hand — then "handOver"),
                ["wipeCounter", 2]. The counter of the set is used when there is one (hands above it; the cloth on its top).
+               Presenter actions (a person): ["holdSign", "Giảm 20%", 2, { "color": "#2f9e8f" }] (a small sign with 1–3 short lines — a
+               list or "line 1|line 2" — raised in both hands in front of the chest, tilted a little, then lowered; the text is
+               kept big enough to read), ["showSize", "big" | "medium" | "small" | number, 1.4] ("this big": both hands apart,
+               palms facing, a small bounce), ["takeSelfie", 1.6, { "with": "@boy" }] (needs "holds": "phone", put away is fine:
+               the phone high at arm's length, a V sign, a flash; with "with" the other person (leans in, V sign) or pet (tilts its
+               head) does their part at the same time and steps up beside the taker), ["yawnStretch"] (a wide yawn, both arms up, a shake
+               of the head). In a vertical frame the sign and the gap come out narrower so the hands stay in the frame.
   script       `"phone": true` on a turn with `say`: the line is spoken on the phone (needs "holds": "phone").
                With `say`, the whole line is spoken with that face; without it, it is an expression beat
                before the turn's actions.
@@ -265,8 +272,13 @@ CONE_BACK = 0.12                                         # đợt 36: đeo loa x
 CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ sơ trước ngực / tay chỉ trúng điểm trên phim
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
-            'introduce', 'shrug', 'throwBall')
+            'introduce', 'shrug', 'throwBall',
+            'holdSign', 'showSize', 'takeSelfie', 'yawnStretch')            # đợt 39 C
 GESTURES += ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')          # đợt 39 B
+# ĐỢT 39 C — NGƯỜI DẪN: giơ bảng chữ, ra dấu kích thước, chụp ảnh tự sướng, ngáp vươn vai. Tay / bảng / điện thoại phải nằm trong khung
+# (cùng đường đo `GESTURES`); `acting_check` đo thêm tấm bảng (chữ đủ lớn, trước ngực), khe giữa hai tay, điện thoại + người chụp cùng, tay qua đầu.
+TALK_39 = ('holdSign', 'showSize', 'takeSelfie', 'yawnStretch')
+SIZE_39 = {'small': 44, 'medium': 130, 'big': 250}      # runtime/rig-svg.js SIZE_GAP — khe giữa hai lòng bàn tay (đơn vị khung 400 × 470 của người lớn)
 # ĐỘNG TÁC THÚ đợt 35: moments.json đo con vật trong khung, chân trên sàn (lăn ngửa: lưng trên sàn, chân chổng trời), nấp: đầu ló ra,
 # thân khuất một phần; liếm: mõm tới tay / mặt người.
 PET_ACTS = ('rollOver', 'chaseTail', 'knead', 'lick', 'hide', 'eatCarrot', 'bark')
@@ -934,6 +946,32 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                 moments.append({'t': mid[1], 'what': f'{op["who"]} {"puts on" if on else "takes off"} gloves', 'ask': [f'Is {op["who"]} ' + ('pulling a blue medical glove onto one hand with the other hand?' if on else 'peeling a blue medical glove off one hand with the other hand?')],
                                 'check': {'kind': 'prep', 'name': op['name'], 'who': op['who'], 'times': mid, 'samples': [round(t0 + 0.1 * n, 2) for n in range(int((t1 - t0) * 10) + 1)],
                                           'after': [round(min(t1 + 0.3, end - 0.05), 2)]}})
+            continue
+        if op['kind'] == 'talk39':
+            # NGƯỜI DẪN (đợt 39 C): mốc theo runtime/rig-svg.js — giơ bảng: bảng lên ở 0,87 s, hạ ở 0,87 + max(hold; 1,2); ra dấu: tay tới ở 0,45 s, buông ở
+            # 0,45 + max(hold; 1,1); tự sướng: máy lên ở 0,5 s, chớp ở 0,75 + max(0,5; 0,45 × hold), xong ở 0,7 + max(hold; 1,2); ngáp: tay lên ở 0,55 s,
+            # hạ ở 0,7 + max(hold; 1,1). Mốc cuối của tự sướng là lúc CHỚP SÁNG.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, name, who = float(step['start']), op['name'], op['who']
+            hold = float(op['hold']) if op.get('hold') else {'holdSign': 2.0, 'showSize': 1.4, 'takeSelfie': 1.6, 'yawnStretch': 1.3}[name]
+            if name == 'holdSign':
+                H = max(hold, 1.2); marks = [0.87 + 0.55 * H, 0.87 + 0.75 * H, 0.87 + 0.95 * H]
+                ask = [f'Is {who} holding a small sign with the text "{op.get("text") or ""}" in both hands in front of the chest, facing the viewer?', 'Is the text on the sign big and readable (Vietnamese letters with their marks intact)?']
+            elif name == 'showSize':
+                H = max(hold, 1.1); marks = [0.45 + 0.3 * H, 0.45 + 0.6 * H, 0.45 + 0.9 * H]
+                ask = [f'Are {who}\'s two hands held apart in front of the body, palms facing each other, showing the size of something ("this big")?']
+            elif name == 'takeSelfie':
+                H = max(hold, 1.2); flash = 0.75 + max(0.5, hold * 0.45) + 0.08; marks = [0.9, 0.7 + 0.5 * H, 0.7 + 0.9 * H, flash]
+                ask = [f'Is {who} holding a phone up high at arm\'s length, smiling and tilting the head, taking a selfie' + (f' together with {op["with"]}, who leans in beside them' if op.get('with') else '') + '?',
+                       'Is the phone clearly visible above the head, with a white flash of the camera at the moment of the shot?'] + ([f'Are both {who} and {op["with"]} inside the frame, close together?'] if op.get('with') else [])
+            else:
+                H = max(hold, 1.1); marks = [0.8, 0.7 + 0.5 * H, 0.7 + 0.9 * H]
+                ask = [f'Is {who} yawning wide (mouth open, eyes shut) with both arms stretched up over the head?']
+            times = [round(t0 + m, 2) for m in marks]
+            moments.append({'t': times[1], 'what': f'{who} {name}', 'ask': ask + [f'Are {who}\'s hands inside the frame (not cut off by its edge)?'],
+                            'check': {'kind': 'talk39', 'name': name, 'who': who, 'times': times, 'size': SIZE_39.get(op.get('size'), op.get('size')) if name == 'showSize' else None, 'with': op.get('with')}})
             continue
         if op['kind'] == 'gesture':
             # ĐỘNG TÁC TAY (đợt 33): ở 40 / 55 / 70 % bước, bàn tay của người làm nằm trong khung — góc trung khung dọc lấy bề ngang
@@ -1638,6 +1676,37 @@ def main():
                     fail(f'{where}: "readChart" needs a clipboard in hand — give "{actor}" "holds": "clipboard" (or "holdsHidden": true to keep it put away until then)')
                 gaze = f", gaze: set.target({actor}, {listener}, 'head')" if stage_set is not None else ''
                 return f"['readChart', {js(hold)}, {{ to: {listener}{gaze} }}]"
+        # ĐỢT 39 C — NGƯỜI DẪN: kiểm tra đối số ngay ở đây; khung DỌC: bảng hẹp / khe hẹp (`{ narrow: true }`, như reo); chụp ảnh tự sướng
+        # cần điện thoại trong tay (đang cất cũng được) và nhận `{ "with": "@người / con vật" }`.
+        talk = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+        if talk in TALK_39 and actor in names:
+            if names[actor]['_pet']: fail(f'{where}: "{talk}" is done by a person — a pet cannot {talk}')
+            args = list(step[1:]) if isinstance(step, list) else []
+            if talk == 'holdSign':
+                if not args or not (isinstance(args[0], str) and args[0].strip() or isinstance(args[0], list) and 1 <= len(args[0]) <= 3 and all(isinstance(line, str) and line.strip() for line in args[0])):
+                    fail(f'{where}: "holdSign" needs the text of the sign: ["holdSign", "Giảm 20%", seconds, {{ "color": "#2f9e8f" }}] — 1–3 short lines (a list of strings, or "line 1|line 2"); got {js(step)}')
+                if len(args) > 1 and not (isinstance(args[1], (int, float)) and args[1] > 0): fail(f'{where}: ["holdSign", text, seconds] — seconds is a number > 0, got {js(args[1])}')
+                if len(args) > 2 and not (isinstance(args[2], dict) and set(args[2]) <= {'color', 'narrow'}): fail(f'{where}: ["holdSign", text, seconds, {{ "color": "#hex" }}] — got {js(args[2])}')
+            if talk == 'showSize':
+                if args and not (args[0] in SIZE_39 or (isinstance(args[0], (int, float)) and not isinstance(args[0], bool) and args[0] > 0)): fail(f'{where}: ["showSize", size] — size is "small", "medium", "big" or a number > 0, got {js(args[0])}')
+                if len(args) > 1 and not (isinstance(args[1], (int, float)) and args[1] > 0): fail(f'{where}: ["showSize", size, seconds] — seconds is a number > 0, got {js(args[1])}')
+            if talk == 'yawnStretch' and args and not (isinstance(args[0], (int, float)) and args[0] > 0): fail(f'{where}: ["yawnStretch", seconds] — seconds is a number > 0, got {js(args[0])}')
+            if talk == 'takeSelfie':
+                if not any((item if isinstance(item, str) else (item or {}).get('kind')) == 'phone' for item in (names[actor].get('holds') or {'R': names[actor].get('holds')}).values()):
+                    fail(f'{where}: "takeSelfie" needs a phone — give "{actor}" "holds": "phone" (or "holdsHidden": true to keep it put away until then)')
+                if args and not (isinstance(args[0], (int, float)) and args[0] > 0): fail(f'{where}: ["takeSelfie", seconds, {{ "with": "@name" }}] — seconds is a number > 0, got {js(args[0])}')
+                if len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'with'} and isinstance(args[1].get('with'), str) and args[1]['with'].startswith('@') and args[1]['with'][1:] in names and args[1]['with'][1:] != actor):
+                    fail(f'{where}: ["takeSelfie", seconds, {{ "with": "@<another character or pet of the scene>" }}] — got {js(step)}')
+            narrow = height > width * 1.2 and talk in ('holdSign', 'showSize')
+            if talk == 'takeSelfie' and len(args) > 1:
+                return f"['takeSelfie', {js(args[0])}, {{ with: {args[1]['with'][1:]} }}]"
+            if narrow:
+                args = args + [None] * (3 - len(args)) if talk == 'holdSign' else args + [None] * (2 - len(args))
+                defaults = {'holdSign': [None, 2, {}], 'showSize': ['medium', 1.4]}[talk]
+                args = [d if a is None else a for a, d in zip(args, defaults)]
+                if isinstance(args[-1], dict) or talk == 'holdSign': args[-1] = {**(args[-1] if isinstance(args[-1], dict) else {}), 'narrow': True}
+                else: args.append({'narrow': True})
+                return '[' + ', '.join([js(talk)] + [js(a) for a in args]) + ']'
         # REO trong KHUNG DỌC (đợt 34): chữ V dang rộng cần ~1,02 × bề rộng góc toàn — không góc trung nào giữ được cả hai tay,
         # máy phải cắt sang góc toàn giữa chuỗi góc trung. Người (không phải con vật) reo ở khung dọc thì reo hẹp
         # (`cheer({ narrow: true })`: nắm tay giơ cạnh vai). Người viết tự cho tham số thì giữ của họ.
@@ -2080,6 +2149,17 @@ def main():
                     turns.append((f'  // {who["name"]} steps up to the {"pay stand" if nm in DESK_PAY else "counter"} for "{nm}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                     emitted[0] += 1
                     who['x'] = float(who['x']) + move
+            # ĐỢT 39 C: chụp ảnh tự sướng cùng ai (`["takeSelfie", 1.6, { "with": "@boy" }]`): người kia bước lại sát người chụp (cùng phía họ
+            # đang đứng, cách 0,3 × chiều cao trung bình) để cả hai vào một khung hình — máy chụp ở trên cao giữa hai đầu.
+            for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
+                if isinstance(step, list) and step and step[0] == 'takeSelfie' and len(step) > 2 and isinstance(step[2], dict) and isinstance(step[2].get('with'), str) and step[2]['with'][1:] in names:
+                    mate = names[step[2]['with'][1:]]
+                    side = 1 if float(mate['x']) >= float(who['x']) else -1
+                    move = float(who['x']) + side * 0.3 * (who['_host_height'] + mate['_host_height']) / 2 - float(mate['x']) - mate.get('_drop', 0)
+                    if abs(move) > 0.05 * who['_host_height'] and not mate.get('seated') and not mate.get('on'):
+                        turns.append((f'  // {mate["name"]} steps up beside {who["name"]} for the "takeSelfie"', f"[{mate['name']}, ['walk', 4, {round(move / mate['_unit'])}]]"))
+                        emitted[0] += 1
+                        mate['x'] = float(mate['x']) + move
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_35 + CARE_ACTIONS + tuple(PAIR_38) and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
@@ -2314,8 +2394,16 @@ def main():
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
                 # ĐỘNG TÁC TAY của người (đợt 33): moments.json đo bàn tay trong khung ở lúc được hỏi.
                 name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-                if name in GESTURES and turn.get('who') in names and not names[turn['who']]['_pet']:
+                if name in GESTURES and name not in TALK_39 and turn.get('who') in names and not names[turn['who']]['_pet']:      # đợt 39 C: bốn động tác người dẫn đo riêng (`talk39`)
                     gear_ops.append({'turn': emitted[0], 'kind': 'gesture', 'name': name, 'who': turn.get('who'), 'target': None})
+                # NGƯỜI DẪN (đợt 39 C): giơ bảng, ra dấu kích thước, tự sướng, ngáp vươn vai — acting_check đo bảng / khe hai tay / điện thoại / tay qua đầu.
+                if name in TALK_39 and turn.get('who') in names and not names[turn['who']]['_pet']:
+                    args_ = step[1:] if isinstance(step, list) else []
+                    gear_ops.append({'turn': emitted[0], 'kind': 'talk39', 'name': name, 'who': turn.get('who'), 'target': None,
+                                     'hold': next((a for a in args_[1:2] if isinstance(a, (int, float))), None) if name in ('holdSign', 'showSize') else next((a for a in args_[:1] if isinstance(a, (int, float))), None),
+                                     'size': (args_[0] if args_ else 'medium') if name == 'showSize' else None,
+                                     'text': (' / '.join(args_[0]) if isinstance(args_[0], list) else str(args_[0]).replace('|', ' / ')) if name == 'holdSign' and args_ else None,
+                                     'with': next((a['with'][1:] for a in args_[1:2] if isinstance(a, dict) and isinstance(a.get('with'), str)), None) if name == 'takeSelfie' else None})
                 # RỬA TAY, ĐEO / THÁO GĂNG (đợt 38 B): bọt quanh hai tay lúc xoa, găng hiện / mất đúng lúc tay kia kéo nó (acting_check `prep`).
                 if name in PREP_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': 'prep', 'name': name, 'who': turn.get('who'), 'target': None,
@@ -2427,6 +2515,16 @@ def main():
                     part = f"['lookAt', {look}, {{ hold: 2.6, up: 1.5 }}]"
                 else: part = f"[{js(PAIR_38[kind])}, {me}]"
                 code = '{ together: [' + code + f", [{names[name]['name']}, {part}]] }}"
+                emitted[0] += 1
+            # ĐỢT 39 C: `["takeSelfie", hold, { "with": "@người / con vật" }]` một mình: người kia làm phần của mình CÙNG LÚC — người: `joinSelfie`
+            # (nghiêng đầu về phía máy, cười, chữ V); con vật: nghiêng đầu tò mò (`tiltHead`).
+            selfie = [step for step in entry.get('do', []) if isinstance(step, list) and step and step[0] == 'takeSelfie' and len(step) > 2 and isinstance(step[2], dict) and isinstance(step[2].get('with'), str)]
+            if selfie and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1 and selfie[0][2]['with'][1:] in names:
+                mate, me = names[selfie[0][2]['with'][1:]], names[entry['who']]['name']
+                if mate['_pet']:
+                    part = "['tiltHead']"
+                else: part = f"['joinSelfie', {me}, {js(selfie[0][1] if isinstance(selfie[0][1], (int, float)) else 1.6)}]"
+                code = '{ together: [' + code + f", [{mate['name']}, {part}]] }}"
                 emitted[0] += 1
             # `["giveTreat", "@con vật"]` một mình: con vật NHAI miếng bánh / viên thuốc vừa đớp — đúng lúc nó biến khỏi tay
             # người (~1 s sau khi bước bắt đầu). Không thì bánh biến mất mà không ai ăn (Gemini soát cảnh thử đợt 13).
@@ -3135,7 +3233,7 @@ def main():
                 beats[0]['subjects'] = near or lead['subjects']
         if director:
             items, hold = [], None
-            gestured = any(op['kind'] == 'gesture' for op in gear_ops)
+            gestured = any(op['kind'] in ('gesture', 'talk39') for op in gear_ops)
             for beat in beats:
                 time, end = f"T0 + talk.turns[{beat['first']}].start", f"T0 + talk.turns[{beat['last']}].end"
                 # Sau lượt TRỜI CHUYỂN: giữ góc toàn tới khi trời chuyển được 75 % (đèn đã tự bật) — cắt sang góc cận sớm thì không

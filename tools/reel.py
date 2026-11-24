@@ -137,6 +137,8 @@ def main():
         stand = VGCharacter.createProp(standHost, 'paystand', {{ on: entry.stand.on }}); parts.push(standHost);
       }}
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
+      // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{{ "with": "@person" }}` (hay "@pet") trong tuỳ chọn của bước.
+      for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => {{ if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = {{ ...arg, with: arg.with === '@pet' ? pet : person }}; }});
       const line = VGCharacter.sequence(rig, steps);
       if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD});
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};

@@ -83,6 +83,8 @@ for (const entry of entries) {
         cell.insertBefore(standHost, cell.firstChild); stand = createProp(standHost, 'paystand', { on: entry.stand.on });
       }
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
+      // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{ "with": "@person" }` (hay "@pet") trong tuỳ chọn của bước.
+      for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = { ...arg, with: arg.with === '@pet' ? pet : person }; });
       const line = sequence(rig, steps);
       const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' || arg === '@self' ? rig : arg)) : step))) : null;
       const at = line.duration() * (column + 0.5) / cols;

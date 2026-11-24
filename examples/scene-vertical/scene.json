@@ -10,6 +10,7 @@
   "script": [
     { "who": "mai", "say": "Chào bé mèo! Hôm nay bé khoẻ không?" },
     { "who": "miu", "do": ["meow"], "shot": ["mai", "miu"] },
+    { "who": "mai", "do": [["showSize", "medium"]], "shot": "wide" },
     { "who": "mai", "do": ["cheer"], "shot": "wide" }
   ]
 }

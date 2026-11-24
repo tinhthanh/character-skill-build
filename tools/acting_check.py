@@ -317,7 +317,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -1077,6 +1077,79 @@ def check_chart(folder, c, frames):
     line = body['y0'] + (body['y1'] - body['y0']) * CHART_UP if body else H
     return [{'scene': folder, 'what': what, 'ok': seen >= 0.95 and cy <= line,
              'note': f'{seen * 100:.0f} % of the clipboard in the frame (least 95 %), its middle {(cy - line) / (who.get("tall") or 1) * 100:+.1f} % of height from the chest line at {t:g} s (≤ 0)'}]
+
+
+# ĐỢT 39 C — NGƯỜI DẪN: giơ bảng, ra dấu kích thước, chụp ảnh tự sướng, ngáp vươn vai.
+SIGN_TEXT = 0.03       # giơ bảng: chữ trên bảng cao ≥ 3 % chiều cao khung hình (người xem đọc được ở cỡ góc máy tự chọn)
+SIGN_HAND = 0.35       # … hai bàn tay cách mép bảng ≤ 35 % bề ngang bảng (cầm bảng, không bảng trôi giữa không trung)
+SIZE_LOW, SIZE_HIGH = 0.55, 1.35    # ra dấu kích thước: khe giữa hai lòng bàn tay = 55 … 135 % số đo ghi trong rig (tay ngắn của trẻ con: tính theo cỡ người)
+SELFIE_LOW = 0.15      # … và không thấp hơn đường mắt quá 15 % chiều cao khuôn mặt (tay chibi ngắn: máy ngang thái dương, không tới trên đỉnh đầu)
+SELFIE_SIDE = 0.12     # tự sướng: máy cách đường giữa thân ≥ 12 % chiều cao người (giơ ra, không áp vào mặt) …
+STRETCH_UP = 0.1       # ngáp vươn vai: hai bàn tay cao hơn giữa mặt ≥ 10 % chiều cao khuôn mặt (ngang trán trở lên)
+
+
+def check_talk39(folder, c, frames):
+    """NGƯỜI DẪN (đợt 39 C): đo ở ba lúc (tự sướng: thêm lúc chớp sáng) — xem `light_moments` (tools/scene.py)."""
+    W, H = frame_size(folder)
+    name, out = c['name'], []
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{c["who"]} {name} — {text}', 'ok': ok, 'note': note})
+    shown = [(t, frame.get(c['who'])) for t, frame in zip(c['times'], frames)]
+    shown = [(t, who) for t, who in shown if who and who.get('gaze') and who.get('hands')]      # `gaze`: tâm và cao khung KHUÔN MẶT (không phải khung chụp)
+    if not shown: return [{'scene': folder, 'what': f'{c["who"]} {name}', 'ok': None, 'note': 'not in the frame'}]
+    if name == 'holdSign':
+        worst = None
+        for t, who in shown[:3]:
+            sign = next((g for g in who.get('gadgets') or [] if g['kind'] == 28), None)
+            if not sign: row('a sign in the hands', False, f'no sign at {t:g} s'); return out
+            b, body, face = sign['box'], who.get('body'), who['gaze']
+            w, cy = b['x1'] - b['x0'], (b['y0'] + b['y1']) / 2
+            seen, text = in_frame(b, W, H), (sign.get('textH') or 0) / H
+            line = (body['y0'] + (body['y1'] - body['y0']) * 0.75) if body else H
+            near = max(min(abs(h['x'] - b['x0']), abs(h['x'] - b['x1']), abs(h['x'] - (b['x0'] + b['x1']) / 2)) / max(w, 1) for h in who['hands'])
+            score = (min(seen / 0.95, text / SIGN_TEXT), t, seen, text, cy, face, line, near)
+            if worst is None or score[0] < worst[0]: worst = score
+        _, t, seen, text, cy, face, line, near = worst
+        row('the sign, whole in the frame, text big enough', seen >= 0.95 and text >= SIGN_TEXT,
+            f'{seen * 100:.0f} % of the sign in the frame (least 95 %), its text {text * 100:.1f} % of the frame height (least {SIGN_TEXT * 100:g} %) at {t:g} s')
+        chin = face['y'] + face['h'] / 2
+        row('the sign in front of the chest, held in both hands', chin - face['h'] * 0.2 < cy <= line and near <= SIGN_HAND,
+            f'the sign\'s middle {(cy - chin) / (who.get("tall") or 1) * 100:+.1f} % of height from the chin (≥ 0, a little overlap allowed), above the belt line {(line - cy) / (who.get("tall") or 1) * 100:+.1f} %; hands {near * 100:.0f} % of its width from it (≤ {SIGN_HAND * 100:g} %) at {t:g} s')
+    elif name == 'showSize':
+        t, who = shown[len(shown) // 2]
+        hands = sorted(who['hands'], key=lambda h: h['x'])
+        if len(hands) < 2: row('two hands apart', False, f'only {len(hands)} hand measured at {t:g} s'); return out
+        gap, tall = hands[-1]['x'] - hands[0]['x'], who.get('tall') or 1
+        size = c.get('size') or 130
+        if H > W * 1.2: size = min(size, 150)           # khung dọc: khe hẹp (`narrow`, runtime/rig-svg.js `showSize`)
+        want = size / 470 * tall
+        row('two hands apart by the size', want * SIZE_LOW <= gap or c.get('size') is None, f'the hands {gap / tall * 100:.0f} % of height apart, the size asked is {want / tall * 100:.0f} % (least {SIZE_LOW * 100:g} % of it — a child\'s short arms may stop short) at {t:g} s')
+        row('the hands at chest height, level with each other', abs(hands[0]['y'] - hands[-1]['y']) <= 0.12 * tall and who['gaze']['y'] + who['gaze']['h'] / 2 < min(h['y'] for h in hands),
+            f'hands {abs(hands[0]["y"] - hands[-1]["y"]) / tall * 100:.0f} % of height apart vertically (≤ 12 %), below the chin at {t:g} s')
+    elif name == 'takeSelfie':
+        t, who = shown[min(1, len(shown) - 1)]            # lúc giữa dáng giơ máy (không phải lúc máy bắt đầu hạ)
+        tall, face = who.get('tall') or 1, who['gaze']
+        phone = next((i for i in who.get('items') or [] if i['kind'] == 'item'), None)
+        if not phone: row('the phone up', False, f'no phone in hand at {t:g} s'); return out
+        b = phone['box']; cx, cy = (b['x0'] + b['x1']) / 2, (b['y0'] + b['y1']) / 2
+        row('the phone up high at arm\'s length', cy <= face['y'] + SELFIE_LOW * face['h'] and abs(cx - face['x']) >= SELFIE_SIDE * tall,
+            f'the phone {(face["y"] - cy) / face["h"] * 100:+.0f} % of the face height above the eye line (≥ -{SELFIE_LOW * 100:g} % — chibi arms are short: level with the eyes, not above the head), {abs(cx - face["x"]) / tall * 100:.0f} % of height off the face (≥ {SELFIE_SIDE * 100:g} %) at {t:g} s')
+        row('the phone in the frame', in_frame(b, W, H) >= 0.95, f'{in_frame(b, W, H) * 100:.0f} % of the phone in the frame (least 95 %)')
+        ft, fwho = shown[-1] if shown[-1][0] == c['times'][-1] else (None, None)
+        if fwho is not None: row('the flash at the shot', any(g['kind'] == 29 for g in fwho.get('gadgets') or []), f'flash {"seen" if any(g["kind"] == 29 for g in fwho.get("gadgets") or []) else "NOT seen"} at {ft:g} s')
+        if c.get('with'):
+            frame = frames[1]
+            mate = frame.get(c['with'])
+            if not mate or not mate.get('face'): row(f'{c["with"]} in the shot', False, f'{c["with"]} is not in the frame at {t:g} s'); return out
+            box = mate.get('body') or mate['face']
+            near = abs((mate['gaze']['x'] if mate.get('gaze') else (box['x0'] + box['x1']) / 2) - face['x'])
+            row(f'{c["with"]} in the shot beside them', in_frame(box, W, H) >= 0.9 and near <= 1.1 * tall,
+                f'{in_frame(box, W, H) * 100:.0f} % of {c["with"]} in the frame (least 90 %), the two faces {near / tall * 100:.0f} % of height apart (≤ 110 %) at {t:g} s')
+    else:
+        t, who = shown[len(shown) // 2]
+        face = who['gaze']; top = face['y'] - face['h'] * STRETCH_UP
+        high = [h for h in who['hands'] if h['y'] <= top]
+        row('both arms up over the head', len(high) == 2, f'{len(high)} of {len(who["hands"])} hands above the line {STRETCH_UP * 100:g} % of the face height over its middle (the forehead) at {t:g} s')
+    return out
 
 
 def check_xray(folder, c, frames):
@@ -1905,6 +1978,12 @@ def check_scene(folder):
                                         'note': f'the pet\'s body moves at most {hop[1] * 100:.1f} % of {c["who"]}\'s height between two frames, measured against {c["who"]} (at {hop[0]:g} s; limit {PET_JUMP * 100:g} %)'})
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
+            continue
+        if c['kind'] == 'talk39':
+            # đợt 39 C: tay trong khung ở lúc giữa (như `gesture`; tự sướng: bỏ lúc chớp sáng ở cuối) + số đo riêng của từng động tác
+            hands = {**c, 'times': c['times'][:3]}
+            results.extend(check_gesture(folder, hands, frames[:3]))
+            results.extend(check_talk39(folder, c, frames))
             continue
         if c['kind'] == 'gesture':
             results.extend(check_gesture(folder, c, frames))

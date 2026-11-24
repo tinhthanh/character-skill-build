@@ -1702,7 +1702,10 @@ try {
         // ĐỢT 39 A — đế thanh toán (`entry.stand`: lệch `dx` đơn vị khung, mặt quầy cao `on`): `@qr` / `@reader` là mã QR / máy quẹt thẻ của nó, như tools/actions.html.
         const stand = entry.stand ? L.createProp(spot(`left:${left + entry.stand.dx * 0.5}px;top:0;width:200px;height:235px`), 'paystand', { on: entry.stand.on }) : null;
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        return { rig, name, args: args.map((arg) => (arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg)) };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
+        const mapped = args.map((arg) => (arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg));
+        // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{ "with": "@person" }` trong tuỳ chọn của bước.
+        mapped.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) mapped[n] = { ...arg, with: arg.with === '@pet' ? pet : partner }; });
+        return { rig, name, args: mapped };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
       };
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
@@ -1879,6 +1882,34 @@ try {
         const line = actor[name](...args); line.time(when);
         if (!check()) hong(name, what);
         line.progress(1); if (actor.s.heartL || actor.s.heartR || actor.s.ovL || actor.s.ovR) hong(name, 'the gesture stays after the action'); line.kill(); actor.datNghi();
+      }
+      // ĐỢT 39 C — NGƯỜI DẪN: tấm bảng chữ hiện giữa hai bàn tay (đúng chữ) rồi mất; khe giữa hai tay theo cỡ; chớp sáng ở điện thoại rồi tắt; hai tay qua đầu.
+      {
+        const sel = L.createCharacter(spot('left:100px;top:0;width:200px;height:235px'), { id: 'vet', items: { R: 'phone' } }).rig;
+        const mid = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.right) / 2, (r.top + r.bottom) / 2]; };
+        let line = actor.holdSign('Giảm 20%', 2); line.time(1.6);
+        const sign = actor.svg.querySelector('#' + actor.id + '-sign'), card = sign && sign.firstElementChild;
+        if (!sign || sign.style.display === 'none') hong('holdSign', 'no sign is shown');
+        else {
+          const [x, y] = mid(card), a = at(actor.el.coTayL), b = at(actor.el.coTayR), f = face();
+          if (!card.textContent.includes('Giảm 20%')) hong('holdSign', 'the sign does not carry the text');
+          if (Math.abs(x - (a[0] + b[0]) / 2) > 20 || y < f.bottom - 24 || y > body().bottom) hong('holdSign', `the sign is not between the hands, in front of the chest (card ${x.toFixed(0)},${y.toFixed(0)}; hands ${a[0].toFixed(0)},${a[1].toFixed(0)} / ${b[0].toFixed(0)},${b[1].toFixed(0)}; chin ${f.bottom.toFixed(0)}, body bottom ${body().bottom.toFixed(0)})`);
+        }
+        line.progress(1); actor.apDung(); if (actor.s.sign || sign.style.display !== 'none') hong('holdSign', 'the sign is left after the action'); line.kill(); actor.datNghi();
+        line = actor.showSize('big'); line.time(1.0);
+        { const a = at(actor.el.coTayL), b = at(actor.el.coTayR); if (b[0] - a[0] < 60) hong('showSize', `the hands are only ${(b[0] - a[0]).toFixed(0)} px apart for 'big'`); }
+        line.kill(); actor.datNghi(); line = actor.showSize('small'); line.time(1.0);
+        { const a = at(actor.el.coTayL), b = at(actor.el.coTayR); if (b[0] - a[0] > 70) hong('showSize', `the hands are ${(b[0] - a[0]).toFixed(0)} px apart for 'small'`); }
+        line.kill(); actor.datNghi();
+        const flash = sel.svg.querySelector('#' + sel.id + '-flash'); line = sel.takeSelfie(1.6);
+        line.time(1.3); const f2 = sel.el.khuon.getBoundingClientRect(), ph = mid(sel.el.itemR);
+        if (ph[1] > (f2.top + f2.bottom) / 2 + 12 || Math.abs(ph[0] - (f2.left + f2.right) / 2) < 20) hong('takeSelfie', 'the phone is not held up high beside the face');
+        let flashed = false; for (let t = 0.9; t < 1.8; t += 0.02) { line.time(t); if (flash.style.display !== 'none') flashed = true; }
+        if (!flashed) hong('takeSelfie', 'no flash at the shot');
+        line.progress(1); sel.apDung(); if (sel.s.flash || flash.style.display !== 'none' || sel.s.itemZoomR > 1.01) hong('takeSelfie', 'the flash or the enlarged phone stays after the action'); line.kill(); sel.datNghi();
+        line = actor.yawnStretch(); line.time(1.1);
+        { const f3 = face(), a = at(actor.el.coTayL), b = at(actor.el.coTayR); if (a[1] > (f3.top + f3.bottom) / 2 || b[1] > (f3.top + f3.bottom) / 2) hong('yawnStretch', 'the arms are not stretched up beside the head'); if (actor.s.mieng < 0.8) hong('yawnStretch', 'the mouth is not wide open'); }
+        line.progress(1); line.kill(); actor.datNghi();
       }
       for (const [name, args, kind] of [['giveTreat', [dog, { kind: 'pill' }], 3], ['brush', [dog], 4]]) {
         const line = vet[name](...args); line.time(0.6);

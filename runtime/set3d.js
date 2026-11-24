@@ -858,6 +858,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const away = camera.lens - at.depth < 60 || left + cx0 * w > view.clientWidth || left + cx1 * w < 0 || top + cy0 * h > view.clientHeight || top + cy1 * h < 0;
         actor.frame = away ? null : { left, top, w, h };                                                // khung host trên màn hình (cho `framing()`)
         if ((host.style.display === 'none') !== away) host.style.display = away ? 'none' : '';          // `display`, không `visibility`: `check` vẫn đo phần tử bị ẩn bằng visibility
+        if (!away && actor.rig && typeof actor.rig.redrawSign === 'function') actor.rig.redrawSign();      // đợt 39 C: bảng chữ / chớp sáng đặt theo bàn tay — host vừa hiện lại thì vẽ lại
         // RA KHỎI PHÒNG (bước vào / bước ra qua tường bên): mờ dần trong khoảng một phần tư bề ngang người hai bên mép sàn —
         // tường bên chỉ là một mặt phẳng nền, không che được ai đứng ngoài nó.
         const margin = actor.width * 0.25, inside = room ? Math.min(actor.where - room[0], room[1] - actor.where) : Infinity;
@@ -1736,7 +1737,11 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
             return r.width > 0 ? { side, kind: Math.round(rig.s['gadget' + side] || 0), box: rect(r) } : null; }).filter(Boolean)
             // vòng loa đang cầm (`putCone` — hình riêng ở gốc SVG, không trong bàn tay): kind 9 như vành loa
-            .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 9, box: rect(drawnRect(el)) }))) : [],
+            .concat([e.ring, e.ringFront].filter((el) => el && el.style.display !== 'none').map((el) => ({ side: 'ring', kind: 9, box: rect(drawnRect(el)) })))
+            // ĐỢT 39 C: tấm bảng chữ (`holdSign`, kind 28 — kèm cao chữ trên màn hình `textH`) và chớp sáng (`takeSelfie`, kind 29) — hình riêng ở gốc SVG.
+            .concat([['sign', 28], ['flash', 29]].map(([key, kind]) => ({ el: rig.svg.querySelector('#' + rig.id + '-' + key), kind })).filter((g) => g.el && g.el.style.display !== 'none')
+              .map((g) => { const line = g.el.querySelector('[data-sign-line]'), card = g.el.firstElementChild && g.kind === 28 ? g.el.firstElementChild : g.el;
+                return { side: g.kind === 28 ? 'sign' : 'flash', kind: g.kind, box: rect(drawnRect(card)), ...(line ? { textH: line.getBoundingClientRect().height * sy } : {}) }; })) : [],
           items: person ? ['L', 'R'].map((side) => { const el = e['item' + side]; if (!el || !rig.holds || !rig.holds[side] || !(rig.s['item' + side] > 0.5)) return null;
             const r = drawnRect(el); return r.width > 0 ? { side, kind: el.querySelector('[data-clipboard]') ? 'clipboard' : 'item', box: rect(r) } : null; }).filter(Boolean) : [],
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];

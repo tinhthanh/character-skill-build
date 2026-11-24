@@ -792,6 +792,64 @@ with tempfile.TemporaryDirectory() as work:
         elif done.returncode != 0: problems.append('still: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         elif 'measured at 2×' not in done.stdout: problems.append('still: acting_check did not measure the small stroking hand at 2×:\n' + done.stdout[-400:])
 
+    # ĐỢT 39 C — NGƯỜI DẪN, khung DỌC 1080 × 1920, phố: bác sĩ giơ bảng "Giảm 20%" (bảng hẹp, trong khung dọc), ra dấu "to cỡ này", ngáp vươn vai;
+    # cậu bé chụp ảnh tự sướng cùng con chó (nó nghiêng đầu) rồi cùng bác sĩ (bác sĩ bước lại, nghiêng đầu, chữ V). acting_check: bảng
+    # trong khung, chữ ≥ 3 % chiều cao, trước ngực; khe giữa hai tay; máy ngang đầu, chớp sáng, người / con vật chụp cùng trong khung; tay qua đầu.
+    talk39 = {'id': 'talk39', 'width': 1080, 'height': 1920, 'camera': 'auto', 'set': {'preset': 'street'}, 'characters': [
+        {'name': 'boy', 'id': 'boy', 'x': -250, 'z': -560, 'holds': 'phone', 'holdsHidden': True}, {'name': 'dog', 'species': 'corgi', 'x': 120, 'z': -560},
+        {'name': 'vet', 'id': 'vet', 'x': 320, 'z': -560}],
+        'script': [{'who': 'boy', 'do': [['takeSelfie', 1.6, {'with': '@dog'}]]}, {'who': 'vet', 'do': [['holdSign', 'Giảm 20%', 2]]},
+                   {'who': 'vet', 'do': [['showSize', 'big']]}, {'who': 'vet', 'do': ['yawnStretch']}, {'who': 'boy', 'do': [['takeSelfie', 1.6, {'with': '@vet'}]]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_talk39.json')
+    try:
+        json.dump(talk39, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'talk39'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('talk39: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'talk39', 'index.html'), encoding='utf-8').read()
+        for needle in ('{ together: [[boy, [\'takeSelfie\', 1.6, { with: dog }]], [dog, [\'tiltHead\']]] }', "[\"holdSign\", \"Giảm 20%\", 2, {\"narrow\": true}]", '["showSize", "big", 1.4, {"narrow": true}]',
+                       '{ together: [[boy, [\'takeSelfie\', 1.6, { with: vet }]], [vet, [\'joinSelfie\', boy, 1.6]]] }'):
+            if needle not in html: problems.append(f'talk39: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'talk39')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('talk39: ' + (done.stdout.strip() or done.stderr.strip())[-900:])
+        for needle in ('vet holdSign — the sign, whole in the frame, text big enough', 'vet holdSign — the sign in front of the chest', 'vet showSize — two hands apart by the size',
+                       'boy takeSelfie — the phone up high at arm', 'boy takeSelfie — the flash at the shot', 'boy takeSelfie — dog in the shot beside them',
+                       'boy takeSelfie — vet in the shot beside them', 'vet yawnStretch — both arms up over the head'):
+            if needle not in done.stdout: problems.append(f'talk39: acting_check did not measure "{needle}"')
+    # Người dẫn dùng sai cách: bị từ chối với một câu nói rõ.
+    base39 = {'id': 'bad39', 'set': {'preset': 'street'}, 'characters': [{'name': 'vet', 'id': 'vet', 'x': 0, 'z': -560}, {'name': 'dog', 'species': 'corgi', 'x': 300, 'z': -560}], 'script': []}
+    for label, steps, who, needle in [('a sign without text', [['holdSign']], 'vet', 'needs the text of the sign'), ('a sign with 4 lines', [['holdSign', ['a', 'b', 'c', 'd']]], 'vet', 'needs the text of the sign'),
+                                      ('a size that is not a size', [['showSize', 'huge']], 'vet', '"small", "medium", "big"'), ('a selfie without a phone', [['takeSelfie']], 'vet', 'needs a phone'),
+                                      ('a pet holding a sign', [['holdSign', 'Hi']], 'dog', 'done by a person'), ('a selfie with nobody', [['takeSelfie', 1.6, {'with': '@ghost'}]], 'vet', '"with"')]:
+        bad = json.loads(json.dumps(base39)); bad['script'] = [{'who': who, 'do': steps}]
+        if 'nobody' in label: bad['characters'][0]['holds'] = 'phone'
+        path = os.path.join(os.path.dirname(stage), '_check_bad39.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad39'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'presenter actions ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # Kịch bản chữ (đợt 39 C): "giơ bảng: chữ", "to cỡ này", "selfie", "ngáp" (người: ngáp vươn vai; thú: vẫn là `yawn`), "bác sĩ → bé trai: selfie".
+    text = os.path.join(work, 'talk39.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: đường phố · khung: dọc\nbác sĩ (vet) · bé trai (boy) · chó (corgi)\n\nbác sĩ: [giơ bảng: Giảm 20% | tiêm phòng, vẫy tay]\nbác sĩ: [to cỡ này]\n'
+                                            'bác sĩ: [nhỏ cỡ này, ngáp]\nchó: [ngáp, vươn vai]\nbác sĩ → bé trai: selfie\nbé trai: [chụp ảnh tự sướng]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py presenter actions: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'talk39.scene.json'), encoding='utf-8'))
+        steps = [t['do'] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = [[['holdSign', 'Giảm 20% | tiêm phòng'], 'wave'], [['showSize', 'big']], [['showSize', 'small'], ['yawnStretch']], ['yawn', 'stretch'],
+                [['takeSelfie', 1.6, {'with': '@be_trai'}]], [['takeSelfie']]]
+        if steps != want: problems.append(f'script.py presenter actions: steps {steps}, want {want}')
+        vet = next((c for c in made['characters'] if c.get('id') == 'vet'), {})
+        if vet.get('holds') != 'phone' or not vet.get('holdsHidden'): problems.append('script.py presenter actions: "selfie" did not give the vet a put-away phone')
+    for label, line, needle in [('a sign without text', 'bác sĩ: [giơ bảng]', 'cần chữ'), ('a pet with a sign', 'chó: [giơ bảng: Hi]', 'chỉ dành cho người')]:
+        open(text, 'w', encoding='utf-8').write('bối cảnh: đường phố\nbác sĩ (vet) · chó (corgi)\n\n' + line + '\n')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'script.py presenter actions ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
     # Đợt 35: PHÒNG KHÁM — bác sĩ cân con chó (đặt lên cái cân "can" rồi bế về), đo nhiệt độ (con chó quay đuôi lại), cho uống thuốc
     # (con chó há miệng rồi nhai). acting_check: con chó đứng trên bệ cân lúc đọc số, tay tới nó lúc bế, lúc đo nhiệt, lúc đưa thuốc.
     care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},

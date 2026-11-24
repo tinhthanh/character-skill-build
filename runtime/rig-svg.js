@@ -75,6 +75,9 @@ const NGHI = Object.freeze({
   tayL: 'mo', tayR: 'mo',
   // ĐỢT 35 — cân, đo nhiệt độ, cho uống thuốc:
   readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
+  // ĐỢT 39 C — người dẫn: TẤM BẢNG CHỮ giơ bằng hai tay trước ngực (`holdSign`) và CHỚP SÁNG ở điện thoại khi chụp ảnh tự sướng (`takeSelfie`).
+  sign: 0, signN: 0,            // 0…1 tấm bảng hiện giữa hai bàn tay · bảng nào trong `rig.signs` (chữ, màu, cỡ) — như `readoutN`
+  flash: 0,                     // 0…1 chớp sáng ở điện thoại (`takeSelfie`)
   readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
   omSlot: 0,                    // ĐỢT 37: lần BẾ nào trong `rig.carriedList` (carry / weigh / takePet) — mỗi khung vẽ đúng lần bế của nó
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
@@ -812,7 +815,8 @@ export class RigSVG {
                      'laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute',          // đợt 39 B
                      'bandage', 'putCone', 'showXray', 'offerHand', 'offerCheek',
                      'clipNails', 'eyeDrops', 'cleanEars', 'scanChip',          // đợt 38 A
-                     'restrain', 'washHands'];                                    // đợt 38 B
+                     'restrain', 'washHands',                                     // đợt 38 B
+                     'holdSign', 'showSize', 'yawnStretch'];                      // đợt 39 C
   // Ba động tác xoay người sang ngang (`huong` 1). Để riêng, không gộp vào
   // `DONG_TAC`: hai công cụ đo ở trên quét `DONG_TAC` và giả định nhân vật
   // đứng trong khung. Trang thử và trang chỉnh liệt kê cả hai danh sách.
@@ -821,9 +825,11 @@ export class RigSVG {
   // Động tác đổi THẾ ĐỨNG và giữ nguyên thế ấy cho các động tác sau (không khép về nghỉ).
   static STANCE = ['sitDown', 'standUp', 'face', 'hideItem', 'showItem', 'phoneDown', 'kneel', 'ride', 'getOff', 'lookAt', 'putOnGloves'];
   // Động tác TRAO ĐỔI đồ vật giữa hai nhân vật: cần một món đồ (đang cầm / đang cất), nên không chạy trơn như `DONG_TAC`.
-  static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet', 'weigh', 'givePill', 'highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];       // `givePill`: cần con vật và hai tay rảnh
+  static EXCHANGE = ['handOver', 'take', 'carry', 'handshake', 'handOverPet', 'takePet', 'weigh', 'givePill', 'highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag',
+                     'joinSelfie'];       // đợt 39 C — `givePill`: cần con vật và hai tay rảnh
   // Động tác cần ĐANG CẦM một món đồ (điện thoại): không có thì báo lỗi, nên cũng không chạy trơn như `DONG_TAC`.
-  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify', 'readChart', 'takeOffGloves'];       // `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
+  static WITH_ITEM = ['showPhone', 'tapPhone', 'phoneUp', 'inject', 'putDown', 'leash', 'unleash', 'notify', 'readChart', 'takeOffGloves',
+                       'takeSelfie'];       // đợt 39 C — `phoneUp` cũng là một THẾ GIỮ (xem STANCE)
   static { this.DONG_TAC.push('wipeCounter'); this.EXCHANGE.push('giveChange', 'takeChange', 'takeCard'); this.WITH_ITEM.push('payByQR', 'payByCard', 'stampCard', 'pourDrink'); }       // đợt 39 A
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
@@ -1381,6 +1387,13 @@ export class RigSVG {
   <g id="${p}-ringFront" style="display:none"><ellipse rx="40" ry="36" fill="#e6f3fa" fill-opacity=".38" stroke="#8fb8cf" stroke-width="3"/>
     <ellipse rx="28" ry="25" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".6"/>
     <path d="M -36 14 Q -32 -14 -12 -30" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
+  <!-- ĐỢT 39 C: TẤM BẢNG CHỮ (\`holdSign\`) — ở GỐC SVG, trên thân, đầu và cánh tay (cánh tay không vắt ngang chữ); hai bàn tay vẽ lại
+       trên nó (\`use\`), đúng chỗ, đúng hình — nắm hai mép bảng. -->
+  <g id="${p}-signRef"></g>
+  <g id="${p}-sign" style="display:none"><g data-sign-card=""></g><use data-sign-hand="L" href="#${p}-tayL"/><use data-sign-hand="R" href="#${p}-tayR"/></g>
+  <!-- ĐỢT 39 C: CHỚP SÁNG ở điện thoại lúc chụp ảnh tự sướng (\`takeSelfie\`). -->
+  <g id="${p}-flash" style="display:none"><circle r="30" fill="#ffffff" opacity=".55"/><circle r="15" fill="#ffffff"/>
+    <path d="M 0 -46 L 5 -10 L 46 0 L 5 10 L 0 46 L -5 10 L -46 0 L -5 -10 Z" fill="#fffbe0"/></g>
   <g id="${p}-ball" style="display:none"><circle r="11" fill="#d6e84a" stroke="#7d8a1c" stroke-width="1.5"/>
     <path d="M -10 -3 Q 0 5 10 -3 M -10 4 Q 0 -4 10 4" stroke="#ffffff" stroke-width="1.8" fill="none" opacity=".9"/></g>
 </svg>`;
@@ -2192,6 +2205,7 @@ export class RigSVG {
     this.#drawBall();
     this.#drawNote();
     this.#drawReadout();
+    this.#drawSign39();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
     this.#drawScales();
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
@@ -3938,6 +3952,272 @@ export class RigSVG {
     t.to(s, { nhinX: 0, duration: 0.3 }, 0.9);                 // liếc sang màn hình rồi nhìn lại người xem
     if (hold > 1) this.#chop(t, 0.5 + hold * 0.6);
     this.#khep(t, 0.5, 0.5 + hold);
+    return t;
+  }
+
+  // ═══════════════════════════════════════════════ ĐỢT 39 C — NGƯỜI DẪN: giơ bảng, ra dấu kích thước, chụp ảnh tự sướng, ngáp vươn vai
+  // Video giải thích / video dọc ngắn: người dẫn GIƠ TẤM BẢNG CHỮ trước ngực ("Giảm 20%"), ra dấu "to cỡ này" bằng hai bàn tay, giơ điện
+  // thoại chụp ảnh tự sướng (một mình hay cùng người / con vật khác), ngáp và vươn vai. Mọi dáng chính giữ ≥ 1 s (người chấm xem ~1 khung / giây).
+  static SIGN_FONT = [44, 34, 27];        // cỡ chữ tối đa (đơn vị khung) cho bảng 1 / 2 / 3 dòng
+  static SIGN_PAD = 12;                   // lề chữ trong bảng
+  static SIGN_GRIP = 6;                   // lòng bàn tay nằm vào trong mép bảng chừng ấy (nắm tay đè lên mép)
+  static SIGN_MIN = 130; static SIGN_MAX = 260; static SIGN_NARROW = 170;  // bề ngang bảng (đơn vị khung, người lớn — trẻ con theo tầm với)
+  static SIGN_TILT = 4;                   // độ nghiêng tấm bảng lúc giơ (hai tay lệch nhau)
+  static SIZE_GAP = { small: 44, medium: 130, big: 250 };   // `showSize`: khe giữa hai lòng bàn tay (đơn vị khung, người lớn)
+  static SELFIE_AT = [1.9, 0.9];         // `takeSelfie`: lòng bàn tay cầm máy ở cách giữa mặt 1,6 bán kính mặt ra ngoài, 0,55 bán kính LÊN TRÊN — máy ngang đỉnh đầu
+  static SELFIE_ZOOM = 1.7;               // điện thoại phóng to lúc chụp (thấy rõ trong tay)
+  static STRETCH_POSE = [146, 34];        // `yawnStretch`: bắp tay giơ chữ V, cẳng tay gập vào một chút — nắm tay ngang trán, ngoài đầu
+
+  // Góc tay để LÒNG BÀN TAY tới `p` (hệ `#aimOf`, từ vai ở dáng `geo`) với KHUỶU RA NGOÀI — xa giữa thân (hai tay đưa ra trước người: giơ
+  // bảng, ra dấu kích thước). `#armTo` chọn khuỷu thấp hơn: hai lời giải đổi chỗ khi tay đi ngang qua dưới vai, cẳng tay quay ngoắt 240°.
+  // Độ dài tay theo cỡ thân (`coThan`). Góc trên màn hình: dùng với `aim` = 1.
+  #reachOut(k, p, geo, low = false) {
+    const c = this.nv.coThan, a = DAI.canhTay * this.nv.daiCanhTay * c, b = DAI.cangTay * this.nv.daiCangTay * c, deg = 180 / Math.PI;
+    const sh = geo[k], out = k === 'L' ? -1 : 1, hand = 10 * c;
+    let wx = p.x, wy = p.y, res = null;
+    for (let n = 0; n < 3; n++) {
+      const d = clamp(Math.hypot(wx - sh.x, wy - sh.y), Math.abs(a - b) + 1, a + b - 0.5), phi = Math.atan2(wy - sh.y, wx - sh.x) * deg;
+      const alpha = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1)) * deg;
+      const ex = (u) => sh.x + a * Math.cos(u / deg);
+      const ey = (u) => Math.sin(u / deg), pick = low ? ey(phi + alpha) >= ey(phi - alpha) : out * (ex(phi + alpha) - ex(phi - alpha)) >= 0;      // `low`: khuỷu THẤP (tay ôm trước ngực), không thì khuỷu ra ngoài
+      const phiU = pick ? phi + alpha : phi - alpha, exU = ex(phiU), eyU = sh.y + a * Math.sin(phiU / deg);
+      const phiF = Math.hypot(wx - sh.x, wy - sh.y) > a + b - 0.5 ? phiU : Math.atan2(wy - eyU, wx - exU) * deg;
+      res = { bat: clamp(chuanHoaGoc(k === 'R' ? 90 - phiU : phiU - 90), -60, 172), cang: chuanHoaGoc(k === 'R' ? phiU - phiF : phiF - phiU), dir: phiF };
+      wx = p.x - Math.cos(phiF / deg) * hand; wy = p.y - Math.sin(phiF / deg) * hand;
+    }
+    return res;
+  }
+
+  // Một tấm bảng trong `rig.signs` (chữ, màu, cỡ — đơn vị khung). Tấm GIỐNG HỆT đã có thì dùng lại số của nó (`sequence()` dựng mỗi bước
+  // hai lần) — như `#reading`.
+  #signEntry(text, color, maxW) {
+    const lines = (Array.isArray(text) ? text : String(text).split(/\n|\s*\|\s*/)).map((line) => String(line).trim()).filter(Boolean);
+    if (!lines.length || lines.length > 3) throw new Error(`[character] holdSign: text must be 1–3 short lines (split with "\\n" or "|"), got ${JSON.stringify(text)}`);
+    const longest = Math.max(...lines.map((line) => [...line].length)), pad = RigSVG.SIGN_PAD;
+    const minW = Math.min(RigSVG.SIGN_MIN, maxW);
+    const font = Math.max(14, Math.min(RigSVG.SIGN_FONT[lines.length - 1], (maxW - 2 * pad) / (longest * 0.58)));
+    const w = clamp(longest * 0.58 * font + 2 * pad, minW, maxW), h = lines.length * font * 1.16 + 2 * pad;
+    if (color !== null && !HEX_COLOR.test(String(color))) throw new Error(`[character] holdSign: color must be a hex colour such as "#2f9e8f", got ${JSON.stringify(color)}`);
+    const fill = color || '#ffffff', dark = (() => { const c = fill.length === 4 ? fill.replace(/^#(.)(.)(.)$/, '#$1$1$2$2$3$3') : fill, v = parseInt(c.slice(1), 16);
+      return ((v >> 16) * 0.299 + ((v >> 8) & 255) * 0.587 + (v & 255) * 0.114) < 150; })();
+    const entry = { lines, font: +font.toFixed(2), w: +w.toFixed(2), h: +h.toFixed(2), fill, ink: dark ? '#ffffff' : '#16303a', edge: color ? chinhSang(fill, -0.35) : '#1f8a70' };
+    this.signs = this.signs || [];
+    const key = JSON.stringify(entry), found = this.signs.findIndex((item) => JSON.stringify(item) === key);
+    if (found >= 0) return { n: found + 1, entry: this.signs[found] };
+    this.signs.push(entry);
+    return { n: this.signs.length, entry };
+  }
+
+  /** Vẽ lại bảng chữ / chớp sáng nếu đang hiện (host vừa hiện lại sau khi bị ẩn lúc rig vẽ: không đo được bàn tay, bảng nằm sai chỗ). */
+  redrawSign() { if (this.s && (this.s.sign > 0.02 || this.s.flash > 0.02)) this.#drawSign39(); }
+
+  // Vẽ tấm bảng (giữa hai lòng bàn tay, nghiêng theo đường nối hai tay) và chớp sáng (ở bàn tay cầm điện thoại) — mỗi khung.
+  #drawSign39() {
+    const e = this.el, s = this.s;
+    if (!e || !this.svg) return;
+    const sign = e.sign39 || (e.sign39 = this.svg.querySelector('#' + this.id + '-sign')), flash = e.flash39 || (e.flash39 = this.svg.querySelector('#' + this.id + '-flash'));
+    // `getCTM` (hệ của phần tử → hệ của chính khung SVG), KHÔNG `getScreenCTM`: không phụ thuộc cỡ / chỗ của host trên màn hình lúc vẽ (máy quay 3D
+    // đổi chỗ host sau khi rig vẽ — bảng đặt theo hệ màn hình thì lệch khi tua nhảy cóc).
+    // Nhân với nghịch đảo của một phần tử trống luôn hiện ở gốc SVG (`signRef`): bỏ phần co theo `viewBox` — kết quả ở hệ của chính tấm bảng.
+    const ref = e.signRef39 || (e.signRef39 = this.svg.querySelector('#' + this.id + '-signRef')), rm = ref && ref.getCTM(), inv = rm ? rm.inverse() : null;
+    const palm = (k) => { const m = e['coTay' + k] && e['coTay' + k].getCTM(); return m && inv ? new DOMPoint(0, 9).matrixTransform(inv.multiply(m)) : null; };
+    if (sign) {
+      const k = clamp(s.sign, 0, 1), r = (this.signs || [])[Math.round(s.signN) - 1], a = palm('L'), b = palm('R');
+      if (!r || k < 0.02 || !a || !b) sign.style.display = 'none';
+      else {
+        const card = sign.firstElementChild;
+        if (sign.getAttribute('data-n') !== String(Math.round(s.signN))) {
+          card.innerHTML = `<rect x="${-r.w / 2}" y="${-r.h / 2}" width="${r.w}" height="${r.h}" rx="9" fill="${r.fill}" stroke="${r.edge}" stroke-width="4.5"/>`
+            + `<rect x="${-r.w / 2 + 6}" y="${-r.h / 2 + 6}" width="${r.w - 12}" height="${r.h - 12}" rx="6" fill="none" stroke="${r.edge}" stroke-width="1.2" opacity=".55"/>`
+            + r.lines.map((line, n) => `<text data-sign-line="${n}" x="0" y="${((n - (r.lines.length - 1) / 2) * r.font * 1.16 + r.font * 0.36).toFixed(2)}" font-family="Arial, Helvetica, sans-serif" font-size="${r.font}" font-weight="700" fill="${r.ink}" text-anchor="middle" data-layout-ignore="">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+          sign.setAttribute('data-n', String(Math.round(s.signN)));
+        }
+        // Giữa hai lòng bàn tay, nghiêng theo đường nối chúng; lớn dần theo `sign` (hiện ra giữa hai tay).
+        const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, turn = clamp(Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI, -25, 25), size = 0.55 + 0.45 * k;
+        card.setAttribute('transform', `translate(${cx.toFixed(2)} ${cy.toFixed(2)}) rotate(${turn.toFixed(2)}) scale(${size.toFixed(3)})`);
+        card.style.opacity = Math.min(1, k * 2).toFixed(2);
+        // Hai bàn tay vẽ lại TRÊN tấm bảng, đúng chỗ và hình của chúng (hệ của bàn tay → gốc SVG).
+        for (const hand of sign.querySelectorAll('[data-sign-hand]')) {
+          const el = this.svg.querySelector('#' + this.id + '-tay' + hand.getAttribute('data-sign-hand')), m = el && el.getCTM && el.getCTM();
+          if (!m || !inv) continue;
+          const q = inv.multiply(m);
+          hand.setAttribute('transform', `matrix(${[q.a, q.b, q.c, q.d, q.e, q.f].map((v) => v.toFixed(4)).join(' ')})`);
+        }
+        sign.style.display = '';
+      }
+    }
+    if (flash) {
+      const k = clamp(s.flash, 0, 1), side = this.selfieSide, p = side && k > 0.02 ? palm(side) : null;
+      if (!p) flash.style.display = 'none';
+      else {
+        // Đèn ở MẶT LƯNG điện thoại, trên nắm tay (máy phóng to `SELFIE_ZOOM` quanh lòng bàn tay, dựng đứng).
+        flash.setAttribute('transform', `translate(${p.x.toFixed(1)} ${(p.y - 26 * this.nv.coThan).toFixed(1)}) scale(${(0.5 + 0.7 * k).toFixed(3)})`);
+        flash.style.opacity = k.toFixed(2);
+        flash.style.display = '';
+      }
+    }
+  }
+
+  /**
+   * GIƠ BẢNG: lấy ra một tấm bảng nhỏ có chữ `text` (1–3 dòng ngắn, ngắt bằng "\n" hay "|"; tiếng Việt có dấu), cầm hai mép bằng HAI tay,
+   * giơ lên trước ngực, quay về người xem, nghiêng nhẹ, liếc xuống bảng rồi nhìn người xem, cười — giữ `hold` giây — rồi hạ xuống. Bảng
+   * phóng to theo chữ (rộng tới `SIGN_MAX`, trẻ con theo tầm tay). `color`: màu nền bảng (chữ trắng trên nền tối). Đồ đang cầm được cất
+   * trong lúc giơ bảng và lấy ra lại sau.
+   *   rig.holdSign('Giảm 20%')    rig.holdSign('Tiêm phòng|miễn phí', 2.5, { color: '#2f9e8f' })
+   */
+  holdSign(text = 'Hello!', hold = 2, { color = null, narrow = false } = {}) {
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] holdSign: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, keep = this.#stowBoth(t), geo = this.#poseGeo({ huong: 0 });
+    this.#faceFront(t);
+    // Tầm tay: lòng bàn tay với tới ~0,9 cánh tay duỗi, tính ngang ngực.
+    const face = geo.face, arm = (DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay) * this.nv.coThan * 0.88;
+    const top = face.y + face.r * 0.92, guessH = 80 * this.nv.coThan, cy0 = top + guessH / 2;
+    const reachX = (geo.R.x - HONG.x) + Math.sqrt(Math.max(0, arm * arm - (cy0 - geo.R.y) ** 2));
+    const { n, entry } = this.#signEntry(text, color, Math.min(narrow ? RigSVG.SIGN_NARROW : RigSVG.SIGN_MAX, 2 * (reachX + RigSVG.SIGN_GRIP)));
+    const cy = top + entry.h / 2, half = entry.w / 2 - RigSVG.SIGN_GRIP;
+    const pose = (y, tilt = 0) => { const L = this.#reachOut('L', { x: HONG.x - half, y: y + tilt }, geo), R = this.#reachOut('R', { x: HONG.x + half, y: y - tilt }, geo);
+      return { batL: L.bat, cangL: L.cang, batR: R.bat, cangR: R.cang }; };
+    const low = pose(geo.hip.y - 6 * this.nv.coThan), up = pose(cy), tilted = pose(cy, RigSVG.SIGN_TILT), back = pose(cy, -RigSVG.SIGN_TILT * 0.6);
+    t.set(s, { tayL: 'nam', tayR: 'nam', signN: n }, 0.02);
+    t.to(s, { aimL: 1, aimR: 1, carryL: 0, carryR: 0, duration: 0.25, ease: 'sine.inOut' }, 0);
+    // Hai tay xuống trước đùi, cách nhau đúng bề ngang bảng — tấm bảng hiện ra giữa chúng —, rồi giơ lên trước ngực, nảy nhẹ.
+    t.to(s, { ...low, dauY: 3, nhinY: 1.2, duration: 0.32, ease: 'power2.inOut' }, 0);
+    t.to(s, { sign: 1, duration: 0.22, ease: 'power2.out' }, 0.24);
+    t.to(s, { ...up, dauY: 0, nhinY: 0, cuoi: 1, mieng: 0.3, mayL: 0.6, mayR: 0.6, duration: 0.45, ease: 'back.out(1.5)' }, 0.42);
+    // Nghiêng tấm bảng một chút (lắc qua rồi dừng hơi nghiêng), liếc xuống đọc bảng rồi nhìn thẳng người xem.
+    t.to(s, { ...tilted, dau: N.dau - 5, duration: 0.3, ease: 'sine.inOut' }, 0.9).to(s, { ...back, duration: 0.3, ease: 'sine.inOut' }, 1.2);
+    this.#lookTo(t, { x: HONG.x, y: cy }, 0.9, { d: 0.3, huong: 0 });
+    this.#lookTo(t, null, 1.35, { d: 0.3, huong: 0 });
+    t.to(s, { mieng: 0.15, dau: N.dau + 3, duration: 0.3, ease: 'sine.inOut' }, 1.35);
+    const U = 0.87 + Math.max(hold, 1.2);
+    if (hold > 1.4) this.#chop(t, 1.7);
+    t.to(s, { ...low, dau: N.dau, cuoi: 0.6, mieng: 0, duration: 0.4, ease: 'power2.inOut' }, U);
+    t.to(s, { sign: 0, duration: 0.16, ease: 'power2.in' }, U + 0.3);
+    this.#khep(t, 0.45, U + 0.46, keep);
+    return t;
+  }
+
+  /**
+   * RA DẤU KÍCH THƯỚC ("to cỡ này"): hai bàn tay giơ trước người, lòng bàn tay quay vào nhau, cách nhau `size` — 'small' (một bàn tay),
+   * 'medium', 'big' (dang rộng hai tay) hay một số (khe giữa hai lòng bàn tay, đơn vị khung 400 × 470 của người lớn) —, nảy nhẹ hai nhịp,
+   * mắt nhìn vào khoảng giữa hai tay rồi nhìn người xem (nhướn mày, há miệng "to thế này!"). Giữ `hold` giây. Tay trẻ con ngắn: khe lớn
+   * nhất theo tầm tay. Đồ đang cầm được cất trong lúc làm.
+   */
+  showSize(size = 'medium', hold = 1.4, { narrow = false } = {}) {
+    const gap0 = typeof size === 'number' ? size : RigSVG.SIZE_GAP[size];
+    if (!(Number.isFinite(gap0) && gap0 > 0)) throw new Error(`[character] showSize: size must be 'small', 'medium', 'big' or a number of frame units > 0, got ${JSON.stringify(size)}`);
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] showSize: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, keep = this.#stowBoth(t), geo = this.#poseGeo({ huong: 0 }), c = this.nv.coThan;
+    this.#faceFront(t);
+    const arm = (DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay) * c;
+    // Cao ngang ngực dưới (rộng: ngang vai — hai tay dang ra); khe theo cỡ người, không quá tầm tay.
+    const big = gap0 > 160, y = big ? geo.R.y + 10 * c : geo.R.y + 26 * c;
+    const most = 2 * ((geo.R.x - HONG.x) + Math.sqrt(Math.max(0, (arm * 0.86) ** 2 - (y - geo.R.y) ** 2)));
+    const gap = Math.min(gap0 * c, most, narrow ? 150 * c : Infinity);       // khung dọc: khe hẹp — hai bàn tay còn trong khung
+    const pose = (g) => { const L = this.#reachOut('L', { x: HONG.x - g / 2, y }, geo, !big), R = this.#reachOut('R', { x: HONG.x + g / 2, y }, geo, !big);
+      return { batL: L.bat, cangL: L.cang, batR: R.bat, cangR: R.cang }; };
+    const at = pose(gap), wide = pose(gap * 1.12 + 4 * c), small = gap < 40 * c;
+    t.set(s, { tayL: 'mo', tayR: 'mo' }, 0.02);
+    t.to(s, { aimL: 1, aimR: 1, carryL: 0, carryR: 0, duration: 0.25, ease: 'sine.inOut' }, 0);
+    t.to(s, { ...at, mayL: 0.8, mayR: 0.8, cuoi: 0.6, mieng: small ? 0.1 : 0.45, chum: small ? 0.5 : 0.3, duration: 0.45, ease: 'back.out(1.4)' }, 0);
+    // Nảy: hai tay mở thêm một chút rồi về, hai nhịp, đầu gật theo — "cỡ NÀY này!".
+    for (let i = 0; i < 2; i++) t.to(s, { ...wide, dauY: 3, duration: 0.17, ease: 'sine.out' }, 0.5 + i * 0.4).to(s, { ...at, dauY: 0, duration: 0.2, ease: 'sine.inOut' }, 0.67 + i * 0.4);
+    // Mắt vào khoảng giữa hai tay, rồi ra người xem.
+    this.#lookTo(t, { x: HONG.x, y }, 0.15, { d: 0.3, huong: 0 });
+    this.#lookTo(t, null, 0.5 + Math.max(0.6, hold * 0.45), { d: 0.3, huong: 0 });
+    const end = 0.45 + Math.max(hold, 1.1);
+    if (hold > 1.2) this.#chop(t, end - 0.35);
+    this.#khep(t, 0.45, end, keep);
+    return t;
+  }
+
+  /**
+   * CHỤP ẢNH TỰ SƯỚNG: giơ điện thoại đang cầm (`items: { R: 'phone' }`; đang cất thì lấy ra) lên cao trước mặt, duỗi hết tay, mặt lưng máy
+   * về phía người xem; nghiêng đầu, cười thật tươi, tay kia làm chữ V cạnh mặt, nhìn vào máy; CHỚP SÁNG (bấm chụp) — giữ `hold` giây — rồi
+   * hạ máy xuống. `with`: người / con vật chụp cùng (rig) — máy giơ chếch về phía họ và người chụp nghiêng đầu về phía họ; cho họ làm phần
+   * của mình cùng lúc (`joinSelfie` cho người — tools/scene.py tự thêm). Không cầm điện thoại thì báo lỗi.
+   */
+  takeSelfie(hold = 1.6, { with: partner = null, side = 'auto' } = {}) {
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] takeSelfie: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const s = this.s, N = this.NGHI, isPhone = (k) => this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-back]');
+    const k = side === 'L' || side === 'R' ? side : ['R', 'L'].find((x) => isPhone(x) && s['item' + x] > 0.5) || ['R', 'L'].find(isPhone);
+    if (!k || !isPhone(k)) throw new Error('[character] takeSelfie: the character is not holding a phone' + (side === 'L' || side === 'R' ? ` in hand ${side}` : '') + ' — give it one: createCharacter(host, { id, items: { R: "phone" } })');
+    if (partner !== null && !(partner && (typeof partner.centerX === 'function' || partner.live || (typeof partner.x === 'number')))) throw new Error('[character] takeSelfie: with must be another character or pet (a rig)');
+    const t = this.tl(), o = k === 'L' ? 'R' : 'L', m = k === 'L' ? -1 : 1, stowed = s['item' + k] < 0.5, otherBusy = this.holds[o] && s['item' + o] > 0.5;
+    this.selfieSide = k;
+    // Người chụp cùng ở phía nào: nghiêng đầu về phía ấy (má kề má), máy chếch về phía ấy nếu cùng phía tay cầm máy.
+    const towards = partner ? this.#towards(partner.live || partner, k) : m, lean = towards;
+    this.#faceFront(t);
+    if (stowed) t.to(s, { ['item' + k]: 1, duration: 0.15 }, 0);
+    if (otherBusy) t.to(s, { ['item' + o]: 0, ['carry' + o]: 0, duration: 0.15 }, 0);
+    const geo = this.#poseGeo({ huong: 0 }), fc = geo.face, phoneAt = { x: fc.x + m * fc.r * (RigSVG.SELFIE_AT[0] - (partner && towards !== m ? 0.35 : 0)), y: fc.y - fc.r * RigSVG.SELFIE_AT[1] };
+    const reach = this.#reachOut(k, phoneAt, geo);
+    t.set(s, { ['tay' + k]: 'nam' }, 0.02);
+    t.to(s, { ['aim' + k]: 1, ['carry' + k]: 0, ['bat' + k]: reach.bat, ['cang' + k]: reach.cang, ['itemZoom' + k]: RigSVG.SELFIE_ZOOM, ['itemBack' + k]: 1, ['itemTilt' + k]: 0,
+              duration: 0.5, ease: 'back.out(1.3)' }, 0);
+    // Đầu nghiêng (về phía người chụp cùng, hay về phía máy), ngẩng nhìn máy; cười tươi; tay kia chữ V cạnh mặt.
+    this.#lookTo(t, phoneAt, 0.15, { d: 0.4, huong: 0, up: 1 });
+    t.to(s, { dau: N.dau + lean * 9, dauX: lean * 3, than: N.than + lean * 2, vai: N.vai - 6, cuoi: 1, mieng: 0.45, mayL: 0.7, mayR: 0.7, duration: 0.4, ease: 'power2.out' }, 0.15);
+    t.to(s, { ['ovBat' + o]: VSIGN_POSE[0], ['ovCang' + o]: VSIGN_POSE[1], duration: 0.02 }, 0.3);      // đồ ở tay kia đã cất (lấy ra lại sau)
+    t.to(s, { ['ov' + o]: 1, ['carry' + o]: 0, ['handZoom' + o]: 1.5, duration: 0.3, ease: 'back.out(1.6)' }, 0.3);
+    t.set(s, { ['tay' + o]: 'hai' }, 0.35);
+    // Bấm chụp: chớp sáng (và một cái nháy mắt) giữa lúc giữ dáng.
+    const shot = 0.75 + Math.max(0.5, hold * 0.45);
+    t.to(s, { flash: 1, duration: 0.06, ease: 'power2.out' }, shot).to(s, { flash: 0, duration: 0.3, ease: 'power2.in' }, shot + 0.06);
+    t.to(s, { ['itemTilt' + k]: -4, duration: 0.08, ease: 'sine.inOut', yoyo: true, repeat: 1 }, shot - 0.02);
+    const end = 0.7 + Math.max(hold, 1.2);
+    t.set(s, { ['tay' + o]: 'mo' }, end + 0.1);
+    this.#khep(t, 0.5, end, { ...(stowed ? { ['item' + k]: 0 } : {}), ...(otherBusy ? { ['item' + o]: 1 } : {}) });
+    return t;
+  }
+
+  /**
+   * CHỤP CÙNG (phần của người kia trong `takeSelfie`): nghiêng người và đầu về phía người chụp `taker` (má kề má), ngẩng nhìn máy họ giơ trên
+   * cao, cười tươi, tay phía ngoài làm chữ V — giữ cùng nhịp với `takeSelfie(hold)`. Chạy `together` với bước `takeSelfie` của người chụp.
+   */
+  joinSelfie(taker = null, hold = 1.6) {
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] joinSelfie: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, dir = taker ? this.#towards(taker.live || taker, 'R') : 1, outer = dir > 0 ? 'L' : 'R';
+    const busy = this.holds[outer] && s['item' + outer] > 0.5;
+    this.#faceFront(t);
+    // Máy ở trên cao phía người chụp: ngẩng và quay đầu về phía ấy.
+    const face = this.#faceCentre(0);
+    this.#lookTo(t, { x: face.x + dir * face.r * 2.2, y: face.y - face.r * 2.4 }, 0.15, { d: 0.4, huong: 0, up: 1 });
+    t.to(s, { dau: N.dau + dir * 10, dauX: dir * 3, than: N.than + dir * 4, cuoi: 1, mieng: 0.45, mayL: 0.7, mayR: 0.7, duration: 0.45, ease: 'power2.out' }, 0.1);
+    if (!busy) {
+      t.to(s, { ['ovBat' + outer]: VSIGN_POSE[0], ['ovCang' + outer]: VSIGN_POSE[1], duration: 0.02 }, 0.3);
+      t.to(s, { ['ov' + outer]: 1, ['carry' + outer]: 0, ['handZoom' + outer]: 1.5, duration: 0.3, ease: 'back.out(1.6)' }, 0.3);
+      t.set(s, { ['tay' + outer]: 'hai' }, 0.35);
+    }
+    const end = 0.7 + Math.max(hold, 1.2);
+    if (!busy) t.set(s, { ['tay' + outer]: 'mo' }, end + 0.1);
+    this.#khep(t, 0.5, end);
+    return t;
+  }
+
+  /**
+   * NGÁP VƯƠN VAI: hai tay giơ cao qua đầu (chữ V, nắm tay), người rướn lên, ngửa đầu, NGÁP TO (miệng há tròn, mắt nhắm) — giữ `hold` giây,
+   * duỗi thêm một chút —, rồi hạ tay, khép miệng, lắc đầu cho tỉnh, chớp mắt. Mệt / vừa ngủ dậy. Đồ đang cầm được cất trong lúc vươn.
+   */
+  yawnStretch(hold = 1.3) {
+    if (!(Number.isFinite(hold) && hold > 0)) throw new Error(`[character] yawnStretch: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, keep = this.#stowBoth(t), [upper, fore] = RigSVG.STRETCH_POSE, standing = s.seat < 0.5;
+    this.#faceFront(t);
+    t.set(s, { tayL: 'nam', tayR: 'nam' }, 0.02);
+    t.to(s, { aimL: 1, aimR: 1, carryL: 0, carryR: 0, duration: 0.25 }, 0);
+    t.to(s, { batL: upper, batR: upper, cangL: fore, cangR: fore, vai: N.vai - 7, tho: 1, ...(standing ? { y: -6 } : {}), duration: 0.55, ease: 'power2.inOut' }, 0);
+    // Ngáp: miệng há to tròn, mắt nhắm, đầu ngửa — đủ lâu cho người xem thấy.
+    t.to(s, { mieng: 1, chum: 0.45, cuoi: 0, matY: 1, mayL: 0.55, mayR: 0.55, headPitch: -0.45, dauY: -3, duration: 0.45, ease: 'sine.inOut' }, 0.25);
+    const top = 0.7, H = Math.max(hold, 1.1);
+    t.to(s, { batL: upper + 5, batR: upper + 5, cangL: fore - 6, cangR: fore - 6, duration: H * 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, top);      // duỗi thêm, run run
+    const down = top + H;
+    t.to(s, { batL: N.batL, batR: N.batR, cangL: N.cangL, cangR: N.cangR, vai: N.vai, tho: 0, y: 0, mieng: 0.08, chum: 0, headPitch: 0, dauY: 0, matY: 0.35, cuoi: 0.2, duration: 0.5, ease: 'power2.inOut' }, down);
+    t.to(s, { mieng: 0, duration: 0.15 }, down + 0.5);
+    // Lắc đầu cho tỉnh, chớp mắt.
+    [-11, 11, -8, 5].forEach((d, i) => t.to(s, { dauX: d, dau: N.dau - d * 0.45, duration: 0.14, ease: 'sine.inOut' }, down + 0.55 + i * 0.14));
+    t.to(s, { dauX: 0, dau: N.dau, matY: 0, duration: 0.18 }, down + 1.11);
+    this.#chop(t, down + 1.3);
+    this.#khep(t, 0.4, down + 1.35, keep);
     return t;
   }
 
