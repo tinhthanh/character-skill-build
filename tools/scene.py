@@ -122,6 +122,11 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                nods), ["showXray", "<xray cutout name>"] (turns to an "xray" viewer cutout — a lightbox on a stand,
                "spot": [0.675, 0.74] on the film, "screen": "film.png" for your own film — points at the spot, turns back).
                A person on the floor with the pet kneels for "bandage" / "putCone" as for "stroke".
+               Hands on the pet: ["clipNails", "@pet"] (lifts a front paw, cuts its nails with a small clipper; optional
+               { "hold": 1.8 }), ["eyeDrops", "@pet"] (raises the chin, a drop falls from a dropper into the eye, the pet shuts
+               its eyes; { "hold": 1.2 }), ["cleanEars", "@pet"] (wipes inside the ear with a cotton pad, then the pet shakes its
+               head; { "hold": 1.8 }), ["scanChip", "@pet", { "id": "900 123 456 789" }] (passes a chip scanner over the neck,
+               a card shows the number). The person goes to the pet's head end; the pet follows the hands by itself.
                Pets at play: "rollOver" (dogs, cats: on its back, paws in the air), ["chaseTail", 3] (dogs; then dizzy),
                ["knead", 6] (cats), ["lick", "@boy"] (dogs, cats: the boy kneels and holds out a hand at the same time — added for you;
                a pet the boy carries licks his face — he bends his cheek to it, "offerCheek"), ["hide", "@vet"] (runs behind the vet and peeks out, scared — give the pet

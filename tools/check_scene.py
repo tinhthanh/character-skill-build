@@ -824,6 +824,48 @@ with tempfile.TemporaryDirectory() as work:
                            'bac_si look — head turned to the thermometer', 'bac_si pill — head turned to cho', 'bac_si weigh — head turned to the weight shown over the scale'):
                 if needle not in done.stdout: problems.append(f'care35: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
 
+    # ĐỢT 38 A: cắt móng, nhỏ mắt, vệ sinh tai, quét chip — bác sĩ với con corgi trên bàn khám, cậu bé đứng xem (người thứ ba trong phòng).
+    # acting_check: kìm tới bàn chân đang được nhấc, khép / mở; giọt thuốc rơi vào mắt, mắt nhắm; bông ở gốc tai, con vật lắc đầu khi
+    # đã buông tay; máy quét rà trên gáy, thẻ mã chip đọc được, không che đầu con vật hay mặt người; đầu người hướng về chỗ tay làm.
+    care38 = {'id': 'care38', 'camera': 'auto', 'set': {'preset': 'exam'},
+              'characters': [{'name': 'bac_si', 'id': 'vet', 'x': 40, 'z': -560, 'faces': 'cho', 'holds': 'clipboard', 'holdsHidden': True},
+                             {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'}, {'name': 'be', 'id': 'boy', 'x': -260, 'z': -560, 'faces': 'bac_si'}],
+              'script': [{'who': 'bac_si', 'do': [['clipNails', '@cho']]}, {'who': 'bac_si', 'do': [['eyeDrops', '@cho']]}, {'who': 'bac_si', 'do': [['cleanEars', '@cho']]},
+                         {'who': 'bac_si', 'do': [['scanChip', '@cho', {'id': '704 000 111 222'}]]}, {'who': 'be', 'say': 'Cảm ơn bác sĩ ạ.', 'do': ['nod']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_care38.json')
+    try:
+        json.dump(care38, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'care38'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('care38: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'care38', 'index.html'), encoding='utf-8').read()
+        for needle in ('["clipNails", set.target(bac_si, cho, \'head\')]', '["eyeDrops", set.target(bac_si, cho, \'head\')]', '["cleanEars", set.target(bac_si, cho, \'head\')]',
+                       '["scanChip", set.target(bac_si, cho, \'head\'), {"id": "704 000 111 222"}]', 'goes to the head end of cho for "clipNails"', 'subjects: [bac_si, cho], size: "close"'):
+            if needle not in html: problems.append(f'care38: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'care38')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('care38: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('bac_si clipNails cho — the clipper at the paw', 'bac_si clipNails cho — the clipper closes and opens', 'bac_si clipNails cho — the paw is held up while cut',
+                           'bac_si clipNails cho — the other hand holds the paw', 'bac_si clipNails — head turned to the nail clipper',
+                           'bac_si eyeDrops cho — the dropper right above the eye', 'bac_si eyeDrops cho — a drop hangs at the tip, then falls into the eye', 'bac_si eyeDrops cho — the eyes shut after the drop',
+                           'bac_si eyeDrops cho — the chin held up by the other hand', 'bac_si cleanEars cho — the cotton pad wipes at the ear', 'bac_si cleanEars cho — then it shakes its head, hands off',
+                           'bac_si scanChip cho — the scanner passes over the neck and shoulders', 'bac_si scanChip cho — the chip number shown on a big card', 'bac_si scanChip — head turned to the chip number shown',
+                           'bac_si eyeDrops cho — hand reaches', 'cho in view at'):
+                if needle not in done.stdout: problems.append(f'care38: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
+    # Kịch bản chữ (đợt 38 A): "cắt móng", "nhỏ mắt", "lau tai", "quét chip <mã>".
+    text = os.path.join(work, 'care38.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · mèo (cat, trên bàn)\n\nbác sĩ → mèo: cắt móng\nbác sĩ → mèo: nhỏ thuốc mắt\n'
+                                            'bác sĩ → mèo: lau tai\nbác sĩ → mèo: quét chip 704 000 111 222\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py care38: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'care38.scene.json'), encoding='utf-8'))
+        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = [['clipNails', '@meo'], ['eyeDrops', '@meo'], ['cleanEars', '@meo'], ['scanChip', '@meo', {'id': '704 000 111 222'}]]
+        if steps != want: problems.append(f'script.py care38: steps {steps}, want {want}')
+
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %
     # bàn tay ở 0.72.0). Góc trung nới theo bàn tay ở lượt có động tác tay, vẫn hẹp hơn 85 % góc toàn.
     gesture = {'id': 'gesture', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],
@@ -1021,6 +1063,13 @@ with tempfile.TemporaryDirectory() as work:
         ('a pill with extra words', lambda s: s['script'].append({'who': 'vet', 'do': [['givePill', '@cat', 'twice']]}), 'just the pet'),
         ('a pet licking a pet', lambda s: s['script'].append({'who': 'cat', 'do': [['lick', '@cat']]}), 'licks a person'),
         ('a cat chasing its tail', lambda s: s['script'].append({'who': 'cat', 'do': [['chaseTail', 2]]}), 'is for dogs'),
+        # Đợt 38 A: cắt móng, nhỏ mắt, vệ sinh tai, quét chip.
+        ('nails cut on a back paw', lambda s: s['script'].append({'who': 'vet', 'do': [['clipNails', '@cat', {'paw': 'back'}]]}), '"front"'),
+        ('eye drops held for a minute', lambda s: s['script'].append({'who': 'vet', 'do': [['eyeDrops', '@cat', {'hold': 60}]]}), 'hold must be'),
+        ('a chip number that is not text', lambda s: s['script'].append({'who': 'vet', 'do': [['scanChip', '@cat', {'id': 900123}]]}), 'chip number'),
+        ('ears cleaned on a person', lambda s: s['script'].append({'who': 'vet', 'do': [['cleanEars', '@boy']]}), 'needs the pet'),
+        ('a pet that scans a chip', lambda s: s['script'].append({'who': 'cat', 'do': [['scanChip', '@cat']]}), 'done by a person'),
+        ('a clipper with extra words', lambda s: s['script'].append({'who': 'vet', 'do': [['clipNails', '@cat', 'quickly']]}), '"clipNails" takes'),
     ]:
         path = os.path.join(os.path.dirname(stage), f'_check_{abs(hash(label)) % 100000}.json')
         try:

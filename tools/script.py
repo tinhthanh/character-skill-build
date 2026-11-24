@@ -39,6 +39,7 @@ Một tệp kịch bản:
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin),
                                        cân (tự có cái cân cạnh người cân), đo nhiệt độ, cho uống thuốc (giữ đầu, đưa viên thuốc vào mõm)
                                        băng chân, đeo loa (băng / loa còn lại trên con vật)
+                                       cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
                                        con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
@@ -101,6 +102,12 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
 # (một tay giữ đầu, một tay đưa viên thuốc vào mõm). "cho thuốc" vẫn là đưa viên thuốc như bánh thưởng (`giveTreat`).
 TARGETED.update({'cân': ('weigh', 'can'), 'cân ký': ('weigh', 'can'), 'đo nhiệt độ': ('takeTemp', None), 'đo nhiệt': ('takeTemp', None), 'cặp nhiệt': ('takeTemp', None),
                  'cho uống thuốc': ('givePill', None), 'bón thuốc': ('givePill', None)})
+# ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip (hai tay trên con vật). "quét chip 900 123 456 789": mã chip hiện trên thẻ.
+TARGETED.update({'cắt móng': ('clipNails', None), 'cắt móng chân': ('clipNails', None), 'cắt móng tay': ('clipNails', None),
+                 'nhỏ mắt': ('eyeDrops', None), 'nhỏ thuốc mắt': ('eyeDrops', None), 'nhỏ thuốc vào mắt': ('eyeDrops', None),
+                 'vệ sinh tai': ('cleanEars', None), 'lau tai': ('cleanEars', None), 'làm sạch tai': ('cleanEars', None),
+                 'quét chip': ('scanChip', None), 'kiểm tra chip': ('scanChip', None), 'đọc chip': ('scanChip', None)})
+CHIP_VERB = re.compile(r'^(quét chip|kiểm tra chip|đọc chip)\s+(?:mã\s+|số\s+)?([0-9][0-9 .-]{2,22}[0-9])$')
 # ĐỢT 37 — COMBO: một câu cho cả một chuỗi động tác (bảng chung ở runtime/combos.js, khoá "vi"). Combo không đích viết trong
 # ngoặc ("lễ tân: [chào khách]"); combo có đích viết "→" ("bác sĩ → chó: khám tổng quát", "bác sĩ → chó → bé trai: trả thú").
 sys.path.insert(0, HERE)
@@ -232,6 +239,8 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             return {'who': who, 'do': [[name] + targets]}
         if m:
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
+            chip = CHIP_VERB.match(verb)
+            if chip: return {'who': who, 'do': [['scanChip', f'@{target}', {'id': chip.group(2)}]]}
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
             action, extra = TARGETED[verb]
             step = [action, f'@{target}'] + ([extra] if extra else [])
