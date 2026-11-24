@@ -46,6 +46,12 @@
     {
       "who": "host",
       "do": [
+        ["holdSign", "Khám định kỳ|6 tháng một lần", 2.2]
+      ]
+    },
+    {
+      "who": "host",
+      "do": [
         "wave"
       ]
     }

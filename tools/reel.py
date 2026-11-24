@@ -129,6 +129,8 @@ def main():
       label.innerHTML = `${{String(count).padStart(2, '0')}} · ${{entry.label.replace(/</g, '&lt;')}}<small>${{id}}${{turned ? ' · turned 3/4' : ''}}</small>`;
       parts.push(label);
       const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
+      // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{{ "with": "@person" }}` (hay "@pet") trong tuỳ chọn của bước.
+      for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => {{ if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = {{ ...arg, with: arg.with === '@pet' ? pet : person }}; }});
       const line = VGCharacter.sequence(rig, steps);
       if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD});
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};

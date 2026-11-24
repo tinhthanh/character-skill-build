@@ -36,6 +36,10 @@ Một tệp kịch bản:
     tên: [bật đèn] / [tắt đèn]         bật / tắt cây đèn của bối cảnh (phòng khách, công viên…)
     tên: [mất điện] / [có điện]        mọi đèn và màn hình tắt phụt / bật lại
     tên: [trời tối dần] / [hoàng hôn] / [trời sáng]   trời chuyển giờ trong 6 giây
+    tên: [giơ bảng: Giảm 20%]          người giơ tấm bảng chữ trước ngực (1–3 dòng ngắn, ngắt bằng |; chữ có dấu phẩy thì đặt trong "…")
+    tên: [to cỡ này] [nhỏ cỡ này] [ra dấu kích thước]   hai bàn tay ra dấu kích thước · [selfie] [chụp ảnh tự sướng] [chụp hình] (tự có điện
+                                       thoại) · [ngáp] [vươn vai] (người: ngáp + vươn hai tay qua đầu; thú vẫn ngáp / vươn vai kiểu thú)
+    tên → tên khác: selfie             chụp ảnh tự sướng CÙNG người / con vật kia (họ nghiêng vào khung hình, bước lại gần)
     tên → tên khác: hành động          cho thuốc, cho bánh, vuốt ve, khám, bế, chải lông, tiêm, nghe tim, bắt tay, chỉ vào, rọi đèn (đèn pin),
                                        cân (tự có cái cân cạnh người cân), đo nhiệt độ, cho uống thuốc (giữ đầu, đưa viên thuốc vào mõm)
                                        băng chân, đeo loa (băng / loa còn lại trên con vật)
@@ -131,6 +135,16 @@ LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng v�
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
+# ĐỢT 39 C — NGƯỜI DẪN (chỉ người): "bác sĩ: [giơ bảng: Giảm 20%]" (chữ trên bảng: 1–3 dòng ngắn, ngắt bằng "|"; có dấu phẩy thì đặt trong ngoặc kép —
+# [giơ bảng: "Giảm 20%, hôm nay"]), "[to cỡ này]" / "[nhỏ cỡ này]" / "[ra dấu kích thước]", "[selfie]" / "[chụp ảnh tự sướng]" / "[chụp hình]" (tự có điện thoại
+# cất sẵn trong tay), "[ngáp]" / "[vươn vai]" (người: ngáp + vươn hai tay qua đầu — thú vẫn ngáp / vươn vai kiểu thú), và "bác sĩ → bé trai: selfie" (chụp CÙNG).
+SIGN_WORDS = ('giơ bảng', 'giơ biển', 'giơ tấm bảng')
+PRESENT_39 = {'to cỡ này': ['showSize', 'big'], 'to thế này': ['showSize', 'big'], 'nhỏ cỡ này': ['showSize', 'small'], 'bé cỡ này': ['showSize', 'small'],
+              'cỡ này': ['showSize', 'medium'], 'ra dấu kích thước': ['showSize', 'medium'], 'ra dấu to cỡ này': ['showSize', 'big'],
+              'chụp ảnh tự sướng': ['takeSelfie'], 'chụp ảnh': ['takeSelfie'], 'selfie': ['takeSelfie'], 'chụp hình': ['takeSelfie'], 'tự sướng': ['takeSelfie'],
+              'ngáp': ['yawnStretch'], 'vươn vai': ['yawnStretch'], 'ngáp vươn vai': ['yawnStretch']}
+TARGETED_39 = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie', 'chụp hình': 'takeSelfie', 'chụp ảnh': 'takeSelfie', 'tự sướng': 'takeSelfie'}
+SIGN_TEXT = re.compile(r'(' + '|'.join(SIGN_WORDS) + r')\s*:\s*("[^"]*"|[^,\]]*)', re.IGNORECASE)
 
 
 class ScriptError(Exception):
@@ -252,6 +266,10 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
             chip = CHIP_VERB.match(verb)
             if chip: return {'who': who, 'do': [['scanChip', f'@{target}', {'id': chip.group(2)}]]}
+            if verb in TARGETED_39:          # ĐỢT 39 C: "bác sĩ → bé trai: selfie" — chụp ảnh tự sướng CÙNG người / con vật kia
+                if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người — thú không cầm điện thoại')
+                if target == who: raise ScriptError(f'{where}: "{verb}" cùng một người khác — "bác sĩ → bé trai: {verb}"')
+                return {'who': who, 'do': [[TARGETED_39[verb], 1.6, {'with': f'@{target}'}]]}
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
             action, extra = TARGETED[verb]
             step = [action, f'@{target}'] + ([extra] if extra else [])
@@ -267,7 +285,10 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             turn['mood'] = mood
         if rest.startswith('['):
             if not rest.endswith(']'): raise ScriptError(f'{where}: thiếu "]"')
-            for word in [part.strip().lower() for part in rest[1:-1].split(',') if part.strip()]:
+            # ĐỢT 39 C: chữ trên bảng ("giơ bảng: Giảm 20%") có thể chứa dấu cách và "|" — rút ra trước khi tách theo dấu phẩy.
+            signs = []
+            inner = SIGN_TEXT.sub(lambda m: (signs.append(m.group(2).strip().strip('"').strip()) or f'giơ bảng#{len(signs) - 1}'), rest[1:-1])
+            for word in [part.strip().lower() for part in inner.split(',') if part.strip()]:
                 table = PET_MOODS if pet else PERSON_MOODS
                 if word in table or word in table.values():
                     if 'mood' in turn: raise ScriptError(f'{where}: hai tâm trạng trong một lượt')
@@ -278,6 +299,11 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 elif word in SKIES: turn['sky'] = SKIES[word]
                 elif word in COMBO_WORDS and not COMBOS[COMBO_WORDS[word]]['params']: turn.setdefault('do', []).append(COMBO_WORDS[word])
                 elif word in COMBO_WORDS: raise ScriptError(f'{where}: "{word}" cần đích — viết "tên → con vật: {word}"')
+                elif word.startswith('giơ bảng#') or word in SIGN_WORDS or (not pet and word in PRESENT_39):         # ĐỢT 39 C
+                    if pet: raise ScriptError(f'{where}: {m.group(1).strip()} là thú — "{word}" chỉ dành cho người')
+                    if word in SIGN_WORDS or (word.startswith('giơ bảng#') and not signs[int(word.split('#')[1])]):
+                        raise ScriptError(f'{where}: "giơ bảng" cần chữ trên bảng — "{m.group(1).strip()}: [giơ bảng: Giảm 20%]" (1–3 dòng ngắn, ngắt bằng |)')
+                    turn.setdefault('do', []).append(['holdSign', signs[int(word.split('#')[1])]] if word.startswith('giơ bảng#') else list(PRESENT_39[word]))
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:
@@ -310,14 +336,15 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     characters = [c for c in characters if c['name'] in used] or characters
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
-    needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag'}
+    needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag',
+             'takeSelfie': 'phone'}      # đợt 39 C — điện thoại cất sẵn, lấy ra lúc chụp
     for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
         for step in turn.get('do', []) if isinstance(turn, dict) else []:
             item = needs.get(step[0] if isinstance(step, list) and step else step if isinstance(step, str) else None)
             who = next((c for c in characters if c['name'] == turn.get('who')), None)
             if item and who and not who.get('holds') and not who.get('species'):
                 who['holds'] = item
-                if item in ('syringe', 'clipboard'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án
+                if item in ('syringe', 'clipboard', 'phone'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án
             elif item and who and isinstance(who.get('holds'), str) and who['holds'] != item and not who.get('species') and who.get('holdsHidden'):
                 # Món thứ hai (đợt 37: "tiêm phòng" rồi "khám tổng quát" — ống tiêm VÀ bìa hồ sơ): tay kia. Ống tiêm ở tay phải
                 # (tay mặc định, như khi chỉ có nó).
