@@ -1155,6 +1155,68 @@ with tempfile.TemporaryDirectory() as work:
         if steps != want: problems.append(f'script.py combos: steps {steps}, want {want}')
         if vet.get('holds') != 'syringe' or not any(c.get('kind') == 'scale' for c in made['set'].get('cutouts', [])): problems.append('script.py combos: "tiêm phòng" did not give the vet a syringe and a scale')
 
+    # ĐỢT 38 B — PHỐI HỢP VÀ CHUẨN BỊ: bác sĩ rửa tay, đeo găng; y tá GIỮ con chó cho bác sĩ tiêm (y tá phía đuôi), rồi giữ cho bác sĩ đo
+    # nhiệt độ (con chó quay đuôi về bác sĩ — y tá thành phía đầu, hai tay dưới đầu nó); bác sĩ tháo găng. acting_check: hai tay y tá
+    # trên con chó suốt lúc giữ, không che tay bác sĩ, không che mặt con chó, con chó không tự dời; bọt quanh hai tay; găng hiện / mất dưới
+    # bàn tay kia, đủ / hết găng sau bước.
+    team = {'id': 'team38', 'camera': 'auto', 'set': {'preset': 'exam'},
+            'characters': [{'name': 'y_ta', 'id': 'nurse', 'x': 40, 'z': -560, 'faces': 'cho'}, {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'},
+                           {'name': 'bac_si', 'id': 'vet', 'x': 380, 'z': -560, 'faces': 'cho', 'holds': {'L': 'syringe'}, 'holdsHidden': True}],
+            'script': [{'who': 'bac_si', 'say': 'Chị rửa tay rồi đeo găng nhé.', 'dur': 1.8}, {'who': 'bac_si', 'do': [['washHands', 2]]}, {'who': 'bac_si', 'do': ['putOnGloves']},
+                       {'who': 'bac_si', 'say': 'Em giữ bé giúp chị.', 'dur': 1.4},
+                       {'together': [{'who': 'y_ta', 'do': [['restrain', '@cho']]}, {'who': 'bac_si', 'do': [['inject', '@cho']]}]},
+                       {'together': [{'who': 'y_ta', 'do': [['restrain', '@cho']]}, {'who': 'bac_si', 'do': [['takeTemp', '@cho', 1.5]]}]},
+                       {'who': 'bac_si', 'do': ['takeOffGloves']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_team38.json')
+    try:
+        json.dump(team, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'team38'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('team38: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'team38', 'index.html'), encoding='utf-8').read()
+        # Giữ vừa khít phần việc người kia (tiêm 2,35 s → giữ 1,35 s; đo nhiệt 4,2 s → 3,2 s); đầu con chó về phía bác sĩ / phía y tá.
+        for needle in ("[y_ta, ['restrain', set.target(y_ta, cho, 'body'), 1.35, { head: set.target(y_ta, cho, 'head'), headSide: 1 }]]",
+                       "[y_ta, ['restrain', set.target(y_ta, cho, 'body'), 3.2, { head: set.target(y_ta, cho, 'head'), headSide: -1 }]]",
+                       '[bac_si, ["washHands", 2]]', '[bac_si, "putOnGloves"]', '[bac_si, "takeOffGloves"]'):
+            if needle not in html: problems.append(f'team38: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'team38')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('team38: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('y_ta restrains cho — both hands on it throughout', "y_ta restrains cho — bac_si's hands not covered", 'y_ta restrains cho — hands off its face',
+                           'y_ta restrains cho — cho never jumps', "y_ta restrain — head turned to cho's head", 'y_ta holds cho — hand on it throughout',
+                           'bac_si washHands — foam round both hands', 'bac_si washHands — foam gone after shaking dry', 'bac_si washHands — head turned to the hands',
+                           'bac_si putOnGloves — each glove goes on under the other hand', 'bac_si putOnGloves — both gloves on after the step',
+                           'bac_si takeOffGloves — each glove comes off under the other hand', 'bac_si takeOffGloves — no gloves left after the step'):
+                if needle not in done.stdout: problems.append(f'team38: acting_check did not measure "{needle}"')
+    # Giữ con vật sai cách: bị từ chối với một câu nói rõ.
+    for name, script, needle in [('no pet', [{'who': 'y_ta', 'do': ['restrain']}], 'needs the pet'),
+                                 ('a person', [{'who': 'y_ta', 'do': [['restrain', '@bac_si']]}], 'needs a pet of the scene'),
+                                 ('bad hold', [{'who': 'y_ta', 'do': [['restrain', '@cho', 'long']]}], 'hold (0.5…12 s)'),
+                                 ('pet restrains', [{'who': 'cho', 'do': [['restrain', '@cho']]}], 'done by a person')]:
+        bad = dict(team, id='bad38', script=script)
+        path = os.path.join(os.path.dirname(stage), '_check_bad38.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad38'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'restrain ({name}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # Kịch bản chữ: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm", "[rửa tay, đeo găng]", "[tháo găng tay]".
+    text = os.path.join(work, 'team38.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · y tá (nurse) · chó (corgi, trên bàn)\n\nbác sĩ: [rửa tay, đeo găng]\n'
+                                            'cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm\ny tá → chó: giữ chặt\nbác sĩ: [tháo găng tay]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py restrain / gloves: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'team38.scene.json'), encoding='utf-8'))
+        flat = [step for entry in made['script'] for turn in (entry.get('together') or [entry]) for step in (turn.get('do') or [])]
+        for want in ('washHands', 'putOnGloves', ['restrain', '@cho'], ['inject', '@cho'], 'takeOffGloves'):
+            if want not in flat: problems.append(f'script.py restrain / gloves: {want} missing from {flat}')
+        if not any('together' in entry and any(['restrain', '@cho'] in (t.get('do') or []) for t in entry['together']) for entry in made['script']):
+            problems.append('script.py restrain / gloves: "cùng lúc: y tá → chó: giữ | …" did not make a together turn')
+
 for problem in problems: print(f'  ✗ scene: {problem}')
 print('scene: PASS' if not problems else f'scene: FAIL ({len(problems)} problems)')
 sys.exit(1 if problems else 0)

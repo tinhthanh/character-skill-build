@@ -1606,6 +1606,47 @@ try {
       if (compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
       stage.remove();
     }
+    // ĐỢT 38 B — GIỮ CON VẬT, RỬA TAY, ĐEO / THÁO GĂNG: găng là trạng thái của timeline (tua tới đâu cũng đúng, giữ qua bước sau trong
+    // sequence()), hiện ở đúng bàn tay; tháo găng khi không đeo bị từ chối; hai tay người giữ trên con vật; bọt chỉ lúc xoa.
+    {
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:300px;width:900px;height:300px'; document.body.appendChild(stage);
+      const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
+      const vet = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+      const gloved = (side) => vet.svg.classList.contains(vet.id + '-glove' + side);
+      try { vet.takeOffGloves(); hong('takeOffGloves', 'should throw without gloves on'); } catch (e) { if (!/not wearing gloves/.test(e.message)) hong('takeOffGloves', 'unclear error: ' + e.message); }
+      const chain = L.sequence(vet, ['putOnGloves', 'nod', 'takeOffGloves'], { breathe: false }), st = chain.data.steps;
+      const at = (time) => { chain.time(time); vet.apDung(); return [gloved('L'), gloved('R')].join(','); };
+      if (at(st[0].start + 0.2) !== 'false,false') hong('putOnGloves', 'gloves on before the hands pull them on');
+      if (at(st[1].start + 0.3) !== 'true,true') hong('putOnGloves', `gloves not on after putOnGloves (during the next step): ${at(st[1].start + 0.3)}`);
+      if (at(st[2].start + st[2].duration + 0.01) !== 'false,false') hong('takeOffGloves', 'gloves still on after takeOffGloves');
+      // Găng hiện giữa bước, mép găng ở bàn tay (cuff), chiếc găng cầm tay (dụng cụ 15) có lúc hiện.
+      let half = false, held = false;
+      for (let n = 0; n <= 60; n++) { at(st[0].start + st[0].duration * n / 60); if (gloved('L') !== gloved('R')) half = true; if (Math.round(vet.s.gadgetL) === 15 || Math.round(vet.s.gadgetR) === 15) held = true; }
+      if (!half || !held) hong('putOnGloves', 'the gloves do not go on one hand at a time from a glove held in the other hand');
+      chain.kill();
+      vet.reset(); vet.wear('gloves');
+      if (!gloved('L') || !gloved('R')) hong('wear', "wear('gloves') does not glove both hands");
+      const off = vet.takeOffGloves(); off.progress(1); vet.apDung();
+      if (gloved('L') || gloved('R')) hong('takeOffGloves', "gloves put on with wear('gloves') stay on after takeOffGloves");
+      off.kill(); vet.wear('gloves', false); vet.reset();
+      // Rửa tay: bọt quanh cả hai bàn tay lúc xoa, hết bọt sau khi vẩy.
+      const wash = vet.washHands(2); wash.time(1.4); vet.apDung();
+      if (Math.round(vet.s.gadgetL) !== 14 || Math.round(vet.s.gadgetR) !== 14 || vet.el.gadgetL.style.display === 'none') hong('washHands', 'no foam round both hands while rubbing');
+      wash.progress(1); vet.apDung(); if (vet.s.gadgetL || vet.s.gadgetR || vet.s.foam) hong('washHands', 'foam left after shaking the hands dry'); wash.kill();
+      // Giữ con vật: hai bàn tay trên con chó suốt lúc giữ.
+      const dog = L.createPet(spot('left:118px;top:108px;width:100px;height:82px'), { species: 'dog' }).rig;
+      const hold = vet.restrain(dog, 1.6), box = dog.svg.getBoundingClientRect();
+      for (const time of [0.7, 1.3, 2.0]) {
+        hold.time(time); vet.apDung();
+        for (const side of ['L', 'R']) {
+          const r = vet.el['coTay' + side].getBoundingClientRect(), x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2;
+          if (x < box.left - 12 || x > box.right + 12 || y < box.top - 12 || y > box.bottom + 12) hong('restrain', `the ${side} hand is off the pet at ${time} s`);
+        }
+      }
+      hold.progress(1); vet.apDung(); hold.kill();
+      try { vet.restrain(dog, -1); hong('restrain', 'should throw on a bad hold'); } catch (e) { /* đúng */ }
+      stage.remove();
+    }
     // ĐỢT 37 — COMBO: `sequence()` bung combo thành các bước của nó (không còn tên combo trong `steps`); `combo()` trả lượt
     // `conversation()`, bước "with" thành `together` với con vật; thiếu con vật thì báo lỗi rõ.
     {
