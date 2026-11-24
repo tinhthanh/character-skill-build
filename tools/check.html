@@ -69,7 +69,7 @@ try {
     try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.applyConfig(rig, { proportions: { headSize: 1.2 }, faceShape: { halfWidth: 44 } }); if (xau(rig.svg)) hong(k, 'broken SVG attributes after setColors / applyConfig'); }
     catch (e) { hong(k, 'setColors / applyConfig threw: ' + e.message); }
   }
-  for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC, ['exit']); }
+  for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC, ['exit', 'flop']); }       // đợt 40 B: `flop` (thỏ) là thế giữ tới `standUp`
 
   // Tính tất định: gieo cùng hạt phải ra cùng timeline.
   { const rig = new RigSVG(document.getElementById('san'), 'vet');
@@ -2240,6 +2240,44 @@ try {
         munch.kill();
         let nope = ''; try { bun.rollOver(); } catch (error) { nope = error.message; }
         if (!nope.includes('not for a rabbit')) hong('rollOver', 'a rabbit rolling over should be refused');
+        bun.svg.remove();
+      }
+      // Đợt 40 B — mèo & thỏ: rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn, cong lưng, chui hộp; nhảy vui, nằm vật, đứng hai chân, giật mũi.
+      // Loài không hợp báo lỗi rõ; động tác xong về dáng nghỉ (trừ `flop` — thế giữ tới `standUp`); hộp / cuộn len biến mất.
+      {
+        const dog = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog' }).rig;
+        for (const name of ['groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox']) {
+          let wrong = ''; try { dog[name](); } catch (error) { wrong = error.message; }
+          if (!wrong.includes('cats')) hong(name, 'a dog doing a cat action should be refused, naming cats');
+          if (dog.actions.includes(name)) hong(name, 'a dog should not list a cat action');
+        }
+        dog.svg.remove();
+        const cat = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'calico' }).rig;
+        const rest = (rig, label) => { for (const key of ['ngoi', 'nam', 'phong', 'toy', 'box', 'gp', 'nghieng', 'matY', 'taiL', 'truocY', 'sauY', 'tnNhac']) if (Math.abs(rig.s[key] - rig.NGHI[key]) > 0.02) hong(label, `does not end at rest (${key} ${rig.s[key].toFixed(2)}, rest ${rig.NGHI[key]})`); };
+        for (const step of [['groomFace', 3], ['loaf', 2], ['slowBlink', 2], ['batToy', 3], ['archBack', 1.4], ['sitInBox', 2]]) {
+          const run = L.sequence(cat, [step], { breathe: false });
+          let seen = 0, off = 0; for (let time = 0; time <= run.duration(); time += 0.05) { run.time(time); seen = Math.max(seen, cat.s.toy, cat.s.box, cat.s.phong, cat.s.gp); off = Math.max(off, Math.abs(cat.s.x)); }
+          run.progress(1); rest(cat, step[0]); if (Math.abs(cat.s.x) > 0.5) hong(step[0], `the cat does not end where it started (x ${cat.s.x.toFixed(1)})`);
+          if (step[0] === 'sitInBox' && !(off > 60)) hong('sitInBox', `the cat does not move into the box (furthest ${off.toFixed(0)})`);
+          if (['batToy', 'archBack', 'sitInBox', 'groomFace'].includes(step[0]) && seen < 0.9) hong(step[0], 'its prop / pose channel never reaches 1');
+          run.kill();
+        }
+        let nope = ''; try { cat.binky(); } catch (error) { nope = error.message; }
+        if (!nope.includes('rabbit')) hong('binky', 'a cat doing a rabbit action should be refused, naming the rabbit');
+        cat.svg.remove();
+        const bun = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'rabbit' }).rig;
+        for (const step of [['binky', 2], ['periscope', 1.6], ['noseTwitch', 1.6]]) {
+          const run = L.sequence(bun, [step], { breathe: false }); run.progress(1); rest(bun, step[0]); run.kill();
+        }
+        if (!(Math.abs(bun.s.nose) < 0.001 && Math.abs(bun.s.twitch) < 0.001 && Math.abs(bun.s.ria) < 0.001)) hong('noseTwitch', 'the nose does not stop twitching');
+        const down = L.sequence(bun, ['flop'], { breathe: false }); down.progress(1);
+        if (!(bun.s.flop === 1 && bun.s.nam === 1)) hong('flop', `flop is a held pose until standUp (flop ${bun.s.flop}, nam ${bun.s.nam})`);
+        const twitch = L.sequence(bun, [['noseTwitch', 1]], { breathe: false }); twitch.progress(1);
+        if (!(bun.s.flop === 1)) hong('flop', 'another action in between should leave the rabbit flopped'); twitch.kill();
+        const up = L.sequence(bun, ['standUp'], { breathe: false }); up.progress(1);
+        if (!(bun.s.flop === 0 && bun.s.nam === 0)) hong('flop', 'standUp does not get a flopped rabbit up'); up.kill(); down.kill();
+        let bad = ''; try { bun.loaf(); } catch (error) { bad = error.message; }
+        if (!bad.includes('cats')) hong('loaf', 'a rabbit doing a cat action should be refused, naming cats');
         bun.svg.remove();
       }
       // Đợt 40 A — sáu động tác của chó: chổng mông rủ chơi, tru, đào đất, tha đồ chơi, dựa chân người, kéo co (+ `pullToy` của người); loài khác bị từ chối rõ.

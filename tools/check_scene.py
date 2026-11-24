@@ -1187,6 +1187,37 @@ with tempfile.TemporaryDirectory() as work:
                            'tho eatCarrot — big enough in the frame', 'tho eatCarrot — the carrot gets shorter bite by bite', 'be carry meo — the pet stays in the frame', 'be putDown meo — the pet stays in the frame'):
                 if needle not in done.stdout: problems.append(f'pets35: acting_check did not measure {needle!r}')
 
+    # ĐỢT 40 B — mèo & thỏ trong phòng khách: rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn cuộn len, cong lưng dựng lông, chui hộp; nhảy vui, nằm vật,
+    # giật mũi (cận cảnh), đứng hai chân. acting_check đo từng động tác (chân chạm mặt, dáng thấp giữ ≥ 1 s, mắt nhắm liền, cuộn len lăn xa,
+    # lưng cao hơn, đầu thò khỏi hộp, rời sàn + vặn mình, mũi giật nhiều nhịp); dựng sai loài (chó rửa mặt) phải bị từ chối.
+    pets40 = {"id": "pets40b", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "be", "id": "girl", "x": -150, "z": -500}, {"name": "cho", "species": "dog", "x": -300, "z": -500, "faces": "be"}, {"name": "meo", "species": "cat", "x": -70, "z": -500}, {"name": "tho", "species": "rabbit", "x": -230, "z": -600}], "script": [{"who": "be", "say": "Xem mèo và thỏ nhé."}, {"who": "meo", "do": [["groomFace", 3]]}, {"who": "meo", "do": [["loaf", 2]]}, {"who": "meo", "do": [["slowBlink", 2]]}, {"who": "meo", "do": [["batToy", 3]]}, {"who": "meo", "do": [["archBack", 1.4]]}, {"who": "meo", "do": [["sitInBox", 2]]}, {"who": "tho", "do": [["binky", 2]]}, {"who": "tho", "do": ["flop"]}, {"who": "tho", "do": [["noseTwitch", 1.6]]}, {"who": "tho", "do": ["standUp"]}, {"who": "tho", "do": [["periscope", 1.6]]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_pets40b.json')
+    try:
+        json.dump(pets40, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'pets40b'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('pets40b: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pets40b')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('pets40b: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in ('meo groomFace — the paw wipes over the face, stroke after stroke', 'meo loaf — a low, compact shape, held', 'meo slowBlink — eyes close slowly and stay shut',
+                           'meo batToy — the toy bounces away', 'meo archBack — back arched, fur puffed up, held', 'meo sitInBox — head and ears out of the box, held',
+                           'tho binky — jumps clear of the floor with a twist', 'tho flop — a low, compact shape, held', 'tho noseTwitch — the nose twitches fast',
+                           'tho periscope — stands up on the hind legs, front paws off the floor, held',
+                           'meo loaf — big enough in the frame', 'meo batToy — big enough in the frame', 'meo archBack — big enough in the frame', 'tho binky — big enough in the frame',
+                           'tho noseTwitch — big enough in the frame', 'tho periscope — big enough in the frame'):
+                if needle not in done.stdout: problems.append(f'pets40b: acting_check did not measure {needle!r}')
+    wrong = {'id': 'pets40b2', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'cho', 'species': 'dog', 'x': -100, 'z': -500}], 'script': [{'who': 'cho', 'do': ['groomFace']}]}
+    path = os.path.join(os.path.dirname(stage), '_check_pets40b2.json')
+    try:
+        json.dump(wrong, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'pets40b2'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode == 0: problems.append('pets40b: a dog washing its face (a cat action) was not refused')
+
     # ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ. desk39a (quầy lễ tân): bà quét mã QR trên đế thanh toán (đế tự đặt lên mặt quầy), thu ngân thối tiền (đếm từng
     # tờ, bà nhận xấp tiền), đóng dấu thẻ của mình, lau quầy. desk39b (nhà thuốc / quầy cà phê): đóng dấu thẻ rồi ĐƯA cho khách (khách nhận thẻ có dấu), rót nước
     # vào cốc rồi đưa cốc đầy. desk39c: cậu bé quẹt thẻ ngân hàng. Mỗi cái đo bằng tools/acting_check.py (`desk39`); gọi sai thì bị từ chối bằng một câu rõ.

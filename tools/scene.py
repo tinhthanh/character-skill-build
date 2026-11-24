@@ -138,6 +138,12 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                ["carryToy", 120, { "kind": "rope" | "bone" }] (trots with a toy in its mouth; no distance = on the spot) or ["carryToy", "@boy", { "kind": "bone" }]
                (trots to him and drops it at his feet), ["leanOnLeg", "@boy"] (walks up and leans against his leg), ["tugOfWar", "@boy", 2.4] (the dog is walked a rope's length
                from him and the boy pulls the other end of the rope at the same time — his ["pullToy", "@dog"], added for you). Give the dog and the person the same z.
+               Wave 40 — cats: ["groomFace", 3] (licks a paw and wipes it over ear and face), ["loaf", 2] (lies tucked like a loaf of bread, then
+               sits up), ["slowBlink", 2] (eyes close slowly, a sign of trust), ["batToy", 3] (swipes at a ball of yarn that rolls away),
+               ["archBack", 1.4] (Halloween cat: arched back, puffed fur, bushy tail), ["sitInBox", 2] (a cardboard box appears, the cat hops
+               in, only head and ears out, then hops out). Rabbits: ["binky", 2] (happy leap with a mid-air twist and kick), "flop" (flops
+               on its side, legs out — held until "standUp", like "lieDown"), ["periscope", 1.6] (up on the hind legs, looking around),
+               ["noseTwitch", 1.6] (close shot: nose and whiskers twitch). Another species is refused, naming the right one. All ten cut to a close shot like the above.
                In a 3D set a pet's own turn with rollOver, chaseTail, knead, eatCarrot, lick or bark (and no "view") cuts to a close
                shot of the pet for that turn — the pet ≥ 35 % of the frame height, others may be cropped — then back.
                Two people together: ["highFive", "@boy"] (both slap raised hands between them), ["hug", "@owner"] (step in, arms
@@ -300,6 +306,17 @@ PET_ACT_ASK.update({'playBow': 'Is the dog in a play bow — front legs stretche
                     'carryToy': 'Is the dog trotting with a toy (a rope or a bone) in its mouth, head high and proud — or dropping it on the floor?',
                     'leanOnLeg': 'Is the dog leaning its side against the person\'s leg, looking up at them with half-closed eyes?',
                     'tugOfWar': 'Is the dog in a tug of war — gripping a rope in its mouth, braced, pulling back and shaking its head, the rope taut to the person\'s hand?'})
+PET_ACTS += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
+PET_ACT_ASK.update({'groomFace': 'Is the cat sitting and wiping a licked front paw over its ear and face?',      # đợt 40 B
+                    'loaf': 'Is the cat lying like a loaf of bread — paws tucked under, a compact round shape, eyes half closed?',
+                    'slowBlink': 'Does the cat look at the viewer and close its eyes slowly (eyes shut for a moment)?',
+                    'batToy': 'Is the cat crouched, swiping a front paw at a small ball of yarn that rolls away?',
+                    'archBack': 'Is the cat in a Halloween pose — back arched high, fur puffed up, tail up and bushy?',
+                    'sitInBox': 'Is the cat sitting in a cardboard box with only its head and ears above the rim?',
+                    'binky': 'Is the rabbit jumping with a happy twist in mid-air, hind legs kicking out?',
+                    'flop': 'Is the rabbit flopped on its side, legs stretched out, relaxed?',
+                    'periscope': 'Is the rabbit standing up on its hind legs, front paws tucked, ears high, looking around?',
+                    'noseTwitch': 'Is the rabbit\'s nose twitching with whiskers moving, in a close shot?'})
 CAT_BREEDS = ('calico',)                                 # giống mèo mà tên không có chữ "cat" (runtime/rig-thu.js LOAI)
 GSAP_FILE = 'gsap-3.15.1.min.js'                          # vendor/ — GSAP ghim phiên bản (đợt 27)
 TURN_KEYS = ('who', 'say', 'audio', 'dur', 'do', 'shot', 'mood', 'show', 'voice', 'enter', 'exit', 'view', 'phone', 'toast', 'popup', 'mark', 'lamp', 'power', 'sky')
@@ -425,6 +442,9 @@ PET_CLOSE_FILL = 0.62
 PET_CLOSE += ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')      # đợt 40 A — góc cận con vật (dựa chân / kéo co: chân và tay người, đầu dây vẫn lọt vào khung)
 TUG_STAND = 0.29             # đợt 40 A: mõm con chó cách giữa người bấy nhiêu × chiều cao người lúc kéo co (runtime/rig-thu.js TUG_ROPE: along + reach)
 TUG_SNOUT = 84               # … đầu dây ở mõm cách giữa khung con chó chừng ấy đơn vị khung của nó (thế giật ngược)
+PET_CLOSE += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
+PET_ACTS_40 = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
+PET_FILL_40 = {'noseTwitch': 0.95, 'slowBlink': 0.9, 'groomFace': 0.8, 'loaf': 0.95, 'flop': 0.7, 'batToy': 0.95, 'archBack': 0.9, 'binky': 0.9}      # đợt 40 B: cận hơn cho mặt (mũi, mắt) — phần chiều cao khung
 VIEW_SIZES = ('close', 'medium', 'full')
 # Giới hạn máy quay — giống LIMITS trong runtime/set3d.js: chúc cao hơn thì nhân vật lộ là tấm bìa dựng trên sàn,
 # vòng xa hơn thì không có mặt sau để xoay tới.
@@ -1010,7 +1030,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
             span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 1 / 30), 'eatCarrot': (t0 + 0.6, t1 - 0.6, 0.2),
                     'playBow': (t0 + 0.5, t1 - 0.5, 0.2), 'howl': (t0 + 1.1, t1 - 0.7, 0.2), 'dig': (t0 + 0.4, t1 - 0.5, 0.06), 'carryToy': (t0 + 0.7, t1 - 0.3, 0.2),
-                    'leanOnLeg': (t0 + 0.6, t1 - 0.5, 0.2), 'tugOfWar': (t0 + 0.9, t1 - 0.6, 0.1)}.get(op['name'])      # đợt 40 A
+                    'leanOnLeg': (t0 + 0.6, t1 - 0.5, 0.2), 'tugOfWar': (t0 + 0.9, t1 - 0.6, 0.1), **{name: (t0 + 0.1, t1 - 0.1, 0.1) for name in PET_ACTS_40}}.get(op['name'])      # đợt 40 A, đợt 40 B
             samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
                             'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},
@@ -2497,7 +2517,7 @@ def main():
             if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
                 licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
                 entry['view'] = ({'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
-                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': 0.94 if 'leanOnLeg' in acts else 0.88 if ('tugOfWar' in acts or 'leanOnLeg' in acts or ('carryToy' in acts and any(isinstance(st, list) and st and st[0] == 'carryToy' and len(st) > 1 and isinstance(st[1], str) for st in entry.get('do') or []))) else 0.9 if ('playBow' in acts or 'dig' in acts or 'carryToy' in acts) else 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else PET_CLOSE_FILL, 'back': True})      # nằm ngửa: thấp, chặt hơn
+                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': PET_FILL_40.get(next((name for name in acts if name in PET_FILL_40), ''), 0.94 if 'leanOnLeg' in acts else 0.88 if ('tugOfWar' in acts or 'leanOnLeg' in acts or ('carryToy' in acts and any(isinstance(st, list) and st and st[0] == 'carryToy' and len(st) > 1 and isinstance(st[1], str) for st in entry.get('do') or []))) else 0.9 if ('playBow' in acts or 'dig' in acts or 'carryToy' in acts) else 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else PET_CLOSE_FILL), 'back': True})      # nằm ngửa: thấp, chặt hơn
             view_of(entry, where)
             if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì

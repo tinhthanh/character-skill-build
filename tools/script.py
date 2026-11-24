@@ -148,6 +148,9 @@ ACTIONS.update({'rửa tay': 'washHands', 'đeo găng': 'putOnGloves', 'đeo gă
 COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
 SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music', 'chóng mặt': 'dizzy'}
+ACTIONS.update({'rửa mặt': 'groomFace', 'liếm lông': 'groomFace', 'nằm ổ bánh mì': 'loaf', 'nằm cuộn': 'loaf', 'chớp mắt chậm': 'slowBlink', 'vờn': 'batToy', 'vờn đồ chơi': 'batToy',
+                'cong lưng': 'archBack', 'dựng lông': 'archBack', 'chui hộp': 'sitInBox', 'ngồi trong hộp': 'sitInBox', 'nhảy vui': 'binky', 'binky': 'binky',
+                'nằm vật ra': 'flop', 'nằm nghiêng': 'flop', 'đứng hai chân': 'periscope', 'ngóng': 'periscope', 'giật mũi': 'noseTwitch', 'hít hít': 'noseTwitch'})      # ĐỢT 40 B — mèo & thỏ
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}

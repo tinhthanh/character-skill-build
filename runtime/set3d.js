@@ -1722,6 +1722,10 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           facing: rig.s ? +(rig.s.huong || 0).toFixed(3) : null,                       // người và con vật (đếm vòng đuổi đuôi)
           tongue: !person && e.luoi && e.luoi.getAttribute('d') ? rect(drawnRect(e.luoi)) : null,
           carrot: !person && e.carrot && e.carrot.style.display !== 'none' && e.carrotBody ? rect(drawnRect(e.carrotBody)) : null,
+          // ĐỢT 40 B: cuộn len (`batToy`), hộp (mặt trước — `sitInBox`), mắt (`slowBlink`), mũi thỏ (`noseTwitch`), chân trước vẽ đè lên mặt (`groomFace`)
+          toy: !person && e.toy && e.toy.style.display !== 'none' ? rect(drawnRect(e.toyBall)) : null, box: !person && e.boxF && e.boxF.style.display !== 'none' ? rect(drawnRect(e.boxF)) : null,
+          eye: !person && e.matL ? rect(drawnRect(e.matL)) : null, nose: !person && e.nose ? rect(drawnRect(e.nose)) : null,
+          gpaw: !person && e.gPaw && e.gPaw.style.display !== 'none' ? rect(drawnRect(e.gBan)) : null,
           headBox: person && e.dau ? rect(drawnRect(e.dau)) : null,                    // khung đầu người (mặt người bế — liếm mặt)
           // HƯỚNG ĐẦU (đợt 36, `lookAt`): quay (đơn vị `huong`, thân + đầu — đã gồm phần bù góc máy), cúi (`headPitch`), nghiêng; tâm và chiều
           // cao KHUÔN MẶT trên màn hình — tools/acting_check.py dựng tia nhìn từ đó.
