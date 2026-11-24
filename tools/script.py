@@ -143,6 +143,8 @@ SCALE_NAME = 'can'                                       # tên cái cân tự t
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music', 'chóng mặt': 'dizzy'}
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
 LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng vạng': 'evening', 'tối': 'night', 'đêm': 'night', 'ban đêm': 'night'}
+# ĐỢT 40 C — thú ở phòng khám: sợ run trên bàn khám, giãy trong tay người bế, lừ đừ sau thuốc mê, cào cái loa chống liếm.
+ACTIONS.update({'run sợ': 'shiverAtVet', 'sợ run': 'shiverAtVet', 'giãy': 'struggle', 'giãy giụa': 'struggle', 'vùng vẫy': 'struggle', 'lừ đừ': 'groggy', 'chưa tỉnh thuốc': 'groggy', 'mơ màng': 'groggy', 'cào loa': 'pawAtCone', 'gỡ loa': 'pawAtCone'})
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
