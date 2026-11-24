@@ -1791,6 +1791,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         out[name].d39 = Object.fromEntries(Object.entries(rig.desk39Probe()).map(([key, v]) => [key, v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v]));
       }
       out['@pay39'] = { qr: [...view.querySelectorAll('[data-pay-qr]')].map(centre).filter(Boolean), reader: [...view.querySelectorAll('[data-pay-reader]')].map(centre).filter(Boolean) };
+      // ĐỢT 39 B: số đo của sáu cử chỉ thường ngày (`rig.gesture39Probe()` — phần tử → tâm và cỡ trên màn hình, số giữ nguyên).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.gesture39Probe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? centre(v) : v);
+        out[name].g39 = Object.fromEntries(Object.entries(rig.gesture39Probe()).map(([key, v]) => [key, one(v)]));
+      }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;

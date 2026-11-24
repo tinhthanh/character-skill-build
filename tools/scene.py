@@ -97,7 +97,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
-               "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
+               "fingerHeart", "vSign", everyday gestures "laugh", "wipeTears", "facepalm", "shush", "okSign", "salute"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
                Combos (runtime/combos.js — each step becomes a turn of its own; a "say" on that turn comes first):
                "greetCustomer", ["fullCheckup", "@pet"], ["vaccinationVisit", "@pet", "<scale>"], "goodNews", "badNews",
                "waitingImpatient", ["dischargePet", "@pet", "@owner"].
@@ -266,6 +266,7 @@ CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
             'introduce', 'shrug', 'throwBall')
+GESTURES += ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')          # đợt 39 B
 # ĐỘNG TÁC THÚ đợt 35: moments.json đo con vật trong khung, chân trên sàn (lăn ngửa: lưng trên sàn, chân chổng trời), nấp: đầu ló ra,
 # thân khuất một phần; liếm: mõm tới tay / mặt người.
 PET_ACTS = ('rollOver', 'chaseTail', 'knead', 'lick', 'hide', 'eatCarrot', 'bark')

@@ -485,6 +485,72 @@ def check_gesture(folder, c, frames):
     return [{'scene': folder, 'what': what, 'ok': margin >= HAND_IN, 'margin': round(margin, 3), 'note': note}]
 
 
+# ĐỢT 39 B — sáu cử chỉ thường ngày: cái làm nên chữ "đọc được" của từng cử chỉ, đo từ `g39` (`rig.gesture39Probe()` qua `set.careProbe()`).
+# Mọi khoảng cách tính theo chiều cao KHUÔN MẶT trên khung (bé đầu to, người ngồi, góc cận / toàn đều cùng thước).
+G39 = ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')
+G39_LIPS = 0.38        # suỵt: đầu ngón trỏ cách tâm miệng ≤ 38 % chiều cao mặt
+G39_PALM = 0.75        # ôm trán: đầu ngón / bàn tay cách giữa hai mắt ≤ 75 % chiều cao mặt, và đầu đã gục (headPitch ≥ 0,3)
+G39_BROW = 0.55        # chào: đầu ngón tay cách chân mày bên ấy ≤ 55 % chiều cao mặt (bàn tay ở trán, không ở má / tai)
+G39_OK = (0.45, 1.9)   # OK: tâm vòng tròn cách tâm mặt theo bề ngang trong 0,45–1,9 bề ngang mặt, lệch chiều dọc so với mắt ≤ 0,9 chiều cao mặt
+G39_EYE = 0.7          # lau nước mắt: bàn tay cách MỘT mắt ≤ 70 % chiều cao mặt (một trong ba lúc đo), nước mắt đã chảy trước đó
+G39_SWAY = 3.0         # cười lớn: kênh đầu / vai dao động ≥ 3 đơn vị giữa các lúc đo (đầu ngả, vai rung), mắt híp ≥ 0,6, miệng ≥ 0,5
+
+
+def check_gesture39(folder, c, scales):
+    """ĐỢT 39 B: ngón trỏ chặn môi (suỵt), lòng bàn tay úp lên mắt + đầu gục (ôm trán), bàn tay ở chân mày (chào), vòng OK cạnh mặt
+    ngang mắt, bàn tay chạm mắt (lau nước mắt), đầu + vai chuyển động + mắt híp, miệng há (cười lớn)."""
+    name, who_n = c['name'], c['who']
+    g = lambda t: ((scales.get(('care', float(t))) or {}).get(who_n) or {}).get('g39') or {}
+    mid = c['times'][len(c['times']) // 2]
+    out = []
+    row = lambda text, ok, note: out.append({'scene': folder, 'what': f'{who_n} {name} — {text}', 'ok': ok, 'note': note})
+    dist = lambda a, b: ((a['x'] - b['x']) ** 2 + (a['y'] - b['y']) ** 2) ** 0.5
+    face = lambda p: (p.get('face') or {}).get('h') or 0
+    if not g(mid).get('face'):
+        return [{'scene': folder, 'what': f'{who_n} {name} — measured', 'ok': None, 'note': 'no probe data at the moment asked (character not in the frame)'}]
+    if name == 'shush':
+        p = g(mid)
+        tips = [p.get('tip' + k) for k in 'LR' if p.get('tip' + k)]
+        d = min((dist(t, p['mouth']) / face(p) for t in tips), default=None) if p.get('mouth') else None
+        row('the index finger at the lips', d is not None and d <= G39_LIPS, f'fingertip {d * 100:.0f} % of the face height from the mouth at {mid:g} s (most {G39_LIPS * 100:g} %)' if d is not None else 'no finger shape shown')
+    elif name == 'facepalm':
+        p = g(mid)
+        tips = [p.get('hand' + k) for k in 'LR' if p.get('hand' + k) and p.get('chao' + k)]
+        eyes = {'x': (p['eyeL']['x'] + p['eyeR']['x']) / 2, 'y': (p['eyeL']['y'] + p['eyeR']['y']) / 2} if p.get('eyeL') and p.get('eyeR') else None
+        d = min((dist(t, eyes) / face(p) for t in tips), default=None) if eyes else None
+        row('the palm over the eyes', d is not None and d <= G39_PALM, f'palm {d * 100:.0f} % of the face height from the eyes at {mid:g} s (most {G39_PALM * 100:g} %)' if d is not None else 'no flat hand shown')
+        row('the head dropped into the hand', p.get('pitch', 0) >= 0.3, f'head pitch {p.get("pitch", 0):g} at {mid:g} s (at least 0.3)')
+    elif name == 'salute':
+        p = g(mid)
+        best = min(((dist(p['tip' + k], p['brow' + k]) / face(p), k) for k in 'LR' if p.get('tip' + k) and p.get('chao' + k) and p.get('brow' + k)), default=None)
+        row('the flat hand at the brow', best is not None and best[0] <= G39_BROW, f'fingertip {best[0] * 100:.0f} % of the face height from the brow at {mid:g} s (most {G39_BROW * 100:g} %)' if best else 'no flat hand shown')
+    elif name == 'okSign':
+        p = g(mid)
+        tips = [p.get('tip' + k) for k in 'LR' if p.get('tip' + k)]
+        if not tips or not p.get('face'): row('the OK circle beside the face', False, 'no OK hand shown')
+        else:
+            t = tips[0]
+            dx, dy = abs(t['x'] - p['face']['x']) / p['face']['w'], abs(t['y'] - (p['eyeL']['y'] + p['eyeR']['y']) / 2) / face(p)
+            row('the OK circle beside the face', G39_OK[0] <= dx <= G39_OK[1] and dy <= 0.9, f'circle {dx:.2f} face widths out, {dy * 100:.0f} % of the face height off eye level at {mid:g} s')
+    elif name == 'wipeTears':
+        best = None
+        for t in c['times']:
+            p = g(t)
+            for k in 'LR':
+                if p.get('hand' + k) and p.get('ov' + k, 0) > 0.5 and p.get('eyeL') and p.get('eyeR'):
+                    d = min(dist(p['hand' + k], p['eyeL']), dist(p['hand' + k], p['eyeR'])) / face(p)
+                    if best is None or d < best: best = d
+        row('the hand at the eye', best is not None and best <= G39_EYE, f'hand {best * 100:.0f} % of the face height from an eye (most {G39_EYE * 100:g} %)' if best is not None else 'no hand raised to the face at the times asked')
+    elif name == 'laugh':
+        ps = [g(t) for t in c['times']]
+        sway = max(max(p.get(key, 0) for p in ps) - min(p.get(key, 0) for p in ps) for key in ('tilt', 'drop', 'shoulders', 'pitch'))
+        pitch = max(p.get('pitch', 0) for p in ps) - min(p.get('pitch', 0) for p in ps)
+        row('eyes squeezed, mouth wide open', max(p.get('eyesShut', 0) for p in ps) >= 0.6 and max(p.get('mouthOpen', 0) for p in ps) >= 0.5,
+            f'eyes shut {max(p.get("eyesShut", 0) for p in ps):g}, mouth {max(p.get("mouthOpen", 0) for p in ps):g}')
+        row('head and shoulders move with the laugh', sway >= G39_SWAY or pitch >= 0.5, f'channels move {sway:g} (shoulders / head), pitch {pitch:g}')
+    return out
+
+
 PAW_FLOOR = 0.04       # động tác thú (đợt 35): bàn chân thấp nhất (lăn ngửa: lưng) lệch đường sàn ≤ 4 % chiều cao con vật
 HIDE_HEAD = 0.60       # nấp: đầu thấy ≥ 60 % …
 HIDE_BODY = 0.90       # … mà con vật thấy ≤ 90 % — có phần khuất sau người ấy
@@ -1842,6 +1908,7 @@ def check_scene(folder):
             continue
         if c['kind'] == 'gesture':
             results.extend(check_gesture(folder, c, frames))
+            if c['name'] in G39: results.extend(check_gesture39(folder, c, scales))          # đợt 39 B
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
