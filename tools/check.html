@@ -69,7 +69,7 @@ try {
     try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.applyConfig(rig, { proportions: { headSize: 1.2 }, faceShape: { halfWidth: 44 } }); if (xau(rig.svg)) hong(k, 'broken SVG attributes after setColors / applyConfig'); }
     catch (e) { hong(k, 'setColors / applyConfig threw: ' + e.message); }
   }
-  for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC, ['exit', 'flop']); }       // đợt 40 B: `flop` (thỏ) là thế giữ tới `standUp`
+  for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC.filter((name) => !RigThu.WITH_WEAR.includes(name)), ['exit', 'flop']); }       // đợt 40 B: `flop` (thỏ) là thế giữ tới `standUp`; đợt 40 C: `pawAtCone` cần đang đeo loa — có bài kiểm riêng
 
   // Tính tất định: gieo cùng hạt phải ra cùng timeline.
   { const rig = new RigSVG(document.getElementById('san'), 'vet');
@@ -143,7 +143,7 @@ try {
   { const sweep = (rig, label) => {
       const keys = Object.keys(rig.NGHI), read = () => JSON.stringify(keys.map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k])));
       for (const name of rig.actions) {
-        if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name) || (rig.constructor.WITH_ITEM || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
+        if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name) || (rig.constructor.WITH_ITEM || []).includes(name) || (rig.constructor.WITH_WEAR || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
         L.seed(3); rig.reset();
         const step = name === 'point' ? [name, { x: 60, y: 80 }] : (name === 'speak' || name === 'explain') ? [name, 'xin chào bạn nhé một hai ba', 2.4] : name;
         const t = L.sequence(rig, ['idle', step, 'idle']), D = t.duration();
@@ -2240,6 +2240,31 @@ try {
         munch.kill();
         let nope = ''; try { bun.rollOver(); } catch (error) { nope = error.message; }
         if (!nope.includes('not for a rabbit')) hong('rollOver', 'a rabbit rolling over should be refused');
+        bun.svg.remove();
+        // đợt 40 C — thú ở phòng khám: sợ run, vùng vẫy, lừ đừ, cào loa (cần đang đeo loa); gặm cà rốt còn đoạn cuối
+        for (const species of ['dog', 'cat', 'rabbit']) {
+          const pet = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species }).rig;
+          const midOf = (steps, at) => { const seq = L.sequence(pet, steps, { breathe: false }); seq.time(at === 'end' ? seq.duration() : at); return seq; };
+          let seq = midOf([['shiverAtVet', 2]], 1.2); if (!(pet.s.truocY > 15 && pet.s.taiL < -1.5 && pet.s.lanh > 0.9)) hong(`${species}.shiverAtVet`, 'not crouched, ears flat, eyes wide at the middle'); seq.progress(1); seq.kill(); pet.datNghi();
+          seq = midOf([['groggy', 2.4]], 1.4); if (!(pet.s.dauY > 18 && pet.s.matY > 0.4 && pet.s.matY < 1)) hong(`${species}.groggy`, 'head not drooping with half-open eyes at the middle'); seq.progress(1); seq.kill(); pet.datNghi();
+          let wiggle = 0; seq = L.sequence(pet, [['struggle', 1.6]], { breathe: false }); for (let time = 0; time <= seq.duration(); time += 0.05) { seq.time(time); wiggle = Math.max(wiggle, Math.abs(pet.s.sauX)); }
+          if (wiggle < 6) hong(`${species}.struggle`, `the body does not wriggle on the floor (${wiggle.toFixed(1)})`); seq.kill(); pet.datNghi();
+          let refused = ''; try { pet.pawAtCone(); } catch (error) { refused = error.message; }
+          if (!refused.includes('not wearing the cone')) hong(`${species}.pawAtCone`, 'pawing at a cone the pet does not wear should be refused with a clear message');
+          pet.wear('cone');
+          let reach = 0; seq = L.sequence(pet, [['pawAtCone', 2]], { breathe: false }); for (let time = 0; time <= seq.duration(); time += 0.05) { seq.time(time); reach = Math.max(reach, pet.s.tnNhac); }
+          if (reach < 0.9) hong(`${species}.pawAtCone`, 'the front paw does not lift to the cone');
+          seq.progress(1); if (Math.abs(pet.s.tnNhac) > 1e-3 || Math.abs(pet.s.dau - pet.NGHI.dau) > 1e-3) hong(`${species}.pawAtCone`, 'does not end at rest'); seq.kill(); pet.svg.remove();
+        }
+        { // người bế giữ chặt: hai tay lắc theo `vung` của con vật trong tay
+          const boy = L.createCharacter(spot('left:0;top:0;width:300px;height:360px'), { id: 'boy' }).rig, cat2 = L.createPet(spot('left:150px;top:200px;width:150px;height:124px'), { species: 'cat' }).rig;
+          const hold = L.sequence(boy, [['carry', cat2], ['idle', 2.2]], { breathe: false }), wrestle = L.sequence(cat2, [1.3, ['struggle', 1.4, { carried: true }]], { breathe: false });
+          hold.time(1.6); const still = boy.el.batL.getAttribute('transform'); let moved = false;
+          for (let time = 1.7; time <= 2.6; time += 0.07) { wrestle.time(time); hold.time(time); if (boy.el.batL.getAttribute('transform') !== still) moved = true; }
+          if (!moved) hong('struggle', 'the arms of the person carrying the pet do not move with its struggle');
+          if (!cat2.isCarried()) hong('struggle', 'the struggling pet is no longer in the arms');
+          hold.kill(); wrestle.kill(); boy.svg.remove(); cat2.svg.remove();
+        }
         bun.svg.remove();
       }
       // Đợt 40 B — mèo & thỏ: rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn, cong lưng, chui hộp; nhảy vui, nằm vật, đứng hai chân, giật mũi.
