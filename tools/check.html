@@ -2281,7 +2281,7 @@ try {
         const rest = (rig, label) => { for (const key of ['ngoi', 'nam', 'phong', 'yarn', 'box', 'gp', 'nghieng', 'matY', 'taiL', 'truocY', 'sauY', 'tnNhac']) if (Math.abs(rig.s[key] - rig.NGHI[key]) > 0.02) hong(label, `does not end at rest (${key} ${rig.s[key].toFixed(2)}, rest ${rig.NGHI[key]})`); };
         for (const step of [['groomFace', 3], ['loaf', 2], ['slowBlink', 2], ['batToy', 3], ['archBack', 1.4], ['sitInBox', 2]]) {
           const run = L.sequence(cat, [step], { breathe: false });
-          let seen = 0, off = 0; for (let time = 0; time <= run.duration(); time += 0.05) { run.time(time); seen = Math.max(seen, cat.s.toy, cat.s.box, cat.s.phong, cat.s.gp); off = Math.max(off, Math.abs(cat.s.x)); }
+          let seen = 0, off = 0; for (let time = 0; time <= run.duration(); time += 0.05) { run.time(time); seen = Math.max(seen, cat.s.yarn, cat.s.box, cat.s.phong, cat.s.gp); off = Math.max(off, Math.abs(cat.s.x)); }
           run.progress(1); rest(cat, step[0]); if (Math.abs(cat.s.x) > 0.5) hong(step[0], `the cat does not end where it started (x ${cat.s.x.toFixed(1)})`);
           if (step[0] === 'sitInBox' && !(off > 60)) hong('sitInBox', `the cat does not move into the box (furthest ${off.toFixed(0)})`);
           if (['batToy', 'archBack', 'sitInBox', 'groomFace'].includes(step[0]) && seen < 0.9) hong(step[0], 'its prop / pose channel never reaches 1');
