@@ -2253,7 +2253,7 @@ try {
         }
         dog.svg.remove();
         const cat = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'calico' }).rig;
-        const rest = (rig, label) => { for (const key of ['ngoi', 'nam', 'phong', 'toy', 'box', 'gp', 'nghieng', 'matY', 'taiL', 'truocY', 'sauY', 'tnNhac']) if (Math.abs(rig.s[key] - rig.NGHI[key]) > 0.02) hong(label, `does not end at rest (${key} ${rig.s[key].toFixed(2)}, rest ${rig.NGHI[key]})`); };
+        const rest = (rig, label) => { for (const key of ['ngoi', 'nam', 'phong', 'yarn', 'box', 'gp', 'nghieng', 'matY', 'taiL', 'truocY', 'sauY', 'tnNhac']) if (Math.abs(rig.s[key] - rig.NGHI[key]) > 0.02) hong(label, `does not end at rest (${key} ${rig.s[key].toFixed(2)}, rest ${rig.NGHI[key]})`); };
         for (const step of [['groomFace', 3], ['loaf', 2], ['slowBlink', 2], ['batToy', 3], ['archBack', 1.4], ['sitInBox', 2]]) {
           const run = L.sequence(cat, [step], { breathe: false });
           let seen = 0, off = 0; for (let time = 0; time <= run.duration(); time += 0.05) { run.time(time); seen = Math.max(seen, cat.s.toy, cat.s.box, cat.s.phong, cat.s.gp); off = Math.max(off, Math.abs(cat.s.x)); }
