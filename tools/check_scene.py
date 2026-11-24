@@ -1370,7 +1370,9 @@ with tempfile.TemporaryDirectory() as work:
     # chuỗi giữ chỗ '__OUTRO_START__', ra `set.cut("__OUTRO_START__")` và trang báo "set.cut: unknown camera key "0"" (thợ dựng video tìm ra).
     outro42 = {'id': 'outro42', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'outro': {'title': 'VetGo', 'text': 'Chăm boss mỗi ngày'},
                'characters': [{'name': 'me', 'id': 'manager', 'x': -300, 'z': -560}, {'name': 'meo', 'species': 'cat', 'x': 0, 'z': -560}, {'name': 'cho', 'species': 'corgi', 'x': 300, 'z': -560}],
-               'script': [{'who': 'me', 'say': 'Mèo nhà mình thích chui hộp lắm.', 'dur': 2}, {'who': 'meo', 'do': ['sitInBox']}, {'who': 'cho', 'do': ['playBow']}]}
+               'script': [{'who': 'me', 'say': 'Mèo nhà mình thích chui hộp lắm.', 'dur': 2}, {'who': 'meo', 'do': ['sitInBox']},
+                          # đợt 42: lời dẫn đè lên hình — "view" trên cả nhóm `together`: máy vào con chó trong lúc người mẹ nói
+                          {'together': [{'who': 'me', 'say': 'Còn cún thì rủ chơi suốt.', 'dur': 2}, {'who': 'cho', 'do': ['playBow']}], 'view': {'on': ['cho'], 'size': 'close', 'alone': True, 'fill': 0.62}}]}
     path = os.path.join(os.path.dirname(stage), '_check_outro42.json')
     try:
         json.dump(outro42, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -1381,6 +1383,7 @@ with tempfile.TemporaryDirectory() as work:
     else:
         html = open(os.path.join(work, 'outro42', 'index.html'), encoding='utf-8').read()
         if '__OUTRO' in html or 'set.cut("' in html: problems.append('outro42: a camera cut is given the outro placeholder instead of the start view')
+        if 'frameAt(T0 + talk.turns[2].start, [cho], "close"' not in html: problems.append('outro42: the "view" on the "together" entry does not point the camera at the dog during the voice-over')
 
     # ĐỢT 41 — COMBO CHO ĐỢT 38–40: chăm sóc tổng hợp + chuẩn bị khám; tiêm có y tá giữ; thanh toán tại quầy; tiễn khách + ăn mừng cùng bé
     # + chó / mèo / thỏ. Mỗi cảnh phải qua acting_check, composition không còn tên combo; chữ: "chuẩn bị khám", "chó vui"… ra đúng bước.

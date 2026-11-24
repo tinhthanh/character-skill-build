@@ -22,6 +22,10 @@ method, in `sequence()`, in scene files, in Vietnamese scripts and in the action
   That makes 16 combos. Scripts: "spa thú cưng", "chuẩn bị khám", "tiêm có người giữ", "thanh toán tại quầy", "tiễn khách",
   "ăn mừng cùng bé", "chó vui", "mèo thư giãn", "thỏ vui".
 - **Person actions**: 124 in all (`pullToy`).
+- **Voice-over shots**: a `"view"` on a `together` entry points the camera for the whole group, so a narrator's line plays
+  over the action it describes, and the camera stays on the pet instead of cutting to the speaker. Example:
+  `{ "together": [{ "who": "mom", "say": "…" }, { "who": "cat", "do": ["sitInBox"] }], "view": { "on": ["cat"], "size": "close", "alone": true } }`.
+  Before, a `view` inside `together` was refused, so the narration and the action had to follow each other.
 - **CI scenes**: `pets40a`, `pets40a-park`, `pets40b`, `clinic40`, `living40`, `groom41`, `vacc41`, `desk41`, `far41`, `home41`.
 
 Trial films (`/Users/vetgo/Movies/character-skill-trials/`):

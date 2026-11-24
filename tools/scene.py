@@ -79,7 +79,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "holdsHidden"; a single "holds" item sits in the hand on the side of whoever it is handed to / taken from).
                A character that strokes or hands over walks up to the target first if it stands out of reach; a pet
                walks over to a SEATED person (give the pet the same z). `shot`: "face" | "wide" | false | ["vet", "bella"]
-               overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time.
+               overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time; a "view" on the
+               "together" entry itself points the camera for the whole group — a voice-over: `{ "together": [ { "who": "mom",
+               "say": "…" }, { "who": "cat", "do": ["sitInBox"] } ], "view": { "on": ["cat"], "size": "close", "alone": true } }`.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
                crying, embarrassed, sleepy. A PET's "mood": happy, excited, sad, scared, angry, curious, guilty,
                pain, sleepy — alone it is one beat of that face; with "do" the pet keeps the face through those
@@ -2511,9 +2513,14 @@ def main():
             toasts.append({'turn': emitted[0], 'title': note.get('title', ''), 'text': note.get('text', '')})
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
-            known(where, entry, ('together',))
+            known(where, entry, ('together', 'view'))
             if not isinstance(entry['together'], list) or not entry['together']: fail(f'{where}: "together" must be a non-empty list of turns')
-            if any(isinstance(turn, dict) and 'view' in turn for turn in entry['together']): fail(f'{where}: "view" cannot sit inside "together" — put it on a turn of its own, before or after')
+            if any(isinstance(turn, dict) and 'view' in turn for turn in entry['together']): fail(f'{where}: "view" cannot sit inside "together" — put it on the "together" entry itself (one camera for the whole group), or on a turn of its own')
+            # ĐỢT 42: GÓC MÁY CHO CẢ NHÓM — lời dẫn đè lên hình (voice-over): `{ "together": [ { người nói }, { con vật diễn } ], "view": { "on": ["meo"], "size": "close" } }`
+            # — máy quay vào động tác trong lúc người kia nói, không cắt sang người nói. Chỉ dạng đối tượng (không có "who" chung để hiểu "close").
+            if 'view' in entry:
+                if not isinstance(entry['view'], dict): fail(f'{where}: "view" on a "together" entry must be an object — {{ "on": [names], "size": "close" | "medium" | "full" }} or camera values')
+                view_of(entry, where)
             emitted[0] += len(entry['together'])
             turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
         else:
