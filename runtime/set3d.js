@@ -718,6 +718,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (from < to && together(item.actor, pet.actor)) { shown.splice(from, 1); shown.splice(shown.indexOf(item) + 1, 0, pet); }
         }
       }
+      // HAI NGƯỜI (đợt 38 C: thì thầm, vỗ vai — `rig.s.pairFront`): người ấy lên TRƯỚC người đang cùng diễn (`rig.pairList[pairSlot]`)
+      // khi hai người đứng sát nhau — miệng, bàn tay khum, bàn tay trên vai không khuất sau đầu / tóc người kia.
+      const partnerOf = (rig) => rig.pairList && rig.pairList[Math.round(rig.s.pairSlot || 0)];
+      for (const item of shown.filter((entry) => isPerson(entry.actor) && entry.actor.rig.s && entry.actor.rig.s.pairFront > 0.5 && partnerOf(entry.actor.rig))) {
+        const from = shown.indexOf(item), to = shown.findIndex((entry) => entry.actor.rig === partnerOf(item.actor.rig));
+        if (to > from && together(item.actor, shown[to].actor)) { shown.splice(from, 1); shown.splice(to, 0, item); }
+      }
       // Đèn trong tay (đèn soi, đèn pin): tìm trước khi chiếu sáng từng nhân vật.
       if (lighting) { findTorches(); for (const torch of lighting.torches) aimTorch(torch); if (lighting.torches.some((t) => t.kind === 5)) findTorches(); torchPools(); for (const actor of actors) squint(actor); }
       for (let index = 0; index <= shown.length; index++) {

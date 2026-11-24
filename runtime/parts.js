@@ -182,3 +182,20 @@ export function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff'
           <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
         </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
 }
+
+/**
+ * TÚI THUỐC (đợt 38 C): túi giấy nhỏ của nhà thuốc, cầm ở QUAI — thân túi treo dưới bàn tay; dải màu phòng khám và một dấu
+ * cộng trắng trên vòng tròn. `data-bag` để `handOverBag` / `takeBag` nhận ra. Hệ toạ độ như các món khác (−y là phía trên).
+ */
+export function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-bag="1" transform="translate(0 10) rotate(90)">
+          <path d="M -6 3 Q -6 -8 0 -8 Q 6 -8 6 3" fill="none" stroke="#c9b48f" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M -15 3 L 15 3 L 16.5 40 Q 0 42 -16.5 40 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -15 3 L 15 3 L 15.2 8 L -15.2 8 Z" fill="#e8e3d8" stroke="${line}" stroke-width=".7"/>
+          <path d="M -15.6 30 L 15.6 30 L 16.1 36 L -16.1 36 Z" fill="${band}"/>
+          <circle cx="0" cy="19" r="7.5" fill="${band}"/>
+          <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
+}

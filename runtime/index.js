@@ -16,7 +16,7 @@ import { dangKyDau, KIT } from './characters.js';
 import { createProp, PROP_KINDS } from './props.js';
 import { child, teen, adult, tall, stocky } from './bodies.js';
 import { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald } from './hair.js';
-import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash } from './parts.js';
+import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash, bag } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
@@ -81,7 +81,7 @@ export const kit = {
   nameTag: KIT.theTen, pawPrint: KIT.dauChan, stethoscope: KIT.ongNgheVatCo,
   bodies: { child, teen, adult, tall, stocky },
   hair: { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald },
-  parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash },
+  parts: { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash, bag },
   partsOf(id) {
     if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] partsOf("${id}"): no such character (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
     return definitionToPublic(RigSVG.NHAN_VAT[id]);
@@ -241,7 +241,7 @@ export function applyConfig(rig, config) {
 }
 
 // Món đồ có sẵn để cho nhân vật cầm bằng tên: createCharacter(host, { id, items: { R: 'cup' } }).
-const ITEMS = { cup, clipboard, phone, syringe, pills, leash };
+const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.
@@ -336,6 +336,7 @@ export function list() {
 // Các bước CÓ LỜI, và quãng "về chỗ" (miệng đã khép, tay đang thu về) ở cuối mỗi bước ấy.
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
+const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 // Kênh của thế NHÌN THEO (`lookAt`, đợt 36) và các bước KHÔNG thả nó ra.
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
@@ -843,6 +844,15 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       const names = Array.isArray(only) ? only.slice(1).map((step) => (Array.isArray(step) ? step[0] : step)) : [];
       if (names[0] === 'enter' && !names.some((name) => SPEECH_STEPS.includes(name)) && only[0] !== lastLine.rig) begin = Math.max(lastLine.start + 0.5, clock - 1.2);
     }
+    // ĐỢT 38 C — HAI NGƯỜI CÙNG DIỄN (đập tay, ôm, vỗ vai, thì thầm, đưa túi): mọi người trong `together` bắt đầu ĐÚNG CÙNG LÚC. Người vừa
+    // nói xong lượt trước còn đang "về chỗ" (lượt sau được gối lên quãng ấy) thì cả nhóm chờ người ấy — không thì hai bàn tay lệch nhịp.
+    const synced = (turn) => { const steps = turn && !Array.isArray(turn) && Array.isArray(turn.turn) ? turn.turn : turn; return Array.isArray(steps) && steps.slice(1).some((step) => Array.isArray(step) && PAIR_SYNC.includes(step[0])); };
+    if (parallel.length > 1 && parallel.some(synced)) {
+      for (const turn of parallel) {
+        const rig = (turn && !Array.isArray(turn) && Array.isArray(turn.turn) ? turn.turn : turn)[0], known = rig && cast.get(rig);
+        if (known && known.used) begin = Math.max(begin, known.end + stepGap);
+      }
+    }
     const moved = [];
     let finish = begin, spokeLast = null;
     for (let turn of parallel) {
@@ -853,7 +863,7 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       const [rig, ...written] = turn, mine = part(rig);
       // `face`, `handOver`, `take`, `stroke` nhận một NHÂN VẬT KHÁC làm đích: thay bằng mỏ neo (xem `anchor`).
       // `handshake` cũng thế (đợt 28): không thì tay chìa về chỗ người kia đứng lúc đầu cảnh. Trao / nhận con vật cũng thế (đợt 29).
-      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake', 'handOverPet', 'takePet'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
+      const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake', 'handOverPet', 'takePet', 'highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
@@ -928,7 +938,7 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       // không thấy bàn tay và bên kia — về toàn cảnh.
       // Cả `write`: viết vào bìa kẹp diễn ra ngang bụng, cận mặt thì không thấy gì.
       // Bắt tay cũng thế: hai bàn tay gặp nhau ngang hông, cận mặt thì cắt mất (đợt 28).
-      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write', 'handshake'].includes(step.name));
+      const reaching = turn.steps.find((step) => ['handOver', 'take', 'stroke', 'write', 'handshake', 'highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'].includes(step.name));
       if (reaching && !spoken.length && turn.shot === undefined && aimed && aimed !== 'wide') goWide(reaching.start);
       if (!spoken.length && turn.shot === undefined) {
         if (aimed && aimed !== 'wide' && !inFrame.includes(turn.rig)) {

@@ -95,7 +95,7 @@ def main():
     const list = (isPet ? catalog.pets : catalog.people).filter((entry) => !entry.species || entry.species === kind);
     for (const entry of list) {{
       const parts = [];
-      let rig, pet = null, scale = null;
+      let rig, pet = null, scale = null, person = null;
       if (isPet) {{
         const h = personH * 0.6, w = h * 300 / 248;
         const host = add('pet', `left:${{{WIDTH} / 2 - w / 2}}px;top:${{{HEIGHT} * 0.86 - h}}px;width:${{w}}px;height:${{h}}px`);
@@ -109,8 +109,14 @@ def main():
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
         rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
-        if (turned) rig.state.facing = 0.55;
+        if (turned && !entry.person) rig.state.facing = 0.55;
         parts.unshift(host);
+        // HAI NGƯỜI (đợt 38 C): người `entry.person` đứng bên phải, cách tâm `personGap` (đơn vị ô 235 px của bản duyệt), cỡ `personScale`.
+        if (entry.person) {{
+          const h = personH * (entry.personScale || 1), w = h * 400 / 470, cx = personX + personW / 2 + (entry.personGap || 84) * personH / 235;
+          const personHost = add('host', `left:${{cx - w / 2}}px;top:${{personY + personH - h}}px;width:${{w}}px;height:${{h}}px`);
+          person = VGCharacter.createCharacter(personHost, {{ id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }}).rig; parts.push(personHost);
+        }}
         // "scale" (đợt 35, `weigh`): một cái cân trên sàn bên trái người — `@scale` trong các bước.
         if (entry.scale) {{
           const scaleHost = add('scale', `left:${{personX - personW * 0.31}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
@@ -122,8 +128,9 @@ def main():
       count++;
       label.innerHTML = `${{String(count).padStart(2, '0')}} · ${{entry.label.replace(/</g, '&lt;')}}<small>${{id}}${{turned ? ' · turned 3/4' : ''}}</small>`;
       parts.push(label);
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg)) : step));
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
       const line = VGCharacter.sequence(rig, steps);
+      if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD});
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};
       // Chỉ hiện trong khung giờ của mình. `visibility` bằng set của timeline: tua tới / tua lui đều đúng.
       tl.set(parts, {{ visibility: 'visible' }}, start).set(parts, {{ visibility: 'hidden' }}, end);

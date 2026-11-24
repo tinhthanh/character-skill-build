@@ -1,5 +1,5 @@
 {
-  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species), person (pets: a person of that id standing beside the pet, \"@person\" in the steps; personSteps: what the person does at the same time, \"@pet\" is the pet; personAt: the person's centre in px of the cell, default 150). Points are in the 400 × 470 frame.",
+  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species), person (pets: a person of that id standing beside the pet, \"@person\" in the steps; personSteps: what the person does at the same time, \"@pet\" is the pet; personAt: the person's centre in px of the cell, default 150). People rows may have a second person too (wave 38 C — two people together): person, personSteps (\"@self\" is the row's character), personGap (centre to centre in px of a 235 px tall cell, default 84), personScale (0.75 for a child), personItems / personItemsHidden (what the second person holds). Points are in the 400 × 470 frame.",
   "people": [
     { "label": "idle", "steps": [["idle", 1.6]] },
     { "label": "wave", "steps": ["wave"] },
@@ -112,7 +112,15 @@
     { "label": "combo badNews", "steps": ["badNews"]},
     { "label": "combo waitingImpatient", "steps": ["waitingImpatient"]},
     { "label": "combo fullCheckup (pet)", "steps": [["fullCheckup", "@pet"]], "pet": "cat", "items": { "R": "clipboard" }, "itemsHidden": true},
-    { "label": "combo vaccinationVisit (pet on a scale)", "steps": [["vaccinationVisit", "@pet", "@scale"]], "pet": "cat", "scale": "4.2 kg", "items": { "R": "syringe" }, "itemsHidden": true }
+    { "label": "combo vaccinationVisit (pet on a scale)", "steps": [["vaccinationVisit", "@pet", "@scale"]], "pet": "cat", "scale": "4.2 kg", "items": { "R": "syringe" }, "itemsHidden": true },
+    { "label": "highFive (person)", "steps": [["highFive", "@person"]], "person": "nurse", "personSteps": [["highFive", "@self"]], "personGap": 103 },
+    { "label": "highFive (child)", "steps": [["highFive", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["highFive", "@self"]], "personGap": 78 },
+    { "label": "hug (person)", "steps": [["hug", "@person"]], "person": "nurse", "personSteps": [["hug", "@self"]], "personGap": 80 },
+    { "label": "hug (child)", "steps": [["hug", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["hug", "@self"]], "personGap": 70 },
+    { "label": "patShoulder (person)", "steps": [["patShoulder", "@person"]], "person": "granny", "personSteps": [["lookAt", "@self", { "hold": 2.4 }]], "personGap": 75 },
+    { "label": "whisper (person)", "steps": [["whisper", "@person"]], "person": "nurse", "personSteps": [["hearWhisper", "@self"]], "personGap": 80 },
+    { "label": "whisper (child)", "steps": [["whisper", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["hearWhisper", "@self"]], "personGap": 70 },
+    { "label": "handOverBag (person)", "steps": [["handOverBag", "@person"]], "items": { "R": "bag" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["takeBag", "@self"]], "personGap": 94 }
   ],
   "pets": [
     { "label": "idle", "steps": [["idle", 1.6]] },

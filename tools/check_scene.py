@@ -1155,6 +1155,75 @@ with tempfile.TemporaryDirectory() as work:
         if steps != want: problems.append(f'script.py combos: steps {steps}, want {want}')
         if vet.get('holds') != 'syringe' or not any(c.get('kind') == 'scale' for c in made['set'].get('cutouts', [])): problems.append('script.py combos: "tiêm phòng" did not give the vet a syringe and a scale')
 
+    # ĐỢT 38 C — HAI NGƯỜI VỚI NHAU. pairs38 (quầy lễ tân, cùng độ sâu): bác sĩ đưa túi thuốc cho bà (bà tự có túi đang cất), vỗ vai bà (bà
+    # quay lại nhìn), đập tay bé trai (bác sĩ quỳ xuống — tay trẻ con chibi chỉ tới ngang vai), bé ôm bác sĩ, bác sĩ thì thầm với bé.
+    # exam38 (phòng khám, hai độ sâu −560 / −580, một bé gái nhỏ hơn): y tá thì thầm với chủ nuôi, chủ nuôi ôm y tá, y tá đưa túi thuốc rồi
+    # đi ra; chủ nuôi vỗ vai bé gái (quỳ xuống), đập tay bé, bé thì thầm với chủ nuôi (chủ nuôi hạ người xuống nghe).
+    pair_scenes = {
+        'pairs38': {'id': 'pairs38', 'camera': 'auto', 'set': {'preset': 'reception'}, 'characters': [
+            {'name': 'vet', 'id': 'vet', 'x': -150, 'z': -380, 'holds': 'bag', 'faces': 'granny'}, {'name': 'granny', 'id': 'granny', 'x': 150, 'z': -380, 'faces': 'vet'},
+            {'name': 'boy', 'id': 'boy', 'x': 640, 'z': -380, 'faces': 'vet'}],
+            'script': [{'who': 'vet', 'say': 'Here is the medicine for Bella.', 'dur': 1.8}, {'who': 'vet', 'do': [['handOverBag', '@granny']]},
+                       {'who': 'granny', 'say': 'Thank you, doctor.', 'dur': 1.5}, {'who': 'vet', 'do': [['patShoulder', '@granny']]},
+                       {'who': 'vet', 'do': [['highFive', '@boy']]}, {'who': 'boy', 'do': [['hug', '@vet']]}, {'who': 'vet', 'do': [['whisper', '@boy']]}]},
+        'exam38': {'id': 'exam38', 'camera': 'auto', 'set': {'preset': 'exam'}, 'characters': [
+            {'name': 'nurse', 'id': 'nurse', 'x': -150, 'z': -560, 'holds': 'bag', 'faces': 'owner'}, {'name': 'owner', 'id': 'manager', 'x': 260, 'z': -580, 'faces': 'nurse'},
+            {'name': 'girl', 'id': 'girl', 'x': 650, 'z': -580, 'height': 420, 'faces': 'owner'}],
+            'script': [{'who': 'nurse', 'do': [['whisper', '@owner']]}, {'who': 'owner', 'say': 'Really? She is all better?', 'mood': 'surprised', 'dur': 1.8},
+                       {'who': 'owner', 'do': [['hug', '@nurse']]}, {'who': 'nurse', 'do': [['handOverBag', '@owner']]},
+                       {'who': 'nurse', 'say': 'Twice a day, after meals.', 'dur': 1.8, 'exit': 'left'}, {'who': 'owner', 'do': [['patShoulder', '@girl']]},
+                       {'who': 'owner', 'do': [['highFive', '@girl']]}, {'who': 'girl', 'do': [['whisper', '@owner']]}]}}
+    pair_needles = {'pairs38': ('{ together: [[vet, ["handOverBag", granny]], [granny, ["takeBag", vet]]] }', 'items: {"L": "bag"}, itemsHidden: true',
+                                "[granny, ['lookAt', set.target(granny, vet, 'head'), { hold: 2.6, up: 1.5 }]]", '{ together: [[vet, ["highFive", boy]], [boy, ["highFive", vet]]] }',
+                                '{ together: [[boy, ["hug", vet]], [vet, ["hug", boy]]] }', '{ together: [[vet, ["whisper", boy]], [boy, ["hearWhisper", vet]]] }'),
+                    'exam38': ('[owner, ["hearWhisper", nurse]]', '[owner, ["takeBag", nurse]]', "[girl, ['lookAt', set.target(girl, owner, 'head'), { hold: 2.6, up: 1.5 }]]")}
+    pair_measures = ('handOverBag granny — both hold the bag', 'handOverBag granny — the bag passes hand to hand', 'patShoulder granny — hand on the shoulder',
+                     'granny looks back (patShoulder) — head turned', 'highFive boy — the hands meet, raised', 'boy hug vet — arms round each other',
+                     'vet whisper boy — mouth at the ear', 'boy looks back (whisper)', 'vet handOverBag — head turned to granny')
+    for name, scene in pair_scenes.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
+        try:
+            json.dump(scene, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
+        for needle in pair_needles[name]:
+            if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-900:])
+        elif name == 'pairs38':
+            for needle in pair_measures:
+                if needle not in done.stdout: problems.append(f'pairs38: acting_check did not measure "{needle}"')
+    # Hai người sai cách: bị từ chối với một câu nói rõ.
+    base38 = pair_scenes['pairs38']
+    for label, change, needle in [('bag without a bag', lambda sc: sc['characters'][0].pop('holds'), 'needs a medicine bag in hand'),
+                                  ('high five at a pet', lambda sc: (sc['characters'].append({'name': 'cat', 'species': 'cat', 'x': 400, 'z': -380}), sc.__setitem__('script', [{'who': 'vet', 'do': [['highFive', '@cat']]}])), 'needs the other person'),
+                                  ('whisper to nobody', lambda sc: sc.__setitem__('script', [{'who': 'vet', 'do': ['whisper']}]), 'needs the other person'),
+                                  ('take a bag never put away', lambda sc: sc.__setitem__('script', [{'together': [{'who': 'boy', 'do': [['takeBag', '@vet']]}, {'who': 'vet', 'do': ['nod']}]}]), 'put-away medicine bag')]:
+        bad = json.loads(json.dumps(base38)); bad['id'] = 'bad38'; change(bad)
+        path = os.path.join(os.path.dirname(stage), '_check_bad38.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad38'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'two people ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # Kịch bản chữ: "đưa túi thuốc" (bác sĩ tự có túi), "an ủi", "đập tay", "ôm", "thì thầm".
+    text = os.path.join(work, 'pairs38.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: lễ tân\nbác sĩ (vet) · bà (granny) · bé trai (boy)\n\nbác sĩ → bà: đưa túi thuốc\nbác sĩ → bà: an ủi\n'
+                                            'bác sĩ → bé trai: đập tay\nbé trai → bác sĩ: ôm\nbác sĩ → bé trai: thì thầm\nbà → bác sĩ: vỗ vai\nbé trai → bà: nói nhỏ\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py two people: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'pairs38.scene.json'), encoding='utf-8'))
+        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = [['handOverBag', '@ba'], ['patShoulder', '@ba'], ['highFive', '@be_trai'], ['hug', '@bac_si'], ['whisper', '@be_trai'], ['patShoulder', '@bac_si'], ['whisper', '@ba']]
+        if steps != want: problems.append(f'script.py two people: steps {steps}, want {want}')
+        vet = next((c for c in made['characters'] if c.get('id') == 'vet'), {})
+        if vet.get('holds') != 'bag' or vet.get('holdsHidden'): problems.append('script.py two people: "đưa túi thuốc" did not give the vet a medicine bag in hand')
+
 for problem in problems: print(f'  ✗ scene: {problem}')
 print('scene: PASS' if not problems else f'scene: FAIL ({len(problems)} problems)')
 sys.exit(1 if problems else 0)
