@@ -2087,6 +2087,8 @@ export class RigSVG {
       for (const [k, g] of Object.entries(e.tay[ben])) {
         const op = chon === 'mo' ? (k === (dangXoe ? 'xoe' : 'mo') ? 1 : 0) : (k === chon ? 1 : 0);
         g.setAttribute('opacity', op);
+        // ĐỢT 39 B: ba hình mới dài / rộng hơn bàn tay thường — không hiện thì BỎ HẲN khỏi khung (`drawnRect` đo cả hình đang mờ).
+        if (HANDS_39.includes(k)) g.style.display = op ? '' : 'none';
       }
       // Ngửa/sấp cẳng tay: khi bàn tay hướng LÊN (giơ tay, vẫy) cẳng tay xoay ngửa nên
       // ngón cái phải nằm phía TRONG (về phía đầu). Tính "độ hướng lên" của cẳng tay,
