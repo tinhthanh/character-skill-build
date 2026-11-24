@@ -565,6 +565,7 @@ PET_SHARE = 0.35       # (lượt ba) lượt động tác riêng của thú: h�
 TONGUE_LONG = 0.25     # lưỡi lúc chạm đích dài ≥ 1/4 chiều cao đầu
 CLOSE_ACTS = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
 CLOSE_ACTS += ('playBow', 'howl', 'dig', 'carryToy', 'tugOfWar')       # đợt 40 A
+CLOSE_ACTS += ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')       # đợt 40 C
 PET_JUMP = 0.05            # (lượt bốn) giữa hai khung liền nhau (1/30 s) con vật được bế / bàn tay chìa cho liếm dời ≤ 5 % chiều cao người, ĐO SO VỚI
                        # NGƯỜI ẤY (máy quay lia / đổi cỡ thì cả hai cùng dời) — nhấc lên ngực trong 0,6 s nhanh nhất ~4 %; dịch tức thời thì hơn nhiều
 HAND_ON_FACE = 0.15    # … bàn tay chìa cho liếm che ≤ 15 % khung đầu con vật (không đè lên mặt nó)
@@ -669,6 +670,129 @@ def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `chec
         amp = (max(w) - min(w)) / mean
         return ok_('the nose twitches fast', flips >= TWITCH_N and amp >= 0.15, f'the nose swells and shrinks {flips} times (least {TWITCH_N}), by {amp * 100:.0f} % of its width (least 15 %) over {len(w)} frames')
     return []
+# ĐỢT 40 C — thú ở phòng khám: tư thế đạt được và GIỮ ≥ 1 s (người chấm xem ~1 khung / giây), đủ lớn trong khung, đo bằng khung hình vẽ.
+CLINIC_40 = ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')
+CROUCH_40 = 0.4        # sợ run: bốn chân gập — khoảng đáy lưng → đáy bàn chân ngắn đi ≥ 40 % so với lúc đứng …
+HOLD_40 = 1.0          # … và giữ tư thế ≥ 1 s liền
+SHAKE_40 = 10          # sợ run: thân đổi chiều lắc ≥ 10 lần
+SHAKE_AMP_40 = 0.008   # … mỗi lần lệch ≥ 0,8 % bề ngang thân
+DROOP_40 = 0.08        # lừ đừ: đầu thấp hơn lúc đứng ≥ 8 % chiều cao khung lưng (trên bàn chân), giữ ≥ 1 s
+WRITHE_40 = 6          # vùng vẫy: đầu đổi chiều ≥ 6 lần
+WRITHE_AMP_40 = 0.04   # … mỗi lần ≥ 4 % bề ngang đầu
+ARMS_40 = 0.45         # vùng vẫy trong tay: đầu con vật cách bàn tay gần nhất ≤ 45 % chiều cao người bế ở MỌI khung
+HANDS_40 = 0.008       # … và hai bàn tay lắc theo (khoảng dịch ≥ 0,8 % chiều cao người)
+CONE_RING = (0.8, 1.45)    # cào loa: tâm bàn chân trước nằm ở 0,8–1,45 lần bán kính elip nội tiếp khung loa (sát mép vành)
+CONE_TOUCH_40 = 3      # … ở ≥ 3 mốc đo
+LICK_SIZE_40 = 0.075   # liếm (đợt 40 C): lưỡi dài nhất ≥ 7,5 % (bản cũ: mèo 6,2 %) chiều cao KHUNG HÌNH (đọc được ở cỡ cảnh)
+LICK_HOLD_40 = 0.3     # … và nằm trên bàn tay / má ≥ 0,3 s liền
+CARROT_BIG_40 = 0.1    # cà rốt (đợt 40 C): củ nguyên dài ≥ 10 % chiều cao khung hình
+CARROT_HOLD_40 = 0.6   # … mỗi độ dài giữ ≥ 0,6 s (bậc nào cũng thấy ở ~1 khung / giây)
+
+
+def run_length(flags, dt):
+    """Đoạn LIỀN dài nhất (giây) của các mốc đúng trong `flags`, cách nhau `dt` giây."""
+    best = cur = 0
+    for f in flags:
+        cur = cur + 1 if f else 0
+        best = max(best, cur)
+    return best * dt
+
+
+def reversals(values, least):
+    """Số lần đổi chiều của dãy mà mỗi đoạn đi ≥ `least` (bỏ mọi dao động nhỏ hơn)."""
+    turns, last, direction = 0, None, 0
+    for v in values:
+        if v is None: continue
+        if last is None: last = v; continue
+        d = v - last
+        if abs(d) >= least:
+            sign = 1 if d > 0 else -1
+            if direction and sign != direction: turns += 1
+            direction, last = sign, v
+        elif (direction > 0 and v > last) or (direction < 0 and v < last): last = v
+    return turns
+
+
+def check_clinic40(folder, c, frames, track):
+    """ĐỘNG TÁC THÚ Ở PHÒNG KHÁM (đợt 40 C): sợ run — thụp thấp (≥ 8 %) giữ ≥ 1 s, thân rung ≥ 10 nhịp; vùng vẫy — đầu quay qua lại, con vật
+    GIỮ NGUYÊN trong tay người bế (đầu cách bàn tay ≤ 45 % chiều cao người), hai tay lắc theo; lừ đừ — đầu rũ thấp hơn lưng ≥ 5 % giữ ≥ 1 s,
+    thân đung đưa; cào loa — bàn chân trước chạm vành loa ≥ 3 mốc, rồi ngồi xuống."""
+    who, name, out = c['who'], c['name'], []
+    what = f'{who} {name}'
+    seq = [(t, f.get(who)) for t, f in zip(c.get('samples', []), track or [])]
+    seq = [(t, a) for t, a in seq if a and a.get('parts')]
+    if len(seq) < 5: return [{'scene': folder, 'what': f'{what} — measured', 'ok': False, 'note': f'only {len(seq)} frames of {who} measured'}]
+    dt = (seq[-1][0] - seq[0][0]) / (len(seq) - 1)
+    span = lambda a: (min(b['y0'] for b in a['parts'].values()), max(b['y1'] for b in a['parts'].values()))
+    height = lambda a: span(a)[1] - span(a)[0]
+    norm = lambda a: (a['ground'] - span(a)[0]) / (a.get('tall') or 1)        # ĐỈNH ĐẦU cao bao nhiêu trên sàn, theo chiều cao con vật trên màn hình (máy quay zoom thì số điểm ảnh đổi; thân hạ xuống thì cả đầu lẫn lưng cùng hạ nên không đo bằng khung đầu + lưng)
+    cx = lambda b: (b['x0'] + b['x1']) / 2
+    cy = lambda b: (b['y0'] + b['y1']) / 2
+    start = seq[0][1]
+    # BỐN CHÂN CÒN DUỖI BAO NHIÊU: khoảng từ đáy lưng tới đáy bàn chân, theo chiều cao khung lưng — không phụ thuộc máy quay (cắt cảnh / zoom giữa chừng); thụp / ngồi thì chân gập, khoảng ấy ngắn lại
+    leg = lambda a: ((max(p['y1'] for p in a['paws']) - a['parts']['back']['y1']) / max(1, a['parts']['back']['y1'] - a['parts']['back']['y0'])) if a.get('paws') and (a.get('parts') or {}).get('back') else 0
+    if name == 'shiverAtVet':
+        base = leg(start)
+        low = [(base - leg(a)) / base >= CROUCH_40 if base else False for t, a in seq]
+        best = max((base - leg(a)) / base for t, a in seq) if base else 0
+        held = run_length(low, dt)
+        out.append({'scene': folder, 'what': f'{what} — crouches low and holds it', 'ok': held >= HOLD_40,
+                    'note': f'{who} has its legs folded {best * 100:.0f} % shorter than standing (back to paws; least {CROUCH_40 * 100:g} %), kept {held:.1f} s (least {HOLD_40:g} s)'})
+        xs = [cx(a['parts']['head']) for t, a in seq if a['parts'].get('head')]          # đầu lệch nhiều nhất khi cả người rung
+        wide = max((a['parts']['back']['x1'] - a['parts']['back']['x0'] for t, a in seq if a['parts'].get('back')), default=1)
+        turns = reversals(xs, SHAKE_AMP_40 * wide)
+        out.append({'scene': folder, 'what': f'{what} — the whole body shivers', 'ok': turns >= SHAKE_40,
+                    'note': f'the body changes direction {turns} times by at least {SHAKE_AMP_40 * 100:g} % of its width (least {SHAKE_40}) over {len(xs)} frames'})
+    elif name == 'groggy':
+        # ĐẦU CAO BAO NHIÊU trên bàn chân (tâm khung đầu → đáy bàn chân) theo chiều cao khung lưng — đầu rũ thì con số này nhỏ đi
+        lift = lambda a: ((max(p['y1'] for p in a['paws']) - cy(a['parts']['head'])) / max(1, a['parts']['back']['y1'] - a['parts']['back']['y0'])) if a.get('paws') and a['parts'].get('head') and a['parts'].get('back') else None
+        rel = [lift(a) for t, a in seq]
+        ok_rel = [r for r in rel if r is not None]
+        if ok_rel:
+            first = sum(ok_rel[:3]) / min(3, len(ok_rel))
+            drooped = [r is not None and first - r >= DROOP_40 for r in rel]
+            held = run_length(drooped, dt)
+            out.append({'scene': folder, 'what': f'{what} — the head droops and stays down', 'ok': held >= HOLD_40,
+                        'note': f'the head hangs up to {(first - min(ok_rel)) * 100:.0f} % of the body height lower above the paws than at the start (least {DROOP_40 * 100:g} %), kept {held:.1f} s (least {HOLD_40:g} s)'})
+        xs = [cx(a['parts']['back']) for t, a in seq if a['parts'].get('back')]
+        wide = max((a['parts']['back']['x1'] - a['parts']['back']['x0'] for t, a in seq if a['parts'].get('back')), default=1)
+        sway = (max(xs) - min(xs)) / wide if xs else 0
+        out.append({'scene': folder, 'what': f'{what} — sways', 'ok': sway >= 0.01, 'note': f'the body sways {sway * 100:.1f} % of its width (least 1 %)'})
+    elif name == 'struggle':
+        heads = [cx(a['parts']['head']) for t, a in seq if a['parts'].get('head')]
+        hwide = max((a['parts']['head']['x1'] - a['parts']['head']['x0'] for t, a in seq if a['parts'].get('head')), default=1)
+        turns = reversals(heads, WRITHE_AMP_40 * hwide)
+        out.append({'scene': folder, 'what': f'{what} — writhes, the head turns from side to side', 'ok': turns >= WRITHE_40,
+                    'note': f'the head changes direction {turns} times by at least {WRITHE_AMP_40 * 100:g} % of its width (least {WRITHE_40}) over {len(heads)} frames'})
+        if c.get('carried'):
+            carrier = next((n for n, a in (track[0] or {}).items() if a.get('person') and n != who and any(h.get('box') for h in a.get('hands') or [])), None)
+            worst, hand_x = None, []
+            for t, f in zip(c.get('samples', []), track):
+                a, q = f.get(who), f.get(carrier) if carrier else None
+                if not a or not q or not q.get('tall') or not (a.get('parts') or {}).get('head') or not q.get('hands'): continue
+                h = a['parts']['head']
+                d = min(((cx(h) - g['x']) ** 2 + (cy(h) - g['y']) ** 2) ** 0.5 for g in q['hands']) / q['tall']
+                if worst is None or d > worst[1]: worst = (t, d)
+                hand_x.append(sum(g['x'] for g in q['hands']) / len(q['hands']) / q['tall'])
+            if worst: out.append({'scene': folder, 'what': f'{what} — stays in {carrier}\'s arms', 'ok': worst[1] <= ARMS_40,
+                                  'note': f'the head is at most {worst[1] * 100:.0f} % of {carrier}\'s height from a hand (at {worst[0]:g} s; limit {ARMS_40 * 100:g} %)'})
+            if hand_x: out.append({'scene': folder, 'what': f'{what} — {carrier} holds on, the hands shake with it', 'ok': max(hand_x) - min(hand_x) >= HANDS_40,
+                                   'note': f'the hands move {(max(hand_x) - min(hand_x)) * 100:.1f} % of {carrier}\'s height (least {HANDS_40 * 100:g} %)'})
+    elif name == 'pawAtCone':
+        touches, last_height, worn = 0, None, 0
+        for t, a in seq:
+            cone = (a.get('worn') or {}).get('cone')
+            if not cone: continue
+            worn += 1
+            ex, ey, rx, ry = cx(cone), cy(cone), (cone['x1'] - cone['x0']) / 2, (cone['y1'] - cone['y0']) / 2
+            near = [((cx(b) - ex) / rx) ** 2 + ((cy(b) - ey) / ry) ** 2 for b in (a.get('front') or {}).values()]
+            if any(CONE_RING[0] ** 2 <= r <= CONE_RING[1] ** 2 for r in near): touches += 1
+        out.append({'scene': folder, 'what': f'{what} — a front paw at the cone edge', 'ok': worn > 0 and touches >= CONE_TOUCH_40,
+                    'note': f'the cone is drawn at {worn} of {len(seq)} frames; a front paw is on its rim ({CONE_RING[0]:g}–{CONE_RING[1]:g} of the radius) at {touches} (least {CONE_TOUCH_40})'})
+        base, tail = max(leg(a) for t, a in seq[:8]), [leg(a) for t, a in seq[-int(1.8 / dt):-int(0.4 / dt)]]
+        out.append({'scene': folder, 'what': f'{what} — gives up and sits', 'ok': bool(tail) and base > 0 and max(tail) <= base * 0.75,
+                    'note': f'while it sits (the last 1.8 s) its legs are at most {max(tail) / base * 100 if tail and base else 0:.0f} % of the standing length, back to paws (limit 75 %)'})
+    return out
 
 
 def check_pet_act(folder, c, frames, seen=None, track=None):
@@ -719,6 +843,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         out.append({'scene': folder, 'what': f'{what} — big enough in the frame', 'ok': share >= PET_SHARE,
                     'note': f'{c["who"]} is {share * 100:.0f} % of the frame height at {t:g} s (least {PET_SHARE * 100:g} %)'})
     if c['name'] in PET_ACTS_40_NAMES and track: out.extend(check_pet40b(folder, c, track, what))       # đợt 40 B
+    if c['name'] in CLINIC_40 and track: out.extend(check_clinic40(folder, c, frames, [f for f in (track or [])]))      # đợt 40 C
     if c['name'] == 'chaseTail' and track:
         sides = [1 if f[c['who']]['facing'] >= 0 else -1 for f in track if f[c['who']].get('facing') is not None]
         flips = sum(1 for a, b in zip(sides, sides[1:]) if a != b)
@@ -758,6 +883,39 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             if v < level - 0.1 * full: steps += 1; level = v
         out.append({'scene': folder, 'what': f'{what} — the carrot gets shorter bite by bite', 'ok': full > 0 and steps >= 3,
                     'note': f'{steps} steps shorter (least 3), from {full:.0f} px to {min([v for v in lens if v], default=0):.0f} px over {len(track)} frames'})
+    if c['name'] == 'eatCarrot' and track:
+        # đợt 40 C — "củ cà rốt biến mất": (1) củ nguyên to ≥ 10 % chiều cao khung hình, (2) mỗi độ dài ĐỨNG yên ≥ 0,6 s (ở ~1 khung / giây khung nào cũng
+        # thuộc một bậc), (3) đoạn cuối còn lại một lúc rồi mới hết — không biến mất từ độ dài lớn.
+        H = frame_size(folder)[1]
+        seq = [(t, f[c['who']].get('carrot')) for t, f in zip(c.get('samples', []), track) if f.get(c['who'])]
+        lens = [(((b['x1'] - b['x0']) ** 2 + (b['y1'] - b['y0']) ** 2) ** 0.5 if b else 0) for t, b in seq]
+        full = max(lens, default=0)
+        out.append({'scene': folder, 'what': f'{what} — a big carrot', 'ok': full / H >= CARROT_BIG_40, 'note': f'the whole carrot is {full / H * 100:.1f} % of the frame height (least {CARROT_BIG_40 * 100:g} %)'})
+        dt = (seq[1][0] - seq[0][0]) if len(seq) > 1 else 0.2
+        runs, cur = [], 0
+        for i, v in enumerate(lens):
+            if i and v and abs(v - lens[i - 1]) <= 0.04 * max(full, 1): cur += 1
+            else:
+                if cur: runs.append(cur)
+                cur = 1 if v else 0
+        if cur: runs.append(cur)
+        longest_run = max(runs, default=0) * dt
+        shown = [v for v in lens if v]
+        stub = [v for v in shown if v <= 0.45 * full]
+        # `steady`: mọi bậc (trừ lúc đổi) giữ ≥ 0,6 s — đo bằng bậc NGẮN NHẤT còn giữ được
+        steady = min([r for r in runs if r >= 2], default=0) * dt if len(runs) > 1 else longest_run
+        # đoạn cuối: mức dài còn lại ≤ 50 % củ nguyên, giữ ≥ 0,8 s, rồi THỤT dần (≥ 2 mốc ngắn hơn nữa) tới hết — không biến mất từ độ dài ấy
+        small = [v <= 0.5 * full and v > 0 for v in lens]
+        # mức cuối = mức của đoạn đứng yên (≥ 3 mốc liền bằng nhau) CUỐI CÙNG; `shrink` = số mốc SAU nó mà củ còn nhưng ngắn hơn nó
+        stable_end, stable_val = -1, 0
+        for i in range(len(lens)):
+            j = i
+            while j + 1 < len(lens) and lens[j + 1] and abs(lens[j + 1] - lens[i]) <= 0.012 * max(full, 1): j += 1
+            if lens[i] and j - i >= 2: stable_end, stable_val = j, lens[i]
+        shrink = sum(1 for i in range(stable_end + 1, len(lens)) if 0 < lens[i] < 0.98 * stable_val) if stable_end >= 0 else 0
+        last_hold = run_length([v <= 0.5 * full and v > 0 and abs(v - stable_val) <= 0.012 * full for v in lens], dt)
+        out.append({'scene': folder, 'what': f'{what} — every bite stays visible, the last bit is held then eaten', 'ok': steady >= CARROT_HOLD_40 and last_hold >= 0.8 and shrink >= 2 and lens and lens[-1] == 0,
+                    'note': f'{len(runs)} lengths seen, the shortest held {steady:.1f} s (least {CARROT_HOLD_40:g} s); the last bit (under half of the carrot) shows {last_hold:.1f} s (least 0.8 s) and then shrinks over {shrink} measured frames (least 2) before it is gone ({"gone at the end" if lens and lens[-1] == 0 else "still drawn at the end"})'})
     if c['name'] == 'hide' and track:
         # (lượt bốn) bàn tay người đứng trước không đè lên cái đầu đang ló ra
         worst = None
@@ -816,6 +974,15 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             out.append({'scene': folder, 'what': f'{what} {c["target"]} — tongue reaches the {"face" if c.get("carried") else "hand"}, lick after lick', 'ok': touches >= 3,
                         'note': (f'the tongue touches {c["target"]}\'s {"head" if c.get("carried") else "hand"} {touches} times (least 3; touch = tip within {TONGUE_GAP * 100:g} % of height, tongue ≥ {TONGUE_LONG * 100:g} % of the head, longest {max([a / b for a, b in zip(size, heads) if b], default=0) * 100:.0f} %; closest {near * 100:.1f} %) over {len(gaps)} frames' if near is not None
                                  else 'no tongue out')})
+            # đợt 40 C — người chấm bảo liếm "đọc nhỏ": (1) lưỡi dài nhất ≥ 5,5 % chiều cao KHUNG HÌNH (không chỉ so với đầu con vật), (2) lưỡi NẰM
+            # trên bàn tay / má ≥ 0,3 s liền (một khoảnh khắc giữ — ở ~1 khung / giây vẫn bắt được).
+            frame_h = frame_size(folder)[1]
+            longest = max(size, default=0) / frame_h
+            step = (c['samples'][1] - c['samples'][0]) if len(c.get('samples', [])) > 1 else 1 / 30
+            on_target = [g is not None and g <= TONGUE_GAP and size[i] >= TONGUE_LONG * heads[i] for i, g in enumerate(gaps)]
+            held_on = run_length(on_target, step)
+            out.append({'scene': folder, 'what': f'{what} {c["target"]} — the tongue is big on screen and rests on the {"cheek" if c.get("carried") else "hand"}', 'ok': longest >= LICK_SIZE_40 and held_on >= LICK_HOLD_40,
+                        'note': f'longest tongue {longest * 100:.1f} % of the frame height (least {LICK_SIZE_40 * 100:g} %), rests on the target {held_on:.2f} s at a stretch (least {LICK_HOLD_40:g} s)'})
             if not c.get('carried'):
                 # (lượt bốn) con vật ĐỨNG trên sàn — cả hai bàn chân trước, không chồm lên lơ lửng; bàn tay không đè lên mặt nó; bàn tay
                 # không bật nhảy giữa hai khung lúc nó đang liếm.

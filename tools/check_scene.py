@@ -850,6 +850,42 @@ with tempfile.TemporaryDirectory() as work:
         open(text, 'w', encoding='utf-8').write('bối cảnh: đường phố\nbác sĩ (vet) · chó (corgi)\n\n' + line + '\n')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
         if done.returncode == 0 or needle not in done.stderr: problems.append(f'script.py presenter actions ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # ĐỢT 40 C — THÚ Ở PHÒNG KHÁM. clinic40 (phòng khám): chó trên bàn sợ run, được bác sĩ bế và vùng vẫy trong tay (hai tay bác sĩ lắc theo), lừ đừ sau thuốc
+    # mê, được đeo loa rồi cào vành loa. living40 (phòng khách): mèo trong tay bé liếm má, thỏ gặm cà rốt (củ to, ngắn dần, đoạn cuối giữ rồi mới hết). Mỗi cái đo
+    # bằng tools/acting_check.py; ngoài ra `pawAtCone` không đeo loa thì bị từ chối bằng một câu rõ.
+    clinic = {'id': 'clinic40', 'camera': 'auto', 'set': {'preset': 'exam'}, 'characters': [{'name': 'bac_si', 'id': 'vet', 'x': -300, 'z': -560, 'faces': 'cho'}, {'name': 'cho', 'species': 'dog', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'}],
+              'script': [{'who': 'cho', 'do': [['shiverAtVet', 2.2]]}, {'who': 'bac_si', 'do': [['carry', '@cho']]}, {'who': 'cho', 'do': [['struggle', 1.8]]}, {'who': 'bac_si', 'do': ['putDown']},
+                         {'who': 'cho', 'do': [['groggy', 2.4]]}, {'who': 'bac_si', 'do': [['putCone', '@cho']]}, {'who': 'cho', 'do': [['pawAtCone', 3]]}]}
+    living40 = {'id': 'living40', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500, 'faces': 'be'}, {'name': 'meo', 'species': 'cat', 'x': -70, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}],
+                'script': [{'who': 'be', 'say': 'Cả nhà chơi nhé.', 'dur': 1.8}, {'who': 'cho', 'do': [['lick', '@be', 4]]}, {'who': 'be', 'say': 'Mèo ơi lên đây.', 'do': [['carry', '@meo']], 'view': {'on': ['be', 'meo'], 'size': 'full'}}, {'who': 'meo', 'do': [['lick', '@be', 3]]}, {'who': 'tho', 'do': [['eatCarrot', 4]]}]}
+    for scene40, needles40 in ((clinic, ('cho shiverAtVet — crouches low and holds it', 'cho shiverAtVet — the whole body shivers', 'cho shiverAtVet — big enough in the frame', 'cho struggle — writhes, the head turns from side to side',
+                                         "cho struggle — stays in bac_si's arms", 'cho struggle — bac_si holds on, the hands shake with it', 'cho groggy — the head droops and stays down', 'cho groggy — sways',
+                                         'cho pawAtCone — a front paw at the cone edge', 'cho pawAtCone — gives up and sits', 'cho pawAtCone — big enough in the frame')),
+                               (living40, ('cho lick be — the tongue is big on screen and rests on the hand', 'meo lick be — the tongue is big on screen and rests on the cheek', 'tho eatCarrot — a big carrot',
+                                           'tho eatCarrot — every bite stays visible, the last bit is held then eaten'))):
+        path = os.path.join(os.path.dirname(stage), '_check_' + scene40['id'] + '.json')
+        try:
+            json.dump(scene40, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, scene40['id']))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f"{scene40['id']}: the scene does not build: " + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, scene40['id'], 'index.html'), encoding='utf-8').read()
+        if scene40 is clinic and '{"carried": true}' not in html: problems.append('clinic40: the struggling dog in the vet\'s arms is not told it is carried ({ carried: true })')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, scene40['id'])], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f"{scene40['id']}: " + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in needles40:
+                if needle not in done.stdout: problems.append(f"{scene40['id']}: acting_check did not measure {needle!r}")
+    bare = {'id': 'bare40', 'camera': 'auto', 'set': {'preset': 'exam'}, 'characters': [{'name': 'cho', 'species': 'dog', 'on': 'table', 'x': 0, 'z': -560}], 'script': [{'who': 'cho', 'do': [['pawAtCone', 2]]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_bare40.json')
+    try:
+        json.dump(bare, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'bare40'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode == 0 or 'not wearing the cone' not in (done.stderr + done.stdout): problems.append('bare40: pawAtCone without a cone should fail with "not wearing the cone": ' + (done.stderr + done.stdout).strip()[-200:])
+
     # Đợt 35: PHÒNG KHÁM — bác sĩ cân con chó (đặt lên cái cân "can" rồi bế về), đo nhiệt độ (con chó quay đuôi lại), cho uống thuốc
     # (con chó há miệng rồi nhai). acting_check: con chó đứng trên bệ cân lúc đọc số, tay tới nó lúc bế, lúc đo nhiệt, lúc đưa thuốc.
     care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},

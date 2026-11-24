@@ -2003,6 +2003,13 @@ export class RigSVG {
       rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * cradle;
       rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * cradle;
     }
+    // đợt 40 C — con vật trong tay VÙNG VẪY (`struggle` của rig thú ghi `vung` −1…1): hai cánh tay giữ chặt mà lắc theo từng cú giật —
+    // cùng quét sang một phía (`swing`) và siết vào mỗi lần giật (`squeeze`). Đọc từ trạng thái con vật mỗi lần vẽ, nên gọi thẳng hay qua `sequence()` như nhau.
+    const held40 = cradle ? this.#carriedNow() : null, squirm = held40 && held40.pet && held40.pet.s ? clamp(+held40.pet.s.vung || 0, -1, 1) : 0;
+    if (squirm) for (const [side, sign] of [['L', 1], ['R', -1]]) {
+      rotation['bat' + side] += squirm * 7 * cradle + sign * Math.abs(squirm) * 4 * cradle;
+      rotation['cang' + side] += -squirm * 5 * cradle + sign * Math.abs(squirm) * 3 * cradle;
+    }
     // CẦM LÁI: hai tay vươn ra trước–xuống tới tay lái (góc TRÊN MÀN HÌNH, cùng hướng với mặt), bàn tay nắm lại. Tay nào
     // GIƠ HẲN LÊN (vẫy, chỉ — bắp tay lệch dáng nghỉ quá 40°) thì nhả tay lái dần, xong lại về nắm; nhịp tay lúc nói
     // không làm buông tay lái.
@@ -6148,6 +6155,7 @@ export class RigSVG {
     const pet = this.#petOf(target);
     if (target && typeof target === 'object' && (target.el || target.rig) && !pet) throw new Error('[character] putCone(pet): the target must be a pet rig (createPet(...).rig)');
     this.#careFor(pet, 'petCone', 'putCone');
+    if (pet) pet.coneAsked = true;                                  // đợt 40 C: con vật sẽ có loa (lúc dựng bước, mức `petCone` của người còn 0) — `pawAtCone` của nó cho phép
     const t = this.tl(), s = this.s, N = this.NGHI, { reach: head, keep } = this.#careHand(t, target, 'eyes'), { k, tx, ty } = head;
     const o = k === 'L' ? 'R' : 'L', side = tx >= HONG.x ? 1 : -1, arm = this.#stoopFor(t, head, 0.15), deg = Math.PI / 180;
     // Vành loa cùng cỡ loa của con vật: 70 / 132 bề ngang khung mặt nó. Vòng là một hình riêng của người (`ring`, tâm `ringX/Y`):
@@ -6675,10 +6683,12 @@ export class RigSVG {
     }
     const pet = c.pet, inside = pet.svg.parentNode === e.om;
     if (s.om < 0.5) {
+      pet.carrier = null;                                          // đợt 40 C
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
       return;
     }
     if (!inside) { e.om.appendChild(pet.svg); }
+    pet.carrier = this;                                            // đợt 40 C: con vật biết ai đang bế nó (vẽ lại người bế khi nó vùng vẫy — rig-thu.js)
     const toRoot = this.svg.getScreenCTM && e.tren.getScreenCTM ? this.svg.getScreenCTM().inverse().multiply(e.tren.getScreenCTM()) : null;
     if (!toRoot) return;
     const m = toRoot.inverse();

@@ -30,7 +30,7 @@ const mid = (action, progress = 0.45, ...args) => (rig) => { rig[action](...args
 const tag = config ? ' (config)' : '';
 if (pet) {
   panel('rest' + tag); panel('face', null, (rig) => rig.khungMat(70));
-  for (const action of RigThu.DONG_TAC[RigThu.LOAI[id].loai].slice(1)) panel(action, mid(action, 0.5));
+  for (const action of RigThu.DONG_TAC[RigThu.LOAI[id].loai].slice(1)) panel(action, RigThu.WITH_WEAR.includes(action) ? (rig) => { rig.wear('cone'); mid(action, 0.5)(rig); } : mid(action, 0.5));      // đợt 40 C: `pawAtCone` cần đang đeo loa
 } else {
   // Khung cận TÍNH từ tỉ lệ của chính nhân vật (cỡ đầu, cỡ thân, độ dài chân), không đặt cứng:
   // khung cứng hợp với nhân vật chibi thì cắt mất cằm hoặc tay của nhân vật ít chibi hơn.
