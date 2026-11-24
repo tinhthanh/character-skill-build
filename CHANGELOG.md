@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.80.0
+
+Added: 19 person actions (wave 39, three agents in parallel: Opus first, then Sonnet after a usage limit). Each one works as a
+rig method, in `sequence()`, in scene files, in Vietnamese scripts and in the action catalog, and is measured by
+`tools/acting_check.py`. 123 person actions in all.
+
+- **Cashier, reception and café** (A):
+  - `payByQR()` / `payByCard()` hold a phone (or a new `'card'` item) to the QR code or reader of a new `paystand` prop. A
+    green tick shows. The `reception` / `pharmacy` presets put a pay stand on the counter by themselves, and the payer walks up
+    to it.
+  - `giveChange(other)` / `takeChange` count banknotes one by one, then hand them over.
+  - `stampCard(other?)` / `takeCard` press a stamp, and a red mark stays on the card.
+  - `pourDrink()`: a stream falls into the cup and the level rises.
+  - `wipeCounter()`: wide circles with a cloth, which is then folded.
+  - New items `card`, `cash`, `stampcard`; cup options `open` / `full`. `holdsHidden` may be a list of hands.
+  - Scripts: "trả tiền", "quét mã", "quẹt thẻ", "thối tiền", "đóng dấu", "rót nước", "lau quầy"…
+- **Everyday gestures** (B): `laugh` (the whole body, unlike the face-only `express('laughing')`), `wipeTears`, `facepalm`,
+  `shush`, `okSign` (with a one-eye wink, `nhayL/R`), `salute`.
+  - Three new hand shapes: a finger at the lips, an OK circle, a flat salute hand.
+  - Hands are measured onto their target at build time, so they land right for children, seated and turned people.
+  - Scripts: `[cười lớn]` is the action, while `(cười)` / `(cười lớn)` stay the mood. Also "lau nước mắt", "ôm trán", "suỵt",
+    "ra dấu ok", "giơ tay chào".
+- **Presenter** (C):
+  - `holdSign(text, hold, { color, narrow })`: a sign with 1–3 lines, held in both hands in front of the chest; the text
+    shrinks to fit.
+  - `showSize('small' | 'medium' | 'big' | n)`: "this big".
+  - `takeSelfie(hold, { with })`: the phone at arm's length, a V sign, a flash. The partner's `joinSelfie` (a person) or
+    `tiltHead` (a pet) is added, and they step up beside the taker.
+  - `yawnStretch()`.
+  - In vertical frames the sign and the gap come out narrow, as `cheer` does. `examples/scene-presenter` and
+    `examples/scene-vertical` show `holdSign` / `showSize`.
+  - Scripts: `[giơ bảng: Giảm 20%|tiêm phòng]`, "to cỡ này", "selfie", "ngáp". For a person "vươn vai" is `yawnStretch`, for
+    a pet it is still `stretch`.
+- **CI**: scenes `desk39a/b/c`, `talk39`, the gestures script scene, refused scene files and script tests.
+
+Trial film: `/Users/vetgo/Movies/character-skill-trials/dot39/dot39-actions.mp4`. It has four scenes: the cashier desk, the
+café counter, gestures from a Vietnamese script and the presenter. They pass `acting_check` 22 / 22, 18 / 18, 30 / 30 and
+31 / 31.
+
+Fixed
+- `tools/check.html`: the prop test expected every prop on the floor line. `paystand` stands on the counter top, as `laptop`
+  and `monitor` do.
+- Merge: every block a branch inserted was checked to be intact, and so was the line that followed it.
+
+Known
+- A turn with both `say` and `stampCard` with a hand-over makes the `handOver` of a cup right after it fall short (12.8 %).
+  Speak on a turn of its own. `handOver` also falls short when the cup is in the far hand (this was already so before).
+- A clerk standing behind the counter of the 3D `reception` preset is hidden by it and the laptop, so place the clerk in
+  front.
+- The wipe cloth reads weakly at a full shot. A lidded cup turns into a glass cup when pouring starts.
+- `laugh`: the hand on the belly reads weakly facing front.
+- Chibi arms are short, so the selfie phone ends level with the eyes, not above the head, and a child's `showSize` gap is
+  small. A pet partner only tilts its head.
+- In the presenter trial, the sign came close to the right frame edge in the last selfie shot.
+- Not looked at: 2D (non-3D) scenes with a selfie partner; cashier actions with child actors or turned.
+- Not reviewed by Gemini on the rendered film.
+
 ## 0.79.0
 
 Added: 15 person actions (wave 38, three agents in parallel). Each one works as a rig method, in `sequence()`, in scene files
