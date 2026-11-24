@@ -91,7 +91,7 @@ const NGHI = Object.freeze({
   // ĐỢT 40 B — mèo & thỏ: các kênh mới (đều về 0 khi nghỉ)
   phong: 0,                // 0…1 LÔNG DỰNG (`archBack`): viền lông xù răng cưa quanh lưng, đuôi xù thêm
   nghieng: 0,              // độ NGHIÊNG cả con vật quanh chân (dương = ngửa mũi lên, theo hướng đang quay) — `binky` xoay mình, `flop` ngã nghiêng
-  toy: 0, toyX: 0, toyY: 0, toyR: 0,   // cuộn len (`batToy`): hiện 0…1, cách tâm thân (đơn vị khung, + = phía đầu), cao khỏi sàn, góc lăn (độ)
+  yarn: 0, toyX: 0, toyY: 0, toyR: 0,   // đợt 40 B: `yarn` (không phải `toy` — kênh đồ chơi chó ngậm của đợt 40 A) — cuộn len (`batToy`): hiện 0…1, cách tâm thân (đơn vị khung, + = phía đầu), cao khỏi sàn, góc lăn (độ)
   box: 0, boxX: 0,         // hộp các-tông (`sitInBox`): cỡ 0…1 (>1 là nảy), dời ngang so với tâm khung
   gp: 0,                   // 0…1 bàn chân trước gần vẽ ĐÈ LÊN mặt (`groomFace`): chân đang quệt qua má, tai
   nose: 0, ria: 0, twitch: 0,   // thỏ (`noseTwitch`): mũi giật 0…1, ria hất (độ), độ rõ 0…1 (ria dày lên, mũi to ra)
@@ -2078,7 +2078,7 @@ export class RigThu {
       }
     }
     if (e.toy) {
-      const v = clamp(s.toy || 0, 0, 1.2);
+      const v = clamp(s.yarn || 0, 0, 1.2);
       e.toy.style.display = v > 0.02 ? '' : 'none';
       if (v > 0.02) { e.toy.setAttribute('transform', `translate(${f(200 + s.toyX)} ${f(DAT - 15 * v - s.toyY)}) scale(${f(v * 1.3)})`); e.toyBall.setAttribute('transform', `rotate(${f(s.toyR)})`); }
     }
@@ -2173,7 +2173,7 @@ export class RigThu {
     let at = this.#dung(t, 0);
     t.set(s, { toyX: x0, toyY: 0, toyR: 0 }, at);
     t.to(s, { truocY: 16, sauY: 5, tnX: 8, dauY: 7, dauX: 10, taiL: 0.9, taiR: 0.9, dongTu: 1.9, duoi: -34, nhinX: 2, nhinY: 1, cuoi: 0, duration: 0.35, ease: 'power2.out' }, at);
-    t.fromTo(s, { toy: 0 }, { toy: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, at + 0.05);
+    t.fromTo(s, { yarn: 0 }, { yarn: 1, duration: 0.3, ease: 'back.out(2)', immediateRender: false }, at + 0.05);
     at += 0.45;
     const per = 1.15;
     for (let i = 0; i < n; i++) {
@@ -2189,7 +2189,7 @@ export class RigThu {
       t.to(s, { nhinX: 2.4, dauX: 12 + 2 * i, duration: 0.25 }, hit);
     }
     at += n * per;
-    t.to(s, { toyX: x0 + hop * (n + 1.5), toyR: 170 * (n + 1.5), toy: 0, duration: 0.5, ease: 'power1.out' }, at);
+    t.to(s, { toyX: x0 + hop * (n + 1.5), toyR: 170 * (n + 1.5), yarn: 0, duration: 0.5, ease: 'power1.out' }, at);
     this.#khep(t, 0.45, at + 0.2);
     return t;
   }
