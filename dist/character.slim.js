@@ -1,4 +1,4 @@
-/* VGCharacter v0.77.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.78.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -221,6 +221,7 @@ const NGHI = Object.freeze({
   tayL: 'mo', tayR: 'mo',
   readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
   readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
+  omSlot: 0,                    // ĐỢT 37: lần BẾ nào trong `rig.carriedList` (carry / weigh / takePet) — mỗi khung vẽ đúng lần bế của nó
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
   headTurn: 0, headPitch: 0, headTilt: 0,
 });
@@ -324,6 +325,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_FRONT = 0.65;                // đợt 37: đọc bệnh án khi đứng nghiêng — đầu quay về trước, bù chừng ấy phần hướng thân
 const CHART_NOD_PITCH = 0.7;            // đợt 36: gật sau khi đọc bệnh án — đầu cúi (headPitch) ở đáy mỗi lần gật
 const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
@@ -1699,6 +1701,7 @@ class RigSVG {
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
+    so.omSlot = this.s.omSlot;                                 // … và vẫn là lần bế ấy (đợt 37)
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
@@ -2858,7 +2861,8 @@ class RigSVG {
     const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, spot), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
     this.#leanTo(t, reach, 'nam');
     t.set(s, { ['gadget' + k]: 1 }, 0.1);
-    t.to(s, { dau: N.dau + m * 6 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.2, mayR: 0.2, cuoi: 0.45, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.45);
+    t.to(s, { dau: N.dau + m * 6 + reach.lean * 0.8, dauY: 9, mayL: 0.2, mayR: 0.2, cuoi: 0.45, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.45);
+    this.#lookTo(t, { x: reach.tx, y: reach.ty }, 0.4, { d: 0.4 });
     t.to(s, { ['bat' + k]: upper + 3, ['cang' + k]: fore - 5, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.45);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.8);
     t.to(s, { dauY: 12, cuoi: 0.9, chum: 0, mayL: 0.5, mayR: 0.5, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, 0.5 + hold);
@@ -2967,7 +2971,7 @@ class RigSVG {
     if (!this.scaleShows) return;
     const s = this.s;
     for (const item of this.scaleShows) {
-      const on = this.carried && this.carried.pet === item.pet && s.om >= 0.5 && s.omScale >= 0.5 && s.omRise < 0.5;
+      const c = this.#carriedNow(), on = c && c.pet === item.pet && s.om >= 0.5 && s.omScale >= 0.5 && s.omRise < 0.5;
       const want = on ? item.text : item.zero;
       if (item.el.textContent !== want) item.el.textContent = want;
     }
@@ -2994,7 +2998,8 @@ class RigSVG {
     if (this.s.om >= 0.5) throw new Error('[character] weigh: already carrying a pet — putDown() first, or weigh it before picking it up');
     if (reading !== null && typeof reading !== 'string') throw new Error(`[character] weigh: reading must be a string such as '4.2 kg', got ${JSON.stringify(reading)}`);
     if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] weigh: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
-    const t = this.carry(pet), s = this.s, N = this.NGHI, c = this.carried, home = c.reach;
+    const t = this.carry(pet), s = this.s, N = this.NGHI, home = this.carried.reach;
+    let c = this.carried;
     const inv = this.svg.getScreenCTM().inverse(), root = (x, y) => new DOMPoint(x, y).matrixTransform(inv);
     const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => pet.el[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
     const frame = pet.svg.getBoundingClientRect(), bodyR = (pet.el.than || pet.svg).getBoundingClientRect(), headR = pet.el.dau.getBoundingClientRect();
@@ -3003,7 +3008,14 @@ class RigSVG {
     const vb = pet.svg.viewBox && pet.svg.viewBox.baseVal;
     const offX = vb && vb.width ? ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * c.from.w / vb.width : 0, offY = vb && vb.height ? (pet.s.y || 0) * c.from.h / vb.height : 0;
     const side = home.tx >= HONG.x ? 1 : -1, spot = this.#scaleSpot(scale, side);
-    c.scale = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
+    const onScale0 = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
+    if (c.scale && (Math.abs(c.scale.x - onScale0.x) > 1e-6 || Math.abs(c.scale.y - onScale0.y) > 1e-6)) {
+      const copy = { ...c };
+      this.carriedList.push(copy); this.carried = copy; s.omSlot = this.carriedList.length - 1;
+      t.set(s, { omSlot: s.omSlot }, 0);
+      c = copy;
+    }
+    c.scale = onScale0;
     const n = this.#reading({ text: reading || spot.text || RigSVG.WEIGH_READING, x: spot.x, y: c.scale.y + (crown - offY - c.from.y) - 8 });
     const shown = display || (scale && (scale.svg || scale.querySelector) ? scale : null);
     const screen = shown && (shown.svg || shown).querySelector && (shown.svg || shown).querySelector('svg[data-prop="scale"] text, text');
@@ -3275,6 +3287,7 @@ class RigSVG {
     const read = { dauY: CHART_DOWN, dau: N.dau + m * CHART_TILT, nhinY: LOOK_DOWN.eyes, matY: LOOK_DOWN.lids };
     const face = this.#faceCentre(), boardAt = { x: face.x + m * face.r * 0.35, y: face.y + face.r * 2 };
     this.#lookTo(t, boardAt, 0, { d: 0.5 });
+    if (Math.abs(s.huong) > 0.15) t.to(s, { headTurn: clamp(-s.huong * CHART_FRONT, -RigSVG.LOOK_TURN_MAX, RigSVG.LOOK_TURN_MAX), duration: 0.5, ease: 'power2.inOut' }, 0);
     t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, ...read, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.5, ease: 'power2.out' }, 0);
     const scan = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, dau: read.dau - m * 1.5, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, dau: read.dau + m * 1.5, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
     const flip = 0.5 + Math.max(1.3, hold * 0.6);                 // đọc tờ đầu ≥ 1,3 s rồi mới lật
@@ -3296,7 +3309,7 @@ class RigSVG {
       const a = up + 0.75 + i * 1.25;       // đợt 36: mỗi lần gật 1,25 s, giữ ở đáy 0,55 s
       t.to(s, { dauY: CHART_NOD, nhinY: 2, vai: N.vai + 3, matY: 0.3, duration: 0.3, ease: 'sine.inOut' }, a)
        .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
-      t.to(s, { headPitch: CHART_NOD_PITCH, duration: 0.3, ease: 'sine.inOut' }, a)
+      t.to(s, { headPitch: Math.min(1, Math.max(0, listen.headPitch) + CHART_NOD_PITCH), duration: 0.3, ease: 'sine.inOut' }, a)
        .to(s, { headPitch: listen.headPitch, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
     }
     const end = up + 3.25;
@@ -3401,9 +3414,28 @@ class RigSVG {
     return t;
   }
   static LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
+  #holdEntry(t, entry) {
+    const list = this.carriedList || (this.carriedList = []);
+    const key = (item) => JSON.stringify({ from: item.from, reach: item.reach, at: item.at, middle: item.middle, facing: item.facing });
+    let n = list.findIndex((item) => item.pet === entry.pet && item.host === entry.host && item.giver === entry.giver && key(item) === key(entry));
+    if (n < 0) { list.push(entry); n = list.length - 1; }
+    this.carried = list[n];
+    this.s.omSlot = n;
+    t.set(this.s, { omSlot: this.s.omSlot }, 0);
+  }
+  #carriedNow() {
+    const list = this.carriedList;
+    if (!list || !list.length) return this.carried;
+    return list[clamp(Math.round(this.s.omSlot || 0), 0, list.length - 1)] || this.carried;
+  }
   #placeCarried() {
-    const c = this.carried, e = this.el, s = this.s;
+    const c = this.#carriedNow(), e = this.el, s = this.s;
     if (!c || !e.om) return;
+    for (const node of [...e.om.children]) {
+      if (node === c.pet.svg) continue;
+      const owner = (this.carriedList || []).find((item) => item.pet.svg === node);
+      if (owner) { owner.host.appendChild(node); for (const [name, value] of owner.attrs) value === null ? node.removeAttribute(name) : node.setAttribute(name, value); owner.pet.apDung(); }
+    }
     const pet = c.pet, inside = pet.svg.parentNode === e.om;
     if (s.om < 0.5) {
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
@@ -3529,8 +3561,8 @@ class RigSVG {
       t.set(s, { petDrop: 1 }, HANDOVER_AT);
       drop = { x: want, y: spot.y + spot.h * 0.6 };
     }
-    this.carried = { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
-                     reach: this.#reachLow(drop), at: s.x, middle: from.middle, facing: s.huong, giver };
+    this.#holdEntry(t, { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
+                     reach: this.#reachLow(drop), at: s.x, middle: from.middle, facing: s.huong, giver });
     this.#offerArms(t, source, 0);
     t.to(s, { than: this.NGHI.than - dir * 3, nhinX: dir * 2, cuoi: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.set(s, { om: 1, omRise: 0 }, HANDOVER_AT);
@@ -3592,8 +3624,8 @@ class RigSVG {
     const reach = this.#reachLow(pet, null, 'body');
     const vb = pet.svg.viewBox && pet.svg.viewBox.baseVal, walked = vb && vb.width ? (pet.s.x || 0) / vb.width : 0;
     const head = pet.el.dau ? pet.el.dau.getBoundingClientRect() : r, middle = r.width ? clamp((head.left + head.width / 2 - r.left) / r.width - walked, 0.1, 0.9) : 0.5;
-    this.carried = { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((name) => [name, pet.svg.getAttribute(name)]),
-                     from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong };
+    this.#holdEntry(t, { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((name) => [name, pet.svg.getAttribute(name)]),
+                     from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong });
     const other = reach.k === 'L' ? 'R' : 'L';
     this.#leanTo(t, reach, 'xoe');
     t.to(s, { ['bat' + other]: reach.bend ? -reach.bend : reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
@@ -8171,6 +8203,116 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
 }
 return { CAMERA_LIMITS, OVERVIEW, createSet };
 })();
+__m['runtime/combos.js'] = (function () {
+const COMBOS = {
+  "greetCustomer": {
+    "params": [],
+    "about": "welcome someone: wave, bow, then a hand on the chest — \"welcome, I am…\"",
+    "steps": ["wave", "bow", "introduce"],
+    "vi": ["chào khách", "đón khách", "chào đón"]
+  },
+  "fullCheckup": {
+    "params": ["pet"],
+    "about": "a whole check-up: stethoscope, ears, teeth (the pet opens its mouth), temperature, then read the chart and nod",
+    "steps": [
+      ["listen", "$pet"],
+      ["examine", "$pet", "ears"],
+      { "step": ["examine", "$pet", "teeth"], "with": { "$pet": [["openMouth", 2.2]] } },
+      ["takeTemp", "$pet"],
+      "readChart"
+    ],
+    "vi": ["khám tổng quát", "khám tổng thể", "khám toàn diện", "khám sức khoẻ", "khám sức khỏe"]
+  },
+  "vaccinationVisit": {
+    "params": ["pet", "scale"],
+    "about": "a vaccination: weigh the pet, inject (held syringe), put the syringe away, give a treat, thumbs up",
+    "steps": [
+      ["weigh", "$pet", "$scale"],
+      ["inject", "$pet"],
+      "hideItem",
+      ["giveTreat", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["tiêm phòng", "tiêm ngừa", "chích ngừa", "tiêm vắc-xin", "tiêm vaccine"]
+  },
+  "goodNews": {
+    "params": [],
+    "about": "hearing good news: a relieved breath, thumbs up, a cheer",
+    "steps": ["relief", "thumbsUp", "cheer"],
+    "vi": ["tin vui", "báo tin vui", "mừng rỡ", "mừng quá"]
+  },
+  "badNews": {
+    "params": [],
+    "about": "giving or hearing bad news: worried hands, a sad face, a slow nod",
+    "steps": ["worry", ["express", "sad", 1.4], "nod"],
+    "vi": ["tin buồn", "báo tin buồn", "buồn bã"]
+  },
+  "waitingImpatient": {
+    "params": [],
+    "about": "waiting too long: check the watch, look around, fold the arms",
+    "steps": ["checkWatch", "lookAround", ["crossArms", 1.6]],
+    "vi": ["sốt ruột", "sốt ruột chờ", "chờ lâu", "đợi lâu", "nóng ruột"]
+  },
+  "dischargePet": {
+    "params": ["pet", "owner"],
+    "about": "send a pet home: pick it up, hand it to the owner, count off three instructions, wave goodbye",
+    "steps": [
+      ["carry", "$pet"],
+      ["handOverPet", "$owner"],
+      ["countFingers", 3],
+      "wave"
+    ],
+    "vi": ["trả thú", "trả về", "giao thú", "xuất viện", "trả bé về"]
+  }
+};
+const isPlaceholder = (value) => typeof value === 'string' && /^\$[A-Za-z_]\w*$/.test(value);
+function fill(step, values) {
+  const parts = Array.isArray(step) ? step : [step];
+  const out = [];
+  for (const part of parts) {
+    if (isPlaceholder(part)) {
+      const value = values[part.slice(1)];
+      if (value === undefined || value === null) break;
+      out.push(value);
+    } else out.push(part);
+  }
+  return Array.isArray(step) ? out : out[0];
+}
+function bind(name, args) {
+  const combo = COMBOS[name];
+  const values = {};
+  combo.params.forEach((param, n) => { values[param] = args[n]; });
+  for (const raw of combo.steps) {
+    const step = raw && !Array.isArray(raw) && typeof raw === 'object' ? raw.step : raw;
+    if (Array.isArray(step) && isPlaceholder(step[1]) && (values[step[1].slice(1)] === undefined || values[step[1].slice(1)] === null)) {
+      throw new Error(`[character] combo "${name}" needs ${combo.params.map((p) => `"${p}"`).join(', ')} — missing "${step[1].slice(1)}"`);
+    }
+  }
+  return values;
+}
+const isCombo = (name) => typeof name === 'string' && Object.prototype.hasOwnProperty.call(COMBOS, name);
+function expandCombo(name, args = []) {
+  if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
+  const values = bind(name, args);
+  return COMBOS[name].steps.map((raw) => fill(raw && !Array.isArray(raw) && typeof raw === 'object' ? raw.step : raw, values));
+}
+function combo(rig, name, ...args) {
+  if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
+  const values = bind(name, args);
+  return COMBOS[name].steps.map((raw) => {
+    if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+      const together = [[rig, fill(raw.step, values)]];
+      for (const [key, steps] of Object.entries(raw.with || {})) {
+        const other = values[key.slice(1)];
+        if (other) together.push([other, ...steps.map((step) => fill(step, values))]);
+      }
+      return together.length > 1 ? { together } : together[0];
+    }
+    return [rig, fill(raw, values)];
+  });
+}
+return { COMBOS, isCombo, expandCombo, combo };
+})();
 __m['characters/receptionist.js'] = (function () {
 const __default = {
   id: 'receptionist',
@@ -8402,8 +8544,9 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
+const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.77.0';
+const VERSION = '0.78.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;
@@ -8600,13 +8743,20 @@ function list() {
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
     bakedConfigs: Object.keys(bakedConfigs),
+    combos: Object.fromEntries(Object.entries(COMBOS).map(([name, value]) => [name, { params: value.params, about: value.about }])),
   };
 }
 const SPEECH_STEPS = ['speak', 'explain', 'speakCues', 'call'];
 const SPEECH_SETTLE = 0.55;
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
+const expandCombos = (stepList) => stepList.flatMap((step) => {
+  if (typeof step === 'number') return [step];
+  const [name, ...args] = Array.isArray(step) ? step : [step];
+  return isCombo(name) && typeof name === 'string' ? expandCombos(expandCombo(name, args)) : [step];
+});
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
+  stepList = expandCombos(stepList);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   const marked = !!(rig.m && typeof rig.m === 'object'), K = keys.length;
@@ -9005,7 +9155,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
 }
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

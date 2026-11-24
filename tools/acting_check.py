@@ -1164,10 +1164,12 @@ def check_reading(folder, c, shots):
         up_ok = all(abs(h['tilt']) <= 3 and h['down'] <= 4 for h in raised)
         nod_ok = nods[0]['down'] >= NOD_DEEP and nods[2]['down'] >= NOD_DEEP and nods[1]['down'] <= 4
         # Đợt 36: ĐẦU CÚI THẬT ở đáy hai lần gật (`headPitch` × 32° ≥ NOD_BEND°), ngẩng ở giữa (Gemini: "ngẩng lên có, nhưng không gật").
-        bend = [h.get('pitch', 0) * 32 for h in nods]
+        # Đợt 37: tính từ chỗ đầu đang nhìn người nghe (lúc vừa ngẩng) — người nghe thấp thì đầu đã cúi sẵn chừng ấy.
+        base = max(0, raised[0].get('pitch', 0)) * 32
+        bend = [h.get('pitch', 0) * 32 - base for h in nods]
         nod_ok = nod_ok and bend[0] >= NOD_BEND and bend[2] >= NOD_BEND and bend[1] <= NOD_BEND / 2
         out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': up_ok and nod_ok,
-                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP}), head bent {bend[0]:.0f}° / {bend[1]:.0f}° / {bend[2]:.0f}° (want ≥ {NOD_BEND}° / ≤ {NOD_BEND / 2:g}° / ≥ {NOD_BEND}°)'})
+                    'note': f'raised: tilt {raised[0]["tilt"]:.1f}°, down {raised[0]["down"]:.1f}, head bent {base:.0f}° to the listener; nods: {nods[0]["down"]:.1f} / {nods[1]["down"]:.1f} / {nods[2]["down"]:.1f} (want ≥ {NOD_DEEP} / ≤ 4 / ≥ {NOD_DEEP}), head bent further {bend[0]:.0f}° / {bend[1]:.0f}° / {bend[2]:.0f}° (want ≥ {NOD_BEND}° / ≤ {NOD_BEND / 2:g}° / ≥ {NOD_BEND}°)'})
     else: out.append({'scene': folder, 'what': f'{c["who"]} looks up from the chart, then nods twice', 'ok': None, 'note': 'not measured'})
     return out
 

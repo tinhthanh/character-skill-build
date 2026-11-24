@@ -1,4 +1,4 @@
-/* VGCharacter v0.77.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.78.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -312,6 +312,7 @@ const NGHI = Object.freeze({
   // ĐỢT 35 — cân, đo nhiệt độ, cho uống thuốc:
   readout: 0,                   // 0…1 THẺ SỐ ĐO bật lên (số cân trên cân `weigh`, nhiệt độ trên nhiệt kế `takeTemp`): độ lớn / độ hiện
   readoutN: 0,                  // thẻ nào trong `rig.readings` (1, 2, …; 0 = không có) — chữ và chỗ đặt ghi lúc dựng động tác
+  omSlot: 0,                    // ĐỢT 37: lần BẾ nào trong `rig.carriedList` (carry / weigh / takePet) — mỗi khung vẽ đúng lần bế của nó
   omScale: 0,                   // 1 = con vật đang bế ĐI TỚI / RỜI CÂN (`weigh`): chỗ "nhà" của nó trong lúc ấy là mặt bệ cân, không phải chỗ nó đứng
   // ĐỢT 36 — NHÌN THEO MỘT ĐIỂM (`lookAt`): đầu quay riêng so với thân (cùng đơn vị `huong`), cúi (1) / ngẩng (−1), nghiêng thêm (độ).
   headTurn: 0, headPitch: 0, headTilt: 0,
@@ -502,6 +503,7 @@ const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, 
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
+const CHART_FRONT = 0.65;                // đợt 37: đọc bệnh án khi đứng nghiêng — đầu quay về trước, bù chừng ấy phần hướng thân
 const CHART_NOD_PITCH = 0.7;            // đợt 36: gật sau khi đọc bệnh án — đầu cúi (headPitch) ở đáy mỗi lần gật
 const CHART_FLIP_ZOOM = 2.3;            // đợt 36: bìa hồ sơ phóng to lúc lật trang
 const CHART_TILT = 14, CHART_DOWN = 11, CHART_NOD = 17;   // đọc bệnh án: đầu nghiêng (độ) và hạ về phía bảng; gật sâu (lượt ba: Gemini 1 khung / giây)   // bìa hồ sơ trước ngực (phóng to cho đọc được); tay kia lên mép trên lật trang
@@ -2725,6 +2727,7 @@ class RigSVG {
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
+    so.omSlot = this.s.omSlot;                                 // … và vẫn là lần bế ấy (đợt 37)
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
@@ -4378,7 +4381,10 @@ class RigSVG {
     const t = this.tl(), s = this.s, N = this.NGHI, reach = this.#reachLow(target, null, spot), { k, upper, fore } = reach, m = k === 'L' ? -1 : 1;
     this.#leanTo(t, reach, 'nam');
     t.set(s, { ['gadget' + k]: 1 }, 0.1);
-    t.to(s, { dau: N.dau + m * 6 + reach.lean * 0.8, dauY: 9, nhinY: 2.6, mayL: 0.2, mayR: 0.2, cuoi: 0.45, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.45);
+    t.to(s, { dau: N.dau + m * 6 + reach.lean * 0.8, dauY: 9, mayL: 0.2, mayR: 0.2, cuoi: 0.45, chum: 0.25, duration: 0.35, ease: 'sine.inOut' }, 0.45);
+    // Đợt 37: ĐẦU quay / cúi về chỗ đang soi (tai, mắt, mõm), không chỉ con ngươi — cảnh thử: bác sĩ cười nhìn thẳng ra máy quay
+    // trong lúc soi tai.
+    this.#lookTo(t, { x: reach.tx, y: reach.ty }, 0.4, { d: 0.4 });
     // Soi chỗ thứ nhất, nhích đèn sang chỗ thứ hai, rồi gật: "ổn".
     t.to(s, { ['bat' + k]: upper + 3, ['cang' + k]: fore - 5, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.45);
     t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.25, ease: 'sine.inOut' }, 0.5 + hold * 0.8);
@@ -4542,7 +4548,7 @@ class RigSVG {
     if (!this.scaleShows) return;
     const s = this.s;
     for (const item of this.scaleShows) {
-      const on = this.carried && this.carried.pet === item.pet && s.om >= 0.5 && s.omScale >= 0.5 && s.omRise < 0.5;
+      const c = this.#carriedNow(), on = c && c.pet === item.pet && s.om >= 0.5 && s.omScale >= 0.5 && s.omRise < 0.5;
       const want = on ? item.text : item.zero;
       if (item.el.textContent !== want) item.el.textContent = want;
     }
@@ -4583,7 +4589,8 @@ class RigSVG {
     if (this.s.om >= 0.5) throw new Error('[character] weigh: already carrying a pet — putDown() first, or weigh it before picking it up');
     if (reading !== null && typeof reading !== 'string') throw new Error(`[character] weigh: reading must be a string such as '4.2 kg', got ${JSON.stringify(reading)}`);
     if (!(typeof hold === 'number' && hold > 0)) throw new Error(`[character] weigh: hold must be a number of seconds > 0, got ${JSON.stringify(hold)}`);
-    const t = this.carry(pet), s = this.s, N = this.NGHI, c = this.carried, home = c.reach;
+    const t = this.carry(pet), s = this.s, N = this.NGHI, home = this.carried.reach;
+    let c = this.carried;
     // Đo con vật Ở NHÀ (carry vừa đưa nó về host): chân (đáy bàn chân), giữa thân, đỉnh đầu — trong hệ gốc của SVG này.
     const inv = this.svg.getScreenCTM().inverse(), root = (x, y) => new DOMPoint(x, y).matrixTransform(inv);
     const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => pet.el[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
@@ -4596,7 +4603,15 @@ class RigSVG {
     const offX = vb && vb.width ? ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * c.from.w / vb.width : 0, offY = vb && vb.height ? (pet.s.y || 0) * c.from.h / vb.height : 0;
     const side = home.tx >= HONG.x ? 1 : -1, spot = this.#scaleSpot(scale, side);
     // Khung con vật trên cân: chân (hình chưa dời — trong tay người hình nó không dời theo bước đi) đứng giữa mặt bệ.
-    c.scale = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
+    const onScale0 = { x: spot.x - (middle - offX - c.from.x), y: spot.y - (feetY - offY - c.from.y) };
+    // Lần bế này đã mang một cái cân KHÁC (cân lần hai cùng chỗ, trên cân khác — đợt 37): tách một mục riêng cho lần cân này.
+    if (c.scale && (Math.abs(c.scale.x - onScale0.x) > 1e-6 || Math.abs(c.scale.y - onScale0.y) > 1e-6)) {
+      const copy = { ...c };
+      this.carriedList.push(copy); this.carried = copy; s.omSlot = this.carriedList.length - 1;
+      t.set(s, { omSlot: s.omSlot }, 0);
+      c = copy;
+    }
+    c.scale = onScale0;
     const n = this.#reading({ text: reading || spot.text || RigSVG.WEIGH_READING, x: spot.x, y: c.scale.y + (crown - offY - c.from.y) - 8 });
     // MÀN HÌNH CỦA CÁI CÂN (đợt 35, lượt ba): '0.0 kg' khi trống, số cân khi con vật đứng trên bệ, về '0.0 kg' khi bế ra — rig ghi chữ
     // ấy mỗi lần vẽ (`#drawScales`). Cân là đạo cụ (`scale`) hay đưa riêng (`display`: bối cảnh 3D, `scale` là một điểm).
@@ -4992,6 +5007,10 @@ class RigSVG {
     // Đợt 36: đầu CÚI hẳn về tấm bảng trước ngực (`lookAt`: nét mặt trượt xuống, mí hạ), thêm vào dáng nghiêng / hạ đầu ở trên.
     const face = this.#faceCentre(), boardAt = { x: face.x + m * face.r * 0.35, y: face.y + face.r * 2 };
     this.#lookTo(t, boardAt, 0, { d: 0.5 });
+    // Đợt 37: người đang ĐỨNG NGHIÊNG (quay về con vật, `huong` 0,55) — tấm bìa trước ngực hiện ngay dưới mặt trên màn hình, mà
+    // `#lookAngles` giữ đầu theo hướng thân (đích ở trước mặt): tia nhìn đi chéo sang con vật, lệch tấm bìa 59 % chiều cao mặt
+    // (acting_check). Lúc đọc, đầu quay về phía trước, chỗ tấm bìa — rồi ngẩng lên quay sang người nghe như cũ.
+    if (Math.abs(s.huong) > 0.15) t.to(s, { headTurn: clamp(-s.huong * CHART_FRONT, -RigSVG.LOOK_TURN_MAX, RigSVG.LOOK_TURN_MAX), duration: 0.5, ease: 'power2.inOut' }, 0);
     t.to(s, { ['bat' + k]: CHART_POSE.hold[0], ['cang' + k]: CHART_POSE.hold[1], ['itemZoom' + k]: CHART_POSE.zoom, ...read, cuoi: 0.25, mayL: 0.25, mayR: 0.25, duration: 0.5, ease: 'power2.out' }, 0);
     // Mắt dò từng dòng (trái → phải), đầu nhích theo dòng — vẫn cúi.
     const scan = (from, to) => { for (let a = from; a + 0.5 <= to; a += 0.5) t.to(s, { nhinX: -1.2, dau: read.dau - m * 1.5, duration: 0.08, ease: 'sine.out' }, a).to(s, { nhinX: 1.2, dau: read.dau + m * 1.5, duration: 0.38, ease: 'sine.inOut' }, a + 0.1); };
@@ -5027,7 +5046,9 @@ class RigSVG {
        .to(s, { dauY: 0, nhinY: 0, vai: N.vai, matY: 0, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
       // Đợt 36: GẬT THẬT — đầu cúi hẳn (`headPitch` lên CHART_NOD_PITCH ≈ 22°: nét mặt trượt xuống, mí hạ) cùng lúc hạ đầu, giữ ở đáy;
       // Gemini (1 khung / giây) thấy ngẩng lên mà "không gật" khi chỉ có `dauY`.
-      t.to(s, { headPitch: CHART_NOD_PITCH, duration: 0.3, ease: 'sine.inOut' }, a)
+      // Đợt 37: cúi THÊM CHART_NOD_PITCH tính từ chỗ đang nhìn người nghe — người nghe thấp (một đứa trẻ) thì đầu đã cúi sẵn
+      // ~13°, gật tới 22° tuyệt đối chỉ còn nhích 9° (acting_check: "giữa hai lần gật vẫn cúi 12°").
+      t.to(s, { headPitch: Math.min(1, Math.max(0, listen.headPitch) + CHART_NOD_PITCH), duration: 0.3, ease: 'sine.inOut' }, a)
        .to(s, { headPitch: listen.headPitch, duration: 0.3, ease: 'sine.inOut' }, a + 0.85);
     }
     // Tờ đã lật nằm sau bảng: đặt lại tờ trên cùng khi bìa đã hạ (khép xong) — không lật ngược lại trước mắt người xem.
@@ -5175,12 +5196,43 @@ class RigSVG {
   }
   static LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 
+  // LẦN BẾ (đợt 37): `carry` / `takePet` ghi một mục mới vào `carriedList` và bật `omSlot` tới nó từ đầu bước. Trước đây chỉ có
+  // một `this.carried`, ghi lúc DỰNG: một lần bế về sau (trả con vật cho chủ sau khi cân) ghi đè nó, và lúc phát các khung của lần
+  // cân đọc lần bế mới — mất `scale`, con vật về lại bàn thay vì đứng trên cân (combo `vaccinationVisit` + `dischargePet`).
+  // Lần bế GIỐNG HỆT đã có (`sequence()` dựng mỗi bước hai lần: bản nháp rồi bản thật) thì dùng lại số của nó — như `readoutN`:
+  // gọi thẳng và qua `sequence()` ra cùng một `omSlot` (tools/check.html so từng kênh).
+  #holdEntry(t, entry) {
+    const list = this.carriedList || (this.carriedList = []);
+    const key = (item) => JSON.stringify({ from: item.from, reach: item.reach, at: item.at, middle: item.middle, facing: item.facing });
+    let n = list.findIndex((item) => item.pet === entry.pet && item.host === entry.host && item.giver === entry.giver && key(item) === key(entry));
+    // Dùng lại NGUYÊN mục cũ (không ghi đè, không xoá trường): `scale` (cân) và `receiver` (trao) gắn thêm vào nó chỉ có tác dụng khi
+    // `omScale` / `omGive` bật — một lần bế sau trùng chỗ với lần cân không làm mất cái cân của nó.
+    if (n < 0) { list.push(entry); n = list.length - 1; }
+    this.carried = list[n];
+    // Ghi cả vào trạng thái LÚC DỰNG: `#khep` cuối bước giữ `omSlot` đang có — không thì cuối bước nó về lần bế trước.
+    this.s.omSlot = n;
+    t.set(this.s, { omSlot: this.s.omSlot }, 0);
+  }
+
+  // Lần bế của khung đang vẽ.
+  #carriedNow() {
+    const list = this.carriedList;
+    if (!list || !list.length) return this.carried;
+    return list[clamp(Math.round(this.s.omSlot || 0), 0, list.length - 1)] || this.carried;
+  }
+
   // ĐẶT CON VẬT ĐANG BẾ vào đúng chỗ (gọi trong `apDung`, là hàm của trạng thái): `om` ≥ 0,5 thì SVG của nó nằm trong
   // ngăn `om` (giữa thân và hai tay), ở vị trí trượt từ chỗ nó đứng (`from`) lên trước bụng theo `omRise`; dưới 0,5 thì
   // trả nó về host của nó, đúng như cũ. Ngăn mang phép biến đổi NGƯỢC của `tren` nên bên trong là hệ toạ độ của SVG gốc.
   #placeCarried() {
-    const c = this.carried, e = this.el, s = this.s;
+    const c = this.#carriedNow(), e = this.el, s = this.s;
     if (!c || !e.om) return;
+    // Con vật của một lần bế KHÁC còn nằm trong ngăn (tua qua chỗ đổi lần bế): trả nó về host của nó trước.
+    for (const node of [...e.om.children]) {
+      if (node === c.pet.svg) continue;
+      const owner = (this.carriedList || []).find((item) => item.pet.svg === node);
+      if (owner) { owner.host.appendChild(node); for (const [name, value] of owner.attrs) value === null ? node.removeAttribute(name) : node.setAttribute(name, value); owner.pet.apDung(); }
+    }
     const pet = c.pet, inside = pet.svg.parentNode === e.om;
     if (s.om < 0.5) {
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
@@ -5373,8 +5425,8 @@ class RigSVG {
       t.set(s, { petDrop: 1 }, HANDOVER_AT);
       drop = { x: want, y: spot.y + spot.h * 0.6 };
     }
-    this.carried = { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
-                     reach: this.#reachLow(drop), at: s.x, middle: from.middle, facing: s.huong, giver };
+    this.#holdEntry(t, { pet: from.pet, host: from.host, attrs: from.attrs, from: spot,
+                     reach: this.#reachLow(drop), at: s.x, middle: from.middle, facing: s.huong, giver });
     this.#offerArms(t, source, 0);
     t.to(s, { than: this.NGHI.than - dir * 3, nhinX: dir * 2, cuoi: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
     t.set(s, { om: 1, omRise: 0 }, HANDOVER_AT);
@@ -5468,8 +5520,8 @@ class RigSVG {
     // (Trừ phần hình vẽ đã dời khi con vật đi trong khung của nó — xem `#placeCarried`.)
     const vb = pet.svg.viewBox && pet.svg.viewBox.baseVal, walked = vb && vb.width ? (pet.s.x || 0) / vb.width : 0;
     const head = pet.el.dau ? pet.el.dau.getBoundingClientRect() : r, middle = r.width ? clamp((head.left + head.width / 2 - r.left) / r.width - walked, 0.1, 0.9) : 0.5;
-    this.carried = { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((name) => [name, pet.svg.getAttribute(name)]),
-                     from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong };
+    this.#holdEntry(t, { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((name) => [name, pet.svg.getAttribute(name)]),
+                     from: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }, reach, at: s.x, middle, facing: s.huong });
     const other = reach.k === 'L' ? 'R' : 'L';
     this.#leanTo(t, reach, 'xoe');
     t.to(s, { ['bat' + other]: reach.bend ? -reach.bend : reach.upper * 0.6, ['cang' + other]: -40, ['tay' + other]: 'xoe', duration: 0.45, ease: 'power2.out' }, 0);
@@ -12070,6 +12122,149 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
 return { CAMERA_LIMITS, OVERVIEW, createSet };
 })();
 
+/* ───── runtime/combos.js ───── */
+__m['runtime/combos.js'] = (function () {
+// COMBO — CẢNH NHỎ DỰNG SẴN (đợt 37): một tên gọi cho cả một chuỗi động tác đã có.
+//
+//   sequence(vet, [['fullCheckup', dog]])          → listen, examine tai, examine răng, takeTemp, readChart
+//   conversation(combo(vet, 'fullCheckup', dog))   → như trên, và con chó há miệng đúng lúc soi răng
+//   scene.json: { "who": "vet", "do": [["fullCheckup", "@cho"]] }   → mỗi bước một lượt (máy quay, con vật đáp lại…)
+//
+// Mỗi combo: `params` (tên tham số theo thứ tự), `steps` (bước như trong `sequence()`, "$tên" là chỗ của tham số) và
+// `vi` (cách nói trong kịch bản chữ, tools/script.py). Một bước có thể là { "step": [...], "with": { "$pet": [ bước… ] } }:
+// nhân vật kia diễn CÙNG LÚC (con vật há miệng khi soi răng). `sequence()` chỉ dựng phần của chính nhân vật; `combo()`,
+// tools/scene.py và tools/script.py dựng cả phần kia. Tham số không truyền: bước bỏ nó và các đối số sau nó.
+//
+// Khối giữa hai dòng BEGIN / END là JSON thuần — tools/scene.py và tools/script.py đọc thẳng nó (một bảng cho cả ba nơi).
+// BEGIN COMBOS
+const COMBOS = {
+  "greetCustomer": {
+    "params": [],
+    "about": "welcome someone: wave, bow, then a hand on the chest — \"welcome, I am…\"",
+    "steps": ["wave", "bow", "introduce"],
+    "vi": ["chào khách", "đón khách", "chào đón"]
+  },
+  "fullCheckup": {
+    "params": ["pet"],
+    "about": "a whole check-up: stethoscope, ears, teeth (the pet opens its mouth), temperature, then read the chart and nod",
+    "steps": [
+      ["listen", "$pet"],
+      ["examine", "$pet", "ears"],
+      { "step": ["examine", "$pet", "teeth"], "with": { "$pet": [["openMouth", 2.2]] } },
+      ["takeTemp", "$pet"],
+      "readChart"
+    ],
+    "vi": ["khám tổng quát", "khám tổng thể", "khám toàn diện", "khám sức khoẻ", "khám sức khỏe"]
+  },
+  "vaccinationVisit": {
+    "params": ["pet", "scale"],
+    "about": "a vaccination: weigh the pet, inject (held syringe), put the syringe away, give a treat, thumbs up",
+    "steps": [
+      ["weigh", "$pet", "$scale"],
+      ["inject", "$pet"],
+      "hideItem",
+      ["giveTreat", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["tiêm phòng", "tiêm ngừa", "chích ngừa", "tiêm vắc-xin", "tiêm vaccine"]
+  },
+  "goodNews": {
+    "params": [],
+    "about": "hearing good news: a relieved breath, thumbs up, a cheer",
+    "steps": ["relief", "thumbsUp", "cheer"],
+    "vi": ["tin vui", "báo tin vui", "mừng rỡ", "mừng quá"]
+  },
+  "badNews": {
+    "params": [],
+    "about": "giving or hearing bad news: worried hands, a sad face, a slow nod",
+    "steps": ["worry", ["express", "sad", 1.4], "nod"],
+    "vi": ["tin buồn", "báo tin buồn", "buồn bã"]
+  },
+  "waitingImpatient": {
+    "params": [],
+    "about": "waiting too long: check the watch, look around, fold the arms",
+    "steps": ["checkWatch", "lookAround", ["crossArms", 1.6]],
+    "vi": ["sốt ruột", "sốt ruột chờ", "chờ lâu", "đợi lâu", "nóng ruột"]
+  },
+  "dischargePet": {
+    "params": ["pet", "owner"],
+    "about": "send a pet home: pick it up, hand it to the owner, count off three instructions, wave goodbye",
+    "steps": [
+      ["carry", "$pet"],
+      ["handOverPet", "$owner"],
+      ["countFingers", 3],
+      "wave"
+    ],
+    "vi": ["trả thú", "trả về", "giao thú", "xuất viện", "trả bé về"]
+  }
+};
+// END COMBOS
+
+const isPlaceholder = (value) => typeof value === 'string' && /^\$[A-Za-z_]\w*$/.test(value);
+
+/** Thay "$tên" trong một bước bằng giá trị thật; tham số không có → bỏ nó và mọi đối số sau nó. */
+function fill(step, values) {
+  const parts = Array.isArray(step) ? step : [step];
+  const out = [];
+  for (const part of parts) {
+    if (isPlaceholder(part)) {
+      const value = values[part.slice(1)];
+      if (value === undefined || value === null) break;
+      out.push(value);
+    } else out.push(part);
+  }
+  return Array.isArray(step) ? out : out[0];
+}
+
+/** Các giá trị tham số của combo `name` theo tên. Ném lỗi nếu thiếu tham số bắt buộc (mọi tham số trừ cái cuối có thể bỏ). */
+function bind(name, args) {
+  const combo = COMBOS[name];
+  const values = {};
+  combo.params.forEach((param, n) => { values[param] = args[n]; });
+  // Tham số dùng làm ĐÍCH đầu tiên của một bước (con vật, người nhận) là bắt buộc.
+  for (const raw of combo.steps) {
+    const step = raw && !Array.isArray(raw) && typeof raw === 'object' ? raw.step : raw;
+    if (Array.isArray(step) && isPlaceholder(step[1]) && (values[step[1].slice(1)] === undefined || values[step[1].slice(1)] === null)) {
+      throw new Error(`[character] combo "${name}" needs ${combo.params.map((p) => `"${p}"`).join(', ')} — missing "${step[1].slice(1)}"`);
+    }
+  }
+  return values;
+}
+
+const isCombo = (name) => typeof name === 'string' && Object.prototype.hasOwnProperty.call(COMBOS, name);
+
+/** Các bước của CHÍNH nhân vật làm combo (phần "with" của nhân vật khác bị bỏ) — `sequence()` dùng. */
+function expandCombo(name, args = []) {
+  if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
+  const values = bind(name, args);
+  return COMBOS[name].steps.map((raw) => fill(raw && !Array.isArray(raw) && typeof raw === 'object' ? raw.step : raw, values));
+}
+
+/**
+ * Combo thành các LƯỢT của `conversation()`: mỗi bước một lượt `[rig, bước]`, bước có "with" thành
+ * `{ together: [[rig, bước], [nhân vật kia, …bước của nó]] }`.
+ *
+ *   conversation([...combo(vet, 'fullCheckup', dog), [vet, ['explain', 'Bé khoẻ lắm!', 2]]])
+ */
+function combo(rig, name, ...args) {
+  if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
+  const values = bind(name, args);
+  return COMBOS[name].steps.map((raw) => {
+    if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+      const together = [[rig, fill(raw.step, values)]];
+      for (const [key, steps] of Object.entries(raw.with || {})) {
+        const other = values[key.slice(1)];
+        if (other) together.push([other, ...steps.map((step) => fill(step, values))]);
+      }
+      return together.length > 1 ? { together } : together[0];
+    }
+    return [rig, fill(raw, values)];
+  });
+}
+
+return { COMBOS, isCombo, expandCombo, combo };
+})();
+
 /* ───── characters/receptionist.js ───── */
 __m['characters/receptionist.js'] = (function () {
 // Receptionist — the worked EXAMPLE of a custom character: the nurse's head with new hair,
@@ -12401,9 +12596,10 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
+const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.77.0';
+const VERSION = '0.78.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 
@@ -12692,6 +12888,7 @@ function list() {
     expressions: Object.keys(RigSVG.EXPRESSIONS),
     props: [...PROP_KINDS],
     bakedConfigs: Object.keys(bakedConfigs),
+    combos: Object.fromEntries(Object.entries(COMBOS).map(([name, value]) => [name, { params: value.params, about: value.about }])),
   };
 }
 
@@ -12719,7 +12916,15 @@ const SPEECH_SETTLE = 0.55;
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
 
+// COMBO (đợt 37, runtime/combos.js): một bước `['fullCheckup', pet]` bung ra thành các bước của nó, ngay tại chỗ.
+const expandCombos = (stepList) => stepList.flatMap((step) => {
+  if (typeof step === 'number') return [step];
+  const [name, ...args] = Array.isArray(step) ? step : [step];
+  return isCombo(name) && typeof name === 'string' ? expandCombos(expandCombo(name, args)) : [step];
+});
+
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
+  stepList = expandCombos(stepList);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
@@ -13344,7 +13549,7 @@ dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
 
 
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
 })();
 
 __m['runtime/index.js'].__setBakedConfigs({});

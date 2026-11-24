@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.78.0
+
+Added: combos (wave 37), one step for a whole short scene, built from the actions that already exist
+- **`runtime/combos.js`**: seven combos, `greetCustomer` (wave, bow, introduce), `fullCheckup(pet)` (listen, examine ears,
+  examine teeth with the pet's `openMouth` at the same time, takeTemp, readChart), `vaccinationVisit(pet, scale)` (weigh, inject,
+  hideItem, giveTreat, thumbsUp), `goodNews` (relief, thumbsUp, cheer), `badNews` (worry, a sad face, nod), `waitingImpatient`
+  (checkWatch, lookAround, crossArms) and `dischargePet(pet, owner)` (carry, handOverPet, countFingers 3, wave). One JSON table,
+  read by the runtime, `tools/scene.py` and `tools/script.py`.
+- **Runtime**: a combo is a step like any other. `sequence(vet, [['fullCheckup', dog]])` expands it in place.
+  `VGCharacter.combo(rig, name, ...args)` gives `conversation()` turns, with the other character's part as `together`.
+  `VGCharacter.COMBOS`, `list().combos`. A missing pet or owner throws with the parameter's name.
+- **Scene files**: `"do": [["vaccinationVisit", "@cho", "can"]]`. Every step becomes a turn of its own, so the camera, the
+  pet's answers, kneeling and stepping closer work as on hand-written turns. A `say` on the same turn is spoken first, as its own
+  turn. `exit` goes on the last step. A combo inside `together`, a missing target or too many arguments are refused with a
+  message.
+- **Vietnamese scripts**: "bác sĩ → chó: khám tổng quát" / "tiêm phòng"; "bác sĩ → chó → bé trai: trả thú" (a combo with two
+  targets); "lễ tân: [chào khách]", "[tin vui]", "[tin buồn]", "[sốt ruột]". The syringe, clipboard and scale come by themselves.
+  A second item goes to the other hand (syringe right, clipboard left).
+- Action catalog rows `combo …` (review sheet / reel). CI: scene `combo37` (waiting, greeting, vaccination, good news, sending
+  the dog home with the boy, bad news) passes `tools/acting_check.py` 58 / 58. `checkup37` (a full check-up with the boy
+  listening) passes 48 / 48.
+  `check.html` checks the runtime expansion.
+
+Fixed
+- **Weighing a pet, then later handing it to someone, put it back on the table instead of the scale.** The person rig kept one
+  `carried` record, written while building. The later `carry` replaced it, and the frames of the weigh lost the scale. Each
+  carry or takePet now has its own entry in `rig.carriedList`, picked per frame by a new state channel `omSlot`. Before:
+  "paws 25 % of height off the top of the scale", "cho moves away from the hand" (12 frames). After: 26 / 26.
+- **`readChart` to a short listener: the nod did not read as a nod.** Looking at a child already bends the head about 14°, and
+  the nod went to 22° in all, so it moved only 8° further. The nod now bends 22° *further* than the gaze to the listener.
+  `acting_check` measures the nod from that gaze (between nods 0°, bottoms 18°).
+- **`readChart` while turned three-quarters toward a pet: the head pointed past the clipboard.** The board sits just under
+  the face on screen, but the head stayed turned with the body, so the ray ran toward the pet 59 % of the face height off the
+  board. While reading, the head now turns to the front (`CHART_FRONT`, 0.65 of the body turn), then turns to the listener
+  as before. Ray off the board: 59 % → 2 %.
+- **`examine`: the vet smiled at the camera and covered the pet's head.** The head now turns and bends to the spot being
+  examined (`lookAt`, as for `takeTemp` in 0.77.0). `tools/scene.py` stands the vet a little further off (0.16 → 0.2 of
+  the person's height). Pet's head in view: 54–59 % → 73–77 %. The vet looks at the pet: ray off its head 15 %. Check-up scene
+  with a third person in the room: 62 / 66 → 68 / 68.
+- `acting_check`: new measure "head turned to the pet's head" for `examine` (in `fullCheckup` and on its own).
+
+Known (found while trying the combos, not caused by them)
+- A turn with both `say` and `weigh` measures the pet off the scale (the combo avoids it by speaking first).
+- A scale standing beside the vet is cut by the frame edge in a medium shot of a person on that side (the camera keeps clear
+  of furniture in use, but not this one).
+- The combos have not been reviewed by Gemini on a rendered film yet.
+
 ## 0.77.0
 
 Added — the rig itself (wave 36: two agents in parallel), for the reviewer's two standing misses in 0.76.0

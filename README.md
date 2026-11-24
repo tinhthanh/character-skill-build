@@ -30,6 +30,8 @@ And what a scene can do with them:
 - **Conversations** — `conversation([[rig, ...steps], …], { camera })` chains turns, times them
   and cuts to whoever speaks; `captions(talk, element)` shows the words;
   `examples/conversation/` is a complete two-person scene.
+- **Combos** — one step for a whole short scene: `greetCustomer`, `fullCheckup(pet)`, `vaccinationVisit(pet, scale)`,
+  `goodNews`, `badNews`, `waitingImpatient`, `dischargePet(pet, owner)`; in scripts as "khám tổng quát", "tiêm phòng", "trả thú"…
 - **Tone of voice** — a line can be spoken worried, sad, angry, laughing… (`{ mood }` on the
   speaking step); nine expressions in all, and a whole-body `cheer`.
 - **Voice and camera** — `tools/cues.py voice.wav` turns a voice file into mouth cues for

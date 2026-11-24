@@ -98,6 +98,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
+               Combos (runtime/combos.js — each step becomes a turn of its own; a "say" on that turn comes first):
+               "greetCustomer", ["fullCheckup", "@pet"], ["vaccinationVisit", "@pet", "<scale>"], "goodNews", "badNews",
+               "waitingImpatient", ["dischargePet", "@pet", "@owner"].
                Exam room: ["weigh", "@pet", "<scale cutout name>"] (picks the pet up, sets it on a set.cutouts "scale" with a
                "name" — stand it beside the person, same z ±60 — reads the number, a big display pops up with the scale's
                "reading", the scale's own display reads 0 until the pet is on it; puts the pet back; optional 4th
@@ -333,6 +336,90 @@ ROOM_DEFAULTS = {'width': 1800, 'depth': 1300, 'height': 700, 'front': 200, 'flo
                  'wall': 'linear-gradient(#d9e8ec, #c3d8de)', 'sideWall': 'linear-gradient(#cfdfe4, #b8ced5)'}
 
 
+def load_combos():
+    """COMBO (đợt 37): bảng JSON giữa hai dòng BEGIN / END COMBOS của runtime/combos.js — một bảng cho runtime, scene.py, script.py."""
+    source = open(os.path.join(ROOT, 'runtime', 'combos.js'), encoding='utf-8').read()
+    block = re.search(r'// BEGIN COMBOS\nexport const COMBOS = (\{.*\});\n// END COMBOS', source, re.S)
+    if not block: fail('runtime/combos.js: the COMBOS block between "// BEGIN COMBOS" and "// END COMBOS" is missing')
+    return json.loads(block.group(1))
+
+
+COMBOS = load_combos()
+
+
+def combo_fill(step, values):
+    """Thay "$tên" bằng giá trị; tham số không có → bỏ nó và mọi đối số sau nó (như fill() trong runtime/combos.js)."""
+    parts = step if isinstance(step, list) else [step]
+    out = []
+    for part in parts:
+        if isinstance(part, str) and re.match(r'^\$[A-Za-z_]\w*$', part):
+            value = values.get(part[1:])
+            if value is None: break
+            out.append(value)
+        else: out.append(part)
+    return out if isinstance(step, list) else out[0]
+
+
+def combo_turns(who, name, args, where):
+    """Một combo của `who` → các lượt kịch bản: mỗi bước một lượt; bước có "with" → { together: […] } với nhân vật kia."""
+    combo = COMBOS[name]
+    if len(args) > len(combo['params']): fail(f'{where}: combo "{name}" takes {len(combo["params"])} argument(s) ({", ".join(combo["params"]) or "none"}), got {len(args)}')
+    values = dict(zip(combo['params'], args))
+    turns = []
+    for raw in combo['steps']:
+        own = raw['step'] if isinstance(raw, dict) else raw
+        if isinstance(own, list) and len(own) > 1 and isinstance(own[1], str) and own[1].startswith('$') and values.get(own[1][1:]) is None:
+            fail(f'{where}: combo "{name}" needs {", ".join(combo["params"])} — e.g. ["{name}", ' + ', '.join(f'"@{p}"' for p in combo['params']) + ']')
+        step = combo_fill(own, values)
+        turn = {'who': who, 'do': [step]}
+        partners = []
+        for key, steps in (raw.get('with') or {}).items() if isinstance(raw, dict) else []:
+            other = values.get(key[1:])
+            if isinstance(other, str) and other.startswith('@'): partners.append({'who': other[1:], 'do': [combo_fill(s, values) for s in steps]})
+        turns.append({'together': [turn] + partners} if partners else turn)
+    return turns
+
+
+def expand_combos(script):
+    """Kịch bản có bước combo (`["fullCheckup", "@cho"]`) → mỗi bước của combo thành một lượt riêng, để mọi thứ tools/scene.py
+    làm cho một lượt (máy quay, con vật đáp lại, quỳ xuống, bước lại gần…) áp dụng cho từng bước. Các khoá khác của lượt
+    (say, mood, view, toast…) ở lượt đầu — có "say" thì chúng thành một lượt nói riêng trước combo; "exit" ở lượt cuối."""
+    if not isinstance(script, list): return script
+    out = []
+    for index, entry in enumerate(script):
+        where = f'script[{index}]'
+        if isinstance(entry, dict) and isinstance(entry.get('together'), list):
+            for turn in entry['together']:
+                for step in (turn.get('do') or []) if isinstance(turn, dict) and isinstance(turn.get('do'), list) else []:
+                    name = step[0] if isinstance(step, list) and step else step
+                    if isinstance(name, str) and name in COMBOS: fail(f'{where}: combo "{name}" cannot be inside "together" — give it a turn of its own')
+            out.append(entry); continue
+        if not isinstance(entry, dict) or not isinstance(entry.get('do'), list): out.append(entry); continue
+        if not any(isinstance(n, str) and n in COMBOS for n in ((s[0] if isinstance(s, list) and s else s) for s in entry['do'])):
+            out.append(entry); continue
+        rest = {k: v for k, v in entry.items() if k not in ('do', 'exit')}
+        pieces, plain = [], []
+        for step in entry['do']:
+            name = step[0] if isinstance(step, list) and step else step
+            if isinstance(name, str) and name in COMBOS:
+                if plain: pieces.append({'who': entry.get('who'), 'do': plain}); plain = []
+                pieces += combo_turns(entry.get('who'), name, list(step[1:]) if isinstance(step, list) else [], where)
+            else: plain.append(step)
+        if plain: pieces.append({'who': entry.get('who'), 'do': plain})
+        if 'say' in rest:
+            # Lời của lượt NÓI TRƯỚC, thành một lượt riêng: rồi mới tới từng bước. (Một lượt vừa "say" vừa "weigh" đo con vật
+            # trên cân sai giờ — Known 0.78.0; và người xem nghe xong mới thấy làm.)
+            out.append({'who': entry.get('who'), **rest})
+        else:
+            first = pieces[0]['together'][0] if 'together' in pieces[0] else pieces[0]
+            first.update(rest)
+        if 'exit' in entry:
+            last = pieces[-1]['together'][0] if 'together' in pieces[-1] else pieces[-1]
+            last['exit'] = entry['exit']
+        out += pieces
+    return out
+
+
 def check_camera(values, where):
     if 'pitch' in values and not PITCH_LIMITS[0] <= values['pitch'] <= PITCH_LIMITS[1]:
         fail(f'{where}: pitch {values["pitch"]} is outside {PITCH_LIMITS[0]}…{PITCH_LIMITS[1]}° — from higher up the characters read as cards standing on the floor. For a view of the whole room use "wide": true')
@@ -505,6 +592,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                             'check': dict({'kind': op['kind'], 'who': op['who'], 'target': op['target'], 'to': REACH_ACTIONS[op['kind']], 'times': times},
                                           # BẾ (đợt 35, lượt bốn): mỗi 1/30 s suốt bước — con vật không nhảy chỗ giữa hai khung
                                           **({'samples': [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]} if op['kind'] == 'carry' else {}),
+                                          # SOI (đợt 37): đầu quay / cúi về đầu con vật lúc soi tai, mắt, răng — không nhìn ra máy quay.
+                                          **({'gaze': [{'times': times, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}]} if op['kind'] == 'examine' and pet else {}),
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}),
@@ -896,6 +985,7 @@ def main():
     if args.no_outro: scene.pop('outro', None)
     if args.no_grain and isinstance(scene.get('set'), dict): scene['set']['grain'] = False
     known('scene', scene, TOP_KEYS)
+    scene['script'] = expand_combos(scene.get('script'))
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
     stage_set = scene.get('set')
@@ -1605,7 +1695,7 @@ def main():
                 # chibi chỉ chĩa về phía đầu mà không tới — đèn soi rọi vào thành bàn.
                 # Bắt tay 0,22: mỗi cánh tay chibi chỉ vươn ~0,09 chiều cao — đứng 0,38 thì hai bàn tay cách nhau 24 % chiều cao
                 # (đo bằng tools/acting_check.py, đợt 28).
-                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.16, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19, 'bandage': 0.16, 'putCone': 0.24}.get(step[0], 0.24) * who['_host_height']
+                wanted = {'handOver': 0.28, 'handOverPet': 0.34, 'handshake': 0.22, 'examine': 0.2, 'giveTreat': 0.16, 'givePill': 0.18, 'takeTemp': 0.19, 'bandage': 0.16, 'putCone': 0.24}.get(step[0], 0.24) * who['_host_height']
                 target = names[step[1][1:]]
                 # CHO UỐNG THUỐC con chó / thỏ (đợt 36 — Gemini: "chỉ một tay gần mõm, không thấy viên thuốc" ở cảnh corgi): thân dài, ĐẦU
                 # nằm ở đầu gần người (nó quay mặt về người) — đứng 0,18 tính từ GIỮA thân là đứng đè lên đầu nó, hai bàn tay chồng lên

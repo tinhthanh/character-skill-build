@@ -1575,7 +1575,8 @@ try {
       let compared = 0;
       for (const [id, list] of [['vet', catalog.people], ['dog', catalog.pets], ['cat', catalog.pets], ['rabbit', catalog.pets], ['corgi', catalog.pets]]) {
         const kind = id in RigThu.LOAI ? RigThu.LOAI[id].loai : null;
-        for (const entry of list.filter((item) => item.steps.length === 1 && (!item.species || item.species === kind))) {
+        // Combo (đợt 37) không có hàm trên rig để gọi thẳng — chỉ chạy qua sequence(); tools/check_scene.py thử nó trong cảnh.
+        for (const entry of list.filter((item) => item.steps.length === 1 && !L.COMBOS[Array.isArray(item.steps[0]) ? item.steps[0][0] : item.steps[0]] && (!item.species || item.species === kind))) {
           await new Promise((resolve) => setTimeout(resolve, 0));        // nhường lượt: trang vẫn trả lời chrome_run giữa chừng (CI chậm)
           stage.replaceChildren(); L.seed(5);
           const direct = build(id, entry, 0), keys = Object.keys(direct.rig.NGHI);
@@ -1603,6 +1604,28 @@ try {
         }
       }
       if (compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
+      stage.remove();
+    }
+    // ĐỢT 37 — COMBO: `sequence()` bung combo thành các bước của nó (không còn tên combo trong `steps`); `combo()` trả lượt
+    // `conversation()`, bước "with" thành `together` với con vật; thiếu con vật thì báo lỗi rõ.
+    {
+      const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
+      const host = document.createElement('div'); host.style.cssText = 'position:absolute;left:0;top:0;width:200px;height:235px'; stage.appendChild(host);
+      const petHost = document.createElement('div'); petHost.style.cssText = 'position:absolute;left:110px;top:108px;width:100px;height:82px'; stage.appendChild(petHost);
+      const vet = L.createCharacter(host, { id: 'vet', items: { R: 'clipboard' }, itemsHidden: true }).rig, dog = L.createPet(petHost, { species: 'dog' }).rig;
+      const names = (line) => line.data.steps.map((step) => step.name).join(',');
+      const greet = L.sequence(vet, ['greetCustomer', 'nod'], { breathe: false });
+      if (names(greet) !== 'wave,bow,introduce,nod') hong('combo.greetCustomer', `sequence steps are ${names(greet)}`);
+      const plain = L.sequence(vet, ['wave', 'bow', 'introduce', 'nod'], { breathe: false });
+      if (Math.abs(plain.duration() - greet.duration()) > 1e-6) hong('combo.greetCustomer', `lasts ${greet.duration().toFixed(2)} s, the same steps by hand ${plain.duration().toFixed(2)} s`);
+      greet.kill(); plain.kill();
+      const turns = L.combo(vet, 'fullCheckup', dog);
+      const teeth = turns.find((turn) => turn && turn.together);
+      if (turns.length !== 5 || !teeth || teeth.together[1][0] !== dog || teeth.together[1][1][0] !== 'openMouth') hong('combo.fullCheckup', `combo() turns are wrong: ${JSON.stringify(turns.map((turn) => (turn.together ? 'together' : turn[1])))}`);
+      let refused = '';
+      try { L.sequence(vet, ['fullCheckup']); } catch (error) { refused = String(error.message); }
+      if (!/needs "pet"/.test(refused)) hong('combo.fullCheckup', `without a pet: expected an error naming "pet", got ${JSON.stringify(refused)}`);
+      if (!L.list().combos || !L.list().combos.dischargePet) hong('combo', 'list().combos does not list the combos');
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.

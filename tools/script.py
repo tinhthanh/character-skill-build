@@ -43,6 +43,9 @@ Một tệp kịch bản:
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
                                        con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
     con vật: [lăn ngửa] [đuổi đuôi] [nhào] [gặm cà rốt]   chó / mèo lăn ngửa, chó đuổi đuôi, mèo nhào, thỏ gặm cà rốt
+    COMBO (cả một chuỗi):              bác sĩ → chó: khám tổng quát · bác sĩ → chó: tiêm phòng (cân, tiêm, cho bánh)
+                                       bác sĩ → chó → bé trai: trả thú (bế, trao cho chủ, dặn ba điều, vẫy chào)
+                                       lễ tân: [chào khách] · bé trai: [tin vui] / [tin buồn] / [sốt ruột]
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
@@ -98,6 +101,11 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
 # (một tay giữ đầu, một tay đưa viên thuốc vào mõm). "cho thuốc" vẫn là đưa viên thuốc như bánh thưởng (`giveTreat`).
 TARGETED.update({'cân': ('weigh', 'can'), 'cân ký': ('weigh', 'can'), 'đo nhiệt độ': ('takeTemp', None), 'đo nhiệt': ('takeTemp', None), 'cặp nhiệt': ('takeTemp', None),
                  'cho uống thuốc': ('givePill', None), 'bón thuốc': ('givePill', None)})
+# ĐỢT 37 — COMBO: một câu cho cả một chuỗi động tác (bảng chung ở runtime/combos.js, khoá "vi"). Combo không đích viết trong
+# ngoặc ("lễ tân: [chào khách]"); combo có đích viết "→" ("bác sĩ → chó: khám tổng quát", "bác sĩ → chó → bé trai: trả thú").
+sys.path.insert(0, HERE)
+from scene import COMBOS, expand_combos       # noqa: E402
+COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
 SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
 MARKS = {'!': '!', '?': '?', 'tim': 'heart', 'zzz': 'zzz', 'mồ hôi': 'sweat', 'giận': 'anger', 'nhạc': 'music', 'chóng mặt': 'dizzy'}
 HEAD_KEYS = ('bối cảnh', 'máy', 'khung', 'mở đầu', 'kết thúc', 'logo', 'nhạc', 'âm lượng nhạc', 'ánh sáng')
@@ -213,6 +221,15 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     def turn_of(body, where):
         """Một lượt: "tên (tâm trạng): lời" · "tên: [hành động…]" · "tên → tên khác: hành động"."""
         m = re.match(r'^(.+?)\s*→\s*(.+?)\s*:\s*(.+)$', body)
+        if m and m.group(3).strip().lower().strip('[]') in COMBO_WORDS:
+            who, verb = who_of(m.group(1), where), m.group(3).strip().lower().strip('[]')
+            name = COMBO_WORDS[verb]
+            targets = [f'@{who_of(part, where)}' for part in re.split(r'\s*→\s*', m.group(2))]
+            params = COMBOS[name]['params']
+            if len(targets) > len(params) or not params:
+                raise ScriptError(f'{where}: "{verb}" cần {len(params)} đích ({", ".join(params) or "không có"}) — ví dụ: "bác sĩ → chó → bé trai: trả thú"')
+            if 'scale' in params and len(targets) == params.index('scale'): targets.append(SCALE_NAME)      # tiêm phòng: cân bằng cái cân tự thêm
+            return {'who': who, 'do': [[name] + targets]}
         if m:
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
@@ -239,6 +256,8 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 elif word in SWITCHES: turn['lamp'] = SWITCHES[word]
                 elif word in POWER: turn['power'] = POWER[word]
                 elif word in SKIES: turn['sky'] = SKIES[word]
+                elif word in COMBO_WORDS and not COMBOS[COMBO_WORDS[word]]['params']: turn.setdefault('do', []).append(COMBO_WORDS[word])
+                elif word in COMBO_WORDS: raise ScriptError(f'{where}: "{word}" cần đích — viết "tên → con vật: {word}"')
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:
@@ -264,6 +283,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             if pending: script[-1]['toast'] = pending; pending = None
     if pending and script: (script[-1]['together'][0] if 'together' in script[-1] else script[-1])['toast'] = pending
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
+    script = expand_combos(script)              # combo → từng lượt: đồ cầm (ống tiêm, bìa hồ sơ), cái cân… tính như viết tay
 
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
@@ -278,6 +298,11 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             if item and who and not who.get('holds') and not who.get('species'):
                 who['holds'] = item
                 if item in ('syringe', 'clipboard'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án
+            elif item and who and isinstance(who.get('holds'), str) and who['holds'] != item and not who.get('species') and who.get('holdsHidden'):
+                # Món thứ hai (đợt 37: "tiêm phòng" rồi "khám tổng quát" — ống tiêm VÀ bìa hồ sơ): tay kia. Ống tiêm ở tay phải
+                # (tay mặc định, như khi chỉ có nó).
+                first = who['holds']
+                who['holds'] = {'R': 'syringe', 'L': item if first == 'syringe' else first} if 'syringe' in (first, item) else {'R': first, 'L': item}
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
     # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
     # mặt phẳng của người ấy).
