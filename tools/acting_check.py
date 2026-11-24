@@ -598,7 +598,7 @@ LIFT_40 = 0.12         # nhảy vui: bàn chân thấp nhất cách sàn ≥ 12 
 TWITCH_N = 4           # giật mũi: mũi đổi chiều (phình / xẹp) ≥ 4 lần, biên độ ≥ 15 % bề ngang mũi
 
 
-def check_pet40(folder, c, track, what):
+def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `check_pet40` là của đợt 40 A)
     """Phép đo riêng cho mười động tác đợt 40 B (track = các khung mỗi 0,1 s suốt bước)."""
     name, who, times = c['name'], c['who'], c.get('samples', [])
     fr = [f[who] for f in track if f.get(who)]
@@ -718,7 +718,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         share = (span[1] - span[0]) / H if span else 0
         out.append({'scene': folder, 'what': f'{what} — big enough in the frame', 'ok': share >= PET_SHARE,
                     'note': f'{c["who"]} is {share * 100:.0f} % of the frame height at {t:g} s (least {PET_SHARE * 100:g} %)'})
-    if c['name'] in PET_ACTS_40_NAMES and track: out.extend(check_pet40(folder, c, track, what))       # đợt 40 B
+    if c['name'] in PET_ACTS_40_NAMES and track: out.extend(check_pet40b(folder, c, track, what))       # đợt 40 B
     if c['name'] == 'chaseTail' and track:
         sides = [1 if f[c['who']]['facing'] >= 0 else -1 for f in track if f[c['who']].get('facing') is not None]
         flips = sum(1 for a, b in zip(sides, sides[1:]) if a != b)

@@ -1292,7 +1292,7 @@ with tempfile.TemporaryDirectory() as work:
     pets40 = {'pets40a': {'id': 'pets40a', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -330, 'z': -500, 'faces': 'be'}],
                         'script': [{'who': 'cho', 'do': [['playBow', 1.4]]}, {'who': 'cho', 'do': [['howl', 1.8]]}, {'who': 'cho', 'do': [['dig', 5]]}, {'who': 'cho', 'do': [['carryToy', 90, {'kind': 'rope'}]]},
                                    {'who': 'cho', 'do': [['carryToy', '@be', {'kind': 'bone'}]]}, {'who': 'cho', 'do': [['leanOnLeg', '@be', 2]]}, {'who': 'cho', 'do': [['tugOfWar', '@be', 2.4]]}]},
-               'pets40b': {'id': 'pets40b', 'camera': 'auto', 'set': {'preset': 'park'}, 'characters': [{'name': 'vet', 'id': 'vet', 'x': 0, 'z': -500}, {'name': 'husky', 'species': 'husky', 'x': -300, 'z': -500, 'faces': 'vet'}],
+               'pets40a_park': {'id': 'pets40a-park', 'camera': 'auto', 'set': {'preset': 'park'}, 'characters': [{'name': 'vet', 'id': 'vet', 'x': 0, 'z': -500}, {'name': 'husky', 'species': 'husky', 'x': -300, 'z': -500, 'faces': 'vet'}],
                         'script': [{'who': 'husky', 'do': [['playBow', 1.2]]}, {'who': 'husky', 'do': [['leanOnLeg', '@vet', 2]]}, {'who': 'husky', 'do': [['tugOfWar', '@vet', 2.4]]}, {'who': 'husky', 'do': [['howl', 1.6]]}]}}
     for key, scene in pets40.items():
         path = os.path.join(os.path.dirname(stage), f'_check_{key}.json')
