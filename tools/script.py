@@ -100,6 +100,11 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'băng chân': ('bandage', None), 'băng bó': ('bandage', None), 'quấn băng': ('bandage', None), 'băng': ('bandage', None),
             'đeo loa': ('putCone', None), 'đeo vòng chống liếm': ('putCone', None), 'đeo vòng cổ chống liếm': ('putCone', None),
             'liếm': ('lick', None), 'liếm tay': ('lick', None), 'liếm mặt': ('lick', None), 'nấp': ('hide', None), 'trốn': ('hide', None), 'nấp sau': ('hide', None)}
+# ĐỢT 39 A — quầy thu ngân & quầy cà phê: trả tiền (quét mã QR / quẹt thẻ), thối tiền, đóng dấu thẻ, rót nước, lau quầy. Người làm tự có đồ cần cầm
+# (điện thoại, thẻ ngân hàng, xấp tiền, thẻ tích điểm, cốc) — xem `needs` bên dưới; người nhận có sẵn món đồ đang cất (tools/scene.py).
+TARGETED.update({'thối tiền': ('giveChange', None), 'trả tiền thừa': ('giveChange', None), 'đóng dấu': ('stampCard', None), 'đóng dấu thẻ': ('stampCard', None)})
+ACTIONS.update({'trả tiền': 'payByQR', 'quét mã': 'payByQR', 'quét qr': 'payByQR', 'quét mã qr': 'payByQR', 'thanh toán': 'payByQR', 'quẹt thẻ': 'payByCard',
+                'đóng dấu': 'stampCard', 'đóng dấu thẻ': 'stampCard', 'rót nước': 'pourDrink', 'pha cà phê': 'pourDrink', 'rót': 'pourDrink', 'lau bàn': 'wipeCounter', 'lau quầy': 'wipeCounter'})
 # ĐỢT 35 — phòng khám: cân (bế con vật đặt lên cân — cảnh tự có một cái cân "can" cạnh người cân), đo nhiệt độ, cho uống thuốc
 # (một tay giữ đầu, một tay đưa viên thuốc vào mõm). "cho thuốc" vẫn là đưa viên thuốc như bánh thưởng (`giveTreat`).
 TARGETED.update({'cân': ('weigh', 'can'), 'cân ký': ('weigh', 'can'), 'đo nhiệt độ': ('takeTemp', None), 'đo nhiệt': ('takeTemp', None), 'cặp nhiệt': ('takeTemp', None),
@@ -311,13 +316,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
     needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag'}
+    needs.update({'payByQR': 'phone', 'payByCard': 'card', 'giveChange': 'cash', 'stampCard': 'stampcard', 'pourDrink': {'kind': 'cup', 'open': True}})       # đợt 39 A
     for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
         for step in turn.get('do', []) if isinstance(turn, dict) else []:
             item = needs.get(step[0] if isinstance(step, list) and step else step if isinstance(step, str) else None)
             who = next((c for c in characters if c['name'] == turn.get('who')), None)
             if item and who and not who.get('holds') and not who.get('species'):
-                who['holds'] = item
-                if item in ('syringe', 'clipboard'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án
+                who['holds'] = item if isinstance(item, str) else {'L': item}
+                if item in ('syringe', 'clipboard', 'cash', 'stampcard'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án / thối tiền / đóng dấu (đợt 39 A: cash, stampcard)
             elif item and who and isinstance(who.get('holds'), str) and who['holds'] != item and not who.get('species') and who.get('holdsHidden'):
                 # Món thứ hai (đợt 37: "tiêm phòng" rồi "khám tổng quát" — ống tiêm VÀ bìa hồ sơ): tay kia. Ống tiêm ở tay phải
                 # (tay mặc định, như khi chỉ có nó).

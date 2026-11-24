@@ -1630,6 +1630,144 @@ def check_pair(folder, c, shots, scales):
     return out
 
 
+# ĐỢT 39 A — quầy thu ngân & quầy cà phê (số đo từ `set.careProbe()` → `d39` của người, `@pay39` của đế thanh toán; moments.json `desk39`).
+DESK_QR = 0.16        # quét QR: tâm điện thoại cách tâm mã QR ≤ 16 % chiều cao người (mã lộ ra cạnh máy)
+DESK_READER = 0.10    # quẹt thẻ: tâm thẻ cách tâm máy quẹt ≤ 10 %
+DESK_TICK = 0.14      # dấu tick xanh nằm cạnh điện thoại / thẻ
+DESK_STAMP = 0.06     # đóng dấu: mặt con dấu cách ô đóng dấu ≤ 6 %; dấu đỏ cách ô ≤ 5 %
+DESK_STILL = 0.012    # đóng dấu: lúc ấn, con dấu dời ≤ 1,2 % giữa hai khung (ấn giữ, không đung đưa)
+DESK_HANDS = 0.12     # đếm tiền: hai bàn tay cách nhau ≤ 12 % lúc tờ tiền sang tay
+
+
+def check_desk39(folder, c, shots, scales):
+    """QUẦY THU NGÂN / CÀ PHÊ (đợt 39 A), đo ở từng lúc trong `times` theo nhãn trong `phases`:
+      • payByQR — `near`: điện thoại cạnh mã QR (≤ DESK_QR); `tick`: dấu tick xanh cạnh điện thoại; payByCard — thẻ chạm máy quẹt (≤ DESK_READER) rồi tick;
+      • stampCard — `press`: mặt con dấu trên ô đóng dấu của thẻ, và đứng yên (`samples`); `mark`: dấu đỏ còn trên thẻ sau khi nhấc con dấu;
+      • giveChange — `count`: hai bàn tay gặp nhau lúc tờ tiền sang tay, `notes`: số tờ tiền hiện trong tay kia tăng từng tờ tới đủ; `samples`: xấp tiền luôn
+        ở trong tay ai đó (không biến mất), đầu trong tay người đưa, cuối trong tay người nhận;
+      • pourDrink — `pour`: dòng nước từ trên xuống tới miệng cốc, mức nước dâng; `full`: cốc đầy vẫn trong tay;
+      • wipeCounter — `wipe`: khăn dưới vai, lướt ngang ≥ 5 % chiều cao qua các lúc đo, đầu cúi."""
+    name, who, other = c['name'], c['who'], c.get('target')
+    phases = c.get('phases') or {}
+    dist = lambda p, q: ((p['x'] - q['x']) ** 2 + (p['y'] - q['y']) ** 2) ** 0.5
+    def at(t):
+        f = {a['name']: a for a in shots.get(float(t), [])}
+        care = scales.get(('care', float(t))) or {}
+        return f.get(who), f.get(other) if other else None, (care.get(who) or {}).get('d39') or {}, care.get('@pay39') or {}
+    def centre(item):
+        b = item['box']
+        return {'x': (b['x0'] + b['x1']) / 2, 'y': (b['y0'] + b['y1']) / 2}
+    out = []
+    def report(what, rows, ok_all=True, extra=''):
+        if not rows: out.append({'scene': folder, 'what': f'{who} {name} — {what}', 'ok': None, 'note': 'not measured (not in the frame)'}); return
+        bad = [r for r in rows if not r[1]]
+        worst = max(rows, key=lambda r: (not r[1], r[2]))
+        out.append({'scene': folder, 'what': f'{who} {name} — {what} ({len(rows)} moments)', 'ok': not bad and ok_all,
+                    'note': f'{worst[3]} at {worst[0]:g} s' + (f' ({len(bad)} of {len(rows)} moments fail)' if bad else '') + extra})
+    times = lambda label: [t for t in c['times'] if phases.get(str(t)) == label]
+    if name in ('payByQR', 'payByCard'):
+        qr = name == 'payByQR'; limit = DESK_QR if qr else DESK_READER
+        rows = []
+        for t in times('near'):
+            a, _, d, pay = at(t)
+            marks = pay.get('qr' if qr else 'reader') or []
+            if not a or not a.get('tall') or not a.get('items') or not marks: continue
+            item = centre(a['items'][0]); m = min(marks, key=lambda p: dist(p, item)); d_ = dist(m, item) / a['tall']
+            rows.append((t, d_ <= limit, d_, f'{"phone" if qr else "card"} {d_ * 100:.1f} % from the {"QR code" if qr else "card reader"}'))
+        report(f'the {"phone is held to the QR code" if qr else "card taps the reader"}', rows)
+        rows = []
+        for t in times('tick'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or not a.get('items'): continue
+            item = centre(a['items'][0]); tick = d.get('ting')
+            near = dist(tick, item) / a['tall'] if tick else 9
+            rows.append((t, tick is not None and near <= DESK_TICK, near, 'green tick ' + (f'{near * 100:.1f} % from the {"phone" if qr else "card"}' if tick else 'not shown')))
+        report('the green tick shows on it', rows)
+    elif name == 'stampCard':
+        rows = []
+        for t in times('press'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or not d.get('stamp') or not d.get('spot'): continue
+            g = dist(d['stamp'], d['spot']) / a['tall']
+            rows.append((t, g <= DESK_STAMP, g, f'stamp face {g * 100:.1f} % from the empty box on the card'))
+        report('the stamp is pressed on the card', rows)
+        ys = []
+        for t in c.get('samples') or []:
+            a, _, d, _ = at(t)
+            if a and a.get('tall') and d.get('stamp'): ys.append((t, d['stamp']['x'] / a['tall'], d['stamp']['y'] / a['tall']))
+        if len(ys) >= 8:
+            worst = max(((((p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2) ** 0.5, q[0]) for p, q in zip(ys, ys[1:])), default=(0, 0))
+            out.append({'scene': folder, 'what': f'{who} {name} — the press is held still ({len(ys)} frames)', 'ok': worst[0] <= DESK_STILL,
+                        'note': f'the stamp moves at most {worst[0] * 100:.2f} % of height between frames (at {worst[1]:g} s; limit {DESK_STILL * 100:g} %)'})
+        rows = []
+        for t in times('mark'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or not d.get('spot'): continue
+            ink = d.get('ink'); g = dist(ink, d['spot']) / a['tall'] if ink else 9
+            rows.append((t, ink is not None and g <= DESK_STAMP * 0.85, g, 'red mark ' + (f'{g * 100:.1f} % from the box' if ink else 'not on the card')))
+        report('a red mark stays on the card', rows)
+    elif name == 'giveChange':
+        rows, shown = [], []
+        for t in times('count'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or len(a.get('hands') or []) < 2: continue
+            g = dist(a['hands'][0], a['hands'][1]) / a['tall']
+            rows.append((t, g <= DESK_HANDS, g, f'hands {g * 100:.1f} % apart as a note passes'))
+        report('a note passes from one hand to the other', rows)
+        for t in times('notes'):
+            a, _, d, _ = at(t)
+            if a: shown.append((t, d.get('notes') if 'notes' in d else 0))
+        want = c.get('counted', 4)
+        okn = len(shown) == want and [n for _, n in shown] == list(range(1, want + 1))
+        if shown: out.append({'scene': folder, 'what': f'{who} {name} — the notes appear one by one ({len(shown)} moments)', 'ok': okn, 'note': 'notes in the hand: ' + ', '.join(f'{n} at {t:g} s' for t, n in shown)})
+        owners = []
+        for t in c.get('samples') or []:
+            a, b, _, _ = at(t)
+            if not a or not b: continue
+            owners.append((t, [p['name'] for p in (a, b) for item in p.get('items') or []]))
+        if owners:
+            gone = [t for t, held in owners if not held]
+            passed = owners[0][1] and owners[0][1][0] == who and owners[-1][1] and owners[-1][1][-1] == other
+            out.append({'scene': folder, 'what': f'{who} {name} — the notes pass to {other} ({len(owners)} frames)', 'ok': bool(passed) and not gone,
+                        'note': f'held by {owners[0][1]} → {owners[-1][1]}' + (f', {len(gone)} frames with nobody holding them' if gone else ', never out of a hand')})
+    elif name == 'pourDrink':
+        rows, levels = [], []
+        for t in times('pour'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or not d.get('cup') or not d.get('mouth'): continue
+            levels.append(d.get('level') or 0)
+            s_ = d.get('stream')
+            if not s_: rows.append((t, False, 9, 'no stream')); continue
+            cup, mouth = d['cup'], d['mouth']
+            side = max(0, abs(s_['x'] - cup['x']) - cup['w'] / 2) / a['tall']
+            reaches = s_['y'] + s_['h'] / 2 >= mouth['y'] - 0.01 * a['tall'] and s_['y'] - s_['h'] / 2 <= mouth['y']
+            rows.append((t, side <= 0.01 and reaches, side, f'stream {"reaches" if reaches else "does not reach"} the cup mouth, {side * 100:.1f} % beside the cup'))
+        report('the stream falls into the cup', rows)
+        if len(levels) >= 2: out.append({'scene': folder, 'what': f'{who} {name} — the level rises ({len(levels)} moments)', 'ok': all(y > x + 0.1 for x, y in zip(levels, levels[1:])),
+                                         'note': 'level ' + ' → '.join(f'{v:.2f}' for v in levels)})
+        rows = []
+        for t in times('full'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('items'): continue
+            rows.append((t, (d.get('level') or 0) >= 0.99, 1 - (d.get('level') or 0), f'cup level {(d.get("level") or 0):.2f} in hand'))
+        report('the full cup is still in hand', rows)
+    elif name == 'wipeCounter':
+        pts, down, below = [], 0, True
+        for t in times('wipe'):
+            a, _, d, _ = at(t)
+            if not a or not a.get('tall') or not d.get('cloth'): continue
+            pts.append((t, d['cloth']['x'] / a['tall'], d['cloth']['y'] / a['tall']))
+            sh = [p['y'] for p in a.get('shoulders') or []]
+            if sh and d['cloth']['y'] < min(sh): below = False
+            if (a.get('head') or {}).get('down', 0) >= 3: down += 1
+        if len(pts) >= 3:
+            xs = [p[1] for p in pts]; spread = max(xs) - min(xs)
+            out.append({'scene': folder, 'what': f'{who} {name} — the cloth sweeps across the counter ({len(pts)} moments)', 'ok': spread >= 0.05 and below and down >= len(pts) / 2,
+                        'note': f'cloth moves {spread * 100:.1f} % of height sideways, {"below" if below else "ABOVE"} the shoulders, head bent in {down} of {len(pts)} moments'})
+        else: out.append({'scene': folder, 'what': f'{who} {name} — the cloth sweeps across the counter', 'ok': None, 'note': 'not measured (not in the frame)'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
@@ -1647,6 +1785,9 @@ def check_scene(folder):
     results += check_people_framed(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
+        if c['kind'] == 'desk39':          # đợt 39 A
+            results.extend(check_desk39(folder, c, shots, scales))
+            continue
         if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
         if c['kind'] == 'prep':
             results.extend(check_prep(folder, c, shots))

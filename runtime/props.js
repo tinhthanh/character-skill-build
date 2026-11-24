@@ -180,6 +180,29 @@ const DRAW = {
       <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
     </g>`;
   },
+  // ĐỢT 39 A — QUẦY THANH TOÁN trên mặt bàn / quầy cao `on`: một kệ mica có MÃ QR (bên trái) và một máy quẹt thẻ (bên phải). Khách đưa
+  // điện thoại tới mã QR (`payByQR(prop.qr)`), chạm thẻ vào màn hình máy (`payByCard(prop.reader)`).
+  paystand: ({ on = 150, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, q = PAY_QR(top), cell = 30 / 9;
+    const bits = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      const finder = (r < 3 && c < 3) || (r < 3 && c > 5) || (r > 5 && c < 3);
+      if (!finder && ((r * 7 + c * 3 + r * c) % 3 === 0)) bits.push(`<rect x="${(q.x - 15 + c * cell).toFixed(2)}" y="${(q.y - 15 + r * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}"/>`);
+    }
+    const finder = (x, y) => `<rect x="${x}" y="${y}" width="${cell * 3}" height="${cell * 3}" fill="none" stroke="#16232b" stroke-width="${cell * 0.8}"/><rect x="${x + cell}" y="${y + cell}" width="${cell}" height="${cell}"/>`;
+    const r = PAY_READER(top);
+    return `
+    <rect x="148" y="${top - 6}" width="54" height="6" rx="2" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
+    <rect x="152" y="${top - 72}" width="46" height="66" rx="4" fill="#ffffff" stroke="${line}" stroke-width="1.400"/>
+    <rect x="152" y="${top - 72}" width="46" height="12" rx="4" fill="${color}"/><path d="M 160 ${top - 66} h 22" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#16232b">${bits.join('')}${finder(q.x - 15, q.y - 15)}${finder(q.x + 15 - cell * 3, q.y - 15)}${finder(q.x - 15, q.y + 15 - cell * 3)}</g>
+    <circle data-pay-qr="1" cx="${q.x}" cy="${q.y}" r="0.6" fill="none"/>
+    <path d="M ${r.x - 17} ${top} L ${r.x - 15} ${top - 58} Q ${r.x - 15} ${top - 62} ${r.x - 11} ${top - 62} H ${r.x + 11} Q ${r.x + 15} ${top - 62} ${r.x + 15} ${top - 58} L ${r.x + 17} ${top} Z" fill="#2f3440" stroke="#15181e" stroke-width="1.300"/>
+    <rect x="${r.x - 11}" y="${top - 57}" width="22" height="20" rx="2" fill="#bfe8d0"/>
+    <path d="M ${r.x - 3} ${top - 51} q 3 3 0 7 M ${r.x + 1} ${top - 53} q 5 5 0 11 M ${r.x + 5} ${top - 55} q 7 7 0 15" stroke="#1f7a4d" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    ${[0, 1, 2].map((row) => [-6, 0, 6].map((dx) => `<circle cx="${r.x + dx}" cy="${top - 29 + row * 7}" r="2" fill="#8a929e"/>`).join('')).join('')}
+    <circle data-pay-reader="1" cx="${r.x}" cy="${r.y}" r="0.6" fill="none"/>`;
+  },
   // ĐÈN ĐỌC PHIM X-QUANG (đợt 35): hộp đèn sáng trên một chân đứng có bánh xe, cao ngang vai người đứng cạnh nó, tấm phim
   // trong hộp — vẽ sẵn bộ xương một con chó nhìn ngang (`image`: ảnh phim của bạn thay vào). `spot` [0…1, 0…1]: chỗ người ta
   // chỉ trên phim (`showXray`) — phim vẽ sẵn có một vết rạn xương ở đó; điểm ấy là phần tử `data-xray-spot`, và `prop.spot`.
@@ -215,6 +238,8 @@ const DRAW = {
 
 // Đèn đọc phim: bề ngang hộp mặc định, chỗ chỉ mặc định trên phim (vết rạn ở cẳng chân trước), khung hộp & phim trong khung 400 × 470.
 const XRAY_W = 176, XRAY_SPOT = [0.675, 0.74];
+// Đợt 39 A — quầy thanh toán: tâm mã QR và màn hình máy quẹt thẻ (khung 400 × 470), theo mặt quầy `top`.
+const PAY_QR = (top) => ({ x: 175, y: top - 33 }), PAY_READER = (top) => ({ x: 226, y: top - 47 });
 let xrayCount = 0;
 function xrayFrame(w) {
   const h = Math.round(w * 0.7), x0 = 200 - w / 2, y0 = 118;
@@ -252,13 +277,13 @@ function screen(x, y, w, h, image) {
 }
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
-const DEFAULT_COLOR = { xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+const DEFAULT_COLOR = { paystand: '#2f9e8f', xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter' | 'xray'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter' | 'xray' | 'paystand'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading, spot }
  *     spot     đèn đọc phim (`xray`): chỗ chỉ trên phim, [0…1, 0…1] tính từ góc trên trái tấm phim (mặc định [0.675, 0.74])
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
@@ -315,6 +340,11 @@ export function createProp(host, kind, options = {}) {
     // CHỖ CHỈ trên phim, trong khung 400 × 470 (`showXray` của người đứng cạnh, cùng cỡ host): `rig.showXray(prop.spot)`.
     const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;
     prop.spot = { x: +(g.fx + at[0] * g.fw).toFixed(1), y: +(g.fy + at[1] * g.fh).toFixed(1) };
+  }
+  if (kind === 'paystand') {
+    // Đợt 39 A: mã QR và màn hình máy quẹt thẻ trong khung 400 × 470 — đích của `payByQR` / `payByCard` cho người cùng cỡ host.
+    const top = PROP_FRAME.floor - (o.on === undefined ? 150 : o.on);
+    prop.qr = PAY_QR(top); prop.reader = PAY_READER(top);
   }
   if (kind === 'scooter') {
     // Người cầm lái ngồi trên yên: rig ở thế `ride` có hông ở `rideSeatY()` khi chân chạm sàn — nâng nó lên bấy nhiêu đơn vị

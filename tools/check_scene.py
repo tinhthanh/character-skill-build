@@ -1110,6 +1110,74 @@ with tempfile.TemporaryDirectory() as work:
                            'tho eatCarrot — big enough in the frame', 'tho eatCarrot — the carrot gets shorter bite by bite', 'be carry meo — the pet stays in the frame', 'be putDown meo — the pet stays in the frame'):
                 if needle not in done.stdout: problems.append(f'pets35: acting_check did not measure {needle!r}')
 
+    # ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ. desk39a (quầy lễ tân): bà quét mã QR trên đế thanh toán (đế tự đặt lên mặt quầy), thu ngân thối tiền (đếm từng
+    # tờ, bà nhận xấp tiền), đóng dấu thẻ của mình, lau quầy. desk39b (nhà thuốc / quầy cà phê): đóng dấu thẻ rồi ĐƯA cho khách (khách nhận thẻ có dấu), rót nước
+    # vào cốc rồi đưa cốc đầy. desk39c: cậu bé quẹt thẻ ngân hàng. Mỗi cái đo bằng tools/acting_check.py (`desk39`); gọi sai thì bị từ chối bằng một câu rõ.
+    desk_scenes = {'desk39a': {'id': 'desk39a', 'camera': 'auto', 'set': {'preset': 'reception'}, 'characters': [{'name': 'clerk', 'id': 'receptionist', 'x': -260, 'z': -380, 'faces': 'granny', 'holds': {'R': 'cash', 'L': 'stampcard'}, 'holdsHidden': True}, {'name': 'granny', 'id': 'granny', 'x': 200, 'z': -380, 'faces': 'clerk', 'holds': 'phone'}], 'script': [{'who': 'clerk', 'say': 'That will be two hundred thousand.', 'dur': 1.8}, {'who': 'granny', 'do': [['payByQR']]}, {'who': 'clerk', 'do': [['giveChange', '@granny']]}, {'who': 'granny', 'say': 'Thank you.', 'dur': 1.2}, {'who': 'clerk', 'do': ['stampCard']}, {'who': 'clerk', 'do': [['wipeCounter', 2]]}]},
+                   'desk39b': {'id': 'desk39b', 'camera': 'auto', 'set': {'preset': 'pharmacy'}, 'characters': [{'name': 'barista', 'id': 'receptionist', 'x': -120, 'z': -380, 'faces': 'guest', 'holds': {'R': {'kind': 'cup', 'open': True}, 'L': 'stampcard'}, 'holdsHidden': True}, {'name': 'guest', 'id': 'granny', 'x': 150, 'z': -380, 'faces': 'barista', 'holds': {'R': {'kind': 'stampcard', 'stamped': True}, 'L': {'kind': 'cup', 'open': True, 'full': True}}, 'holdsHidden': True}], 'script': [{'who': 'barista', 'do': [['stampCard', '@guest']]}, {'who': 'barista', 'do': ['pourDrink']}, {'who': 'barista', 'do': [['handOver', '@guest']]}, {'who': 'guest', 'say': 'Lovely, thank you.', 'dur': 1.4}]},
+                   'desk39c': {'id': 'desk39c', 'camera': 'auto', 'set': {'preset': 'reception'}, 'characters': [{'name': 'clerk', 'id': 'receptionist', 'x': -260, 'z': -380, 'faces': 'boy'}, {'name': 'boy', 'id': 'boy', 'x': 300, 'z': -380, 'faces': 'clerk', 'holds': 'card'}], 'script': [{'who': 'clerk', 'say': 'Card or cash?', 'dur': 1.4}, {'who': 'boy', 'do': [['payByCard']]}]}}
+    desk_needles = {'desk39a': ('["payByQR", set.targetPoint(granny, [', '"paystand"', '{ together: [[clerk, ["giveChange", granny, { top: set.targetPoint(clerk, [', '[granny, ["takeChange", clerk]]', "['stampCard', null, { top: set.targetPoint(clerk, [", "['wipeCounter', 2, set.targetPoint(clerk, ["),
+                    'desk39b': ('{ together: [[barista, ["stampCard", guest, { top: set.targetPoint(barista, [', '[guest, ["takeCard", barista]]', "['pourDrink', { top: set.targetPoint(barista, [", '{ together: [[barista, ["handOver", guest]], [guest, ["take", barista]]] }'),
+                    'desk39c': ('["payByCard", set.targetPoint(boy, [',)}
+    desk_measures = {'desk39a': ('granny payByQR — the phone is held to the QR code', 'granny payByQR — the green tick shows on it', 'clerk giveChange — a note passes from one hand to the other',
+                              'clerk giveChange — the notes appear one by one', 'clerk giveChange — the notes pass to granny', 'clerk stampCard — the stamp is pressed on the card',
+                              'clerk stampCard — the press is held still', 'clerk stampCard — a red mark stays on the card', 'clerk wipeCounter — the cloth sweeps across the counter'),
+                     'desk39b': ('barista stampCard — the stamp is pressed on the card', 'barista stampCard — a red mark stays on the card', 'barista pourDrink — the stream falls into the cup',
+                              'barista pourDrink — the level rises', 'barista pourDrink — the full cup is still in hand'),
+                     'desk39c': ('boy payByCard — the card taps the reader', 'boy payByCard — the green tick shows on it')}
+    for name, scene in desk_scenes.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
+        try:
+            json.dump(scene, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
+        for needle in desk_needles[name]:
+            if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-900:])
+        else:
+            for needle in desk_measures[name]:
+                if needle not in done.stdout: problems.append(f'{name}: acting_check did not measure "{needle}"')
+    # Quầy thu ngân sai cách: bị từ chối với một câu nói rõ.
+    base39 = desk_scenes['desk39a']
+    for label, change, needle in [('pay without a phone', lambda sc: sc['characters'][1].pop('holds'), 'needs a phone in hand'),
+                                  ('pay in a 2D scene without a stand', lambda sc: (sc.pop('set'), [c.pop('z', None) for c in sc['characters']]), 'needs a pay stand'),
+                                  ('change without banknotes', lambda sc: sc['characters'][0].__setitem__('holds', 'stampcard'), 'needs banknotes in hand'),
+                                  ('stamp without a card', lambda sc: sc['characters'][0].__setitem__('holds', 'cash'), 'needs a stamp card in hand'),
+                                  ('pour without a cup', lambda sc: sc.__setitem__('script', [{'who': 'clerk', 'do': ['pourDrink']}]), 'needs a cup in hand'),
+                                  ('change to a pet', lambda sc: (sc['characters'].append({'name': 'cat', 'species': 'cat', 'x': 400, 'z': -380}), sc.__setitem__('script', [{'who': 'clerk', 'do': [['giveChange', '@cat']]}])), 'needs the other person'),
+                                  ('wipe for a minute', lambda sc: sc.__setitem__('script', [{'who': 'clerk', 'do': [['wipeCounter', 99]]}]), 'seconds must be')]:
+        bad = json.loads(json.dumps(base39)); bad['id'] = 'bad39'; change(bad)
+        path = os.path.join(os.path.dirname(stage), '_check_bad39.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad39'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle not in done.stderr: problems.append(f'cashier ({label}): expected a refusal naming {needle!r} — got: {(done.stderr or done.stdout).strip()[-200:]}')
+    # Kịch bản chữ: "quét mã", "quẹt thẻ", "thối tiền", "đóng dấu", "rót nước", "lau quầy" — người làm tự có đồ cần cầm.
+    text = os.path.join(work, 'desk39.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: lễ tân\nthu ngân (receptionist) · khách (granny) · bé (boy)\n\nkhách: [quét mã]\nthu ngân → khách: thối tiền\nbé: [quẹt thẻ]\nthu ngân: [lau quầy]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py cashier: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'desk39.scene.json'), encoding='utf-8'))
+        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = ['payByQR', ['giveChange', '@khach'], 'payByCard', 'wipeCounter']
+        if steps != want: problems.append(f'script.py cashier: steps {steps}, want {want}')
+        gave = {c['id']: c for c in made['characters']}
+        if gave['granny'].get('holds') != {'R': 'phone', 'L': 'cash'} and gave['granny'].get('holds') != 'phone' and 'phone' not in json.dumps(gave['granny'].get('holds')): problems.append('script.py cashier: "quét mã" did not give the customer a phone')
+        if 'cash' not in json.dumps(gave['receptionist'].get('holds')): problems.append('script.py cashier: "thối tiền" did not give the cashier banknotes')
+        if gave['boy'].get('holds') != 'card': problems.append('script.py cashier: "quẹt thẻ" did not give the customer a bank card')
+    text = os.path.join(work, 'drink39.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: nhà thuốc\npha chế (receptionist)\n\npha chế: [rót nước]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py barista: ' + (done.stderr or done.stdout).strip()[-300:])
+    elif 'cup' not in open(os.path.join(work, 'drink39.scene.json'), encoding='utf-8').read(): problems.append('script.py barista: "rót nước" did not give a cup')
+
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
     # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.
     ride = os.path.join(ROOT, 'examples', 'scene-ride', 'scene.json')

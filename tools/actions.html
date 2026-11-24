@@ -75,7 +75,14 @@ for (const entry of entries) {
         const scaleHost = document.createElement('div'); scaleHost.style.cssText = `position:absolute;left:${(5 - 62) * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
         cell.insertBefore(scaleHost, cell.firstChild); scale = createProp(scaleHost, 'scale', { reading: entry.scale === true ? '4.2 kg' : String(entry.scale) });
       }
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
+      // ĐẾ THANH TOÁN (đợt 39 A: quét QR, quẹt thẻ): `entry.stand` — một đạo cụ `paystand` đứng cạnh người, lệch `dx` đơn vị khung (400 × 470), mặt quầy cao `on`;
+      // `@qr` / `@reader` trong các bước là chỗ mã QR / máy quẹt thẻ của nó.
+      let stand = null;
+      if (entry.stand) {
+        const standHost = document.createElement('div'); standHost.style.cssText = `position:absolute;left:${(5 + entry.stand.dx * 0.5) * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
+        cell.insertBefore(standHost, cell.firstChild); stand = createProp(standHost, 'paystand', { on: entry.stand.on });
+      }
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
       const line = sequence(rig, steps);
       const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' || arg === '@self' ? rig : arg)) : step))) : null;
       const at = line.duration() * (column + 0.5) / cols;

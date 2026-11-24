@@ -128,7 +128,15 @@ def main():
       count++;
       label.innerHTML = `${{String(count).padStart(2, '0')}} · ${{entry.label.replace(/</g, '&lt;')}}<small>${{id}}${{turned ? ' · turned 3/4' : ''}}</small>`;
       parts.push(label);
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
+      // ĐẾ THANH TOÁN (đợt 39 A: quét QR, quẹt thẻ): `entry.stand` — đạo cụ `paystand` đứng cạnh người, lệch `dx` đơn vị khung (400 × 470), mặt quầy cao `on`;
+      // `@qr` / `@reader` trong các bước là chỗ mã QR / máy quẹt thẻ của nó.
+      let stand = null;
+      if (entry.stand) {{
+        const standHost = add('host', `left:${{personX + entry.stand.dx * personW / 400}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
+        parts[0].parentNode.insertBefore(standHost, parts[0]);
+        stand = VGCharacter.createProp(standHost, 'paystand', {{ on: entry.stand.on }}); parts.push(standHost);
+      }}
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
       const line = VGCharacter.sequence(rig, steps);
       if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD});
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};
