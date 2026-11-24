@@ -14,8 +14,9 @@ clap, count on fingers, check the time, bow, greet with a wai, shake hands, pond
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
 or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
-read a patient chart (flipping a page), point at an X-ray film,
-get a notification on the phone (89 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
+read a patient chart (flipping a page), point at an X-ray film, trim its nails (holding the paw up), put drops in its eye,
+clean its ear with a cotton pad, scan its microchip (the number shows on a card),
+get a notification on the phone (93 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase
@@ -161,6 +162,9 @@ clips for every voice file.
    (`examples/scene-ride/scene.json`).
    Clinic care: `["bandage", "@pet"]`, `["putCone", "@pet"]` (both stay on the pet), `["readChart", 2]` (with
    `"holds": "clipboard"`), `["showXray", "<name>"]` at an `"xray"` viewer cutout standing beside the person.
+   Hands on the pet: `["clipNails", "@pet"]`, `["eyeDrops", "@pet"]`, `["cleanEars", "@pet"]`, `["scanChip", "@pet", { "id": "900 123 456 789" }]`
+   — the person goes to the pet's head end and the turn cuts to a close shot; the pet's paw / chin / eyes / head follow the hands
+   by themselves (nothing to add for the pet). Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai" / "lau tai", "quét chip <số>".
    `scene.py` warns when a view leaves someone half out of the frame — frame them in or leave them out.
    Light: `"set": { "light": "night", "lamps": [ … ] }` (`day`, `evening`, `night`), `"window": true` on a
    back-wall panel, `"lamp": "on"` on a turn — lamps glow (and flicker when switched on), light the room and the

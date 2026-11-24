@@ -1765,6 +1765,61 @@ try {
         if (nurse.s.om || Math.hypot(back[0] - home[0], back[1] - home[1]) > 3) hong('weigh', 'the pet is not put back where it was');
         line.kill(); cat.svg.remove(); nurse.svg.remove(); busy.svg.remove(); scaleHost.remove();
       }
+      // ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip: dụng cụ trong tay tới đúng chỗ trên con vật, con vật động THEO tay người
+      // (chân nhấc, cằm nâng, mắt nhắm, lắc đầu), thẻ mã chip, không còn gì sau động tác; đối số sai bị từ chối rõ ràng.
+      {
+        const nurse = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'nurse' }).rig;
+        const pup = L.createPet(spot('left:995px;top:118px;width:100px;height:82px'), { species: 'dog' }).rig;
+        pup.s.huong = -1; pup.apDung();
+        const gap = (a, b) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return Math.max(0, p.left - q.right, q.left - p.right, p.top - q.bottom, q.top - p.bottom); };
+        const tool = (kind) => { const side = ['L', 'R'].find((k) => Math.round(nurse.s['gadget' + k]) === kind); return side ? nurse.el['gadget' + side].querySelector(`[data-gadget="${kind}"]`) : null; };
+        const pawRest = pup.el.tnBan.getBoundingClientRect().top;
+        const clip = nurse.clipNails(pup);
+        clip.time(1.5);
+        if (!tool(10)) hong('clipNails', 'no nail clipper in the hand');
+        else {
+          if (gap(tool(10), pup.el.tnBan) > 6) hong('clipNails', `the clipper does not reach the paw (${gap(tool(10), pup.el.tnBan).toFixed(0)} px off)`);
+          if (!(nurse.s.snipL > 0.9 || nurse.s.snipR > 0.9)) hong('clipNails', 'the clipper is not closed at a cut');
+        }
+        if (!(pawRest - pup.el.tnBan.getBoundingClientRect().top > 4)) hong('clipNails', 'the front paw is not lifted while held');
+        clip.progress(1); pup.apDung();
+        if (tool(10) || Math.abs(pup.el.tnBan.getBoundingClientRect().top - pawRest) > 1) hong('clipNails', 'the clipper or the lifted paw stays afterwards');
+        clip.kill();
+        const drops = nurse.eyeDrops(pup), d0 = 1.0 + 1.2 * 0.5;
+        drops.time(d0 + 0.45);
+        const drop = tool(11) && tool(11).querySelector('[data-drop]');
+        if (!drop || drop.style.display === 'none') hong('eyeDrops', 'no drop at the tip of the dropper');
+        else {
+          const eyes = [pup.el.matL, pup.el.matR].map((el) => el.getBoundingClientRect()), q = drop.getBoundingClientRect();
+          if (!eyes.some((e) => Math.abs((q.left + q.right) / 2 - (e.left + e.right) / 2) < e.width * 1.5 && q.bottom < e.top + e.height)) hong('eyeDrops', 'the drop is not right above an eye');
+        }
+        if (Math.abs(pup.care38Probe().chin - 1) > 1e-3) hong('eyeDrops', 'the chin is not held up while the drop falls');
+        drops.time(d0 + 1.2);
+        if (pup.care38Probe().blink < 0.9) hong('eyeDrops', 'the eyes do not shut after the drop');
+        drops.progress(1); if (tool(11) || pup.care38Probe().blink > 0.01 || pup.care38Probe().chin > 0.01) hong('eyeDrops', 'the dropper, the raised chin or the shut eyes stay afterwards');
+        drops.kill();
+        const ears = nurse.cleanEars(pup);
+        ears.time(1.2);
+        if (!tool(12) || gap(tool(12), pup.el.dau) > 4) hong('cleanEars', 'the cotton pad is not at the head');
+        ears.time(0.65 + 1.8 + 0.35 + 0.11);
+        if (Math.abs(pup.care38Probe().shake) < 8) hong('cleanEars', 'the pet does not shake its head after the ears are wiped');
+        ears.progress(1); if (tool(12) || pup.care38Probe().shake !== 0) hong('cleanEars', 'the pad or the head shake stays afterwards');
+        ears.kill();
+        const chip = L.sequence(nurse, [['scanChip', pup, { id: '704 000 111 222' }]]);
+        chip.time(3.6);
+        if (!tool(13)) hong('scanChip', 'no chip scanner in the hand');
+        const card = nurse.el.readout;
+        if (card.style.display === 'none' || card.querySelector('text').textContent !== '704 000 111 222') hong('scanChip', 'no card with the chip number');
+        else if (card.querySelector('rect').getBoundingClientRect().width < card.querySelector('text').getBoundingClientRect().width) hong('scanChip', 'the chip number is wider than its card');
+        chip.time(chip.duration()); if (tool(13) || card.style.display !== 'none') hong('scanChip', 'the scanner or the card stays afterwards');
+        chip.kill();
+        for (const [label, fn, needle] of [['clipNails', () => nurse.clipNails(pup, { paw: 'back' }), "'front'"], ['eyeDrops', () => nurse.eyeDrops(pup, { hold: 30 }), 'hold'],
+                                           ['scanChip', () => nurse.scanChip(pup, { id: 42 }), 'chip number'], ['cleanEars', () => nurse.cleanEars(nurse), 'pet rig']]) {
+          let why = ''; try { fn(); } catch (error) { why = error.message; }
+          if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
+        }
+        nurse.svg.remove(); pup.svg.remove();
+      }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;
       if (patient.el.cone.style.display === 'none') hong('wear', 'createPet({ wear: ["cone"] }) shows no cone');

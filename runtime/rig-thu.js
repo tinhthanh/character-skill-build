@@ -491,7 +491,7 @@ export class RigThu {
   // vẽ ở dáng nằm cuộn trong tay, CỘNG THÊM vào trạng thái của chính nó: timeline riêng của con vật (gừ gừ, vẫy đuôi)
   // vẫn chạy, chỉ thân và chân được đặt nằm, không đứng / ngồi trên không trung.
   #view() {
-    if (!(this.svg && this.svg.ownerSVGElement)) return this.s;
+    if (!(this.svg && this.svg.ownerSVGElement)) return this.#careView(this.s);       // đợt 38 A: cộng phần người đang giữ nó làm
     const s = this.s;
     // Khoá nào có trong HELD thì lấy dáng bế; riêng đầu (dauY) CỘNG thêm để con vật vẫn gật / nghiêng đầu được.
     // `heldBlend` (đợt 35, lượt bốn): người bế đặt theo độ nhấc lên — dáng đứng chuyển DẦN sang dáng cuộn trong tay, không bật một khung.
@@ -513,7 +513,7 @@ export class RigThu {
 
   apDung() {
     const s = this.#view(), e = this.el, nv = this.nv, { H, S, ng } = this.#khung();
-    const held = s !== this.s;
+    const held = !!(this.svg && this.svg.ownerSVGElement);       // (đợt 38 A: `#view` còn trả Proxy khi người giữ con vật làm — bế là khi SVG nằm trong SVG người)
     const fx = (v) => v.toFixed(2);
     // Cả con lật theo `huong` quanh trục giữa khung; co dãn quanh điểm chạm đất.
     // Giữa chừng cú lật KHÔNG ép con vật dẹt về 0: bề ngang chỉ co tới 30% rồi đổi bên. Co về 0 thì có một khung hình
@@ -1011,6 +1011,78 @@ export class RigThu {
     let level = 0;
     for (const rig of this.careBy || []) level = Math.max(level, clamp(+(rig.s && rig.s[key]) || 0, 0, 1));
     return level;
+  }
+
+  /* ------------------------------------------------ ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip
+   * Người làm GIỮ con vật bằng tay: chân trước được nhấc lên (`petPaw`), cằm được nâng (`petChin`), mắt nhắm lại sau giọt thuốc
+   * (`petBlink`), lắc đầu sau khi lau tai (`petShake`, −1…1) là trạng thái của NGƯỜI (như `petWrap`) — con vật đọc lại mỗi lần vẽ
+   * (`#careView`) từ những người trong `heldBy38` (rig người ghi vào). Nhờ thế chân / đầu nó chỉ động đúng lúc bàn tay người ở đó, gọi
+   * thẳng hay qua `sequence()` đều như nhau. Tập riêng, không dùng `careBy`: người đã băng chân con khác thì `petWrap` của họ vẫn là 1.
+   */
+  static PAW_LIFT = 100;       // góc treo chân trước lúc được nhấc lên (độ; chìa ra trước, cao ngang vai — thấy rõ trên mép bàn)
+  static CHIN_UP = 17;         // đầu ngửa lên bấy nhiêu độ khi được nâng cằm (nhỏ mắt)
+  static SHAKE_TURN = 22;      // lắc đầu: biên độ xoay đầu (độ)
+
+  // Trạng thái để VẼ cộng thêm phần người đang giữ con vật làm (đợt 38 A) — không có ai thì chính `s`.
+  #careView(s) {
+    if (!this.heldBy38 || !this.heldBy38.size) return s;
+    let paw = 0, chin = 0, blink = 0, shake = 0;
+    for (const rig of this.heldBy38) {
+      const q = rig && rig.s;
+      if (!q) continue;
+      paw = Math.max(paw, clamp(+q.petPaw || 0, 0, 1)); chin = Math.max(chin, clamp(+q.petChin || 0, 0, 1)); blink = Math.max(blink, clamp(+q.petBlink || 0, 0, 1));
+      if (Math.abs(+q.petShake || 0) > Math.abs(shake)) shake = clamp(+q.petShake || 0, -1, 1);
+    }
+    if (!paw && !chin && !blink && !shake) return s;
+    const add = { dau: -RigThu.CHIN_UP * chin + RigThu.SHAKE_TURN * shake, dauY: -3 * chin, dauX: 4 * shake, taiL: 1.3 * shake, taiR: -1.3 * shake };
+    return new Proxy(s, { get: (o, key) => {
+      if (key === 'tnNhac') return pha(o.tnNhac, 1, paw);
+      if (key === 'tnGoc') return pha(o.tnGoc, RigThu.PAW_LIFT, paw);
+      if (key === 'matY') return Math.max(o.matY, blink);
+      if (key in add) return o[key] + add[key];
+      return o[key];
+    } });
+  }
+
+  // Điểm (x, y) trong hệ của phần tử `el` → khung 400 × 330 của con vật: nhân các phép biến đổi từ `el` lên SVG gốc (không qua màn
+  // hình — bối cảnh 3D chiếu nghiêng) và KHÔNG gộp danh sách biến đổi (`consolidate` ghi đè thuộc tính; `apDung` còn đọc `translate` của mắt).
+  #framePoint(el, x, y) {
+    let m = new DOMMatrix();
+    for (let node = el; node && node !== this.svg; node = node.parentNode) {
+      const list = node.transform && node.transform.baseVal;
+      if (!list) continue;
+      let own = new DOMMatrix();
+      for (let i = 0; i < list.numberOfItems; i++) { const q = list.getItem(i).matrix; own = own.multiply(new DOMMatrix([q.a, q.b, q.c, q.d, q.e, q.f])); }
+      m = own.multiply(m);
+    }
+    const q = new DOMPoint(x, y).matrixTransform(m);
+    return { x: q.x, y: q.y };
+  }
+
+  /**
+   * CHỖ NGƯỜI CHĂM SÓC ĐẶT TAY / DỤNG CỤ (đợt 38 A), trong khung 400 × 330 của con vật, theo dáng ĐANG VẼ: 'paw' (giữa bàn chân trước
+   * phía người xem), 'eye' (con mắt phía `side`: −1 trái, 1 phải màn hình), 'ear' (trong gốc tai phía `side`), 'chin' (dưới cằm),
+   * 'crown' (đỉnh đầu), 'scruff' (gáy — sau cổ, trên vai), 'back' (giữa lưng).
+   */
+  carePoint(which, side = 1) {
+    if (!this.el || !this.el.dau) return null;
+    this.apDung();
+    const e = this.el, nv = this.nv, r = nv.dau.r, pick = (a, b) => ((a.x - b.x) * side >= 0 ? a : b);
+    if (which === 'paw') return this.#framePoint(e.tnBan, 0, 0);
+    if (which === 'eye') return pick(this.#framePoint(e.matL, 0, 0), this.#framePoint(e.matR, 0, 0));
+    if (which === 'ear') { const [tx, ty] = nv.taiTam; return pick(this.#framePoint(e.dau, -tx * 0.95, ty - 3), this.#framePoint(e.dau, tx * 0.95, ty - 3)); }
+    if (which === 'chin') return this.#framePoint(e.dau, 0, r * 0.84);
+    if (which === 'crown') return this.#framePoint(e.dau, 0, -r * 0.8);
+    if (which === 'scruff') return this.#framePoint(e.nguc, -nv.dayThan * 0.35, -nv.dayThan * 0.92);
+    if (which === 'back') { const ry = +e.thanE.getAttribute('ry') || nv.dayThan; return this.#framePoint(e.thanE, 0, -ry * 0.95); }
+    throw new Error(`[character] carePoint: unknown spot ${JSON.stringify(which)} (paw, eye, ear, chin, crown, scruff, back)`);
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 38 A, `set.careProbe`): các phần tử và mức đang vẽ. */
+  care38Probe() {
+    const e = this.el, v = this.#careView(this.s), level = (key) => Math.max(0, ...[...(this.heldBy38 || [])].map((rig) => clamp(+(rig.s && rig.s[key]) || 0, 0, 1)));
+    return { eyes: [e.matL, e.matR], paw: e.tnBan, head: e.dau, blink: +clamp(v.matY, 0, 1).toFixed(3), lift: +level('petPaw').toFixed(3), chin: +level('petChin').toFixed(3),
+             shake: +(v.dau - this.s.dau + RigThu.CHIN_UP * level('petChin')).toFixed(2) };
   }
 
   /**

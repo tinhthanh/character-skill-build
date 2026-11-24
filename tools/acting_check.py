@@ -314,7 +314,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -1252,13 +1252,192 @@ def check_gaze_dir(folder, c, shots):
     return out
 
 
+# ĐỢT 38 A — cắt móng, nhỏ mắt, vệ sinh tai, quét chip (số đo từ `set.careProbe()` → `c38` của người và con vật).
+TOOL_AT = 0.012       # dụng cụ (khung hình) cách bàn chân / khung đầu / phần thấy được của con vật ≤ 1,2 % chiều cao người
+HOLD_AT = 0.02        # tay giữ (tay không cầm dụng cụ) cách bàn chân / khung đầu / lưng con vật ≤ 2 % chiều cao người
+PAW_UP = 0.025        # chân trước nhấc cao hơn lúc đứng ≥ 2,5 % chiều cao người (thấy là "nhấc chân lên")
+TOOL_SEEN = 0.05      # dụng cụ (cạnh dài) ≥ 5 % chiều cao khung ở lúc được hỏi — góc cận
+DROP_SEEN = 0.012     # giọt thuốc ≥ 1,2 % chiều cao khung
+BLINK = 0.9           # mắt con vật nhắm ≥ 90 % suốt 0,6 s sau khi giọt thuốc rơi vào
+SHAKE_DEG = 10        # lắc đầu: xoay ≥ 10° mỗi bên, ≥ 4 lần đổi chiều
+SWEEP = 0.02          # máy quét rà qua lại ≥ 2 % chiều cao người (bề ngang tâm máy giữa các mốc)
+CARD_TEXT = 0.03      # mã chip: chữ cao ≥ 3 % chiều cao khung
+CARD_OVER = 0.15      # thẻ che khung đầu con vật ≤ 15 %
+
+
+def box_of(c):
+    return {'x0': c['x'] - c['w'] / 2, 'x1': c['x'] + c['w'] / 2, 'y0': c['y'] - c['h'] / 2, 'y1': c['y'] + c['h'] / 2}
+
+
+def box_gap(a, b):
+    return (max(0, a['x0'] - b['x1'], b['x0'] - a['x1']) ** 2 + max(0, a['y0'] - b['y1'], b['y0'] - a['y1']) ** 2) ** 0.5
+
+
+def check_care38(folder, c, shots, scales):
+    """ĐỢT 38 A: dụng cụ ở đúng chỗ trên con vật, tay kia giữ nó, và cái thấy được của từng động tác — kìm khép / mở nhiều lần, chân nhấc
+    lên rồi hạ; giọt thuốc đọng ở đầu vòi, rơi vào mắt, mắt nhắm; bông lau ở gốc tai, con vật lắc đầu khi đã buông tay; máy quét rà trên
+    gáy, thẻ mã chip đọc được, không che đầu con vật."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    person = lambda t: (care(t).get(who_n) or {}).get('c38') or {}
+    pet = lambda t: (care(t).get(pet_n) or {}).get('c38') or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    H = lambda t: care(t).get('@H') or frame_size(folder)[1]
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    what = lambda text: f'{who_n} {name} {pet_n} — {text}'
+    out = []
+
+    def holder_gap(t, target):
+        """Tay KHÔNG cầm dụng cụ: cách `target` (khung) bao nhiêu chiều cao người."""
+        a, side = frame(t).get(who_n), person(t).get('side')
+        hands = [h for h in (a or {}).get('hands') or [] if h.get('box') and h.get('side') != side]
+        if not hands or not tall(t) or not target: return None
+        return min(box_gap(h['box'], target) for h in hands) / tall(t)
+
+    def head_box(t): return ((frame(t).get(pet_n) or {}).get('parts') or {}).get('head')
+
+    def tool_size(t):
+        tool = person(t).get('tool')
+        return max(tool['w'], tool['h']) / H(t) if tool else 0
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': what(text), 'ok': ok, 'note': note})
+
+    mid = c['times'][len(c['times']) // 2]
+    if name == 'clipNails':
+        # (1) kìm tới bàn chân lúc khép, (2) khép ≥ 0,9 lúc cắt, mở ≤ 0,1 giữa hai lần, (3) chân nhấc suốt quãng cắt, tay đỡ dưới nó, hạ xuống sau.
+        gaps, snips, opens = [], [], []
+        for t in c['closed']:
+            tool, paw = person(t).get('tool'), pet(t).get('paw')
+            if tool and paw and tall(t): gaps.append((t, box_gap(box_of(tool), box_of(paw)) / tall(t)))
+            snips.append(person(t).get('snip', 0))
+        opens = [person(t).get('snip', 1) for t in c['open']]
+        worst = max(gaps, key=lambda g: g[1]) if gaps else None
+        row('the clipper at the paw', bool(worst) and worst[1] <= TOOL_AT and len(gaps) == len(c['closed']),
+            f'the clipper is at most {worst[1] * 100:.1f} % of height from the paw at the {len(gaps)} cuts (at {worst[0]:g} s; limit {TOOL_AT * 100:g} %)' if worst else 'no clipper or paw at the cuts')
+        row(f'the clipper closes and opens, {len(c["closed"])} cuts', min(snips) >= 0.9 and max(opens) <= 0.1 and len(snips) >= 2,
+            f'closed {min(snips):.2f} at least at the cuts, open {max(opens):.2f} at most between them (want ≥ 0.9 / ≤ 0.1)')
+        # Bàn chân so với ĐẦU con vật trong cùng khung (máy có thể cắt cảnh giữa lúc đứng và lúc nhấc), theo chiều cao đầu.
+        rel = lambda t: (lambda paw, head: (paw['y'] - head['y']) / max(1, head['h']) if paw and head else None)(pet(t).get('paw'), pet(t).get('head'))
+        rest = [rel(t) for t in c['down'] if rel(t) is not None]
+        lifted, held = [], []
+        for t in c['lifted']:
+            paw, head, now = pet(t).get('paw'), pet(t).get('head'), rel(t)
+            if now is None or not rest or not tall(t): continue
+            lifted.append(((min(rest) - now) * head['h'] / tall(t), pet(t).get('lift', 0)))
+            g = holder_gap(t, box_of(paw))
+            if g is not None: held.append((t, g))
+        low = min(lifted, key=lambda x: x[0]) if lifted else None
+        down = [pet(t).get('lift', 1) for t in c['down']]
+        row('the paw is held up while cut, put down after', bool(low) and low[0] >= PAW_UP and max(down) <= 0.01,
+            (f'the paw at least {low[0] * 100:.1f} % of height above where it stands over {len(lifted)} moments (least {PAW_UP * 100:g} %); lifted {max(down):.2f} before and after' if low else 'paw not measured'))
+        far = max(held, key=lambda x: x[1]) if held else None
+        row('the other hand holds the paw', bool(far) and far[1] <= HOLD_AT,
+            f'the holding hand is at most {far[1] * 100:.1f} % of height from the paw over {len(held)} moments (at {far[0]:g} s; limit {HOLD_AT * 100:g} %)' if far else 'not measured')
+        size = tool_size(mid)
+        row('the clipper big enough on screen', size >= TOOL_SEEN, f'the clipper is {size * 100:.1f} % of the frame height at {mid:g} s (least {TOOL_SEEN * 100:g} %)')
+    elif name == 'eyeDrops':
+        # (1) lọ ngay trên mắt (tâm lọ trong ±1,5 bề ngang mắt, đáy lọ trên mắt), (2) giọt đọng rồi rơi vào mắt, (3) cằm nâng, tay đỡ ở đầu, (4) mắt nhắm.
+        def eye_near(t, x):
+            eyes = [e for e in pet(t).get('eyes') or [] if e]
+            return min(eyes, key=lambda e: abs(e['x'] - x)) if eyes else None
+        above = []
+        for t in c['times']:
+            tool = person(t).get('tool')
+            eye = tool and eye_near(t, tool['x'])
+            if tool and eye: above.append((t, abs(tool['x'] - eye['x']) / max(1, eye['w']), (eye['y'] - (tool['y'] + tool['h'] / 2)) / max(1, eye['h'])))
+        bad = [a for a in above if a[1] > 1.5 or a[2] < 0]
+        row('the dropper right above the eye', len(above) == len(c['times']) and not bad,
+            '; '.join(f'{a[0]:g} s: {a[1]:.1f} eye widths aside, {a[2]:.1f} eye heights above' for a in (bad or above[:1])) if above else 'no dropper or eye')
+        hanging = [t for t in c['hanging'] if person(t).get('drop')]
+        falls = [(t, person(t).get('drop')) for t in c['falling']]
+        last = falls[-1][1] if falls and falls[-1][1] else None
+        eye = last and eye_near(c['falling'][-1], last['x'])
+        into = bool(eye) and abs(last['x'] - eye['x']) <= eye['w'] and last['y'] < eye['y'] + eye['h'] / 2
+        gone = not person(c['hit'] + 0.05).get('drop')
+        row('a drop hangs at the tip, then falls into the eye', len(hanging) >= 3 and all(f for _, f in falls) and into,
+            f'drop seen at {len(hanging)} of {len(c["hanging"])} moments at the tip (least 3), falling at {sum(1 for _, f in falls if f)} of {len(falls)}; '
+            + (f'last seen {abs(last["x"] - eye["x"]) / max(1, eye["w"]):.1f} eye widths aside, {(eye["y"] - last["y"]) / max(1, eye["h"]):.1f} eye heights above the eye' if eye else 'not over an eye') + ('' if gone else '; still there after it hit'))
+        size = (last['h'] / H(c['falling'][-1])) if last else 0
+        row('the drop and the dropper big enough on screen', size >= DROP_SEEN and tool_size(mid) >= TOOL_SEEN,
+            f'drop {size * 100:.1f} % (least {DROP_SEEN * 100:g} %), dropper {tool_size(mid) * 100:.1f} % of the frame height (least {TOOL_SEEN * 100:g} %)')
+        chin = [pet(t).get('chin', 0) for t in c['chin']]
+        held = [g for g in (holder_gap(t, head_box(t)) for t in c['chin']) if g is not None]
+        row('the chin held up by the other hand', min(chin) >= 0.95 and held and max(held) <= HOLD_AT,
+            f'chin raised {min(chin):.2f} at least (want 1), the holding hand at most ' + (f'{max(held) * 100:.1f} %' if held else '—') + f' of height from the head (limit {HOLD_AT * 100:g} %)')
+        blinks = [pet(t).get('blink', 0) for t in c['blink']]
+        row('the eyes shut after the drop', min(blinks) >= BLINK, f'eyes shut {min(blinks):.2f} at least over {c["blink"][0]:g}–{c["blink"][-1]:g} s (least {BLINK:g})')
+    elif name == 'cleanEars':
+        spots, held = [], []
+        for t in c['wipe']:
+            tool, head = person(t).get('tool'), head_box(t)
+            if not tool or not head or not tall(t): continue
+            upper = tool['y'] <= head['y0'] + (head['y1'] - head['y0']) * 0.55
+            spots.append((t, box_gap(box_of(tool), head) / tall(t), upper, tool['x'], tool['y']))
+            g = holder_gap(t, head)
+            if g is not None: held.append(g)
+        bad = [x for x in spots if x[1] > TOOL_AT or not x[2]]
+        move = (max(x[3] for x in spots) - min(x[3] for x in spots) + max(x[4] for x in spots) - min(x[4] for x in spots)) if spots else 0
+        row('the cotton pad wipes at the ear', len(spots) == len(c['wipe']) and not bad and move >= 3,
+            (f'pad on the upper half of the head at {len(spots) - len(bad)} of {len(c["wipe"])} moments, moving {move:.0f} px' + (f'; {bad[0][0]:g} s: {bad[0][1] * 100:.1f} % off the head' if bad else '')) if spots else 'no pad or head')
+        row('the other hand holds the head', bool(held) and max(held) <= HOLD_AT, f'the holding hand at most {max(held) * 100:.1f} % of height from the head (limit {HOLD_AT * 100:g} %)' if held else 'not measured')
+        turns = [pet(t).get('shake', 0) for t in c['shake']]
+        flips = sum(1 for a, b in zip(turns, turns[1:]) if a * b < 0)
+        # Tay đã BUÔNG: tâm mọi bàn tay cách tâm đầu con vật ≥ 0,7 chiều cao đầu (khung đầu rộng hơn hình — đo theo tâm).
+        def off_head(t):
+            head, hands = head_box(t), [h['box'] for h in (frame(t).get(who_n) or {}).get('hands') or [] if h.get('box')]
+            if not head or not hands: return None
+            hx, hy, hh = (head['x0'] + head['x1']) / 2, (head['y0'] + head['y1']) / 2, head['y1'] - head['y0']
+            return min((((b['x0'] + b['x1']) / 2 - hx) ** 2 + ((b['y0'] + b['y1']) / 2 - hy) ** 2) ** 0.5 for b in hands) / max(1, hh)
+        free = [g for g in (off_head(t) for t in c['free']) if g is not None]
+        row('then it shakes its head, hands off', max(map(abs, turns)) >= SHAKE_DEG and flips >= 4 and bool(free) and min(free) >= 0.7,
+            f'head turned up to {max(map(abs, turns)):.0f}°, {flips} changes of direction (least {SHAKE_DEG}°, 4)' + (f'; the hands {min(free):.2f} head heights from the middle of its head (least 0.7)' if free else ''))
+    else:
+        xs, near, held = [], [], []
+        for t in c['scan']:
+            tool, f = person(t).get('tool'), frame(t).get(pet_n) or {}
+            parts = list((f.get('parts') or {}).values())
+            if not tool or not parts or not tall(t): continue
+            xs.append(tool['x'] / tall(t))
+            near.append((t, min(box_gap(box_of(tool), b) for b in parts) / tall(t)))
+            back = (f.get('parts') or {}).get('back')
+            g = holder_gap(t, back)
+            if g is not None: held.append(g)
+        worst = max(near, key=lambda x: x[1]) if near else None
+        sweep = (max(xs) - min(xs)) if xs else 0
+        row('the scanner passes over the neck and shoulders', bool(worst) and worst[1] <= 0.03 and sweep >= SWEEP,
+            f'the scanner at most {worst[1] * 100:.1f} % of height off the pet (limit 3 %), sweeping {sweep * 100:.1f} % of height (least {SWEEP * 100:g} %)' if worst else 'no scanner')
+        row('the other hand on its back', bool(held) and max(held) <= HOLD_AT, f'the holding hand at most {max(held) * 100:.1f} % of height from its back (limit {HOLD_AT * 100:g} %)' if held else 'not measured')
+        texts, over, big, inside, over_face = [], [], [], [], []
+        W, Hf = frame_size(folder)
+        for t in c['card']:
+            p = person(t)
+            texts.append(p.get('text'))
+            card, text, head = p.get('card'), p.get('cardText'), head_box(t)
+            face = (frame(t).get(who_n) or {}).get('headBox')
+            if card and face:
+                b, area = box_of(card), max(1, (face['x1'] - face['x0']) * (face['y1'] - face['y0']))
+                over_face.append(max(0, min(b['x1'], face['x1']) - max(b['x0'], face['x0'])) * max(0, min(b['y1'], face['y1']) - max(b['y0'], face['y0'])) / area)
+            if card and head:
+                b, area = box_of(card), max(1, (head['x1'] - head['x0']) * (head['y1'] - head['y0']))
+                over.append(max(0, min(b['x1'], head['x1']) - max(b['x0'], head['x0'])) * max(0, min(b['y1'], head['y1']) - max(b['y0'], head['y0'])) / area)
+                inside.append(in_frame(b, W, Hf))
+            if text: big.append(text['h'] / H(t))
+        ok = all(x == c['id'] for x in texts) and big and min(big) >= CARD_TEXT and over and max(over) <= CARD_OVER and min(inside) >= 0.95 and max(over_face or [0]) <= CARD_OVER
+        row('the chip number shown on a big card', bool(ok),
+            f'"{c["id"]}" shown at {sum(1 for x in texts if x == c["id"])} of {len(texts)} moments; text ' + (f'{min(big) * 100:.1f} %' if big else '—') + f' of the frame height (least {CARD_TEXT * 100:g} %); covers '
+            + (f'{max(over) * 100:.0f} %' if over else '—') + f' of {pet_n}\'s head and {max(over_face or [0]) * 100:.0f} % of {who_n}\'s face (limit {CARD_OVER * 100:g} % each); ' + (f'{min(inside) * 100:.0f} % in the frame' if inside else ''))
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     # Mọi lúc cần chụp: các dải thời gian của từng phép đo (danh sách số — `reading` của cân là chữ, bỏ qua).
-    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
-    shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
+                                    'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
+    when38 = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
+    shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + when38 + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
     hide_jobs = [(c['times'][len(c['times']) // 2], c['who'], c.get('target') or c['who']) for c in checks if c['kind'] == 'petAct' and c['name'] == 'hide']
@@ -1271,6 +1450,9 @@ def check_scene(folder):
         if c['kind'] == 'showXray' and c.get('listener'): results.extend(check_gaze(folder, c, shots))
         if c['kind'] == 'readChart' and c.get('reading'): results.extend(check_reading(folder, c, shots))
         if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))
+        if c['kind'] == 'care38':
+            results.extend(check_care38(folder, c, shots, scales))
+            continue
         if c['kind'] == 'walk':
             worst = None
             for t, frame in zip(c['times'], frames):
