@@ -2158,7 +2158,7 @@ export class RigSVG {
       screen.setAttribute('x', -a); screen.setAttribute('width', 2 * a);
       e.readout.setAttribute('data-half', String(half));
     }
-    e.readout.setAttribute('transform', `translate(${(r.side || r.w ? x : clamp(x, half + 4, KHUNG.w - half - 4)).toFixed(1)} ${(y - 6 * k).toFixed(1)}) scale(${(0.45 + 0.55 * k).toFixed(3)})`);
+    e.readout.setAttribute('transform', `translate(${(r.side || r.w ? x : clamp(x, half + 4, KHUNG.w - half - 4)).toFixed(1)} ${(y - 6 * k).toFixed(1)}) scale(${((0.45 + 0.55 * k) * (r.w ? 0.82 : 1)).toFixed(3)})`);      // thẻ rộng (mã chip) nhỏ lại một chút: chữ vẫn ≥ 8 % khung ở góc cận
     e.readout.style.opacity = Math.min(1, k * 1.6).toFixed(2);
     e.readout.style.display = '';
   }
@@ -4858,13 +4858,16 @@ export class RigSVG {
       } catch (error) { return null; } finally { Object.assign(s, was); this.apDung(); }
     };
     const fit = (side, x, y, make, at) => {
-      let tx = x, ty = y, p = make(tx, ty);
-      for (let n = 0; n < 2; n++) {
+      let tx = x, ty = y, p = make(tx, ty), best = null;
+      for (let n = 0; n < 3; n++) {
         const q = measure(side, p, ...at(p));
-        if (!q || Math.hypot(x - q.x, y - q.y) < 0.5) break;
+        if (!q) return best ? best.p : p;
+        const miss = Math.hypot(x - q.x, y - q.y);
+        if (!best || miss < best.miss) best = { p, miss };
+        if (miss < 0.5 || n === 2) break;
         tx += x - q.x; ty += y - q.y; p = make(tx, ty);
       }
-      return p;
+      return best.p;                                     // lời giải trúng nhất (bù quá tay có thể đổi hướng khuỷu — giữ lần tốt nhất)
     };
     const arm = (side, x, y, reachIn) => fit(side, x, y, (a, b) => solve(side, a, b, reachIn * cB), () => [0, reachIn]);
     // Dụng cụ CHÚC THẲNG XUỐNG (lọ nhỏ mắt, máy quét): cổ tay đặt sao cho điểm `along` của dụng cụ (sau khi xoay quanh lòng bàn tay
@@ -5038,7 +5041,7 @@ export class RigSVG {
     // 3. BÍP: thẻ số với mã chip bật lên trên lưng con vật (lệch về phía đuôi — không che đầu nó), người nhìn thẻ, gật.
     const beep = 2.85, w = Math.max(116, Math.round(id.length * 12.6 + 26));
     // Thẻ trên LƯNG con vật, lệch về phía đuôi, thấp ngay trên lưng — không che đầu nó, không che mặt người cúi sát (lượt hai).
-    const card = { x: B.x - fwd * 72, y: Math.min(B.y - 30, S.y - lift - RigSVG.SCAN_AT - 12) };
+    const card = { x: B.x - fwd * 50, y: Math.min(B.y - 30, S.y - lift - RigSVG.SCAN_AT - 12) };
     t.to(s, { readoutN: this.#reading({ text: id, x: card.x + s.x, y: card.y + (s.y || 0) + DOI_Y, w }), duration: 0.02 }, beep - 0.05);
     t.to(s, { readout: 1, duration: 0.35, ease: 'back.out(1.8)' }, beep);
     const look = { x: card.x, y: card.y - 26 }, angles = this.#lookAngles(look, { huong: turn });

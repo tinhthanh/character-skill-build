@@ -1769,7 +1769,7 @@ try {
       // (chân nhấc, cằm nâng, mắt nhắm, lắc đầu), thẻ mã chip, không còn gì sau động tác; đối số sai bị từ chối rõ ràng.
       {
         const nurse = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'nurse' }).rig;
-        const pup = L.createPet(spot('left:985px;top:118px;width:100px;height:82px'), { species: 'dog' }).rig;
+        const pup = L.createPet(spot('left:995px;top:118px;width:100px;height:82px'), { species: 'dog' }).rig;
         pup.s.huong = -1; pup.apDung();
         const gap = (a, b) => { const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return Math.max(0, p.left - q.right, q.left - p.right, p.top - q.bottom, q.top - p.bottom); };
         const tool = (kind) => { const side = ['L', 'R'].find((k) => Math.round(nurse.s['gadget' + k]) === kind); return side ? nurse.el['gadget' + side].querySelector(`[data-gadget="${kind}"]`) : null; };
@@ -1801,7 +1801,7 @@ try {
         const ears = nurse.cleanEars(pup);
         ears.time(1.2);
         if (!tool(12) || gap(tool(12), pup.el.dau) > 4) hong('cleanEars', 'the cotton pad is not at the head');
-        ears.time(0.65 + 1.8 + 0.35 + 0.11 * 1.5);
+        ears.time(0.65 + 1.8 + 0.35 + 0.11);
         if (Math.abs(pup.care38Probe().shake) < 8) hong('cleanEars', 'the pet does not shake its head after the ears are wiped');
         ears.progress(1); if (tool(12) || pup.care38Probe().shake !== 0) hong('cleanEars', 'the pad or the head shake stays afterwards');
         ears.kill();
