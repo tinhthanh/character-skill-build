@@ -82,6 +82,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                overrides the camera for that turn. `{ "together": [ … ] }` runs turns at the same time; a "view" on the
                "together" entry itself points the camera for the whole group — a voice-over: `{ "together": [ { "who": "mom",
                "say": "…" }, { "who": "cat", "do": ["sitInBox"] } ], "view": { "on": ["cat"], "size": "close", "alone": true } }`.
+               A NARRATOR who is only a voice (wave 42): `{ "name": "loi_dan", "narrator": true, "voice": "baotrang" }` in "characters" —
+               no "id" / "species" / "x": it has no body on screen and the camera never frames it; its turns carry only "say" (+ "audio",
+               "dur", "voice"), alone or inside "together" with a "view" on whoever acts. Captions and lip timing work as for anyone.
   script       `"mood"` on a turn: happy, sad, surprised, angry, thinking, laughing, worried, confused, tired,
                crying, embarrassed, sleepy. A PET's "mood": happy, excited, sad, scared, angry, curious, guilty,
                pain, sleepy — alone it is one beat of that face; with "do" the pet keeps the face through those
@@ -236,7 +239,47 @@ def known(where, given, allowed):
 
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds', 'hook')
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
-CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
+CHARACTER_KEYS = ('narrator', 'name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
+NARRATOR_KEYS_42A = ('narrator', 'name', 'voice')            # đợt 42 A: người dẫn không hiện hình chỉ có tên, giọng đọc
+NARRATOR_TURN_KEYS_42A = ('who', 'say', 'audio', 'dur', 'voice', 'view')
+NARRATOR_RIG_42A = 'vet'                                     # rig vô hình mượn để có miệng / cue / phụ đề; không bao giờ `set.place`
+
+
+def narrator_split_42a(script, narrators):
+    """ĐỢT 42 A: tách lượt của NGƯỜI DẪN (giọng, không hiện hình) khỏi các lượt của nhân vật thật. Lượt riêng → mục `together` rỗng kèm
+    `_narr42a`; lượt trong `together` → dời sang `_narr42a` của mục ấy. Nhờ vậy mọi bước đo / dựng góc máy chỉ thấy nhân vật thật."""
+    if not narrators: return script
+    out = []
+    for index, entry in enumerate(script):
+        where = f'script[{index}]'
+        group = entry['together'] if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]
+        voices = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in narrators]
+        if not voices:
+            out.append(entry); continue
+        for turn in voices:
+            known(f'{where} (narrator "{turn["who"]}")', turn, NARRATOR_TURN_KEYS_42A)
+            if not isinstance(turn.get('say'), str) or not turn['say'].strip(): fail(f'{where}: the narrator "{turn["who"]}" has no body — a turn of theirs needs a "say" line (nothing else)')
+        if group is not entry.get('together'):                        # lượt riêng của người dẫn: "view" (nếu có) thuộc về mục
+            wrapper = {'together': [], '_narr42a': [{k: v for k, v in entry.items() if k != 'view'}]}
+            if 'view' in entry: wrapper['view'] = entry['view']
+            out.append(wrapper)
+        else:
+            if any('view' in turn for turn in voices): fail(f'{where}: put "view" on the "together" entry, not on the narrator\'s turn')
+            out.append(dict(entry, together=[turn for turn in group if turn not in voices], _narr42a=[dict(turn) for turn in voices]))
+    return out
+
+
+def pet_fill_42a(entry):
+    """ĐỢT 42 A: `fill` cho góc cận một con thú trong nhóm `together` có "view": theo động tác của chính con thú ấy (cùng bảng như góc tự động của lượt riêng)."""
+    who = (entry.get('view') or {}).get('on', [None])[0]
+    acts = [step if isinstance(step, str) else step[0] for turn in entry.get('together', []) if isinstance(turn, dict) and turn.get('who') == who
+            for step in turn.get('do') or [] if isinstance(step, (str, list)) and step]
+    known_acts = [name for name in acts if name in PET_CLOSE]
+    if not known_acts: return None
+    fills = [PET_FILL_40[name] if name in PET_FILL_40 else 0.9 if name in ('playBow', 'dig', 'carryToy') else 0.74 if name == 'rollOver' else 0.7 if name in ('chaseTail', 'bark') else 0.66 if name == 'lick' else PET_CLOSE_FILL for name in known_acts]
+    return max(fills)
+
+
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door', 'facing')
@@ -1321,6 +1364,20 @@ def main():
     known('scene', scene, TOP_KEYS)
     scene['script'] = expand_combos(scene.get('script'))
     scene['script'] = pair_restrain(scene['script'])                    # đợt 38 B: giữ con vật vừa khít phần việc người kia
+    # ĐỢT 42 A — NGƯỜI DẪN KHÔNG HIỆN HÌNH: `{ "name": "loi_dan", "narrator": true, "voice": "baotrang" }` trong "characters". Chỉ nói (giọng + phụ đề),
+    # không có thân trên màn hình, máy quay không bao giờ chiếu vào. Rút khỏi dàn nhân vật thật ở đây; lượt của họ đi riêng (`_narr42a`).
+    narrators_42a = {}
+    if isinstance(scene.get('characters'), list):
+        for who in scene['characters']:
+            if not isinstance(who, dict) or not who.get('narrator'): continue
+            known(f'narrator "{who.get("name")}"', who, NARRATOR_KEYS_42A)
+            if who['narrator'] is not True or not isinstance(who.get('name'), str) or not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', who['name']): fail(f'a narrator is {{ "name": "<identifier>", "narrator": true, "voice": "baotrang" }} — got {js(who)}')
+            if who.get('voice') is not None and not isinstance(who['voice'], str): fail(f'narrator "{who["name"]}": "voice" must be a voice name (see `voice-tts voices`)')
+            if who['name'] in narrators_42a or any(c is not who and isinstance(c, dict) and c.get('name') == who['name'] for c in scene['characters']): fail(f'two characters are named "{who["name"]}"')
+            narrators_42a[who['name']] = {'name': who['name'], 'voice': who.get('voice'), '_pet': False, 'x': 0, 'id': NARRATOR_RIG_42A}
+        if narrators_42a:
+            scene['script'] = narrator_split_42a(scene['script'], narrators_42a)
+            scene['characters'] = [c for c in scene['characters'] if not (isinstance(c, dict) and c.get('narrator'))]
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
     stage_set = scene.get('set')
@@ -1840,9 +1897,11 @@ def main():
         return '[' + ', '.join(parts) + ']'
 
     def turn_code(turn, where):
-        if not isinstance(turn, dict) or turn.get('who') not in names: fail(f'{where}: "who" must name a character in the scene (got {js(turn.get("who") if isinstance(turn, dict) else turn)})')
+        if isinstance(turn, dict) and turn.get('who') in narrators_42a: names_42a = narrators_42a
+        else: names_42a = names
+        if not isinstance(turn, dict) or turn.get('who') not in names_42a: fail(f'{where}: "who" must name a character in the scene (got {js(turn.get("who") if isinstance(turn, dict) else turn)})')
         known(where, turn, TURN_KEYS)
-        who = names[turn['who']]
+        who = names_42a[turn['who']]
         steps = []
         # `mood`: lượt CÓ lời thì cả câu được nói bằng nét mặt ấy; lượt không lời thì là một nhịp nét mặt
         # trước các động tác của lượt.
@@ -1945,7 +2004,7 @@ def main():
         if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
         body = f"[{who['name']}, " + ', '.join(steps) + ']'
         # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
-        if 'shot' not in turn and 'say' in turn:
+        if 'shot' not in turn and 'say' in turn and who['name'] not in narrators_42a:
             mentioned = [other['name'] for other in names.values() if other['_pet'] and re.search(r'(?<!\w)' + re.escape(other['name']) + r'(?!\w)', str(turn['say']), re.IGNORECASE)]
             if mentioned: turn = dict(turn, shot=[who['name']] + mentioned)
         if 'shot' in turn:
@@ -2158,7 +2217,7 @@ def main():
             if 'bullets' in show and (not isinstance(show['bullets'], list) or not all(isinstance(item, str) for item in show['bullets'])): fail(f'{where}: "show.bullets" must be a list of strings')
             if 'image' in show and not os.path.isfile(os.path.join(base, show['image'])): fail(f'{where}: show.image not found: {show["image"]} (looked in {base})')
             shows.append(dict(show, turn=flat))
-        flat += len(entry['together']) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
+        flat += len(entry['together']) + len(entry.get('_narr42a', [])) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
         backs = []                                          # (người, quãng) — lùi lại sau lượt này
         turned_back = []                                    # (con vật, người) — con vật quay lại nhìn người ấy sau lượt này (takeTemp)
         first_turn = emitted[0]                             # nhịp của đạo diễn tự động: gồm cả các bước lại gần / lùi lại
@@ -2513,16 +2572,22 @@ def main():
             toasts.append({'turn': emitted[0], 'title': note.get('title', ''), 'text': note.get('text', '')})
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
-            known(where, entry, ('together', 'view'))
-            if not isinstance(entry['together'], list) or not entry['together']: fail(f'{where}: "together" must be a non-empty list of turns')
+            known(where, entry, ('together', 'view', '_narr42a'))
+            if not isinstance(entry['together'], list) or not (entry['together'] or entry.get('_narr42a')): fail(f'{where}: "together" must be a non-empty list of turns')
             if any(isinstance(turn, dict) and 'view' in turn for turn in entry['together']): fail(f'{where}: "view" cannot sit inside "together" — put it on the "together" entry itself (one camera for the whole group), or on a turn of its own')
             # ĐỢT 42: GÓC MÁY CHO CẢ NHÓM — lời dẫn đè lên hình (voice-over): `{ "together": [ { người nói }, { con vật diễn } ], "view": { "on": ["meo"], "size": "close" } }`
             # — máy quay vào động tác trong lúc người kia nói, không cắt sang người nói. Chỉ dạng đối tượng (không có "who" chung để hiểu "close").
+            # ĐỢT 42 A: góc cận MỘT con thú, một mình, chưa khai `fill` — choán khung theo động tác nó làm trong nhóm (như góc tự động của lượt riêng): thỏ nhảy vui / chó chổng mông 0,9; mèo chui hộp 0,62…
+            if isinstance(entry.get('view'), dict) and 'fill' not in entry['view'] and entry['view'].get('alone') and entry['view'].get('size') == 'close' and isinstance(entry['view'].get('on'), list) and len(entry['view']['on']) == 1:
+                fill_42a = pet_fill_42a(entry)
+                if fill_42a: entry['view'] = dict(entry['view'], fill=fill_42a)
             if 'view' in entry:
                 if not isinstance(entry['view'], dict): fail(f'{where}: "view" on a "together" entry must be an object — {{ "on": [names], "size": "close" | "medium" | "full" }} or camera values')
                 view_of(entry, where)
-            emitted[0] += len(entry['together'])
-            turns.append((None, '{ together: [' + ', '.join(turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])) + '] }'))
+            emitted[0] += len(entry['together']) + len(entry.get('_narr42a', []))
+            # Lời của người dẫn (đợt 42 A) chạy CÙNG LÚC với nhóm, xếp sau cùng; một mình thì là một lượt thường.
+            parts_42a = [turn_code(turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])] + [turn_code(turn, f'{where}.narrator') for turn in entry.get('_narr42a', [])]
+            turns.append((None, '{ together: [' + ', '.join(parts_42a) + '] }' if len(parts_42a) > 1 else parts_42a[0]))
         else:
             code = turn_code(entry, where)
             # GÓC CẬN CON VẬT tự động (đợt 35, lượt ba): lượt riêng của con vật làm một động tác của nó (lăn ngửa, đuổi đuôi, nhào, gặm,
@@ -3062,6 +3127,9 @@ def main():
                 if abs(z - kept[-1][1]) > 5: kept.append((turn, z, hops[n - 1][0]))
             if len(kept) > 1: pet_depths[name] = kept
             else: del pet_depths[name]
+    for narrator in narrators_42a.values():
+        # Người dẫn (đợt 42 A): một rig có miệng để căn giờ lời + phụ đề, gắn vào một thẻ div RỜI — không `set.place`, không clip, không vào `framing()`.
+        setup.append(f"    const {narrator['name']} = VGCharacter.createCharacter(document.createElement('div'), {{ id: {js(narrator['id'])} }}).rig;      // narrator: a voice, no body on screen")
     for who in names.values():
         mount = f"host({js(who['name'])})" if stage_set is not None else f"$('{who['_element']}')"
         held = {}

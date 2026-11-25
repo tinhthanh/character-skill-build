@@ -54,6 +54,17 @@ Một tệp kịch bản:
                                        bác sĩ → chó → bé trai: trả thú (bế, trao cho chủ, dặn ba điều, vẫy chào)
                                        lễ tân: [chào khách] · bé trai: [tin vui] / [tin buồn] / [sốt ruột]
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
+    LỒNG TIẾNG (lời dẫn đè lên hình):  máy quay vào ĐỘNG TÁC, không cắt sang người nói
+      mẹ (lồng tiếng) → mèo: [chui hộp] | Mèo nhà mình thích chui hộp lắm.     người (hay người dẫn) nói câu sau dấu "|", con vật làm động tác
+      cùng lúc (quay mèo): mẹ: Mèo nhà mình … | mèo: [chui hộp]                 dạng đầy đủ — "quay …" chọn ai vào khung; thêm cận / trung / toàn
+                                                                                  (cùng lúc (quay mèo, cận): …). Không ghi "(quay …)" mà trong nhóm có người dẫn
+                                                                                  không hiện hình thì máy tự vào những ai đang diễn (không nói).
+      Cỡ cảnh tự chọn: một con thú → cận (một mình, scene.py chọn độ choán khung theo động tác: 0,62–0,95); thú + người, hay nhiều thú → trung.
+    NGƯỜI DẪN KHÔNG HIỆN HÌNH (chỉ có giọng + phụ đề, không có thân trên màn hình, máy không bao giờ quay vào):
+      khai ở dòng nhân vật với mã "lồng tiếng" (hay "không hiện"):   lời dẫn (lồng tiếng, giọng baotrang) · mèo (calico) · chó (corgi)
+      rồi:  lời dẫn: Chào mừng các bạn tới nhà bé Mốc.       (lượt riêng: máy giữ góc đang có)
+            cùng lúc (quay mèo): lời dẫn: Mèo thích chui hộp. | mèo: [chui hộp]       hay      lời dẫn (lồng tiếng) → mèo: [chui hộp] | Mèo thích chui hộp.
+      Người dẫn chỉ nói (không [hành động], không tâm trạng); "giọng …" nếu muốn có tiếng đọc (voice-tts), không thì phụ đề ước lượng giờ.
     thông báo: Tiêu đề | nội dung      thẻ thông báo của ứng dụng trượt vào khung ở lượt kế tiếp
   Dòng bắt đầu bằng # là ghi chú. Hành động / tâm trạng viết tiếng Việt hay tên gốc (wave, happy…) đều được.
 
@@ -170,6 +181,12 @@ TARGETED_39 = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie
 SIGN_TEXT = re.compile(r'(' + '|'.join(SIGN_WORDS) + r')\s*:\s*("[^"]*"|[^,\]]*)', re.IGNORECASE)
 
 
+NARRATOR_IDS_42A = ('lồng tiếng', 'không hiện', 'giọng dẫn')       # đợt 42 A: mã của người dẫn không hiện hình
+VOICEOVER_42A = re.compile(r'^(.+?)\s*\(\s*lồng tiếng\s*\)\s*→\s*(.+?)\s*:\s*(\[.*\])\s*\|\s*(.+)$', re.IGNORECASE)      # "mẹ (lồng tiếng) → mèo: [chui hộp] | lời"
+TOGETHER_42A = re.compile(r'^cùng lúc\s*(?:\(([^)]*)\))?\s*:\s*(.*)$', re.IGNORECASE)
+SIZES_42A = {'cận': 'close', 'cận cảnh': 'close', 'trung': 'medium', 'trung cảnh': 'medium', 'toàn': 'full', 'toàn cảnh': 'full'}
+
+
 class ScriptError(Exception):
     pass
 
@@ -225,12 +242,21 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     # NHÂN VẬT và CHỖ ĐỨNG. Ai "trên bàn / ghế / quầy" thì lên hộp ấy; người đầu tiên đứng cạnh hộp có thú trên đó; còn
     # lại dàn sang trái (hay ra hai bên khi không có hộp nào), cùng một độ sâu để tay với tới nhau.
     names, characters, labels = set(), [], {}
+    narrators_42a, narrator_labels_42a = [], set()
     boxes = BOXES[preset]
     for who in cast:
         name = slug(who['label'])
         while name in names: name += '_2'
         names.add(name); labels[who['label'].lower()] = name
         pet = who['id'] in PET_SPECIES
+        if who['id'].lower() in NARRATOR_IDS_42A:            # đợt 42 A: người dẫn không hiện hình — chỉ tên + giọng, không chỗ đứng
+            voice = None
+            for option in who['options']:
+                if option.lower().startswith('giọng '): voice = option.split(' ', 1)[1].strip()
+                else: raise ScriptError(f'{who["where"]}: an off-screen narrator takes only the option "giọng …" (a voice) — got "{option}"')
+            narrators_42a.append({'name': name, 'narrator': True, **({'voice': voice} if voice else {})})
+            narrator_labels_42a.add(name)
+            continue
         entry = {'name': name, ('species' if pet else 'id'): who['id'], 'z': -560}
         for option in who['options']:
             low = option.lower()
@@ -273,10 +299,30 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
 
     def is_pet(name): return any(c['name'] == name and 'species' in c for c in characters)
 
+    def together_42a(turns, option, where):
+        """Các lượt của một nhóm `cùng lúc` → mục `together`. Có "(quay …)" hay có người dẫn không hiện hình: thêm "view" — máy quay vào
+        những ai đang DIỄN (không phải người nói): một con thú → cận, một mình (độ choán khung do scene.py chọn theo động tác); thú + người hay nhiều thú → trung."""
+        entry = {'together': turns}
+        if option is None and not any(turn['who'] in narrator_labels_42a for turn in turns): return entry
+        subjects, size = [], None
+        for word in [part.strip() for part in (option or '').split(',') if part.strip()]:
+            if word.lower() in SIZES_42A: size = SIZES_42A[word.lower()]
+            elif word.lower().startswith('quay '): subjects += [who_of(label, where) for label in re.split(r'\s+và\s+|\s*\+\s*', word[5:].strip()) if label]
+            else: raise ScriptError(f'{where}: cannot read "{word}" in "cùng lúc (…)" — write "quay mèo" or "quay mèo và mẹ", then cận / trung / toàn: "cùng lúc (quay mèo, cận): …"')
+        if option is not None and not subjects and size is None: raise ScriptError(f'{where}: "cùng lúc (…)" needs "quay <who>" — for example "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"')
+        actors = [turn['who'] for turn in turns if turn['who'] not in narrator_labels_42a]
+        subjects = list(dict.fromkeys(subjects or [who for who in actors if not any(t['who'] == who and 'say' in t for t in turns)] or actors))
+        if not subjects: raise ScriptError(f'{where}: nobody in this group is on screen for the camera to film — add a character who acts')
+        if any(who in narrator_labels_42a for who in subjects): raise ScriptError(f'{where}: the narrator has no body on screen, the camera cannot film them — "quay …" must name a person or pet in the scene')
+        size = size or ('close' if len(subjects) == 1 and is_pet(subjects[0]) else 'medium')
+        entry['view'] = {'on': subjects, 'size': size, **({'alone': True} if len(subjects) == 1 else {})}
+        return entry
+
     def turn_of(body, where):
         """Một lượt: "tên (tâm trạng): lời" · "tên: [hành động…]" · "tên → tên khác: hành động"."""
         m = re.match(r'^(.+?)\s*→\s*(.+?)\s*:\s*(.+)$', body)
         if m and m.group(3).strip().lower().strip('[]') in COMBO_WORDS:
+            if who_of(m.group(1), where) in narrator_labels_42a: raise ScriptError(f'{where}: a narrator who is off screen can only speak — "{m.group(1).strip()}: <line>"')
             who, verb = who_of(m.group(1), where), m.group(3).strip().lower().strip('[]')
             name = COMBO_WORDS[verb]
             targets = [f'@{who_of(part, where)}' for part in re.split(r'\s*→\s*', m.group(2))]
@@ -287,6 +333,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             return {'who': who, 'do': [[name] + targets]}
         if m:
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
+            if who in narrator_labels_42a or target in narrator_labels_42a: raise ScriptError(f'{where}: a narrator who is off screen can only speak — "{m.group(1).strip()}: <line>"')
             chip = CHIP_VERB.match(verb)
             if chip: return {'who': who, 'do': [['scanChip', f'@{target}', {'id': chip.group(2)}]]}
             if verb in TARGETED_39:          # ĐỢT 39 C: "bác sĩ → bé trai: selfie" — chụp ảnh tự sướng CÙNG người / con vật kia
@@ -301,6 +348,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         if not m: raise ScriptError(f'{where}: không hiểu dòng này — viết "tên: lời", "tên: [hành động]" hay "tên → tên khác: hành động"')
         who, mood_word, rest = who_of(m.group(1), where), (m.group(2) or '').strip().lower(), m.group(3).strip()
         pet, turn = is_pet(who), {'who': who}
+        if who in narrator_labels_42a and (mood_word or rest.startswith('[')): raise ScriptError(f'{where}: "{m.group(1).strip()}" is an off-screen narrator — only a spoken line ("{m.group(1).strip()}: <line>"), no mood and no [action]')
         if mood_word:
             table = PET_MOODS if pet else PERSON_MOODS
             mood = table.get(mood_word) or (mood_word if mood_word in table.values() else None)
@@ -334,6 +382,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             turn['say'] = rest
         return turn
 
+    def attach_toast_42a(entry, note):
+        """Thẻ thông báo gắn vào lượt của một nhân vật thật (người dẫn không hiện hình không mang thẻ); không có thì giữ lại cho lượt sau."""
+        group = entry['together'] if 'together' in entry else [entry]
+        turn = next((t for t in group if t['who'] not in narrator_labels_42a), None)
+        if turn is None: return False
+        turn['toast'] = note
+        return True
+
     script, pending = [], None
     for where, line in lines:
         if line.lower().startswith('thông báo:'):
@@ -342,21 +398,27 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             if not parts[0]: raise ScriptError(f'{where}: "thông báo:" cần một tiêu đề — "thông báo: Nhắc lịch tái khám | Thứ Bảy 9:00"')
             pending = {'title': parts[0], **({'text': parts[1]} if len(parts) > 1 and parts[1] else {})}
             continue
-        if line.lower().startswith('cùng lúc:'):
-            parts = [part.strip() for part in line.split(':', 1)[1].split('|') if part.strip()]
+        # ĐỢT 42 A — "mẹ (lồng tiếng) → mèo: [chui hộp] | Mèo nhà mình thích chui hộp lắm." = "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"
+        voice_over = VOICEOVER_42A.match(line)
+        together = TOGETHER_42A.match(line)
+        if voice_over:
+            speaker, actor, action, words = voice_over.groups()
+            script.append(together_42a([turn_of(f'{speaker}: {words}', where), turn_of(f'{actor}: {action}', where)], f'quay {actor}', where))
+        elif together:
+            parts = [part.strip() for part in together.group(2).split('|') if part.strip()]
             if len(parts) < 2: raise ScriptError(f'{where}: "cùng lúc:" cần ít nhất hai lượt, cách nhau bằng "|"')
-            script.append({'together': [turn_of(part, where) for part in parts]})
-            if pending: script[-1]['together'][0]['toast'] = pending; pending = None
+            script.append(together_42a([turn_of(part, where) for part in parts], together.group(1), where))
         else:
             script.append(turn_of(line, where))
-            if pending: script[-1]['toast'] = pending; pending = None
-    if pending and script: (script[-1]['together'][0] if 'together' in script[-1] else script[-1])['toast'] = pending
+        if pending and attach_toast_42a(script[-1], pending): pending = None
+    if pending and script and not attach_toast_42a(script[-1], pending): raise ScriptError('thông báo: no on-screen character to attach the card to — put it before a turn of a person or pet')
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
     script = expand_combos(script)              # combo → từng lượt: đồ cầm (ống tiêm, bìa hồ sơ), cái cân… tính như viết tay
 
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
     characters = [c for c in characters if c['name'] in used] or characters
+    if narrators_42a and not characters: raise ScriptError('only an off-screen narrator — at least one character on screen is needed')
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
     needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag',
@@ -374,7 +436,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 # (tay mặc định, như khi chỉ có nó).
                 first = who['holds']
                 who['holds'] = {'R': 'syringe', 'L': item if first == 'syringe' else first} if 'syringe' in (first, item) else {'R': first, 'L': item}
-    scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters, 'script': script}
+    scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters + [n for n in narrators_42a if n['name'] in used], 'script': script}
     # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
     # mặt phẳng của người ấy).
     weighs = [(turn['who'], step[1][1:]) for turn in script if isinstance(turn, dict) for step in turn.get('do', []) if isinstance(step, list) and step and step[0] == 'weigh']

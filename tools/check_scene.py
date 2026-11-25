@@ -1429,6 +1429,38 @@ with tempfile.TemporaryDirectory() as work:
         want = [['washHands', 2], 'putOnGloves', ['clipNails', '@cho'], ['eyeDrops', '@cho'], ['cleanEars', '@cho'], 'thumbsUp', ['playBow', 1.2], 'wagTail', ['carryToy', 120]]
         if steps != want: problems.append(f'script.py combos 41: steps {steps}, want {want}')
 
+    # ĐỢT 42 A — LỒNG TIẾNG trong kịch bản chữ + NGƯỜI DẪN KHÔNG HIỆN HÌNH: kịch bản dùng cả hai dạng cú pháp ("(lồng tiếng) →" và "cùng lúc (quay …)") dựng được;
+    # composition có góc máy của nhóm `together` vào con thú (không bao giờ vào người dẫn), người dẫn không có chỗ đứng / thân trên màn hình; acting_check đạt.
+    text = os.path.join(work, 'voiceover42a.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách · máy: tự động\nlời dẫn (lồng tiếng) · mèo (calico) · chó (corgi) · thỏ (rabbit) · mẹ (manager)\n\n'
+                                            'lời dẫn: Nhà mình có ba bé, bé nào cũng có một sở thích riêng.\n'
+                                            'lời dẫn (lồng tiếng) → mèo: [chui hộp] | Mèo nhà mình thích chui hộp lắm.\n'
+                                            'cùng lúc (quay chó, cận): lời dẫn: Còn cún thì rủ chơi suốt ngày. | chó: [rủ chơi]\n'
+                                            'cùng lúc: lời dẫn: Thỏ vui là nhảy tưng tưng. | thỏ: [nhảy vui]\n'
+                                            'cùng lúc (quay thỏ và mẹ): lời dẫn: Cả nhà cùng vui. | thỏ: [nhảy vui] | mẹ: [vỗ tay]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('voiceover42a: script.py does not accept the voice-over syntax: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'voiceover42a.scene.json'), encoding='utf-8'))
+        views = [e.get('view') for e in made['script'] if isinstance(e, dict) and 'together' in e]
+        want = [{'on': ['meo'], 'size': 'close', 'alone': True}, {'on': ['cho'], 'size': 'close', 'alone': True}, {'on': ['tho'], 'size': 'close', 'alone': True}, {'on': ['tho', 'me'], 'size': 'medium'}]        # người + thú: cỡ trung, không "alone"
+        if views != want: problems.append(f'voiceover42a: script.py views {views}, want {want}')
+        if not any(c.get('narrator') for c in made['characters']): problems.append('voiceover42a: the narrator is not in the scene file')
+        for n, c in enumerate([c for c in made['characters'] if not c.get('narrator') and c.get('species')]): c['x'] = -560 + 260 * n      # nửa trái phòng: cái TV bên phải không bị mép khung chạm khi cận con thú
+        made['script'].pop()                                   # cảnh dựng thật chỉ có ba nhịp thú (người + thú cỡ trung: thú nhỏ hơn 35 % khung — acting_check)
+        json.dump(made, open(os.path.join(work, 'voiceover42a.scene.json'), 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(os.path.join(work, 'voiceover42a.scene.json'), os.path.join(work, 'voiceover42a'))
+        if done.returncode != 0: problems.append('voiceover42a: the scene does not build: ' + (done.stderr.strip() or done.stdout.strip())[-300:])
+        else:
+            html = open(os.path.join(work, 'voiceover42a', 'index.html'), encoding='utf-8').read()
+            frames = re.findall(r'frameAt\([^;]*?\[([^\]]*)\], "(\w+)"', html)
+            if len([f for f in frames if f[0] in ('meo', 'cho', 'tho') and f[1] == 'close']) < 3: problems.append(f'voiceover42a: the camera does not frame the pets during the voice-over: {frames}')
+            if 'fill: 0.9 }' not in html: problems.append('voiceover42a: a pet alone in a voice-over close-up is not framed by the fill of its action (0.9 for the rabbit binky)')
+            if any('loi_dan' in f[0] for f in frames) or 'set.place(loi_dan' in html or "host(\"loi_dan\")" in html: problems.append('voiceover42a: the off-screen narrator is placed or framed by the camera')
+            if html.count('[loi_dan, [\'explain\'') < 4: problems.append('voiceover42a: the narrator lines are not all in the conversation')
+            done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'voiceover42a')], capture_output=True, text=True)
+            if done.returncode != 0 or 'loi_dan' in done.stdout: problems.append('voiceover42a: acting_check ' + ('measures the narrator: ' if 'loi_dan' in done.stdout else 'fails: ') + (done.stdout.strip() or done.stderr.strip())[-500:])
+
     # ĐỢT 37 — COMBO (runtime/combos.js): mỗi bước của combo thành một lượt riêng; lời của lượt nói trước combo; bước có "with" chạy
     # `together` với con vật; trả thú cho chủ sau khi cân (mỗi lần bế một `omSlot` — trước đây lần bế sau ghi đè lần cân).
     combo = {'id': 'combo37', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},

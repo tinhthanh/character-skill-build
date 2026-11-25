@@ -150,6 +150,9 @@ clips for every voice file.
 **A scene from plain words:** `python3 tools/script.py kich-ban.txt` — a header (`bối cảnh: phòng khám · máy: tự
    động · khung: dọc`), the cast (`bác sĩ (vet) · chó (corgi, trên bàn)`), then `bác sĩ (vui): lời`, `chó: [sợ]`,
    `bác sĩ → chó: cho thuốc`, `cùng lúc: … | …` — written to a `.scene.json` and built (`--help` for every word).
+   **Voice-over** (a line over an action, the camera stays on the action): `mẹ (lồng tiếng) → mèo: [chui hộp] | Mèo nhà mình thích chui hộp lắm.`
+   or `cùng lúc (quay mèo, cận): mẹ: … | mèo: [chui hộp]`. **Off-screen narrator** (voice + captions, no body, never framed): cast
+   `lời dẫn (lồng tiếng, giọng baotrang)`, then `lời dẫn: …`; scene file `{ "name": "loi_dan", "narrator": true, "voice": "baotrang" }`.
 
 **Several scenes into one film:** `python3 tools/film.py film.json` (transitions, sound in step, background
    music that dips under speech, an `.srt` of every spoken line, a poster frame).
