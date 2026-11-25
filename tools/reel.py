@@ -106,6 +106,9 @@ def main():
           const table = add('table', `left:${{left - w * 0.15}}px;top:${{top + h * 0.93}}px;width:${{w * 1.3}}px;height:${{personY + personH - top - h * 0.93}}px`);
           const petHost = add('pet', `left:${{left}}px;top:${{top}}px;width:${{w}}px;height:${{h}}px`);
           pet = VGCharacter.createPet(petHost, {{ species: entry.pet, wear: entry.wear || [] }}).rig; parts.push(table, petHost);
+          // đợt 42 F — "tub": con vật trong chậu tắm cùng đơn vị với nó (host cao × 470 / 330, chung sàn), vẽ trước nó trong HTML.
+          if (entry.tub) {{ const fit = pet.tubFit42f(), th = h * 470 / 330, tub = add('host', `left:${{left + w / 2 - th * 200 / 470}}px;top:${{top + h * 292 / 330 - th * 458 / 470}}px;width:${{th * 400 / 470}}px;height:${{th}}px`);
+            petHost.parentNode.insertBefore(tub, petHost); VGCharacter.createProp(tub, 'tub', {{ width: fit.length, height: fit.rim }}); pet.inTub42f(fit.rim); parts.push(tub); }}
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
         rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;

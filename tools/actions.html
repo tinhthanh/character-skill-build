@@ -41,6 +41,8 @@ for (const entry of entries) {
       if (entry.pet) {
         const petHost = document.createElement('div'); petHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${(entry.petOnFloor ? 162 : 118) * zoom}px;width:${100 * zoom}px;height:${82 * zoom}px`;     // petOnFloor: con vật đứng dưới sàn (quỳ xuống mới với tới)
         cell.appendChild(petHost); pet = createPet(petHost, { species: entry.pet, wear: entry.wear || [] }).rig;
+        // đợt 42 F — "tub": con vật đứng trong CHẬU TẮM (đạo cụ `tub` cùng đơn vị với nó, vẽ sau nó; vành trước che chân — `inTub42f`).
+        if (entry.tub) { const fit = pet.tubFit42f(), tubHost = document.createElement('div'); tubHost.style.cssText = `position:absolute;left:${115 * zoom}px;top:${((entry.petOnFloor ? 162 : 118) + 82 * 292 / 330 - 82 * 458 / 330) * zoom}px;width:${100 * zoom}px;height:${82 * 470 / 330 * zoom}px`; cell.insertBefore(tubHost, petHost); createProp(tubHost, 'tub', { width: fit.length, height: fit.rim }); pet.inTub42f(fit.rim); }
       }
       const host = document.createElement('div'); host.style.cssText = isPet ? `position:absolute;left:${15 * zoom}px;top:${60 * zoom}px;width:${200 * zoom}px;height:${165 * zoom}px` : `position:absolute;left:${5 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
       cell.insertBefore(host, cell.firstChild);

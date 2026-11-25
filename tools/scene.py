@@ -129,6 +129,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                its eyes; { "hold": 1.2 }), ["cleanEars", "@pet"] (wipes inside the ear with a cotton pad, then the pet shakes its
                head; { "hold": 1.8 }), ["scanChip", "@pet", { "id": "900 123 456 789" }] (passes a chip scanner over the neck,
                a card shows the number). The person goes to the pet's head end; the pet follows the hands by itself.
+               Grooming (wave 42 F): ["bathPet", "@pet", { "hold": 1.8 }] on a pet with "inTub": true (it stands in a bath tub sized to
+               it, on its box or the floor — 3D sets): shower spray on its back, foam lathered in with both hands, rinsed; the person
+               steps back and the pet shakes off water. ["towelDry", "@pet"] (wraps a towel round it, rubs — the fur turns fluffy),
+               ["brushTeeth", "@pet"] (holds the muzzle, the mouth opens, short brush strokes, then it licks its lips).
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).
@@ -237,6 +241,7 @@ def known(where, given, allowed):
 TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 'props', 'script', 'camera', 'captions', 'layout', 'music', 'musicVolume', 'set', 'sides', 'intro', 'outro', 'marks', 'sounds', 'hook')
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
+CHARACTER_KEYS = CHARACTER_KEYS + ('inTub',)               # đợt 42 F: con vật đứng trong chậu tắm (tự thêm, cỡ vừa nó)
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)
 PERSON_WEARABLES = ('mask', 'gloves', 'cap')              # phụ kiện người: khẩu trang, găng tay, mũ phẫu thuật
 PROP_KEYS = ('kind', 'x', 'height', 'color', 'width', 'tabletop', 'back', 'front', 'fill', 'reading', 'door', 'facing')
@@ -280,6 +285,23 @@ CARE_38_OPTIONS = {'clipNails': {'paw', 'hold'}, 'eyeDrops': {'hold'}, 'cleanEar
 CARE_38_HOLD = {'clipNails': (0.6, 6, 1.8), 'eyeDrops': (0.5, 5, 1.2), 'cleanEars': (0.8, 6, 1.8), 'scanChip': (0.8, 6, 1.6)}     # (ít nhất, nhiều nhất, mặc định) — rig-svg.js
 CARE_38_GAP = {'clipNails': 0.17, 'eyeDrops': 0.2, 'cleanEars': 0.18, 'scanChip': 0.11}    # đứng cách ĐẦU con vật bấy nhiêu chiều cao người (ở phía đầu nó, như băng chân)
 CARE_38_HEAD = 0.2                                       # … đầu con vật cách giữa thân nó chừng ấy chiều cao host của nó (mèo ngồi: 0,08)
+# ĐỢT 42 F — tắm (trong chậu tắm), đánh răng, lau khô: như đợt 38 A (đứng ở phía đầu con vật, góc cận, con vật đọc kênh tay người). Tắm xong con vật
+# RŨ NƯỚC (như `shakeOff`, theo kênh `petShake42f` của người lúc đã lùi ra — `RigSVG.bathShakeAt42f`). Con vật `"inTub": true`: đứng trong chậu tắm tự thêm.
+CARE_42F = ('bathPet', 'brushTeeth', 'towelDry')
+CARE_38 = CARE_38 + CARE_42F
+CARE_35 = CARE_35 + CARE_42F
+REACH_ACTIONS.update({'bathPet': 'body', 'brushTeeth': 'face', 'towelDry': 'body'})
+CARE_38_OPTIONS.update({'bathPet': {'hold'}, 'brushTeeth': {'hold'}, 'towelDry': {'hold'}})
+CARE_38_HOLD.update({'bathPet': (1, 6, 1.8), 'brushTeeth': (0.8, 6, 2), 'towelDry': (1, 6, 2.2)})
+CARE_38_GAP.update({'bathPet': 0.12, 'brushTeeth': 0.19, 'towelDry': 0.12})
+BATH_SPRAY_42F, BATH_RINSE_42F, BATH_BACK_42F = 1.6, 1.5, 34       # rig-svg.js `BATH_SPRAY42F`, `BATH_RINSE42F`, `BATH_BACK42F` (đơn vị khung người)
+
+
+def bath_shake_42f(hold):
+    """Giây (từ đầu bước `bathPet`) con vật bắt đầu rũ nước — như `RigSVG.bathShakeAt42f`."""
+    return round(0.55 + BATH_SPRAY_42F + 0.55 + 0.35 + hold + 0.75 + BATH_RINSE_42F + 1.2, 2)
+
+
 CONE_BACK = 0.12                                         # đợt 36: đeo loa xong lùi ra bấy nhiêu chiều cao người
 CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ sơ trước ngực / tay chỉ trúng điểm trên phim
 # ĐỘNG TÁC TAY (đợt 33): bàn tay vung ra xa thân — vẫy, chỉ, giơ ngón… moments.json hỏi bàn tay có nằm trong khung không.
@@ -419,6 +441,7 @@ ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
 # kia nhận (`takeChange` / `takeCard`) cùng lúc, có sẵn món đồ đang cất.
 ITEM_KINDS = ITEM_KINDS + ('card', 'stampcard', 'cash')
 CUTOUT_KINDS = CUTOUT_KINDS + ('paystand',)
+CUTOUT_KINDS = CUTOUT_KINDS + ('tub',)                     # đợt 42 F: chậu tắm (con vật trong chậu: "inTub" trên con vật — chậu tự thêm vừa cỡ nó)
 DESK_39 = ('payByQR', 'payByCard', 'giveChange', 'stampCard', 'pourDrink', 'wipeCounter')
 DESK_PAY = ('payByQR', 'payByCard')
 DESK_ITEM = {'payByQR': 'phone', 'payByCard': 'card', 'giveChange': 'cash', 'stampCard': 'stampcard', 'pourDrink': 'cup'}      # món đồ phải đang cầm
@@ -690,6 +713,7 @@ def care38_plan(op, t0):
     (`hold` của bước). `times`: ba lúc tay ở trên con vật (lúc giữa là lúc được hỏi); `gaze`: đầu hướng về đâu; `check`: số đo riêng của
     acting_check (`care38`) — kìm khép / mở và chân nhấc, giọt thuốc rơi vào mắt và mắt nhắm, bông ở gốc tai và đầu lắc, máy quét rà trên gáy
     và thẻ mã chip."""
+    if op['kind'] in CARE_42F: return care42f_plan(op, t0)          # đợt 42 F
     kind, hold = op['kind'], float(op.get('hold') or CARE_38_HOLD[op['kind']][2])
     r = lambda a: round(t0 + a, 2)
     every = lambda a, b, d=0.1: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
@@ -722,6 +746,39 @@ def care38_plan(op, t0):
         gaze = [{'times': times, 'aim': 'gadget', 'gadget': 13, 'what': 'the chip scanner'}, {'times': card, 'aim': 'readout', 'what': 'the chip number shown'}]
         ask = [f'Is {who} passing a handheld scanner over the back of the neck of the animal ({pet})?', 'Is a big card with the chip number shown above the animal?']
     return {'times': times, 'gaze': gaze, 'check': dict(check, kind='care38', name=kind, who=who, target=pet, times=times), 'ask': ask}
+
+
+def care42f_plan(op, t0):
+    """ĐỢT 42 F: các lúc đo của tắm / đánh răng / lau khô, tính từ đầu bước `t0` theo đúng nhịp của runtime/rig-svg.js (`hold` của bước) — xem
+    `check_care42f` của tools/acting_check.py."""
+    kind, hold = op['kind'], float(op.get('hold') or CARE_38_HOLD[op['kind']][2])
+    r = lambda a: round(t0 + a, 2)
+    every = lambda a, b, d=0.2: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
+    who, pet = op['who'], op['target']
+    if kind == 'bathPet':
+        W, E1 = 0.55, 0.55 + BATH_SPRAY_42F
+        L0 = E1 + 0.55; R0 = L0 + 0.35 + hold; W2 = R0 + 0.75; E2 = W2 + BATH_RINSE_42F; SH = bath_shake_42f(hold)
+        times = [r(W + 0.8), r(L0 + 0.35 + hold / 2), r(W2 + 0.7)]
+        check = {'spray': every(W + 0.3, E1 - 0.15) + every(W2 + 0.3, E2 - 0.15), 'lather': every(L0 + 0.5, R0 - 0.1), 'wet': [r(E1 + 0.1), r(SH - 0.2)],
+                 'rinsed': [r(E2 + 0.25)], 'foamUp': [r(L0 + 0.5), r(R0 - 0.1)], 'shake': every(SH + 0.2, SH + 0.95, 0.05), 'free': [r(SH + 0.25), r(SH + 0.7)],
+                 'rimAt': [r(W + 0.8), r(L0 + 1.0), r(SH + 0.5)], 'gadget': 40}
+        gaze = [{'times': [check['spray'][1], check['spray'][4], check['spray'][-2]], 'aim': 'gadget', 'gadget': 40, 'what': 'the shower head'},
+                {'times': [check['lather'][1], check['lather'][len(check['lather']) // 2]], 'aim': 'pet', 'on': pet, 'what': f'{pet} (lathering)'}]
+        ask = [f'Is the animal ({pet}) standing inside a bath tub, with {who} spraying water on its back from a shower head?',
+               f'Is there white foam on the back of the animal ({pet}) while {who} lathers it with both hands?', f'Does the animal ({pet}) shake off water after {who} steps back?']
+    elif kind == 'brushTeeth':
+        B0 = 0.95
+        times = [r(B0 + 0.2), r(B0 + hold / 2), r(B0 + hold - 0.15)]
+        check = {'brush': every(B0 + 0.1, B0 + hold - 0.1, 0.1), 'lick': every(B0 + hold + 0.85, B0 + hold + 1.7, 0.05), 'free': [r(B0 + hold + 0.9), r(B0 + hold + 1.4)], 'gadget': 41}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet}\'s head'}]
+        ask = [f'Is {who} brushing the teeth of the animal ({pet}) with a small toothbrush while holding its muzzle, its mouth partly open?']
+    else:
+        R0, U = 1.3, 1.3 + hold
+        times = [r(R0 + 0.2), r(R0 + hold / 2), r(U - 0.15)]
+        check = {'carry': [r(0.5), r(0.8)], 'rub': every(R0 + 0.1, U - 0.1, 0.1), 'after': [r(U + 0.6), r(U + 0.95)], 'happy': [r(U + 0.9), r(U + 1.6)], 'gadget': 42}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet} (drying)'}]
+        ask = [f'Is the animal ({pet}) wrapped in a towel that {who} rubs with both hands?', f'Does the animal\'s fur look fluffy after the towel is taken off?']
+    return {'times': times, 'gaze': gaze, 'check': dict(check, kind='care42f', name=kind, who=who, target=pet, times=times, hold=hold), 'ask': ask}
 
 
 def care_window(kind, length):
@@ -1465,6 +1522,11 @@ def main():
         if stage_set is None and ('z' in who or 'on' in who): fail(f'character "{name}": "z" and "on" place a character in a 3D set — add "set" at the top of the scene file')
         if stage_set is not None:
             if 'on' in who and who['on'] not in [box.get('name') for box in stage_set.get('boxes', [])]: fail(f'character "{name}": "on" must name one of set.boxes (got {js(who["on"])})')
+        if 'inTub' in who:          # đợt 42 F
+            if who['inTub'] is not True and who['inTub'] is not False: fail(f'character "{name}": "inTub" must be true (stands in a bath tub) or false — got {js(who["inTub"])}')
+            if who['inTub'] and not pet: fail(f'character "{name}": "inTub" is for a pet (it stands in a bath tub) — "{name}" is a person')
+            if who['inTub'] and stage_set is None: fail(f'character "{name}": "inTub" needs a 3D set ("set") — the tub stands on the floor or on the box the pet is "on"')
+            if who['inTub'] and (who.get('enter') or name in late): fail(f'character "{name}": a pet in a tub cannot "enter" — it is in the tub from the start')
         # NHẬN TÚI THUỐC (đợt 38 C): người được ai đó `["handOverBag", "@người này"]` mà không cầm gì thì có sẵn một túi ĐANG CẤT — `takeBag`
         # nhận vào đó (cùng chỗ trên màn hình với túi trong tay người đưa).
         bag_turns = [t for entry in (scene.get('script') or []) for t in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry])]
@@ -1601,7 +1663,13 @@ def main():
             if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
                 fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
         if name == 'givePill' and len(step) > 2: fail(f'{where}: "givePill" takes just the pet: ["givePill", "@pet"] — got {js(step)}')
-        if name in CARE_38:
+        if name in CARE_42F:          # đợt 42 F: ["bathPet", "@pet", { "hold": 1.8 }], ["brushTeeth", "@pet", { "hold": 2 }], ["towelDry", "@pet", { "hold": 2.2 }]
+            options = step[2] if len(step) > 2 else {}
+            lo, hi, d = CARE_38_HOLD[name]
+            if len(step) > 3 or not isinstance(options, dict) or set(options) - {'hold'}: fail(f'{where}: "{name}" takes ["{name}", "@pet", {{ "hold": {d:g} }}] — got {js(step)}')
+            if 'hold' in options and not (isinstance(options['hold'], (int, float)) and not isinstance(options['hold'], bool) and lo <= options['hold'] <= hi): fail(f'{where}: "{name}" hold must be {lo:g}…{hi:g} seconds — got {js(options["hold"])}')
+            if name == 'bathPet' and not names[step[1][1:]].get('inTub'): reach_notes.append(f'{where}: "{step[1][1:]}" is bathed but does not stand in a tub — add "inTub": true to it (a tub sized to it is added)')
+        elif name in CARE_38:
             # ĐỢT 38 A: ["clipNails", "@pet", { "hold": 1.8 }], ["eyeDrops", "@pet"], ["cleanEars", "@pet"], ["scanChip", "@pet", { "id": "900 …" }].
             options = step[2] if len(step) > 2 else {}
             lo, hi, _ = CARE_38_HOLD[name]
@@ -2620,6 +2688,11 @@ def main():
             if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):
                 code = '{ together: [' + code + f", [{names[pilled[0]]['name']}, 0.35, ['openMouth', 1.1], ['chew', 3]]] }}"
                 emitted[0] += 1
+            # ĐỢT 42 F — `["bathPet", "@con vật"]`: người đứng lùi ra `BATH_BACK_42F` đơn vị khung sau bước ấy (con vật rũ nước theo kênh của người — không ghép bước).
+            bathed = [step for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'bathPet' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']]
+            if bathed and not names[entry['who']]['_pet']:
+                bather, tub_pet = names[entry['who']], names[bathed[0][1][1:]]
+                bather['x'] = float(bather['x']) - (1 if float(tub_pet['x']) + tub_pet.get('_drop', 0) >= float(bather['x']) else -1) * BATH_BACK_42F * bather['_unit']
             # `["lick", "@người"]` một mình (đợt 35): người ấy CHÌA TAY ra trước mõm cùng lúc (`offerHand`) — không thì con vật liếm
             # không khí. Đang bế con vật thì thôi: nó liếm mặt người bế. Bối cảnh 3D, người đứng, con vật dưới sàn: quỳ xuống trước.
             # đợt 40 C — `struggle` khi đang được bế: báo cho rig ({ carried: true }) — lúc dựng bước, hình con vật có thể chưa nằm trong tay.
@@ -3113,6 +3186,11 @@ def main():
                 hops = pet_depths.get(who['name']) if who['_pet'] else None
                 if hops: depth_z = hops[0][1]
                 setup.append(f"    set.place({who['name']}, {{ x: {who['_x0']:g}, z: {depth_z:g}{lift}, height: {who['_host_height']:g}{over} }});")
+                if who['_pet'] and who.get('inTub'):
+                    # ĐỢT 42 F: CHẬU TẮM vừa con vật, cùng đơn vị với nó (host cao bằng host con vật × 470 / 330), ngay sau nó (z − 6) — nó cắt dưới vành chậu.
+                    tub = f"tub42f_{who['name']}"
+                    setup.append(f"    const {tub} = document.createElement('div'), {tub}Fit = {who['name']}.tubFit42f(); VGCharacter.createProp({tub}, 'tub', {{ width: {tub}Fit.length, height: {tub}Fit.rim }}); "
+                                 f"set.stand({tub}, {{ x: {who['_x0']:g}, z: {depth_z - 6:g}{lift}, height: {who['_host_height'] * 470 / 330:.1f} }}); {who['name']}.inTub42f({tub}Fit.rim);          // {who['name']} stands in a bath tub")
     for prop in props:
         options = {'color': prop['options'].get('color'), 'width': prop['options'].get('width'), 'height': prop['options'].get('tabletop'), 'back': prop['options'].get('back'),
                    'fill': prop['options'].get('fill'), 'reading': prop['options'].get('reading'), 'door': prop['options'].get('door'),

@@ -448,6 +448,7 @@ export class RigThu {
     // trái tim nổi đè lên miệng bác sĩ đứng sát bàn khám (Gemini, a.mp4 00:35).
     // ĐỢT 40 B: phần tử của cuộn len, hộp, bàn chân vẽ đè lên mặt, mũi và ria thỏ
     Object.assign(this.el, Object.fromEntries(['toy', 'toyBall', 'boxB', 'boxF', 'gPaw', 'gArm', 'gBan', 'nose', 'riaL', 'riaR', 'phong'].map((n) => [n, q(n)])));
+    Object.assign(this.el, Object.fromEntries(['fluff42f', 'wetG42f', 'foam42f', 'towel42f', 'tubClip42f'].map((n) => [n, q(n)])));      // đợt 42 F
     this.markEl = attachMark(this.el.dau, [this.nv.loai === 'rabbit' ? -30 : -26, this.nv.loai === 'rabbit' ? -78 : -66], 1.25);
     this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
     this.apDung();
@@ -466,6 +467,8 @@ export class RigThu {
       <feMorphology in="SourceAlpha" operator="dilate" radius="1.3" result="d"/>
       <feFlood flood-color="${m.vien}" result="c"/><feComposite in="c" in2="d" operator="in" result="o"/>
       <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <!-- ĐỢT 42 F: con vật đứng TRONG CHẬU TẮM (\`inTub42f\`) — cắt phần dưới vành chậu (chậu là đạo cụ vẽ sau lưng nó, vành trước che chân). -->
+    <clipPath id="${p}-tub42f" clipPathUnits="userSpaceOnUse"><rect id="${p}-tubClip42f" x="-3000" y="-3000" width="6400" height="6000"/></clipPath>
   </defs>
   <g id="${p}-trail" style="display:none">${Array.from({ length: 16 }, (_, n) => `<ellipse rx="7" ry="3.2" fill="#ffffff" stroke="#b9ad9c" stroke-width="1"/>`).join('')}</g>
   <!-- ĐỢT 40 B: hộp các-tông (sitInBox) — mặt trong phía sau vẽ TRƯỚC con vật, mặt trước vẽ SAU (che thân, chỉ đầu và tai thò ra) -->
@@ -484,6 +487,7 @@ export class RigThu {
       <path id="${p}-duoiDau" stroke="${nv.loai === 'cat' ? m.dom : m.longSang}" fill="none" stroke-linecap="round"/></g>
     <g id="${p}-than"${V}>
       <path id="${p}-phong" fill="${m.long}" stroke="${m.long}" stroke-width="1.500" stroke-linejoin="round" style="display:none"/>
+      <path id="${p}-fluff42f" fill="${m.long}" stroke="${m.long}" stroke-width="1.500" stroke-linejoin="round" style="display:none"/>
       <circle id="${p}-mong" r="${nv.dayThan + 1}" fill="${m.long}"/>
       <circle id="${p}-gu" r="${nv.dayThan * 0.92}" fill="${m.long}"/>
       <ellipse id="${p}-thanE" fill="${m.long}"/>
@@ -495,7 +499,11 @@ export class RigThu {
       <g id="${p}-van">${nv.loai === 'cat'
         ? (m.patch ? `<ellipse cx="-14" cy="${(-nv.dayThan * 0.35).toFixed(1)}" rx="15" ry="${(nv.dayThan * 0.55).toFixed(1)}" fill="${m.patch}"/><ellipse cx="16" cy="${(-nv.dayThan * 0.5).toFixed(1)}" rx="9" ry="${(nv.dayThan * 0.4).toFixed(1)}" fill="${m.dom}"/>` : '')
           + [-17, -2, 13].map((x) => `<path d="M ${x} ${-nv.dayThan + 1} q 4 7 1 14" stroke="${m.dom}" stroke-width="3.400" fill="none" stroke-linecap="round"/>`).join('') : ''}</g>
+      <!-- ĐỢT 42 F: lông ƯỚT bết thành từng túm (vệt tối dọc lưng, sườn) — \`apDung\` đặt theo thân -->
+      <g id="${p}-wetG42f" style="display:none">${[0, 1, 2, 3, 4, 5, 6].map(() => `<path fill="none" stroke="${chinhSang(m.long, -0.42)}" stroke-width="2.600" stroke-linecap="round"/>`).join('')}</g>
     </g>
+    <!-- ĐỢT 42 F: BỌT DẦU TẮM trên lưng (\`bathPet\` của người) — bọt trắng, không qua bộ lọc viền -->
+    <g id="${p}-foam42f" style="display:none">${Array.from({ length: 18 }, () => `<circle fill="#ffffff" fill-opacity=".95" stroke="#a8cbe2" stroke-width="1.100"/>`).join('')}</g>
     <g id="${p}-chanGan"${V}>
       <circle id="${p}-duiN" r="${nv.chanS.dui}" fill="${m.long}"/>
       ${chan('sn', m.long, nv.chanS)}${chan('tn', m.long, nv.chanT)}
@@ -514,6 +522,9 @@ export class RigThu {
       <path id="${p}-vong" stroke="${m.vongCo}" stroke-width="6" fill="none" stroke-linecap="round"/>
       <circle id="${p}-the" r="4.200" fill="${m.the}" stroke="${m.vienNet}" stroke-width="0.900"/>
     </g>
+    <!-- ĐỢT 42 F: KHĂN TẮM quấn quanh thân (\`towelDry\` của người): sau vòng cổ, trước đầu -->
+    <g id="${p}-towel42f" style="display:none"><path data-cloth fill="#bfe8e0" stroke="#2f9e8f" stroke-width="1.600" stroke-linejoin="round"/>
+      <path data-folds fill="none" stroke="#8fcfc4" stroke-width="1.800" stroke-linecap="round"/><path data-stripes fill="none" stroke="#2f9e8f" stroke-width="3.400" stroke-linecap="round" opacity=".55"/></g>
     <g id="${p}-nuoc" style="display:none">${[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `<path data-drop="${n}" d="M 0 -10 Q 6.5 0 0 6.5 Q -6.5 0 0 -10 Z" fill="#7cc8f0" stroke="#3a8cc4" stroke-width="1.2"/>`).join('')}</g>
     <g id="${p}-dau"${V}>
       <!-- LOA CHỐNG LIẾM (wear('cone')): nhìn thẳng vào mặt, cái loa là một vành trong mờ bao quanh đầu, vẽ SAU đầu. -->
@@ -713,6 +724,7 @@ export class RigThu {
     if (e.sua) { const v = clamp(s.sua || 0, 0, 1); e.sua.style.display = v > 0.03 ? '' : 'none'; if (v > 0.03) { e.sua.setAttribute('opacity', v.toFixed(2)); e.sua.setAttribute('transform', `translate(${(4 * v).toFixed(2)} 0) scale(${(0.8 + 0.3 * v).toFixed(3)})`); } }
     if (e.toyM) this.#veDo40(H, S);
     this.#veDot40(s, H, S, ng);       // đợt 40 B
+    this.#ve42f(s, H, S);             // đợt 42 F: ướt / bọt / khăn / lông bông / chậu tắm
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
     // đợt 40 C: đang vùng vẫy trong tay người bế (`vung` đổi) thì người bế vẽ lại — hai tay lắc theo (rig-svg.js `squirm`). Chặn đệ quy: người vẽ lại có thể gọi `apDung` của con vật.
     if (held && this.carrier && !this.#dongBo && (+s.vung || 0) !== this.#vungCu) {
@@ -781,7 +793,7 @@ export class RigThu {
 
   // Mõm: nét môi hình chữ "w" dưới mũi, hàm mở ra phía dưới, lưỡi nằm trong hàm rồi thè ra.
   #veMom() {
-    const s = this.s, e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y;
+    const s = this.#careView(this.s), e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y;
     const mo = clamp(s.mieng, 0, 1), cu = s.cuoi * 2.6 * k, w = 9.5 * k, f = (v) => v.toFixed(2);
     // Nét môi chữ "w": khi `cuoi` âm (buồn, hối lỗi, đau) hai vòng cung dẹt lại rồi úp xuống — giữ nguyên vòng cung thì
     // khoé môi có trễ xuống mõm vẫn như đang cười (Gemini soát cảnh thử đợt 13).
@@ -815,7 +827,7 @@ export class RigThu {
   /** Chiều cao BẦU ĐẦU (đơn vị khung của đầu, chưa nhân `headScale`) — không tính tai. */
   skullHeight() { return this.nv.dau.r * 1.8; }
   #veGape(mo, fang) {
-    const s = this.s, e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y, f = (v) => v.toFixed(2);
+    const s = this.#careView(this.s), e = this.el, k = this.nv.mom.co, y0 = this.nv.mom.y, f = (v) => v.toFixed(2);
     const g = clamp(s.gape || 0, 0, 1), hh = this.skullHeight(), w = 9.5 * k;
     const yt = y0 + 1.2 * k;
     const D = Math.max(g * RigThu.GAPE_DEPTH * hh, mo * 0.75 * 21 * k);
@@ -1193,14 +1205,14 @@ export class RigThu {
       paw = Math.max(paw, clamp(+q.petPaw || 0, 0, 1)); chin = Math.max(chin, clamp(+q.petChin || 0, 0, 1)); blink = Math.max(blink, clamp(+q.petBlink || 0, 0, 1));
       if (Math.abs(+q.petShake || 0) > Math.abs(shake)) shake = clamp(+q.petShake || 0, -1, 1);
     }
-    if (!paw && !chin && !blink && !shake) return s;
+    const f = this.#face42f();        // đợt 42 F: mặt / miệng theo việc tắm, đánh răng, lau khô
+    if (!paw && !chin && !blink && !shake && !f) return s;
     const add = { dau: -RigThu.CHIN_UP * chin + RigThu.SHAKE_TURN * shake, dauY: -3 * chin, dauX: 4 * shake, taiL: 1.3 * shake, taiR: -1.3 * shake };
     return new Proxy(s, { get: (o, key) => {
       if (key === 'tnNhac') return pha(o.tnNhac, 1, paw);
       if (key === 'tnGoc') return pha(o.tnGoc, RigThu.PAW_LIFT, paw);
-      if (key === 'matY') return Math.max(o.matY, blink);
-      if (key in add) return o[key] + add[key];
-      return o[key];
+      const v = key === 'matY' ? Math.max(o.matY, blink) : key in add ? o[key] + add[key] : o[key];
+      return f && key in f ? f[key](v) : v;          // đợt 42 F
     } });
   }
 
@@ -1235,6 +1247,7 @@ export class RigThu {
     if (which === 'crown') return this.#framePoint(e.dau, 0, -r * 0.8);
     if (which === 'scruff') return this.#framePoint(e.nguc, -nv.dayThan * 0.35, -nv.dayThan * 0.92);
     if (which === 'back') { const ry = +e.thanE.getAttribute('ry') || nv.dayThan; return this.#framePoint(e.thanE, 0, -ry * 0.95); }
+    if (which === 'mouth42f') return this.#framePoint(e.dau, side * 9.5 * nv.mom.co * 0.45, nv.mom.y + 2);      // đợt 42 F: miệng, lệch về phía `side` (đánh răng)
     throw new Error(`[character] carePoint: unknown spot ${JSON.stringify(which)} (paw, eye, ear, chin, crown, scruff, back)`);
   }
 
@@ -1243,6 +1256,176 @@ export class RigThu {
     const e = this.el, v = this.#careView(this.s), level = (key) => Math.max(0, ...[...(this.heldBy38 || [])].map((rig) => clamp(+(rig.s && rig.s[key]) || 0, 0, 1)));
     return { eyes: [e.matL, e.matR], paw: e.tnBan, head: e.dau, blink: +clamp(v.matY, 0, 1).toFixed(3), lift: +level('petPaw').toFixed(3), chin: +level('petChin').toFixed(3),
              shake: +(v.dau - this.s.dau + RigThu.CHIN_UP * level('petChin')).toFixed(2) };
+  }
+
+  /* ------------------------------------------------ ĐỢT 42 F — tắm, đánh răng, lau khô (người làm — rig-svg.js `bathPet`, `brushTeeth`, `towelDry`)
+   * Như đợt 38 A: những gì bàn tay người làm lên con vật là kênh của NGƯỜI (`petWet42f` lông ướt, `petFoam42f` bọt trên lưng, `petDry42f`
+   * lông khô bông lên, `petTowel42f` / `petRub42f` khăn quấn và chà, `petMood42f` −1 khó chịu … 1 vui, `petGape42f` miệng hé ra cho đánh răng,
+   * `petLick42f` liếm mép) — con vật đọc lại khi vẽ từ những người trong `heldBy38`. Ướt và khô GIỮ sau động tác (người giữ kênh ấy).
+   * CHẬU TẮM là đạo cụ (`createProp(host, 'tub')`, vẽ sau con vật): `inTub42f(rim)` cắt hình con vật dưới vành chậu — vành trước che chân.
+   */
+  static WET_DARK42F = 0.3;           // lông ướt tối đi chừng ấy (nhân màu)
+  static FOAM_N42F = 18;              // số bong bóng bọt trên lưng
+  static SHAKE_DUR42F = 1.0;          // giây một lần rũ nước (`petShake42f` của người đi 0 → 1 trong chừng ấy)
+
+  // Mức của một kênh người qua những người đang làm (lớn nhất).
+  #lvl42f(key) {
+    let v = 0;
+    for (const rig of this.heldBy38 || []) v = Math.max(v, clamp(+(rig && rig.s && rig.s[key]) || 0, 0, 1));
+    return v;
+  }
+
+  // Mức tâm trạng (−1 khó chịu … 1 vui) và các mức khác, gộp từ người làm.
+  #levels42f() {
+    if (!this.heldBy38 || !this.heldBy38.size) return null;
+    let sad = 0, happy = 0, rub = 0, towelAt = 0;
+    for (const rig of this.heldBy38) {
+      const q = rig && rig.s;
+      if (!q) continue;
+      const m = clamp(+q.petMood42f || 0, -1, 1);
+      sad = Math.max(sad, -m); happy = Math.max(happy, m);
+      if ((+q.petTowel42f || 0) > towelAt) { towelAt = +q.petTowel42f; rub = clamp(+q.petRub42f || 0, -1, 1); }
+    }
+    const dry = this.#lvl42f('petDry42f');
+    return { sad, happy, rub, dry, wet: this.#lvl42f('petWet42f') * (1 - dry), foam: this.#lvl42f('petFoam42f'), towel: this.#lvl42f('petTowel42f'),
+             gape: this.#lvl42f('petGape42f'), lick: this.#lvl42f('petLick42f'), shake: this.#lvl42f('petShake42f') };
+  }
+
+  // Phần cộng vào nét mặt (dùng trong `#careView`): tai cụp ra sau, miệng méo khi bị tắm; tai dựng, cười khi được lau khô; miệng hé khi
+  // đánh răng; lưỡi thè liếm mép. Không có gì thì null.
+  #face42f() {
+    const L = this.#levels42f();
+    if (!L || !(L.sad || L.happy || L.gape || L.lick || L.shake)) return null;
+    const { sad, happy, gape, lick, shake } = L;
+    // RŨ NƯỚC (`petShake42f`: pha 0…1 trong RigThu.SHAKE_DUR42F giây, như `shakeOff`): cả người lắc từ đầu tới đuôi, nhỏ dần, mắt nhắm, giọt nước văng ra.
+    const on = shake > 0.001 && shake < 0.999, tau = shake * RigThu.SHAKE_DUR42F, w = on ? Math.sin(Math.PI * tau / 0.07) * Math.max(0, 1 - tau / 1.0) : 0;
+    const drops = on ? clamp((tau - 0.15) / 0.75, 0, 1) : 0;
+    return { taiL: (v) => v - 1.7 * sad + 0.5 * happy + 1.6 * w, taiR: (v) => v - 1.7 * sad + 0.5 * happy - 1.6 * w, cuoi: (v) => v - 1.0 * sad + 0.55 * happy,
+             matY: (v) => Math.max(v, 0.28 * sad, on ? 0.85 : 0), lanh: (v) => Math.max(v, 0.7 * sad), duoi: (v) => v - 22 * sad + 10 * happy + 35 * w,
+             gape: (v) => Math.max(v, gape), mieng: (v) => Math.max(v, gape * 0.55, lick * 0.4), luoi: (v) => Math.max(v, lick * 0.75),
+             dau: (v) => v + 18 * w, dauX: (v) => v + 5 * w, truocX: (v) => v + 4 * w, sauX: (v) => v - 3 * w, nuoc: (v) => (drops > 0.02 && drops < 0.98 ? Math.max(v, drops) : v) };
+  }
+
+  /** CHẬU TẮM VỪA CON VẬT NÀY (đợt 42 F): `{ rim, length }` đơn vị khung của nó — vành cao `rim` trên sàn (che chân và phần dưới bụng), dài `length`
+   * (đủ chứa thân). Dựng chậu cùng ĐƠN VỊ với con vật: host chậu cao bằng host con vật × 470 / 330 (tools/scene.py tự làm). */
+  tubFit42f() {
+    const nv = this.nv, low = Math.max(nv.H0.y, nv.S0.y);
+    return { rim: +clamp(DAT - (low + nv.dayThan * 0.25), 26, 70).toFixed(1), length: Math.round((nv.S0.x - nv.H0.x) + nv.dayThan * 2 + 70) };
+  }
+
+  /** ĐỨNG TRONG CHẬU TẮM (đợt 42 F): cắt hình con vật dưới đường `rim` đơn vị khung trên sàn của nó — đặt nó trước một đạo cụ `tub` cùng chỗ
+   * (vành trước của chậu lộ ra, chân ở trong chậu). `null`: ra khỏi chậu. */
+  inTub42f(rim = null) {
+    if (rim !== null && !(Number.isFinite(rim) && rim > 0 && rim < DAT)) throw new Error(`[character] inTub42f: rim must be the height of the tub rim in frame units (> 0), or null — got ${JSON.stringify(rim)}`);
+    this.tubRim42f = rim;
+    if (rim !== null && this.s.ngoi) this.s.ngoi = 0;          // ĐỨNG trong chậu (mèo nghỉ ở dáng ngồi): lưng lộ trên vành cho người tắm
+    this.apDung();
+    return this;
+  }
+
+  // Vẽ phần đợt 42 F. `s`: trạng thái đang vẽ; `H`, `S`: hông, vai của khung vừa tính.
+  #ve42f(s, H, S) {
+    const e = this.el, nv = this.nv, f = (v) => v.toFixed(2), L = this.#levels42f() || { wet: 0, dry: 0, foam: 0, towel: 0, rub: 0 };
+    // Chậu tắm: cắt dưới vành (khung của `goc`).
+    if (e.tubClip42f) {
+      const on = Number.isFinite(this.tubRim42f) && this.tubRim42f > 0;
+      if (on) { e.tubClip42f.setAttribute('height', f(3000 + DAT - this.tubRim42f)); if (e.goc.getAttribute('clip-path') !== `url(#${this.id}-tub42f)`) e.goc.setAttribute('clip-path', `url(#${this.id}-tub42f)`); }
+      else if (e.goc.hasAttribute('clip-path')) e.goc.removeAttribute('clip-path');
+    }
+    const mx = (H.x + S.x) / 2, my = (H.y + S.y) / 2, goc = Math.atan2(S.y - H.y, S.x - H.x) / RAD, nua = Math.hypot(S.x - H.x, S.y - H.y) / 2, day = nv.dayThan * (1 + (s.tho || 0) * 0.035);
+    const xoay = `translate(${f(mx)} ${f(my)}) rotate(${f(goc)})`;
+    // ƯỚT: màu tối đi (ma trận màu trên bộ lọc viền — cả thân, chân, đầu), thân xẹp, đuôi mảnh, lông bết từng vệt.
+    const wet = clamp(L.wet, 0, 1), dry = clamp(L.dry, 0, 1);
+    const filter = this.svg.querySelector('#' + this.id + '-vien'), merge = filter && filter.querySelector('feMerge');
+    if (merge) {
+      let cm = filter.querySelector('feColorMatrix');
+      if (wet > 0.01 && !cm) {
+        cm = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+        cm.setAttribute('in', 'SourceGraphic'); cm.setAttribute('type', 'matrix'); cm.setAttribute('result', 'wet42f'); cm.setAttribute('color-interpolation-filters', 'sRGB');
+        filter.insertBefore(cm, merge);
+      }
+      const src = merge.lastElementChild;
+      if (cm && wet > 0.01) {
+        const k = 1 - RigThu.WET_DARK42F * wet, b = 0.05 * wet;      // tối đi, ngả lạnh một chút
+        cm.setAttribute('values', `${f(k)} 0 0 0 0 0 ${f(k)} 0 0 ${f(b * 0.2)} 0 0 ${f(k)} 0 ${f(b)} 0 0 0 1 0`);
+        if (src.getAttribute('in') !== 'wet42f') src.setAttribute('in', 'wet42f');
+      } else if (src.getAttribute('in') !== 'SourceGraphic') src.setAttribute('in', 'SourceGraphic');
+    }
+    if (wet > 0.01 || dry > 0.01) {
+      e.thanE.setAttribute('ry', f(day * (1 - 0.12 * wet + 0.08 * dry)));
+      e.duoi.setAttribute('stroke-width', f(+e.duoi.getAttribute('stroke-width') * (1 - 0.45 * wet + 0.4 * dry)));
+    }
+    if (e.wetG42f) {
+      e.wetG42f.style.display = wet > 0.03 ? '' : 'none';
+      if (wet > 0.03) {
+        e.wetG42f.setAttribute('opacity', f(Math.min(1, wet * 1.2)));
+        // vệt lông bết: những nét cong ngắn chúc xuống từ lưng, dọc thân (khung xoay theo thân)
+        [...e.wetG42f.children].forEach((path, i) => {
+          const x = -nua * 0.95 + (i + 0.5) * (nua * 1.9 / 7), top = -day * (0.82 - 0.12 * Math.abs(Math.sin(i * 1.9))), len = day * (0.55 + 0.25 * Math.abs(Math.sin(i * 2.7)));
+          path.setAttribute('d', `M ${f(x)} ${f(top)} q ${f(2.5 + (i % 2) * 1.5)} ${f(len * 0.5)} ${f(-1)} ${f(len)}`);
+          path.setAttribute('transform', xoay);
+        });
+      }
+    }
+    // LÔNG BÔNG (lau khô xong): một vòng viền gợn sóng quanh cả thân, to hơn thân — viền ngoài của con vật phồng ra.
+    if (e.fluff42f) {
+      e.fluff42f.style.display = dry > 0.03 ? '' : 'none';
+      if (dry > 0.03) {
+        const rx = nua + nv.dayThan * 0.55 + 2 + 5 * dry, ry = day + 2 + 6 * dry, N = 26, pts = [];
+        for (let i = 0; i < N * 2; i++) {
+          const a = (i / (N * 2)) * Math.PI * 2, k = i % 2 ? 1 + 0.07 * dry : 1;
+          pts.push(`${f(Math.cos(a) * rx * k)} ${f(Math.sin(a) * ry * k)}`);
+        }
+        e.fluff42f.setAttribute('d', 'M ' + pts.join(' L ') + ' Z');
+        e.fluff42f.setAttribute('transform', xoay);
+      }
+    }
+    // BỌT trên lưng: bong bóng hiện dần (thứ tự xáo), dọc sống lưng, hai lớp.
+    if (e.foam42f) {
+      const v = clamp(L.foam, 0, 1);
+      e.foam42f.style.display = v > 0.02 ? '' : 'none';
+      if (v > 0.02) {
+        const dx = S.x - H.x, dy = S.y - H.y, len = Math.hypot(dx, dy) || 1, tx = dx / len, ty = dy / len, nx = ty, ny = -tx, n = RigThu.FOAM_N42F;
+        const A = { x: H.x - tx * day * 0.55, y: H.y - ty * day * 0.55 }, B = { x: S.x + tx * day * 0.2, y: S.y + ty * day * 0.2 };
+        [...e.foam42f.children].forEach((c, i) => {
+          const order = (i * 7) % n, shown = clamp((v * 1.15 - order / n) * 4, 0, 1);
+          const row = i % 3 === 2 ? 1 : 0, u = row ? (i / n) * 0.8 + 0.1 : (i / n), h = day * (0.72 + 0.3 * row) + 2.5 * Math.sin(i * 2.1);
+          const r = (5.6 + 3.6 * Math.abs(Math.sin(i * 1.7))) * (row ? 0.8 : 1) * shown;
+          c.style.display = r > 0.3 ? '' : 'none';
+          c.setAttribute('cx', f(pha(A.x, B.x, u) + nx * h)); c.setAttribute('cy', f(pha(A.y, B.y, u) + ny * h)); c.setAttribute('r', f(Math.max(0.01, r)));
+        });
+      }
+    }
+    // KHĂN quấn quanh thân: mép trên ôm lưng, mép dưới rủ dưới bụng thành nếp; chà (`rub`) thì khăn xô dọc thân, nếp dời theo.
+    if (e.towel42f) {
+      const v = clamp(L.towel, 0, 1.2);
+      e.towel42f.style.display = v > 0.02 ? '' : 'none';
+      if (v > 0.02) {
+        const dx = S.x - H.x, dy = S.y - H.y, len = Math.hypot(dx, dy) || 1, tx = dx / len, ty = dy / len, nx = ty, ny = -tx, sh = (L.rub || 0) * 5;
+        const at = (u, h) => ({ x: pha(H.x - tx * day * 0.85, S.x + tx * day * 0.55, u) + tx * sh + nx * h, y: pha(H.y - ty * day * 0.85, S.y + ty * day * 0.55, u) + ty * sh + ny * h });
+        const top = [], bottom = [];
+        for (let i = 0; i <= 8; i++) { const u = i / 8; top.push(at(u, day * (1.12 + 0.08 * Math.sin(u * Math.PI)))); bottom.push(at(u, -day * (1.25 + 0.12 * Math.sin(i * 1.9 + sh)))); }
+        const p = (q) => `${f(q.x)} ${f(q.y)}`;
+        e.towel42f.querySelector('[data-cloth]').setAttribute('d', `M ${p(top[0])} ` + top.slice(1).map((q) => `L ${p(q)}`).join(' ') + ` Q ${p(at(1.08, 0))} ${p(bottom[8])} ` + bottom.slice(0, 8).reverse().map((q) => `L ${p(q)}`).join(' ') + ` Q ${p(at(-0.08, 0))} ${p(top[0])} Z`);
+        e.towel42f.querySelector('[data-folds]').setAttribute('d', [0.3, 0.55, 0.78].map((u) => `M ${p(at(u + sh * 0.012, day * 0.7))} Q ${p(at(u + 0.04, -day * 0.1))} ${p(at(u - 0.02 + sh * 0.01, -day * 1.1))}`).join(' '));
+        e.towel42f.querySelector('[data-stripes]').setAttribute('d', [0.1, 0.9].map((u) => `M ${p(at(u, day * 1.05))} L ${p(at(u, -day * 1.2))}`).join(' '));
+        // Đang mở ra / gấp lại: co về phía lưng.
+        const c = at(0.5, day * 1.1), k = 0.45 + 0.55 * Math.min(1, v);
+        e.towel42f.setAttribute('transform', k < 0.999 ? `translate(${f(c.x)} ${f(c.y)}) scale(${f(k)}) translate(${f(-c.x)} ${f(-c.y)})` : '');
+        e.towel42f.setAttribute('opacity', f(Math.min(1, v * 2)));
+      }
+    }
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 42 F, `set.careProbe` → `c42`): bọt, khăn, lông bông (phần tử đang hiện), các mức, độ há, đường vành chậu (px màn hình). */
+  care42fProbe() {
+    const e = this.el, L = this.#levels42f() || { wet: 0, dry: 0, foam: 0, towel: 0, rub: 0, sad: 0, happy: 0, gape: 0, lick: 0 }, on = (el) => (el && el.style.display !== 'none' ? el : null);
+    let rim = null;
+    if (Number.isFinite(this.tubRim42f) && e.goc.getScreenCTM()) { const q = new DOMPoint(200, DAT - this.tubRim42f).matrixTransform(e.goc.getScreenCTM()); rim = { x: q.x, y: q.y, px: true }; }
+    const r3 = (v) => +(+v || 0).toFixed(3), v = this.#careView(this.s);
+    return { foam: on(e.foam42f), towel: on(e.towel42f), fluff: on(e.fluff42f), body: e.thanE, head: e.dau, mouth: e.moi, rim,
+             wet: r3(L.wet), dry: r3(L.dry), foamLevel: r3(L.foam), towelLevel: r3(L.towel), rub: r3(L.rub), mood: r3((L.happy || 0) - (L.sad || 0)),
+             gape: r3(Math.max(+v.gape || 0, 0)), lick: r3(L.lick), nuoc: r3(v.nuoc), ears: r3(v.taiL) };
   }
 
   /**

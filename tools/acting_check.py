@@ -2080,6 +2080,143 @@ def check_care38(folder, c, shots, scales):
     return out
 
 
+# ĐỢT 42 F — tắm, đánh răng, lau khô (số đo từ `set.careProbe()` → `c42` của người và con vật, `@tub42f` vành các chậu tắm).
+ON_PET_42F = 0.025    # bàn tay (khung) cách thân / đầu / khăn của con vật ≤ 2,5 % chiều cao người
+SPRAY_HIT_42F = 0.03  # cuối tia nước cách lưng con vật (mép trên khung thân) ≤ 3 % chiều cao người
+OFF_PET_42F = 0.02    # lúc con vật rũ nước: mọi bàn tay cách khung thân nó ≥ 2 % chiều cao người (đã buông, đã lùi ra)
+
+
+def check_care42f(folder, c, shots, scales):
+    """ĐỢT 42 F: tắm — tia nước rơi trên lưng, bọt nổi trên lưng khi hai tay xoa, xả sạch bọt, lông ướt, tai cụp, con vật trong chậu (đường cắt
+    trùng vành chậu), rũ nước khi tay đã buông; đánh răng — đầu bàn chải ở miệng đang hé, chải qua lại, tay kia giữ mõm, liếm mép khi đã buông;
+    lau khô — khăn trong tay rồi quấn quanh thân, hai tay chà trên khăn, lông khô bông lên, khăn về tay, con vật vui."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    person = lambda t: (care(t).get(who_n) or {}).get('c42') or {}
+    pet = lambda t: (care(t).get(pet_n) or {}).get('c42') or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    H = lambda t: care(t).get('@H') or frame_size(folder)[1]
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} {pet_n} — {text}', 'ok': ok, 'note': note})
+
+    def hands(t): return [h['box'] for h in (frame(t).get(who_n) or {}).get('hands') or [] if h.get('box')]
+
+    def body(t):
+        b = pet(t).get('body')
+        return box_of(b) if b else None
+
+    def hand_gaps(t, target):
+        if not target or not tall(t): return []
+        return [box_gap(h, target) / tall(t) for h in hands(t)]
+
+    def tool_size(t):
+        tool = person(t).get('tool')
+        return max(tool['w'], tool['h']) / H(t) if tool else 0
+
+    mid = c['times'][len(c['times']) // 2]
+    if name == 'bathPet':
+        hits = []
+        for t in c['spray']:
+            p, b = person(t), body(t)
+            if not p.get('spray') or not p.get('sprayEnd') or not b or not tall(t) or p.get('sprayLevel', 0) < 0.5: hits.append((t, None)); continue
+            end = p['sprayEnd']['y']           # cuối tia nước (theo trục vòi sen)
+            inside = b['x0'] - 0.01 * tall(t) <= p['sprayEnd']['x'] <= b['x1'] + 0.01 * tall(t)
+            hits.append((t, (max(0, b['y0'] - end, end - (b['y0'] + b['y1']) / 2) / tall(t)) if inside else 1))
+        good = [h for h in hits if h[1] is not None and h[1] <= SPRAY_HIT_42F]
+        worst = max((h for h in hits if h[1] is not None), key=lambda h: h[1], default=None)
+        row(f'the water spray lands on its back ({len(hits)} moments)', len(good) == len(hits) and len(hits) >= 4,
+            f'spray seen at {sum(1 for h in hits if h[1] is not None)} of {len(hits)} moments, ending on the back at {len(good)}' + (f'; worst {worst[1] * 100:.1f} % of height off the back at {worst[0]:g} s (limit {SPRAY_HIT_42F * 100:g} %)' if worst else ''))
+        levels = [pet(t).get('foamLevel', 0) for t in c['foamUp']]
+        foam_on = []
+        for t in c['lather']:
+            f, b = pet(t).get('foam'), body(t)
+            if f and b: foam_on.append(box_of(f)['y1'] <= (b['y0'] + b['y1']) / 2 + 0.01 * tall(t) and box_of(f)['y0'] < b['y0'] + 0.01 * tall(t))
+        row('foam builds up on its back', levels[0] < levels[-1] and levels[-1] >= 0.9 and foam_on and all(foam_on),
+            f'foam {levels[0]:.2f} → {levels[-1]:.2f}; on the upper half of the body at {sum(foam_on)} of {len(c["lather"])} moments')
+        far = []
+        for t in c['lather']:
+            g = hand_gaps(t, body(t))
+            if len(g) >= 2: far.append((t, max(g), person(t).get('foamHands', 0)))
+        worst = max(far, key=lambda x: x[1]) if far else None
+        row('both hands lather on it, foam on the hands', bool(worst) and worst[1] <= ON_PET_42F and all(x[2] == 2 for x in far) and len(far) == len(c['lather']),
+            f'the farther hand at most {worst[1] * 100:.1f} % of height from the body over {len(far)} moments (limit {ON_PET_42F * 100:g} %), foam on {min(x[2] for x in far)}–{max(x[2] for x in far)} hands' if worst else 'hands not measured')
+        rinsed = [pet(t).get('foamLevel', 1) for t in c['rinsed']]
+        wet = [pet(t).get('wet', 0) for t in c['wet']]
+        row('rinsed: the foam is gone, the fur stays wet (darker)', max(rinsed) <= 0.05 and min(wet) >= 0.9, f'foam {max(rinsed):.2f} after rinsing; wet {min(wet):.2f} at least after the spray until the shake (want ≥ 0.9)')
+        ears = [pet(t).get('ears', 0) for t in c['lather']]
+        row('unhappy while bathed: ears back', max(ears) <= -0.5, f'ears at most {max(ears):+.2f} while lathered (want ≤ −0.5; 0 = rest)')
+        tubs = []
+        for t in c['rimAt']:
+            rim, b, lips = pet(t).get('rim'), body(t), care(t).get('@tub42f') or []
+            if not rim or not b or not lips: tubs.append((t, None)); continue
+            lip = min((box_of(l) for l in lips), key=lambda l: abs((l['x0'] + l['x1']) / 2 - rim['x']))
+            off = max(0, lip['y0'] - 2 - rim['y'], rim['y'] - lip['y1'] - 2) / max(1, tall(t))
+            tubs.append((t, off if lip['x0'] <= (b['x0'] + b['x1']) / 2 <= lip['x1'] else 1))
+        bad = [x for x in tubs if x[1] is None or x[1] > 0.005]
+        row('it stands inside the tub, the rim in front of its legs', not bad, ('; '.join(f'{x[0]:g} s: ' + ('no tub or rim' if x[1] is None else f'cut {x[1] * 100:.1f} % of height off the rim, or outside the tub') for x in bad))
+            or f'the pet is cut at the tub\'s front rim and centred in the tub at {len(tubs)} moments')
+        shaken = [pet(t).get('nuoc', 0) for t in c['shake']]
+        free = [min(g) for g in (hand_gaps(t, body(t)) for t in c['free']) if g]
+        row('it shakes off water after the person steps back', max(shaken) >= 0.3 and bool(free) and min(free) >= OFF_PET_42F,
+            f'droplets {max(shaken):.2f} (least 0.3)' + (f'; the nearest hand {min(free) * 100:.1f} % of height from its body (least {OFF_PET_42F * 100:g} %)' if free else '; hands not measured'))
+    elif name == 'brushTeeth':
+        at, xs = [], []
+        for t in c['brush']:
+            p, q = person(t), pet(t)
+            head, mouth = p.get('head'), q.get('mouth')
+            if not head or not mouth or not tall(t): at.append((t, None, 0)); continue
+            at.append((t, box_gap(box_of(head), box_of(mouth)) / tall(t), q.get('gape', 0))); xs.append((head['x'] - mouth['x']) / tall(t))      # so với môi: không đổi theo cỡ cảnh
+        seen = [a for a in at if a[1] is not None]
+        worst = max(seen, key=lambda a: a[1]) if seen else None
+        jaws = [(care(t).get(pet_n) or {}).get('jawRatio', 0) for t in c['brush']]
+        row('the toothbrush at the mouth, the mouth open', len(seen) == len(at) and worst[1] <= 0.02 and min(a[2] for a in seen) >= 0.35,
+            (f'brush head at most {worst[1] * 100:.1f} % of height from the lips (limit 2 %), mouth opened {min(a[2] for a in seen):.2f} (least 0.35), jaw {min(jaws) * 100:.0f}–{max(jaws) * 100:.0f} % of the skull' if worst else 'no brush or mouth'))
+        turns = sum(1 for a, b, d in zip(xs, xs[1:], xs[2:]) if (b - a) * (d - b) < 0)
+        row('short brushing strokes', len(xs) >= 4 and max(xs) - min(xs) >= 0.006 and turns >= 3, f'the brush moves {(max(xs) - min(xs)) * 100 if xs else 0:.1f} % of height across the teeth, {turns} changes of direction (least 0.6 %, 3)')
+        held = []
+        for t in c['brush']:
+            h, head = person(t).get('head'), ((frame(t).get(pet_n) or {}).get('parts') or {}).get('head')
+            g = [box_gap(b, head) / tall(t) for b in hands(t)] if head and tall(t) else []
+            if len(g) >= 2: held.append(max(g))
+        row('the other hand holds the muzzle', bool(held) and max(held) <= ON_PET_42F, f'both hands at most {max(held) * 100:.1f} % of height from its head (limit {ON_PET_42F * 100:g} %)' if held else 'not measured')
+        licks = [pet(t).get('lick', 0) for t in c['lick']]
+        free = []
+        for t in c['free']:
+            head = ((frame(t).get(pet_n) or {}).get('parts') or {}).get('head')
+            if head and hands(t): free.append(min(box_gap(b, head) for b in hands(t)) / max(1, tall(t)))
+        row('then it licks its lips, hands off', max(licks) >= 0.9 and bool(free) and min(free) >= OFF_PET_42F, f'tongue out {max(licks):.2f}' + (f', the nearest hand {min(free) * 100:.1f} % of height from its head (least {OFF_PET_42F * 100:g} %)' if free else ''))
+    else:
+        carried = [person(t).get('kind') == 42 for t in c['carry']]
+        wrapped, rubbed, xs = [], [], []
+        for t in c['rub']:
+            q, b = pet(t), body(t)
+            tw = q.get('towel')
+            if not tw or not b: wrapped.append(False); continue
+            tb = box_of(tw)
+            wrapped.append(tb['x0'] <= (b['x0'] + b['x1']) / 2 <= tb['x1'] and person(t).get('kind') != 42)
+            g = hand_gaps(t, tb)
+            if len(g) >= 2: rubbed.append(max(g))
+            xs.append(q.get('rub', 0))
+        row('the towel comes in the hand, then wraps round it', all(carried) and wrapped and all(wrapped), f'towel in the hand at {sum(carried)} of {len(carried)} moments before, round its body at {sum(wrapped)} of {len(wrapped)} moments while rubbed')
+        row('both hands rub on the towel, the towel moves', bool(rubbed) and max(rubbed) <= ON_PET_42F and max(xs) - min(xs) >= 1.2,
+            f'the farther hand at most {max(rubbed) * 100:.1f} % of height from the towel (limit {ON_PET_42F * 100:g} %), towel shifts {min(xs):+.2f}…{max(xs):+.2f}' if rubbed else 'not measured')
+        first, last = pet(c['rub'][0]), pet(c['after'][-1])
+        fl, b = last.get('fluff'), body(c['after'][-1])
+        puffed = bool(fl and b) and box_of(fl)['y0'] < b['y0'] - 1
+        row('the fur goes from wet to fluffy', first.get('dry', 1) <= 0.3 and last.get('dry', 0) >= 0.95 and last.get('wet', 1) <= 0.05 and puffed,
+            f'dry {first.get("dry", 0):.2f} → {last.get("dry", 0):.2f}, wet {first.get("wet", 0):.2f} → {last.get("wet", 0):.2f}, ' + ('a puffed outline above the body' if puffed else 'NO puffed outline'))
+        back = [pet(t).get('towel') is None for t in c['after']]
+        row('the towel goes back to the hand', all(back) and person(c['after'][0]).get('kind') == 42, f'towel off the pet at {sum(back)} of {len(back)} moments, in the hand at {c["after"][0]:g} s: {person(c["after"][0]).get("kind") == 42}')
+        moods = [pet(t).get('mood', 0) for t in c['happy']]
+        row('it looks happy after', min(moods) >= 0.8, f'mood {min(moods):+.2f} at least (want ≥ 0.8)')
+    when = c['carry'][-1] if name == 'towelDry' else c['times'][0]
+    size = tool_size(when)
+    row('the tool big enough on screen', size >= TOOL_SEEN, f'the {"shower head" if name == "bathPet" else "toothbrush" if name == "brushTeeth" else "towel"} is {size * 100:.1f} % of the frame height at {when:g} s (least {TOOL_SEEN * 100:g} %)')
+    return out
+
+
 PAIR_HANDS = 0.04     # đợt 38 C — đập tay / đưa túi: hai lòng bàn tay cách nhau ≤ 4 % chiều cao người thấp hơn ở MỌI lúc đo
 PAIR_ON = 0.06        # vỗ vai: lòng bàn tay cách điểm vai gần của người kia ≤ 6 %; thì thầm: miệng cách đầu người nghe ≤ 6 %
 PAIR_HEADS = 0.04     # ôm: hai cái đầu cách nhau ≤ 4 % (kề nhau)
@@ -2322,6 +2459,7 @@ def check_scene(folder):
     when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     when38 = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
+    when38 += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + when38 + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -2348,6 +2486,9 @@ def check_scene(folder):
         if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))
         if c['kind'] == 'care38':
             results.extend(check_care38(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'care42f':          # đợt 42 F
+            results.extend(check_care42f(folder, c, shots, scales))
             continue
         if c['kind'] == 'walk':
             worst = None

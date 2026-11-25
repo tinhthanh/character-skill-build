@@ -17,6 +17,7 @@ hand it to someone, throw it a ball, weigh it on a scale, take its temperature, 
 read a patient chart (flipping a page), point at an X-ray film, trim its nails (holding the paw up), put drops in its eye,
 clean its ear with a cotton pad, scan its microchip (the number shows on a card),
 hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
+bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
 get a notification on the phone (124 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
@@ -166,6 +167,9 @@ clips for every voice file.
    Hands on the pet: `["clipNails", "@pet"]`, `["eyeDrops", "@pet"]`, `["cleanEars", "@pet"]`, `["scanChip", "@pet", { "id": "900 123 456 789" }]`
    — the person goes to the pet's head end and the turn cuts to a close shot; the pet's paw / chin / eyes / head follow the hands
    by themselves (nothing to add for the pet). Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai" / "lau tai", "quét chip <số>".
+   Grooming (đợt 42 F): `["bathPet", "@pet"]` on a pet with `"inTub": true` (it stands in a bath tub sized to it — 3D sets), `["towelDry", "@pet"]`,
+   `["brushTeeth", "@pet"]` — the pet's wet / foamy / fluffy fur, open mouth, shake-off and lip-lick follow the person by themselves.
+   Scripts: "tắm" (the tub comes by itself), "lau khô" / "lau khô lông", "đánh răng"; cast option "trong chậu".
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

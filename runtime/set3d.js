@@ -1811,6 +1811,14 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const one = (v) => (v && v.getBoundingClientRect ? centre(v) : v);
         out[name].g39 = Object.fromEntries(Object.entries(rig.gesture39Probe()).map(([key, v]) => [key, one(v)]));
       }
+      // đợt 42 F: tắm / đánh răng / lau khô (`rig.care42fProbe()` của người và con vật — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`) và vành các chậu tắm.
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.care42fProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c42 = Object.fromEntries(Object.entries(rig.care42fProbe()).map(([key, v]) => [key, one(v)]));
+      }
+      out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;

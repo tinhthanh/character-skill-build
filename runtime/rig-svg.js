@@ -68,6 +68,11 @@ const NGHI = Object.freeze({
   aimL: 0, aimR: 0,             // 1 = góc của tay ấy là góc TRÊN MÀN HÌNH: dùng nguyên vẹn dù thân đang quay (xem apDung)
   onTopL: 0, onTopR: 0,         // 1 = bàn tay ấy đang VUỐT đỉnh đầu một con vật vẽ trên người này (`over`): bối cảnh 3D vẽ thêm nó trên con vật
   petWrap: 0,                   // 0…1 BĂNG đã quấn lên chân trước con vật (`bandage`, đợt 35) — con vật đọc lại (RigThu.careLevel); giữ sau động tác
+  // ĐỢT 42 F — tắm, đánh răng, lau khô: việc tay người làm lên con vật đang được giữ (con vật đọc lại khi vẽ — RigThu.#ve42f, tập `heldBy38`):
+  // `petWet42f` lông ướt (GIỮ sau động tác), `petFoam42f` bọt trên lưng, `petDry42f` lông khô bông lên (GIỮ), `petTowel42f` khăn quấn quanh thân
+  // (0…1), `petRub42f` khăn xô theo nhịp chà (−1…1), `petMood42f` −1 khó chịu (tai cụp) … 1 vui, `petGape42f` miệng hé cho đánh răng, `petLick42f`
+  // liếm mép, `petShake42f` pha rũ nước 0 → 1 (con vật tự lắc — đã buông tay). `spray42fL/R` 0…1 tia nước từ vòi sen trong tay ấy (gadget 40), `sprayT42f` pha chảy của tia nước.
+  petWet42f: 0, petFoam42f: 0, petDry42f: 0, petTowel42f: 0, petRub42f: 0, petMood42f: 0, petGape42f: 0, petLick42f: 0, petShake42f: 0, spray42fL: 0, spray42fR: 0, sprayT42f: 0,
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
   ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,
@@ -327,6 +332,7 @@ const CAP_RADIUS = 24, CAP_DROP = 4, CAP_SOLID = 0.75;
 // ĐỢT 38 B — rửa tay, đeo găng. Màu găng (thân, mép cuộn, nét viền) — cùng màu `wear('gloves')`.
 const GLOVE = '#7b9be8', GLOVE_RIM = '#6d8ee0', GLOVE_LINE = '#4d6cc0';
 // Bọt xà phòng quanh lòng bàn tay (0, 10): [x, y, bán kính] trong hệ bàn tay — lan ra hai bên để hai bàn tay chụm lại thành một đám.
+const SPRAY_LEN42F = 24;           // đợt 42 F: tia nước dài chừng ấy (đơn vị khung của bàn tay) từ mặt vòi sen
 const FOAM_BUBBLES = [[-12, 3, 5.5], [-3, -3, 4.5], [7, -1, 5.5], [14, 7, 4.8], [-15, 14, 4.6], [11, 18, 5.4], [-6, 23, 5], [4, 28, 4],
                       [0, 11, 6.5], [-9, 9, 3.6], [16, 25, 3.4], [-14, 26, 3.2], [-18, 6, 2.6], [19, 13, 2.8]];
 const WASH_POSE = { rub: [22, -142], high: [26, -152], low: [18, -132] };   // hai bàn tay chụm trước ngực (thấp hơn chắp tay `WAI_POSE`) — xoa lên / xuống
@@ -1186,6 +1192,24 @@ export class RigSVG {
                 <rect x="-7.5" y="21" width="15" height="9" rx="2" fill="#16232b"/><path d="M -5 25.5 h 10" stroke="#7dffb0" stroke-width="1.6"/>
                 <circle cx="0" cy="36" r="3.4" fill="#e8f4ff" stroke="#173f66" stroke-width="1"/>
                 <g data-beep="1" style="display:none" stroke="#38c172" stroke-width="2.4" fill="none" stroke-linecap="round"><path d="M 15 22 q 5 8 0 16 M 20 18 q 8 12 0 24"/><path d="M -15 22 q -5 8 0 16 M -20 18 q -8 12 0 24"/></g></g>
+              <!-- ĐỢT 42 F. VÒI SEN (\`bathPet\`, 40): tay cầm trắng trong nắm tay, đầu vòi loe ra theo hướng bàn tay, dây vòi rủ xuống; TIA NƯỚC
+                   (\`data-spray42f\`) phun ra từ mặt vòi theo \`spray42f\`, các vệt chảy theo \`sprayT42f\`, giọt bắn ở cuối tia. -->
+              <g data-gadget="40"><path d="M 0 -3 C 4 -16 20 -12 22 6 S 18 40 24 60" fill="none" stroke="#7d8a96" stroke-width="3.400" stroke-linecap="round"/>
+                <rect x="-4.200" y="-6" width="8.400" height="26" rx="3.600" fill="#f4f7fa" stroke="#4a5562" stroke-width="1.200"/>
+                <path d="M -5 19 L -15 31 L 15 31 L 5 19 Z" fill="#dfe6ec" stroke="#4a5562" stroke-width="1.200" stroke-linejoin="round"/>
+                <rect x="-16.500" y="30" width="33" height="5" rx="2.500" fill="#b9c4cd" stroke="#4a5562" stroke-width="1.200"/>
+                ${[-11, -5.5, 0, 5.5, 11].map((x) => `<circle cx="${x}" cy="32.500" r="0.900" fill="#4a5562"/>`).join('')}
+                <g data-spray42f style="display:none">${[-12, -7, -2.500, 2.500, 7, 12].map((x, n) => `<path data-jet d="M ${x * 0.85} 36 L ${(x * 1.35).toFixed(2)} ${SPRAY_LEN42F + 36}" stroke="${n % 2 ? '#9fd8f4' : '#5fb8e8'}" stroke-width="${n % 2 ? 2 : 2.600}" stroke-linecap="round" stroke-dasharray="7 5" fill="none"/>`).join('')}
+                  ${[-14, -6, 4, 13].map((x, n) => `<ellipse data-splash cx="${x}" cy="${SPRAY_LEN42F + 36 + (n % 2) * 2}" rx="3.200" ry="1.600" fill="#7cc8f0" opacity=".85"/>`).join('')}</g></g>
+              <!-- BÀN CHẢI ĐÁNH RĂNG thú cưng (\`brushTeeth\`, 41): cán xanh ngọc dài, đầu bàn chải trắng với lông xanh ở đầu ngón; BỌT (\`data-foam42f\`) theo \`foam\`. -->
+              <g data-gadget="41"><rect x="-3.400" y="-8" width="6.800" height="34" rx="3.200" fill="#2f9e8f" stroke="#1d5f56" stroke-width="1.100"/>
+                <rect x="-2.200" y="24" width="4.400" height="10" rx="1.600" fill="#2f9e8f" stroke="#1d5f56" stroke-width="1"/>
+                <rect x="-6.500" y="33" width="13" height="11" rx="2.400" fill="#f4f7fa" stroke="#4a5562" stroke-width="1.100"/>
+                <path d="M -5 35.500 h 10 M -5 38.500 h 10 M -5 41.500 h 10" stroke="#5fb8e8" stroke-width="1.700" stroke-linecap="round"/>
+                <g data-foam42f style="display:none">${[[-8, 37, 3], [8, 40, 3.400], [-3, 46, 2.600], [5, 46.500, 2.200], [0, 31.500, 2.200]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" stroke="#a8cbe2" stroke-width=".9"/>`).join('')}</g></g>
+              <!-- KHĂN TẮM gấp đôi vắt trên bàn tay (\`towelDry\`, 42): rủ xuống hai bên nắm tay, sọc xanh ở mép — cùng màu khăn quấn trên con vật. -->
+              <g data-gadget="42"><path d="M -20 6 Q 0 0 20 6 L 22 46 Q 11 50 0 46 Q -11 50 -22 46 Z" fill="#bfe8e0" stroke="#2f9e8f" stroke-width="1.500" stroke-linejoin="round"/>
+                <path d="M -21 38 Q 0 34 21 38" stroke="#2f9e8f" stroke-width="3.200" fill="none" opacity=".55"/><path d="M -8 10 Q -9 28 -6 44 M 7 10 Q 8 28 6 44" stroke="#8fcfc4" stroke-width="1.700" fill="none" stroke-linecap="round"/></g>
             </g></g>
         </g>
       </g>`;
@@ -2062,6 +2086,7 @@ export class RigSVG {
       for (const child of box.children) child.style.display = +child.getAttribute('data-gadget') === kind ? '' : 'none';
     }
     this.#drawTools38();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
+    this.#drawTools42f();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
     this.#drawTools39();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this.#veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -2656,6 +2681,7 @@ export class RigSVG {
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
+    so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -5333,6 +5359,250 @@ export class RigSVG {
     }
     this.#chop(t, 1.0);
     this.#khep(t, 0.5, 0.5 + strokes * 0.42);
+    return t;
+  }
+
+  // ĐỢT 42 F — TẮM, ĐÁNH RĂNG, LAU KHÔ cho con vật (dịch vụ grooming / spa). Như đợt 38 A: quay gần nghiêng hẳn về con vật (`#care38`), hai tay
+  // cùng vươn ra trước; dụng cụ chỉ hiện trong tay (gadget 40 vòi sen, 41 bàn chải đánh răng, 42 khăn tắm; 14 bọt trên bàn tay khi xoa dầu tắm).
+  // Việc bàn tay làm lên con vật là kênh của người (`petWet42f`, `petFoam42f`, `petDry42f`, `petTowel42f`, `petRub42f`, `petMood42f`, `petGape42f`,
+  // `petLick42f`) — con vật đọc lại khi vẽ (RigThu.#ve42f): gọi thẳng hay qua `sequence()` đều đúng nhịp. Con vật trong chậu tắm: đạo cụ `tub`
+  // + `pet.inTub42f(rim)` (tools/scene.py: `"inTub": true`).
+  static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
+  static BATH_SPRAY42F = 1.6;      // giây xối nước (ướt lông)
+  static BATH_RINSE42F = 1.5;      // giây xả bọt
+  static BATH_BACK42F = 34;        // lùi ra bấy nhiêu đơn vị khung trước khi con vật rũ nước
+  static SHOWER_DIP42F = 68;       // vòi sen chĩa xuống chừng ấy độ dưới phương ngang, về phía con vật
+  static SHOWER_AT42F = 33;        // mặt vòi sen cách cổ tay bấy nhiêu đơn vị khung theo bàn tay (gadget 40)
+  static BRUSH_AT42F = 39;         // giữa đầu bàn chải (gadget 41) …
+  static TOWEL_AT42F = 26;         // giữa khăn vắt trên tay (gadget 42) …
+  /** Giây (tính từ đầu bước `bathPet`) con vật bắt đầu RŨ NƯỚC — người đã lùi ra (con vật tự rũ theo kênh `petShake42f` của người). */
+  static bathShakeAt42f(hold = 1.8) { return +(0.55 + RigSVG.BATH_SPRAY42F + 0.55 + 0.35 + hold + 0.75 + RigSVG.BATH_RINSE42F + 1.2).toFixed(2); }
+
+  // Vẽ theo trạng thái (gọi trong `apDung`): tia nước của vòi sen (`spray42f`, chảy theo `sprayT42f`), bọt trên đầu bàn chải (`foam`).
+  #drawTools42f() {
+    const e = this.el, s = this.s;
+    for (const side of ['L', 'R']) {
+      const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
+      if (!box || kind < 40 || kind > 42) continue;
+      const tool = [...box.children].find((child) => +child.getAttribute('data-gadget') === kind);
+      if (!tool) continue;
+      if (kind === 40) {
+        const jet = tool.querySelector('[data-spray42f]'), v = clamp(+s['spray42f' + side] || 0, 0, 1);
+        if (jet) {
+          jet.style.display = v > 0.03 ? '' : 'none';
+          if (v > 0.03) {
+            jet.setAttribute('opacity', Math.min(1, v * 1.4).toFixed(2));
+            const flow = (-(+s.sprayT42f || 0) * 24).toFixed(1);
+            for (const path of jet.querySelectorAll('[data-jet]')) path.setAttribute('stroke-dashoffset', flow);
+          }
+        }
+      }
+      if (kind === 41) { const foam = tool.querySelector('[data-foam42f]'), v = clamp(+s.foam || 0, 0, 1); if (foam) { foam.style.display = v > 0.05 ? '' : 'none'; foam.setAttribute('opacity', v.toFixed(2)); } }
+    }
+    for (const pet of this.held38 || []) if (pet.el && !(this.caring && this.caring.has(pet))) pet.apDung();
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 42 F, `set.careProbe` → `c42`): dụng cụ 40–42 đang cầm (phần tử), tia nước, đầu bàn chải, bọt trên tay. */
+  care42fProbe() {
+    const e = this.el, s = this.s, side = ['L', 'R'].find((k) => Math.round(s['gadget' + k]) >= 40 && Math.round(s['gadget' + k]) <= 42) || null;
+    const kind = side ? Math.round(s['gadget' + side]) : 0, tool = side ? [...e['gadget' + side].children].find((child) => +child.getAttribute('data-gadget') === kind) : null;
+    const jet = tool && kind === 40 ? tool.querySelector('[data-spray42f]') : null, foamSides = ['L', 'R'].filter((k) => Math.round(s['gadget' + k]) === 14);
+    let end = null;
+    if (jet && jet.style.display !== 'none' && tool.getScreenCTM()) { const q = new DOMPoint(0, 36 + SPRAY_LEN42F).matrixTransform(tool.getScreenCTM()); end = { x: q.x, y: q.y, px: true }; }
+    return { kind, side, tool, spray: jet && jet.style.display !== 'none' ? jet : null, sprayEnd: end, head: tool && kind === 41 ? tool.querySelector('rect:nth-of-type(3)') : null,
+             foamHands: foamSides.length, sprayLevel: side ? +clamp(+s['spray42f' + side] || 0, 0, 1).toFixed(3) : 0 };
+  }
+
+  /**
+   * TẮM cho con vật `target` (đứng trong chậu tắm — đạo cụ `tub`): quay nghiêng về nó, một tay đặt lên sườn giữ yên, tay kia cầm VÒI SEN (hiện
+   * trong tay) chúc xuống xối nước lên lưng — tia nước thấy rõ, lông ướt sẫm lại, con vật cụp tai khó chịu; treo vòi, HAI TAY xoa dầu tắm trên
+   * lưng `hold` giây — bọt trắng nổi dần trên lưng (và trên hai bàn tay); lấy vòi xả sạch bọt; treo vòi, LÙI RA một bước — lúc ấy con vật
+   * RŨ NƯỚC (như `shakeOff` của nó, từ `RigSVG.bathShakeAt42f(hold)` giây — kênh `petShake42f`, không cần bước riêng), người giơ tay che, cười. Lông còn ướt tới khi
+   * `towelDry`. Đầu người quay / cúi về chỗ tay làm.
+   */
+  bathPet(target = null, { hold = 1.8 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 1 && hold <= 6)) throw new Error(`[character] bathPet: hold must be 1…6 seconds of lathering, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this.#care38(t, target, 'bathPet', 0.1), { k, o, dir } = c;
+    const Sc = c.spot('scruff'), B = c.spot('back'), Hd = c.spot('crown'), fwd = Hd.x >= Sc.x ? 1 : -1;
+    const along = (u, dy = 0) => ({ x: Sc.x + (B.x - fwd * 8 - Sc.x) * u, y: Sc.y + (B.y - Sc.y) * u + dy });
+    // Vòi sen chĩa CHÉO XUỐNG lưng từ phía người (`SHOWER_DIP42F` dưới phương ngang): đầu tia nước tới lưng. Lòng bàn tay đặt sao cho trục vòi
+    // (xoay quanh lòng bàn tay — `gadgetTurn`) đúng hướng ấy. (Chúc thẳng đứng như lọ nhỏ mắt thì với con vật thấp, người thấp, cổ tay phải
+    // cao ngang vai — tay không giải được, vòi chĩa ngang.)
+    const dip = RigSVG.SHOWER_DIP42F * Math.PI / 180, v = { x: dir * Math.cos(dip), y: Math.sin(dip) }, cB = c.hand;
+    const aim = (q, lift = 0) => {
+      const end = (36 + SPRAY_LEN42F) * cB, palm = { x: q.x - v.x * (end - 10 * cB), y: q.y - lift - v.y * (end - 10 * cB) };
+      const p = c.arm(k, palm.x, palm.y, 10);
+      const fore = k === 'R' ? 90 - p.bat - p.cang : 90 + p.bat + p.cang;           // hướng cẳng tay trên màn hình theo đúng góc đã giải (kênh `aim`)
+      const turn = chuanHoaGoc(Math.atan2(v.y, v.x) * 180 / Math.PI - fore);
+      return { ...p, spin: k === 'R' ? turn : -turn };
+    };
+    const shower = (u) => aim(along(u));
+    const flank = c.arm(o, B.x - fwd * 6, B.y + 13, 15);           // lòng bàn tay úp bên sườn, trên vành chậu
+    const atHip = { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['aim' + k]: 0, ['gadgetTurn' + k]: 0 };
+    const go = (side, p, at, d, extra = {}) => t.to(s, { ['bat' + side]: p.bat, ['cang' + side]: p.cang, ...(p.spin !== undefined ? { ['gadgetTurn' + side]: p.spin } : {}), ...extra, duration: d, ease: 'sine.inOut' }, at);
+    const toolAt = (p) => ({ x: p.wx + p.u.x * 10 * cB + v.x * (RigSVG.SHOWER_AT42F - 10) * cB, y: p.wy + p.u.y * 10 * cB + v.y * (RigSVG.SHOWER_AT42F - 10) * cB });
+    // 0. Tay xa đặt lên sườn, vòi sen hiện trong tay gần, chúc xuống trên gáy.
+    const ready = aim(along(0.35), 12);
+    go(k, ready, 0.05, 0.5, { ['bat' + o]: flank.bat, ['cang' + o]: flank.cang, dauY: 8, cuoi: 0.55, chum: 0.15, mayL: 0.3, mayR: 0.3 });
+    t.set(s, { ['gadget' + k]: 40, ['spray42f' + k]: 0, sprayT42f: 0, petDry42f: 0, ['tay' + o]: 'xoe' }, 0.1);
+    // Bối cảnh 3D: con vật vẽ TRƯỚC người (như `scanChip`) — cánh tay vươn qua đầu nó tới lưng nằm sau nó, hai bàn tay (bản chép) vẽ trên nó.
+    const front = (on, at) => { if (c.pet) t.to(s, { onTopL: on, onTopR: on, careFront: on, duration: 0.02 }, at); };
+    if (c.pet) (this.caring || (this.caring = new Set())).add(c.pet);
+    front(1, 0.12);
+    c.look(along(0.3), 0.05, { d: 0.45 });
+    // 1. XỐI NƯỚC: tia nước lên lưng, rà từ gáy về giữa lưng rồi lại; lông ướt dần, con vật cụp tai.
+    const W = 0.55, E1 = W + RigSVG.BATH_SPRAY42F;
+    t.to(s, { ['spray42f' + k]: 1, duration: 0.15, ease: 'sine.out' }, W);
+    t.to(s, { sprayT42f: E1 * 3, duration: E1, ease: 'none' }, 0);
+    go(k, shower(0.35), W, 0.25); go(k, shower(0.95), W + 0.25, 0.7); go(k, shower(0.5), W + 0.95, 0.6);
+    c.look(toolAt(shower(0.5)), W + 0.2, { d: 0.6 });
+    t.to(s, { petWet42f: 1, duration: 1.2, ease: 'sine.in' }, W + 0.15);
+    t.to(s, { petMood42f: -1, duration: 0.3, ease: 'power2.out' }, W + 0.25);
+    t.to(s, { ['spray42f' + k]: 0, duration: 0.15, ease: 'sine.in' }, E1);
+    // 2. Treo vòi (tay về hông), HAI TAY xoa dầu tắm trên lưng: bọt nổi dần trên lưng và hai bàn tay.
+    go(k, ready, E1 + 0.05, 0.2);
+    t.to(s, { ...atHip, duration: 0.3, ease: 'power2.inOut' }, E1 + 0.2);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'xoe' }, E1 + 0.5);
+    const qk = along(0.4), qo = along(0.95), L0 = E1 + 0.55;          // xa đầu con vật: bàn tay đầy bọt không che mặt nó
+    const ring = (side, q, sign, dy) => [0, 1, 2, 3].map((n) => c.arm(side, q.x + sign * Math.cos(n * Math.PI / 2) * 4, q.y + dy + sign * Math.sin(n * Math.PI / 2) * 2.5, 15));
+    const ringK = ring(k, qk, 1, 3), ringO = ring(o, qo, -1, 4), Lk = (q, n) => ringK[n % 4], Lo = (q, n) => ringO[n % 4];
+    go(k, Lk(qk, 0), L0, 0.35, { ['aim' + k]: 1, ['bat' + o]: Lo(qo, 0).bat, ['cang' + o]: Lo(qo, 0).cang });
+    c.look(along(0.65), L0, { d: 0.35 });
+    const R0 = L0 + 0.35 + hold;
+    t.set(s, { gadgetL: 14, gadgetR: 14, foam: 0.3 }, L0 + 0.3);
+    t.to(s, { foam: 0.55, duration: 0.5, ease: 'sine.out' }, L0 + 0.3);         // bọt trên tay nhỏ hơn rửa tay: không che lưng con vật
+    t.to(s, { petFoam42f: 1, duration: hold, ease: 'sine.out' }, L0 + 0.35);
+    for (let a = L0 + 0.35, n = 1; a + 0.1 <= R0 - 0.05; a += 0.1, n++) { const d = Math.min(0.1, R0 - a); const pk = Lk(qk, n), po = Lo(qo, n); t.to(s, { ['bat' + k]: pk.bat, ['cang' + k]: pk.cang, ['bat' + o]: po.bat, ['cang' + o]: po.cang, duration: d, ease: 'none' }, a); }
+    t.to(s, { petMood42f: -0.6, duration: 0.4 }, L0 + 0.6);
+    // 3. XẢ: tay gần về hông lấy lại vòi (bọt trên tay ấy chùi đi), tay xa vẫn trên lưng; xối từ gáy về giữa lưng — bọt tan dần.
+    t.to(s, { ...atHip, duration: 0.3, ease: 'power2.inOut' }, R0);
+    t.set(s, { ['gadget' + k]: 40, ['tay' + k]: 'nam', ['spray42f' + k]: 0 }, R0 + 0.32);
+    go(k, ready, R0 + 0.35, 0.35, { ['aim' + k]: 1, ['bat' + o]: flank.bat, ['cang' + o]: flank.cang });
+    const W2 = R0 + 0.75, E2 = W2 + RigSVG.BATH_RINSE42F;
+    t.to(s, { ['spray42f' + k]: 1, duration: 0.15, ease: 'sine.out' }, W2);
+    t.to(s, { sprayT42f: RigSVG.BATH_RINSE42F * 3 + 2, duration: RigSVG.BATH_RINSE42F, ease: 'none' }, W2);
+    go(k, shower(0.35), W2, 0.2); go(k, shower(0.95), W2 + 0.2, 0.7); go(k, shower(0.55), W2 + 0.9, RigSVG.BATH_RINSE42F - 0.9);
+    c.look(toolAt(shower(0.5)), W2 + 0.1, { d: 0.5 });
+    t.to(s, { petFoam42f: 0, duration: RigSVG.BATH_RINSE42F - 0.2, ease: 'sine.inOut' }, W2 + 0.1);
+    t.to(s, { foam: 0, duration: RigSVG.BATH_RINSE42F - 0.3, ease: 'sine.inOut' }, W2 + 0.1);
+    t.set(s, { ['gadget' + o]: 0 }, E2 - 0.15);
+    t.to(s, { ['spray42f' + k]: 0, duration: 0.15, ease: 'sine.in' }, E2);
+    // 4. Treo vòi, buông con vật, LÙI RA một bước; con vật rũ nước (`shakeOff` của nó, từ SH) — người giơ hai tay che, nheo mắt cười.
+    go(k, ready, E2 + 0.05, 0.2);
+    t.to(s, { ...atHip, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.35, ease: 'power2.inOut' }, E2 + 0.2);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo', ['tay' + o]: 'mo', foam: 0 }, E2 + 0.5);
+    front(0, E2 + 0.5);
+    // Không có con vật (đích là một điểm / null — trang thử): diễn tại chỗ, không lùi, không giữ lông ướt.
+    const SH = RigSVG.bathShakeAt42f(hold), x0 = s.x, back = c.pet ? x0 - dir * RigSVG.BATH_BACK42F : x0;
+    let at = E2 + 0.45;
+    t.to(s, { seat: 0, huong: dir * 0.55, duration: 0.3, ease: 'sine.inOut' }, at);
+    at = this.#dam(t, at, 0.34, 'R', 0, 0.6); at = this.#dam(t, at, 0.34, 'L', 0, 0.6);
+    if (c.pet) t.to(s, { x: back, duration: 0.68, ease: 'sine.inOut' }, E2 + 0.45);
+    const face = c.spot('eye');
+    this.#lookTo(t, face, SH - 0.3, { d: 0.3, huong: dir * 0.55 });
+    t.to(s, { batL: 30, cangL: -95, batR: 30, cangR: -95, aimL: 0, aimR: 0, tayL: 'xoe', tayR: 'xoe', cuoi: 1, mieng: 0.45, matY: 0.55, mayL: 0.8, mayR: 0.8, dauY: 3, duration: 0.25, ease: 'power2.out' }, SH);
+    t.fromTo(s, { petShake42f: 0 }, { petShake42f: 1, duration: 1.0, ease: 'none', immediateRender: false }, SH);      // con vật RŨ NƯỚC (RigThu.SHAKE_DUR42F)
+    t.set(s, { petShake42f: 0 }, SH + 1.02);
+    t.to(s, { petMood42f: -0.2, duration: 0.3 }, SH + 0.2);
+    t.to(s, { matY: 0.1, mieng: 0.3, duration: 0.25 }, SH + 1.0);
+    this.#khep(t, 0.5, SH + 1.35, { ...c.keep, ...(c.pet ? { x: back, petWet42f: 1, petDry42f: 0 } : { petWet42f: 0 }) });
+    return t;
+  }
+
+  /**
+   * ĐÁNH RĂNG cho con vật `target`: quay nghiêng về nó; tay xa NÂNG MÕM (giữ dưới cằm, vén môi — miệng nó hé ra, thấy răng), tay gần đưa bàn
+   * chải đánh răng (hiện trong tay) vào răng, chải những đường ngắn dọc hàm `hold` giây — vài bọt trắng trên đầu bàn chải. Rút bàn chải, cất (tay
+   * về hông), buông mõm — con vật LIẾM MÉP hai cái. Người cười, nhìn nó.
+   */
+  brushTeeth(target = null, { hold = 2 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 0.8 && hold <= 6)) throw new Error(`[character] brushTeeth: hold must be 0.8…6 seconds of brushing, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this.#care38(t, target, 'brushTeeth'), { k, o, dir } = c;
+    const C0 = c.spot('chin'), E = c.spot('eye'), mouth = c.spot('mouth42f');
+    // Môi về phía người: tâm mõm lệch về phía người một chút; bàn chải đặt ngang miệng, đầu chải ở đó.
+    const hold0 = c.arm(o, C0.x, C0.y + 6, 16), hold1 = c.arm(o, C0.x, C0.y + 3, 16);
+    const at = (dx) => c.arm(k, mouth.x + dx, mouth.y + 1, RigSVG.BRUSH_AT42F);
+    const ready = c.arm(k, mouth.x - dir * 16, mouth.y - 10, RigSVG.BRUSH_AT42F);
+    // 1. Tay xa tới dưới cằm, bàn chải hiện trong tay gần, sẵn ở cạnh mõm.
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, ['bat' + o]: hold0.bat, ['cang' + o]: hold0.cang, dauY: 8, cuoi: 0.6, chum: 0.2, mayL: 0.35, mayR: 0.35, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 41, foam: 0, ['tay' + o]: 'xoe' }, 0.1);
+    c.look(mouth, 0.05, { d: 0.45 });
+    // 2. Nâng mõm, vén môi: miệng con vật hé ra (răng, lưỡi thấy được).
+    t.to(s, { petGape42f: 0.42, ['bat' + o]: hold1.bat, ['cang' + o]: hold1.cang, duration: 0.35, ease: 'sine.out' }, 0.55);
+    // 3. CHẢI: những đường ngắn dọc hàm (mỗi đường 0,26 s), bọt nổi trên đầu bàn chải.
+    const B0 = 0.95, n = Math.max(3, Math.round(hold / 0.26)), per = hold / n;
+    t.to(s, { ['bat' + k]: at(0).bat, ['cang' + k]: at(0).cang, duration: 0.3, ease: 'power2.out' }, 0.65);
+    for (let i = 0; i < n; i++) { const p = at((i % 2 ? -1 : 1) * 5 * dir - (i % 4 < 2 ? 0 : 2) * dir); t.to(s, { ['bat' + k]: p.bat, ['cang' + k]: p.cang, duration: per, ease: 'sine.inOut' }, B0 + i * per); }
+    t.to(s, { foam: 1, duration: 0.8, ease: 'sine.out' }, B0 + 0.1);
+    t.to(s, { cuoi: 0.8, mieng: 0.2, duration: 0.3 }, B0 + 0.2);
+    // 4. Rút bàn chải, cất (tay về hông), buông mõm; con vật liếm mép hai cái — không bàn tay nào ở đó.
+    const e = B0 + hold;
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, mieng: 0, duration: 0.22, ease: 'power2.out' }, e);
+    t.to(s, { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['aim' + k]: 0, duration: 0.35, ease: 'power2.inOut' }, e + 0.22);
+    t.set(s, { ['gadget' + k]: 0, foam: 0, ['tay' + k]: 'mo' }, e + 0.55);
+    t.to(s, { petGape42f: 0, duration: 0.25, ease: 'sine.in' }, e + 0.1);
+    t.to(s, { ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.4, ease: 'power2.inOut' }, e + 0.35);
+    t.set(s, { ['tay' + o]: 'mo' }, e + 0.6);
+    const lick = e + 0.8;
+    t.to(s, { petLick42f: 1, duration: 0.18, ease: 'sine.out' }, lick).to(s, { petLick42f: 0.15, duration: 0.2, ease: 'sine.in' }, lick + 0.35)
+     .to(s, { petLick42f: 1, duration: 0.18, ease: 'sine.out' }, lick + 0.6).to(s, { petLick42f: 0, duration: 0.25, ease: 'sine.in' }, lick + 0.95);
+    c.look(E, e + 0.4, { d: 0.35 });
+    t.to(s, { cuoi: 1, mieng: 0.3, mayL: 0.6, mayR: 0.6, chum: 0, duration: 0.3 }, e + 0.5);
+    t.to(s, { dauY: 13, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, lick + 0.9);
+    this.#khep(t, 0.5, lick + 1.35, c.keep);
+    return t;
+  }
+
+  /**
+   * LAU KHÔ con vật `target` (vừa tắm): quay nghiêng về nó, tay gần mang chiếc KHĂN TẮM (hiện vắt trên tay) tới lưng nó — khăn mở ra, QUẤN quanh
+   * thân —, HAI TAY chà trên khăn `hold` giây (khăn xô theo nhịp chà; lông khô dần, BÔNG lên: viền lông xù to ra); rồi một tay nhấc khăn lên (khăn về
+   * tay), gấp vắt ở hông — con vật lông bông, vui. Đầu người nhìn chỗ đang lau, xong nhìn mặt nó, cười.
+   */
+  towelDry(target = null, { hold = 2.2 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 1 && hold <= 6)) throw new Error(`[character] towelDry: hold must be 1…6 seconds of rubbing, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this.#care38(t, target, 'towelDry'), { k, o, dir } = c;
+    const Sc = c.spot('scruff'), B = c.spot('back'), Hd = c.spot('crown'), E = c.spot('eye'), fwd = Hd.x >= Sc.x ? 1 : -1;
+    const along = (u, dy = 0) => ({ x: Sc.x + (B.x - fwd * 8 - Sc.x) * u, y: Sc.y + (B.y - Sc.y) * u + dy });
+    const drape = along(0.4, -2), carry = c.arm(k, drape.x - fwd * 10, drape.y - 22, RigSVG.TOWEL_AT42F), lay = c.arm(k, drape.x, drape.y - 4, RigSVG.TOWEL_AT42F);
+    const qk = along(0.15), qo = along(0.7);
+    const ringK = [0, 1, 2, 3].map((n) => c.arm(k, qk.x + Math.cos(n * Math.PI / 2) * 5, qk.y + 3 + Math.sin(n * Math.PI / 2) * 3, 15));
+    const ringO = [0, 1, 2, 3].map((n) => c.arm(o, qo.x - Math.cos(n * Math.PI / 2) * 5, qo.y + 4 - Math.sin(n * Math.PI / 2) * 3, 15));
+    const rk = (n) => ringK[n % 4], ro = (n) => ringO[n % 4];
+    // 1. Khăn hiện vắt trên tay gần, đưa tới trên lưng; tay xa đỡ sườn.
+    t.to(s, { ['bat' + k]: carry.bat, ['cang' + k]: carry.cang, ['bat' + o]: ro(0).bat, ['cang' + o]: ro(0).cang, dauY: 8, cuoi: 0.7, chum: 0.1, mayL: 0.35, mayR: 0.35, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: 42, ['tay' + o]: 'xoe' }, 0.1);
+    if (c.pet) { (this.caring || (this.caring = new Set())).add(c.pet); t.to(s, { onTopL: 1, onTopR: 1, careFront: 1, duration: 0.02 }, 0.12); }      // như `bathPet`
+    c.look(drape, 0.05, { d: 0.45 });
+    // 2. Đặt khăn lên lưng — khăn MỞ RA quấn quanh thân (cùng lúc khăn trên tay biến khỏi tay: nó đã ở trên con vật).
+    t.to(s, { ['bat' + k]: lay.bat, ['cang' + k]: lay.cang, duration: 0.35, ease: 'sine.inOut' }, 0.6);
+    t.set(s, { ['gadget' + k]: 0, petTowel42f: 0.05, ['tay' + k]: 'xoe' }, 0.95);
+    t.to(s, { petTowel42f: 1, duration: 0.35, ease: 'power2.out' }, 0.95);
+    // 3. CHÀ: hai bàn tay vòng tròn ngược nhau trên khăn, khăn xô theo; lông khô dần, bông lên.
+    const R0 = 1.3, beat = 0.3;
+    t.to(s, { ['bat' + k]: rk(0).bat, ['cang' + k]: rk(0).cang, duration: 0.3, ease: 'sine.inOut' }, 1.0);
+    for (let a = R0, n = 1; a + 0.1 <= R0 + hold + 1e-6; a += 0.1, n++) {
+      const pk = rk(n), po = ro(n);
+      t.to(s, { ['bat' + k]: pk.bat, ['cang' + k]: pk.cang, ['bat' + o]: po.bat, ['cang' + o]: po.cang, petRub42f: Math.sin(n * Math.PI / 2), duration: 0.1, ease: 'none' }, a);
+    }
+    t.to(s, { petWet42f: 0, duration: hold, ease: 'sine.inOut' }, R0);
+    t.to(s, { petDry42f: 1, duration: hold, ease: 'sine.in' }, R0 + 0.2);
+    t.to(s, { petMood42f: 0.6, duration: 0.6 }, R0 + hold * 0.4);
+    for (let a = R0 + beat; a < R0 + hold - 0.3; a += 1.1) t.to(s, { dau: N.dau + dir * 3, duration: 0.25, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+    // 4. Nhấc khăn (về tay gần), gấp vắt ở hông; con vật lông bông, vui; nhìn mặt nó, cười.
+    const U = R0 + hold;
+    t.to(s, { ['bat' + k]: lay.bat, ['cang' + k]: lay.cang, petRub42f: 0, duration: 0.25, ease: 'sine.inOut' }, U);
+    t.set(s, { ['tay' + k]: 'nam' }, U + 0.22);
+    t.to(s, { petTowel42f: 0, duration: 0.2, ease: 'power2.in' }, U + 0.25);
+    t.set(s, { ['gadget' + k]: 42 }, U + 0.4);
+    t.to(s, { ['bat' + k]: carry.bat, ['cang' + k]: carry.cang, duration: 0.3, ease: 'power2.out' }, U + 0.4);
+    t.to(s, { ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.4, ease: 'power2.inOut' }, U + 0.35);
+    t.to(s, { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['aim' + k]: 0, ['gadgetTurn' + k]: 0, duration: 0.4, ease: 'power2.inOut' }, U + 0.75);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo', ['tay' + o]: 'mo' }, U + 1.15);
+    if (c.pet) t.to(s, { onTopL: 0, onTopR: 0, careFront: 0, duration: 0.02 }, U + 0.8);
+    t.to(s, { petMood42f: 1, duration: 0.35, ease: 'sine.out' }, U + 0.5);
+    c.look(E, U + 0.5, { d: 0.35 });
+    t.to(s, { cuoi: 1, mieng: 0.35, mayL: 0.7, mayR: 0.7, chum: 0, duration: 0.3 }, U + 0.6);
+    t.to(s, { dauY: 13, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, U + 1.3);
+    this.#khep(t, 0.5, U + 1.9, { ...c.keep, petWet42f: 0, petDry42f: c.pet ? 1 : 0 });
     return t;
   }
 
