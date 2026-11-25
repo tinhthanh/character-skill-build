@@ -899,7 +899,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
-          const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
+          const across = actor.width * 0.32 * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 150, 0.6, 1) : 1), deep = across * 0.55, lifted = (rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1)
+            * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 120, 0.55, 1) : 1);       // đợt 42 D: bay khỏi sàn (chạy, nhảy) — bóng ở lại, nhạt đi
           // Con vật đang được BẾ: SVG của nó nằm trong tay một người (rời khỏi host) — host trống, không có bóng trên sàn.
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
@@ -1535,6 +1536,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // chỗ đứng — đo một lúc thì người đi ra khỏi khung (Gemini soát cảnh thử đợt 14).
         // `mid`: đo đúng lúc GIỮA nhịp (đang khám / cho thuốc) — không phải cả quãng người bước tới rồi lùi về.
         const times = beat.mid ? [(at + beat.end) / 2] : [at, (at + beat.end) / 2, Math.max(at, beat.end - 0.05)];
+        // ĐỢT 42 D: nhịp có người NHẢY / MÚA / CHẠY (`peaks42d`) — đo thêm ở các lúc ấy: đỉnh cú nhảy (đầu không chạm mép trên), hai tay giơ cao.
+        if (Array.isArray(beat.peaks42d)) times.push(...beat.peaks42d.filter((time) => time >= at - 1e-3 && time <= beat.end + 1e-3));
         try { values = set.frameOn(beat.subjects, beat.size, { lamps: !!beat.lamp, tight: !!beat.mid, at: times, seek: (time) => { tl.seek(time, false); set.update(); }, hands: gesture }); } catch (error) { continue; }      // chủ thể đang không thấy (được bế…)
         // SỔ GÓC MÁY (đợt 31): góc trung ghi kèm bề rộng góc TOÀN của cùng chủ thể ở cùng các lúc — cùng ống kính thì bề rộng
         // khung tỉ lệ với khoảng cách máy. Góc trung ≥ 85 % góc toàn là cắt sang một khung gần như cũ (`tools/scene.py` nhắc,
@@ -1751,7 +1754,14 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           worn: !person ? Object.fromEntries([['bandage', e.bang], ['cone', e.cone]].map(([key, el]) => { if (!el || el.style.display === 'none') return [key, null];
             const r = drawnRect(el); return [key, r.width > 0 ? rect(r) : null]; })) : null,
           // ĐỢT 38 B: bàn tay nào đang đeo găng (`gloveL/R` ≥ 0,3 — `putOnGloves`, `takeOffGloves`, `wear('gloves')`).
-          gloves: person && rig.s ? ['L', 'R'].filter((side) => +(rig.s['glove' + side] || 0) >= 0.3) : [] };
+          gloves: person && rig.s ? ['L', 'R'].filter((side) => +(rig.s['glove' + side] || 0) >= 0.3) : [],
+          // ĐỢT 42 D — chạy, nhảy, múa: đáy TỪNG bàn chân (px; `wx` = chỗ trong phòng, đơn vị bối cảnh — máy lia không làm nó "trượt"),
+          // chiều cao người theo đơn vị bối cảnh, và cái bóng trên sàn (bề ngang, đáy, độ đậm). acting_check đo pha bay / chân trụ trượt.
+          ...(person && !carried ? { soles42d: ['L', 'R'].map((side) => { const rs = [e['ban' + side], e['banNg' + side]].filter((el) => el && +(el.getAttribute('opacity') ?? 1) > 0.05).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+              if (!rs.length) return null; const r = rect({ left: Math.min(...rs.map((q) => q.left)), right: Math.max(...rs.map((q) => q.right)), top: Math.min(...rs.map((q) => q.top)), bottom: Math.max(...rs.map((q) => q.bottom)) });
+              return { side, y: r.y1, x: (r.x0 + r.x1) / 2, wx: at.scale ? actor.where + ((r.x0 + r.x1) / 2 - at.x) / at.scale : null }; }).filter(Boolean),
+            wtall: actor.height || 0, lift42d: +(rig.s.lift42d || 0).toFixed(2),
+            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}) };
       });
     },
 

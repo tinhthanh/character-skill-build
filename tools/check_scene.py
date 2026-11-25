@@ -543,7 +543,7 @@ with tempfile.TemporaryDirectory() as work:
         for got, want in checks:
             if got != want: problems.append(f'script.py: expected {want!r} in the scene file — got {got!r}')
         if not os.path.isfile(os.path.join(work, 'kich-ban', 'index.html')): problems.append('script.py: the composition was not built')
-    for text, needle in [('bác sĩ (vet)\nbác sĩ: [nhảy múa]\n', 'dòng 2'), ('bác sĩ (vet) · chó (dog)\nchó: Gâu!\n', 'thú'),
+    for text, needle in [('bác sĩ (vet)\nbác sĩ: [bay lượn]\n', 'dòng 2'), ('bác sĩ (vet) · chó (dog)\nchó: Gâu!\n', 'thú'),
                          ('bối cảnh: sao hoả\nbác sĩ (vet)\nbác sĩ: Chào\n', 'sao hoả'), ('bác sĩ (vet)\nmèo: [vui]\n', '"mèo"'),
                          ('bối cảnh: công viên\nchó (dog, trên bàn)\nchó: [vui]\n', 'bàn')]:
         bad = os.path.join(work, 'bad-script.txt')
@@ -1351,6 +1351,63 @@ with tempfile.TemporaryDirectory() as work:
                        f'{who} playBow — big enough in the frame', f'{who} howl — big enough in the frame', f'{who} tugOfWar — big enough in the frame')\
                 + ((f'{who} dig — tn paw scrapes', f'{who} dig — dirt flying', f'{who} carryToy — toy in its mouth', f'{who} carryToy {person} — toy dropped at their feet') if key == 'pets40a' else ()):
             if needle not in done.stdout: problems.append(f'{key}: acting_check did not measure {needle!r}')
+
+    # ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA (cả thân). motion42d: công viên, bé chạy tới con chó (`["run", "@cho"]` — tools/scene.py đổi ra
+    # quãng, chỗ đứng mới ghi lại), nhảy mừng hai lần, bác sĩ và bé gái nhảy múa cùng lúc. motion42d-v: khung DỌC từ kịch bản tiếng Việt
+    # ("chạy tới", "nhảy cẫng", "[nhảy]" của người = nhảy múa, "[quẩy]"; "[nhảy]" của chó vẫn là `jump` của thú). acting_check đo pha bay
+    # của bước chạy, bàn chân rời sàn khi nhảy (bóng ở lại trên sàn, co lại), chân trụ không trượt, chân về sàn, đầu / tay / chân trong khung.
+    motion42d = {'id': 'motion42d', 'camera': 'auto', 'set': {'preset': 'park'},
+                 'characters': [{'name': 'be', 'id': 'boy', 'x': -700, 'z': -560}, {'name': 'cho', 'species': 'corgi', 'x': -60, 'z': -560, 'faces': 'be'},
+                                {'name': 'vet', 'id': 'vet', 'x': 330, 'z': -620}, {'name': 'girl', 'id': 'girl', 'x': 560, 'z': -620}],
+                 'script': [{'who': 'be', 'say': 'Mochi ơi!', 'dur': 1.2}, {'who': 'be', 'do': [['run', '@cho']]}, {'who': 'cho', 'do': ['wagTail']},
+                            {'who': 'be', 'do': [['jump', 2]]}, {'who': 'vet', 'say': 'Cả nhà cùng nhảy nào!', 'dur': 1.6},
+                            {'together': [{'who': 'vet', 'do': ['dance']}, {'who': 'girl', 'do': [['dance', 'happy', 2, {'bpm': 120}]]}]}]}
+    path = os.path.join(os.path.dirname(stage), '_check_motion42d.json')
+    try:
+        json.dump(motion42d, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'motion42d'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('motion42d: the scene does not build: ' + done.stderr.strip()[:300])
+    else:
+        html = open(os.path.join(work, 'motion42d', 'index.html'), encoding='utf-8').read()
+        if not re.search(r"\[be, \[\"run\", -?\d+\]\]", html): problems.append('motion42d: ["run", "@cho"] was not turned into a distance')
+        if 'peaks42d: bodyTimes42d(' not in html: problems.append('motion42d: the jump / dance turns are not framed at their peaks (peaks42d)')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'motion42d')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('motion42d: ' + (done.stdout.strip() or done.stderr.strip())[-700:])
+        else:
+            for needle in ('be run — flight phases (both feet off the floor)', 'be run — planted feet do not slide', 'be run — both feet back on the floor after it',
+                           'be jump — both feet clearly off the floor', 'be jump — the shadow stays on the floor and shrinks', 'be jump — head, hands and feet in the frame',
+                           'vet dance — feet stay on the floor', 'girl dance — head, hands and feet in the frame', 'girl dance — planted feet do not slide'):
+                if needle not in done.stdout: problems.append(f'motion42d: acting_check did not measure {needle!r}')
+    text = os.path.join(work, 'motion42d-v.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: đường phố · khung: dọc\nbé (boy) · chó (corgi) · bác sĩ (vet) · bé gái (girl)\n'
+                                            'bé: Mochi ơi, chờ anh với!\nbé → chó: chạy tới\nbé: [nhảy cẫng]\nbác sĩ: Cả nhà cùng quẩy nào!\n'
+                                            'cùng lúc: bác sĩ: [nhảy] | bé gái: [quẩy]\nchó: [nhảy]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('motion42d-v: script.py: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'motion42d-v.scene.json'), encoding='utf-8'))
+        steps = [step for entry in made['script'] for turn in (entry.get('together') or [entry]) for step in turn.get('do', [])]
+        if steps != [['run', '@cho'], 'jump', 'dance', 'dance', 'jump']: problems.append(f'motion42d-v: script.py gave {steps}, want run @cho, jump, dance, dance, jump (the dog\'s)')
+        done = build(os.path.join(work, 'motion42d-v.scene.json'), os.path.join(work, 'motion42d-v'))
+        if done.returncode != 0: problems.append('motion42d-v: the scene does not build: ' + done.stderr.strip()[:300])
+        else:
+            done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'motion42d-v')], capture_output=True, text=True)
+            if done.returncode != 0: problems.append('motion42d-v: ' + (done.stdout.strip() or done.stderr.strip())[-700:])
+            elif 'be jump — both feet clearly off the floor' not in done.stdout or 'bac_si dance — head, hands and feet in the frame' not in done.stdout:
+                problems.append('motion42d-v: acting_check did not measure the jump and the dance:\n' + done.stdout[-400:])
+    # Bị từ chối, lỗi rõ ràng: thú chạy / múa, đối số sai.
+    for label, step, who in (('a pet running', ['run', 100], 'cho'), ('run with a word', ['run', 'far'], 'be'), ('jump 9 times', ['jump', 9], 'be'), ('dance in an unknown style', ['dance', 'disco'], 'be')):
+        bad = {'id': 'bad42d', 'set': {'preset': 'park'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': 0, 'z': -560}, {'name': 'cho', 'species': 'corgi', 'x': 300, 'z': -560}],
+               'script': [{'who': who, 'do': [step]}]}
+        path = os.path.join(os.path.dirname(stage), '_check_bad42d.json')
+        try:
+            json.dump(bad, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad42d'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or 'scene:' not in (done.stderr + done.stdout): problems.append(f'motion42d: {label} should be refused with a message')
 
     # ── XE MÁY CHẠY VÀO, NGƯỜI CẦM LÁI (examples/scene-ride): xe trượt vào và quay bánh, người lái ngồi trên yên từ khung
     # đầu, hội thoại chờ xe dừng (T0), "getOff" hạ người xuống đất đúng lúc nó chạy.

@@ -169,6 +169,8 @@ clips for every voice file.
    Hands on the pet: `["clipNails", "@pet"]`, `["eyeDrops", "@pet"]`, `["cleanEars", "@pet"]`, `["scanChip", "@pet", { "id": "900 123 456 789" }]`
    — the person goes to the pet's head end and the turn cuts to a close shot; the pet's paw / chin / eyes / head follow the hands
    by themselves (nothing to add for the pet). Scripts: "cắt móng", "nhỏ mắt", "vệ sinh tai" / "lau tai", "quét chip <số>".
+   Whole body: `["run", "@dog"]` (or `["run", 300]` — a real run with a flight phase), `["jump", 2]` (jump for joy, both feet off the floor),
+   `["dance", "happy", 2, { "bpm": 120 }]` (on the beat, for social videos) — their turns get a full shot. Scripts: "chạy tới", "nhảy cẫng", "nhảy" / "quẩy".
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

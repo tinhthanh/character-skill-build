@@ -45,6 +45,8 @@ Một tệp kịch bản:
                                        băng chân, đeo loa (băng / loa còn lại trên con vật)
                                        cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
                                        giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
+    tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
+                                       "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
@@ -118,6 +120,12 @@ ACTIONS.update(ACTIONS_40A)       # đợt 40 A
 ACTIONS.update({'cười lớn': 'laugh', 'cười ha hả': 'laugh', 'lau nước mắt': 'wipeTears', 'chùi nước mắt': 'wipeTears', 'che mặt': 'facepalm',
                 'ôm trán': 'facepalm', 'facepalm': 'facepalm', 'suỵt': 'shush', 'ra hiệu im lặng': 'shush', 'ok': 'okSign', 'ra dấu ok': 'okSign',
                 'giơ tay chào': 'salute', 'chào kiểu quân đội': 'salute', 'salute': 'salute'})
+# ĐỢT 42 D — cả thân: "[chạy]" chạy tại chỗ, "bé → chó: chạy tới" chạy tới đứng cạnh nó (TARGETED_42D), "[nhảy lên]" / "[nhảy cẫng]" nhảy
+# mừng, "[nhảy múa]" / "[quẩy]" nhảy múa. "[nhảy]" của NGƯỜI là nhảy múa (PERSON_42D); của THÚ vẫn là `jump` (chó nhảy chồm).
+ACTIONS.update({'chạy': 'run', 'chạy tại chỗ': 'run', 'nhảy lên': 'jump', 'nhảy cẫng': 'jump', 'nhảy cẫng lên': 'jump', 'nhảy mừng': 'jump',
+                'nhảy múa': 'dance', 'quẩy': 'dance', 'nhảy nhót': 'dance', 'múa': 'dance'})
+PERSON_42D = {'nhảy': 'dance'}
+TARGETED_42D = {'chạy tới': ('run', None), 'chạy lại': ('run', None), 'chạy đến': ('run', None), 'chạy lại gần': ('run', None), 'chạy về phía': ('run', None)}
 BRACKET_FIRST = {'cười lớn'}              # trong "[…]": từ này vừa là tâm trạng vừa là động tác — ưu tiên ĐỘNG TÁC
 TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('giveTreat', {'kind': 'pill'}), 'cho bánh': ('giveTreat', None), 'cho ăn': ('giveTreat', None),
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
@@ -128,6 +136,7 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'đeo loa': ('putCone', None), 'đeo vòng chống liếm': ('putCone', None), 'đeo vòng cổ chống liếm': ('putCone', None),
             'liếm': ('lick', None), 'liếm tay': ('lick', None), 'liếm mặt': ('lick', None), 'nấp': ('hide', None), 'trốn': ('hide', None), 'nấp sau': ('hide', None)}
 TARGETED.update(TARGETED_40A)      # đợt 40 A
+TARGETED.update(TARGETED_42D)      # đợt 42 D
 # ĐỢT 39 A — quầy thu ngân & quầy cà phê: trả tiền (quét mã QR / quẹt thẻ), thối tiền, đóng dấu thẻ, rót nước, lau quầy. Người làm tự có đồ cần cầm
 # (điện thoại, thẻ ngân hàng, xấp tiền, thẻ tích điểm, cốc) — xem `needs` bên dưới; người nhận có sẵn món đồ đang cất (tools/scene.py).
 TARGETED.update({'thối tiền': ('giveChange', None), 'trả tiền thừa': ('giveChange', None), 'đóng dấu': ('stampCard', None), 'đóng dấu thẻ': ('stampCard', None)})
@@ -375,6 +384,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                     if word in SIGN_WORDS or (word.startswith('giơ bảng#') and not signs[int(word.split('#')[1])]):
                         raise ScriptError(f'{where}: "giơ bảng" cần chữ trên bảng — "{m.group(1).strip()}: [giơ bảng: Giảm 20%]" (1–3 dòng ngắn, ngắt bằng |)')
                     turn.setdefault('do', []).append(['holdSign', signs[int(word.split('#')[1])]] if word.startswith('giơ bảng#') else list(PRESENT_39[word]))
+                elif not pet and word in PERSON_42D: turn.setdefault('do', []).append(PERSON_42D[word])          # đợt 42 D: người "nhảy" là nhảy múa
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:

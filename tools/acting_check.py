@@ -317,7 +317,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39', 'motion42d') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -2314,6 +2314,81 @@ def check_desk39(folder, c, shots, scales):
     return out
 
 
+# ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA: đo từ `soles42d` (đáy từng bàn chân, chỗ trong phòng `wx`), `shadow42d` (bóng trên sàn) của
+# `set.actingProbe()`, mỗi 1/30 s suốt bước. Mọi độ cao tính theo chiều cao người trên màn hình (`tall`), độ trượt theo chiều cao người
+# trong phòng (`wtall`) — máy lia / đẩy không thành "bay" hay "trượt".
+FLY_42D = 0.008          # bàn chân THẤP NHẤT cao hơn sàn chừng này → cả hai chân đã rời sàn (pha bay)
+RUN_FLIGHTS_42D = 3      # chạy: ít nhất chừng ấy pha bay tách rời nhau
+JUMP_PEAK_42D = 0.04     # nhảy lên: đỉnh cú nhảy, bàn chân thấp nhất cao hơn sàn ≥ 4 % chiều cao người
+CONTACT_42D = 0.006      # bàn chân "trên sàn": cách sàn không quá chừng ấy
+SKATE_42D = 0.012        # chân trụ trượt: giữa hai khung liền nhau mà bàn chân ấy vẫn trên sàn, nó dời ≤ 1,2 % chiều cao người
+SHADOW_42D = 0.92        # đỉnh cú nhảy: bóng hẹp lại còn ≤ 92 % bề ngang lúc đứng, và vẫn nằm trên sàn (≤ 3 % chiều cao người)
+
+
+def check_motion42d(folder, c, shots):
+    """ĐỢT 42 D: pha bay (cả hai bàn chân rời sàn — chạy: nhiều lần; nhảy: đủ cao, bóng ở lại trên sàn và co lại), chân trụ không trượt,
+    hai chân về sàn sau bước, không lún; nhảy / múa: đầu, hai bàn tay, hai bàn chân trong khung suốt bước."""
+    W, H = frame_size(folder)
+    who, name = c['who'], c['name']
+    what = lambda text: f'{who} {name} — {text}'
+    track = [(t, next((a for a in shots.get(float(t), []) if a['name'] == who), None)) for t in c.get('samples', [])]
+    track = [(t, a) for t, a in track if a and a.get('soles42d') and a.get('tall')]
+    if len(track) < 5: return [{'scene': folder, 'what': what('measured'), 'ok': None, 'note': f'{who} not seen during the {name}'}]
+    out = []
+    offs = [(t, [(a['ground'] - q['y']) / a['tall'] for q in a['soles42d']], a) for t, a in track]
+    lows = [(t, min(o), a) for t, o, a in offs]
+    flying = [low > FLY_42D for _, low, _ in lows]
+    flights = sum(1 for n, f in enumerate(flying) if f and (n == 0 or not flying[n - 1]))
+    sunk = min(lows, key=lambda x: x[1])
+    out.append({'scene': folder, 'what': what('feet never sink into the floor'), 'ok': sunk[1] >= -FEET,
+                'note': f'lowest foot {sunk[1] * 100:+.1f} % of height from the floor at {sunk[0]:g} s (limit −{FEET * 100:g} %)'})
+    if name == 'run':
+        out.append({'scene': folder, 'what': what('flight phases (both feet off the floor)'), 'ok': flights >= RUN_FLIGHTS_42D,
+                    'note': f'{flights} separate flight phases, {sum(flying)} of {len(flying)} frames with both feet off the floor (least {RUN_FLIGHTS_42D} phases)'})
+    if name == 'jump':
+        peak = max(lows, key=lambda x: x[1])
+        out.append({'scene': folder, 'what': what('both feet clearly off the floor'), 'ok': peak[1] >= JUMP_PEAK_42D,
+                    'note': f'the lower foot rises {peak[1] * 100:.1f} % of height at {peak[0]:g} s ({flights} jump{"" if flights == 1 else "s"} seen; least {JUMP_PEAK_42D * 100:g} %)'})
+        rest, top = lows[0][2].get('shadow42d'), peak[2].get('shadow42d')
+        if rest and top and rest['w'] > 0:
+            near = abs(top['y'] - peak[2]['ground']) / peak[2]['tall']
+            out.append({'scene': folder, 'what': what('the shadow stays on the floor and shrinks'), 'ok': top['w'] <= rest['w'] * SHADOW_42D and near <= FEET,
+                        'note': f'at the top the shadow is {top["w"] / rest["w"] * 100:.0f} % as wide as standing (most {SHADOW_42D * 100:g} %), {near * 100:.1f} % of height from the floor line'})
+        else: out.append({'scene': folder, 'what': what('the shadow stays on the floor and shrinks'), 'ok': None, 'note': 'no shadow measured'})
+    if name == 'dance':
+        out.append({'scene': folder, 'what': what('feet stay on the floor'), 'ok': flights == 0,
+                    'note': 'both feet never leave the floor together' if flights == 0 else f'both feet leave the floor {flights} time{"" if flights == 1 else "s"}'})
+    # CHÂN TRỤ KHÔNG TRƯỢT: bàn chân ở trên sàn ở hai khung liền nhau thì không dời trong phòng.
+    worst = None
+    for (t0, o0, a0), (t1, o1, a1) in zip(offs, offs[1:]):
+        if t1 - t0 > 0.05 or not a0.get('wtall'): continue
+        for q0, f0 in zip(a0['soles42d'], o0):
+            q1, f1 = next(((q, f) for q, f in zip(a1['soles42d'], o1) if q['side'] == q0['side']), (None, None))
+            if q1 is None or q0.get('wx') is None or q1.get('wx') is None or f0 > CONTACT_42D or f1 > CONTACT_42D: continue
+            if abs((a1.get('facing') or 0) - (a0.get('facing') or 0)) > 0.04: continue          # đang XOAY tại chỗ (quay ngang để chạy, xoay khi múa): hình giày đổi từ nhìn thẳng sang nhìn nghiêng — không phải trượt
+            slip = abs(q1['wx'] - q0['wx']) / a0['wtall']
+            if worst is None or slip > worst[1]: worst = (t1, slip, q0['side'])
+    if worst: out.append({'scene': folder, 'what': what('planted feet do not slide'), 'ok': worst[1] <= SKATE_42D,
+                          'note': f'a foot on the floor moves at most {worst[1] * 100:.2f} % of height between two frames ({"left" if worst[2] == "L" else "right"} foot at {worst[0]:g} s; limit {SKATE_42D * 100:g} %)'})
+    # ĐẦU, TAY, CHÂN TRONG KHUNG (nhảy, múa): đỉnh cú nhảy không cắt đầu, tay giơ cao không ra ngoài mép, bàn chân không dưới mép dưới.
+    if name in ('jump', 'dance'):
+        bad = None
+        for t, a in track:
+            boxes = [('head', a.get('headBox'))] + [(f'{"left" if h["side"] == "L" else "right"} hand', h.get('box')) for h in a.get('hands') or []]
+            for part, b in boxes:
+                if b and (b['y0'] < 0 or b['x0'] < 0 or b['x1'] > W): bad = bad or (t, part)
+            if any(q['y'] > H for q in a['soles42d']): bad = bad or (t, 'a foot')
+        out.append({'scene': folder, 'what': what('head, hands and feet in the frame'), 'ok': bad is None,
+                    'note': f'{len(track)} frames, all inside' if bad is None else f'the {bad[1]} leaves the frame at {bad[0]:g} s'})
+    # SAU BƯỚC: hai bàn chân về sàn.
+    for t in c.get('after', []):
+        a = next((x for x in shots.get(float(t), []) if x['name'] == who), None)
+        if not a or not a.get('soles42d') or not a.get('tall'): continue
+        off = max(abs(a['ground'] - q['y']) / a['tall'] for q in a['soles42d'])
+        out.append({'scene': folder, 'what': what('both feet back on the floor after it'), 'ok': off <= FEET, 'note': f'feet within {off * 100:.1f} % of height of the floor at {t:g} s (limit {FEET * 100:g} %)'})
+    return out
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
@@ -2333,6 +2408,9 @@ def check_scene(folder):
     results += check_people_framed(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
+        if c['kind'] == 'motion42d':       # đợt 42 D
+            results.extend(check_motion42d(folder, c, shots))
+            continue
         if c['kind'] == 'desk39':          # đợt 39 A
             results.extend(check_desk39(folder, c, shots, scales))
             continue
