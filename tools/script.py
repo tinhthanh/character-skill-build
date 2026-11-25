@@ -262,7 +262,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             voice = None
             for option in who['options']:
                 if option.lower().startswith('giọng '): voice = option.split(' ', 1)[1].strip()
-                else: raise ScriptError(f'{who["where"]}: an off-screen narrator takes only the option "giọng …" (a voice) — got "{option}"')
+                else: raise ScriptError(f'{who["where"]}: người dẫn không hiện hình chỉ nhận tuỳ chọn "giọng …" — thấy "{option}"')
             narrators_42a.append({'name': name, 'narrator': True, **({'voice': voice} if voice else {})})
             narrator_labels_42a.add(name)
             continue
@@ -317,12 +317,12 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         for word in [part.strip() for part in (option or '').split(',') if part.strip()]:
             if word.lower() in SIZES_42A: size = SIZES_42A[word.lower()]
             elif word.lower().startswith('quay '): subjects += [who_of(label, where) for label in re.split(r'\s+và\s+|\s*\+\s*', word[5:].strip()) if label]
-            else: raise ScriptError(f'{where}: cannot read "{word}" in "cùng lúc (…)" — write "quay mèo" or "quay mèo và mẹ", then cận / trung / toàn: "cùng lúc (quay mèo, cận): …"')
-        if option is not None and not subjects and size is None: raise ScriptError(f'{where}: "cùng lúc (…)" needs "quay <who>" — for example "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"')
+            else: raise ScriptError(f'{where}: không hiểu "{word}" trong "cùng lúc (…)" — viết "quay mèo" hay "quay mèo và mẹ", rồi cận / trung / toàn: "cùng lúc (quay mèo, cận): …"')
+        if option is not None and not subjects and size is None: raise ScriptError(f'{where}: "cùng lúc (…)" cần "quay <ai>" — ví dụ "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"')
         actors = [turn['who'] for turn in turns if turn['who'] not in narrator_labels_42a]
         subjects = list(dict.fromkeys(subjects or [who for who in actors if not any(t['who'] == who and 'say' in t for t in turns)] or actors))
-        if not subjects: raise ScriptError(f'{where}: nobody in this group is on screen for the camera to film — add a character who acts')
-        if any(who in narrator_labels_42a for who in subjects): raise ScriptError(f'{where}: the narrator has no body on screen, the camera cannot film them — "quay …" must name a person or pet in the scene')
+        if not subjects: raise ScriptError(f'{where}: nhóm này không có ai hiện trên hình để máy quay — thêm một nhân vật diễn')
+        if any(who in narrator_labels_42a for who in subjects): raise ScriptError(f'{where}: người dẫn không hiện hình, máy không quay được — "quay …" phải là một người hay con vật trong cảnh')
         size = size or ('close' if len(subjects) == 1 and is_pet(subjects[0]) else 'medium')
         entry['view'] = {'on': subjects, 'size': size, **({'alone': True} if len(subjects) == 1 else {})}
         return entry
@@ -331,7 +331,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         """Một lượt: "tên (tâm trạng): lời" · "tên: [hành động…]" · "tên → tên khác: hành động"."""
         m = re.match(r'^(.+?)\s*→\s*(.+?)\s*:\s*(.+)$', body)
         if m and m.group(3).strip().lower().strip('[]') in COMBO_WORDS:
-            if who_of(m.group(1), where) in narrator_labels_42a: raise ScriptError(f'{where}: a narrator who is off screen can only speak — "{m.group(1).strip()}: <line>"')
+            if who_of(m.group(1), where) in narrator_labels_42a: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
             who, verb = who_of(m.group(1), where), m.group(3).strip().lower().strip('[]')
             name = COMBO_WORDS[verb]
             targets = [f'@{who_of(part, where)}' for part in re.split(r'\s*→\s*', m.group(2))]
@@ -342,7 +342,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             return {'who': who, 'do': [[name] + targets]}
         if m:
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
-            if who in narrator_labels_42a or target in narrator_labels_42a: raise ScriptError(f'{where}: a narrator who is off screen can only speak — "{m.group(1).strip()}: <line>"')
+            if who in narrator_labels_42a or target in narrator_labels_42a: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
             chip = CHIP_VERB.match(verb)
             if chip: return {'who': who, 'do': [['scanChip', f'@{target}', {'id': chip.group(2)}]]}
             if verb in TARGETED_39:          # ĐỢT 39 C: "bác sĩ → bé trai: selfie" — chụp ảnh tự sướng CÙNG người / con vật kia
@@ -357,7 +357,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         if not m: raise ScriptError(f'{where}: không hiểu dòng này — viết "tên: lời", "tên: [hành động]" hay "tên → tên khác: hành động"')
         who, mood_word, rest = who_of(m.group(1), where), (m.group(2) or '').strip().lower(), m.group(3).strip()
         pet, turn = is_pet(who), {'who': who}
-        if who in narrator_labels_42a and (mood_word or rest.startswith('[')): raise ScriptError(f'{where}: "{m.group(1).strip()}" is an off-screen narrator — only a spoken line ("{m.group(1).strip()}: <line>"), no mood and no [action]')
+        if who in narrator_labels_42a and (mood_word or rest.startswith('[')): raise ScriptError(f'{where}: "{m.group(1).strip()}" là người dẫn không hiện hình — chỉ có lời ("{m.group(1).strip()}: <lời>"), không tâm trạng, không [hành động]')
         if mood_word:
             table = PET_MOODS if pet else PERSON_MOODS
             mood = table.get(mood_word) or (mood_word if mood_word in table.values() else None)
@@ -421,14 +421,14 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         else:
             script.append(turn_of(line, where))
         if pending and attach_toast_42a(script[-1], pending): pending = None
-    if pending and script and not attach_toast_42a(script[-1], pending): raise ScriptError('thông báo: no on-screen character to attach the card to — put it before a turn of a person or pet')
+    if pending and script and not attach_toast_42a(script[-1], pending): raise ScriptError('thông báo: không có nhân vật nào trên hình để gắn thẻ — đặt nó trước lượt của một người hay con vật')
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
     script = expand_combos(script)              # combo → từng lượt: đồ cầm (ống tiêm, bìa hồ sơ), cái cân… tính như viết tay
 
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
     characters = [c for c in characters if c['name'] in used] or characters
-    if narrators_42a and not characters: raise ScriptError('only an off-screen narrator — at least one character on screen is needed')
+    if narrators_42a and not characters: raise ScriptError('chỉ có người dẫn không hiện hình — cần ít nhất một nhân vật trên hình')
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
     needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag',
