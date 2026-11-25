@@ -95,7 +95,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                time that step plays (`mood` / `mark` only when they start, not when they end). Gestures: "clap", ["countFingers", 3], "checkWatch", "scratchHead",
                "headInHands", "bow", "wai", ["handshake", "@other"] (with the other's ["handshake", "@you"] in "together").
                "ponder", "crossArms", "handsOnHips", "introduce", "callOut", "relief", "startle", "lookAround",
-               ["hurry", 6, 200]. Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
+               ["hurry", 6, 200]. Whole body (đợt 42 D): ["run", 300] / ["run", "@dog"] (runs up beside it; flight phase,
+               { "speed": 0.5…2 }), ["jump", 2, { "height": 1 }] (jump for joy), ["dance", "happy", 2, { "bpm": 120 }]
+               ("gentle" for older people) — their turns get a full shot (feet in the frame, the head kept in at the top of a jump). Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
                ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
@@ -287,6 +289,14 @@ GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsD
             'introduce', 'shrug', 'throwBall',
             'holdSign', 'showSize', 'takeSelfie', 'yawnStretch')            # đợt 39 C
 GESTURES += ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')          # đợt 39 B
+GESTURES += ('jump', 'dance')          # đợt 42 D — hai tay giơ cao lúc nhảy / múa: bàn tay trong khung
+# ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA (cả thân): nhịp của chúng là góc TOÀN (cả người, bàn chân trong khung; máy đo thêm ở đỉnh cú nhảy
+# — đầu không chạm mép trên); chạy là nhịp có người đi (`move`). `["run", "@tên"]` chạy tới đứng cạnh người / con vật ấy (cách
+# RUN_GAP_42D × chiều cao người chạy, tính từ giữa người tới mép gần của nó). moments.json đo (acting_check `motion42d`): pha bay
+# (hai bàn chân rời sàn), chân trụ không trượt, chân về sàn sau khi tiếp đất, đầu / tay / chân trong khung.
+MOTION_42D = ('run', 'jump', 'dance')
+RUN_GAP_42D = 0.42
+RUN_TO_42D = {}               # id(bước ["run", "@tên"]) → tên người / con vật chạy tới (nhịp máy quay lấy cả hai)
 # ĐỢT 39 C — NGƯỜI DẪN: giơ bảng chữ, ra dấu kích thước, chụp ảnh tự sướng, ngáp vươn vai. Tay / bảng / điện thoại phải nằm trong khung
 # (cùng đường đo `GESTURES`); `acting_check` đo thêm tấm bảng (chữ đủ lớn, trước ngực), khe giữa hai tay, điện thoại + người chụp cùng, tay qua đầu.
 TALK_39 = ('holdSign', 'showSize', 'takeSelfie', 'yawnStretch')
@@ -1015,6 +1025,22 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             times = [round(t0 + m, 2) for m in marks]
             moments.append({'t': times[1], 'what': f'{who} {name}', 'ask': ask + [f'Are {who}\'s hands inside the frame (not cut off by its edge)?'],
                             'check': {'kind': 'talk39', 'name': name, 'who': who, 'times': times, 'size': SIZE_39.get(op.get('size'), op.get('size')) if name == 'showSize' else None, 'with': op.get('with')}})
+            continue
+        if op['kind'] == 'motion42d':
+            # ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA: mỗi 1/30 s suốt bước (pha bay, chân trụ không trượt, đầu / tay / chân trong khung) và
+            # 0,3 s sau bước (hai bàn chân đã về sàn).
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            samples = [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            after = round(min(t1 + 0.3, float(timings.get('duration') or t1 + 0.3) - 0.05), 2)
+            ask = {'run': f'Is {op["who"]} running (leaning forward, knees high, arms pumping), with both feet off the ground at some moments?',
+                   'jump': f'Is {op["who"]} jumping for joy, both feet clearly off the floor, arms up, the shadow left on the floor?',
+                   'dance': f'Is {op["who"]} dancing to a beat (bouncing, arms swinging / up), with the whole body in the frame?'}[op['name']]
+            moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' to {op["target"]}' if op.get('target') else ''), 'ask': [ask],
+                            'check': {'kind': 'motion42d', 'name': op['name'], 'who': op['who'], 'target': None, 'to42d': op.get('target'), 'times': times, 'samples': samples, 'after': [after]}})
             continue
         if op['kind'] == 'gesture':
             # ĐỘNG TÁC TAY (đợt 33): ở 40 / 55 / 70 % bước, bàn tay của người làm nằm trong khung — góc trung khung dọc lấy bề ngang
@@ -1755,6 +1781,19 @@ def main():
         # REO trong KHUNG DỌC (đợt 34): chữ V dang rộng cần ~1,02 × bề rộng góc toàn — không góc trung nào giữ được cả hai tay,
         # máy phải cắt sang góc toàn giữa chuỗi góc trung. Người (không phải con vật) reo ở khung dọc thì reo hẹp
         # (`cheer({ narrow: true })`: nắm tay giơ cạnh vai). Người viết tự cho tham số thì giữ của họ.
+        # ĐỢT 42 D — chạy / nhảy lên / nhảy múa: kiểm tra đối số ngay ở đây (lỗi rõ ràng thay cho lỗi của trình duyệt lúc dựng).
+        motion = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+        if motion in ('run', 'dance') and actor in names and names[actor]['_pet']: fail(f'{where}: "{motion}" is a person\'s action — for a pet use "walk", "jump" or "play"')
+        if motion in MOTION_42D and actor in names and not names[actor]['_pet']:          # "jump" của thú là động tác của rig thú
+            args = list(step[1:]) if isinstance(step, list) else []
+            num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+            if motion == 'run' and (len(args) > 2 or (args and not num(args[0])) or (len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'speed', 'steps'}))):
+                fail(f'{where}: ["run", distance, {{ "speed": 0.5…2, "steps": n }}] — distance in frame units (negative = to the left), or ["run", "@<name>"] to run up to someone; got {js(step)}')
+            if motion == 'jump' and (len(args) > 2 or (args and not (isinstance(args[0], int) and not isinstance(args[0], bool) and 1 <= args[0] <= 6)) or (len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'height'}))):
+                fail(f'{where}: ["jump", times 1…6, {{ "height": 0.3…2 }}] — got {js(step)}')
+            if motion == 'dance' and (len(args) > 3 or (args and args[0] not in ('happy', 'gentle')) or (len(args) > 1 and not (isinstance(args[1], int) and not isinstance(args[1], bool) and 1 <= args[1] <= 8))
+                                      or (len(args) > 2 and not (isinstance(args[2], dict) and set(args[2]) <= {'bpm'}))):
+                fail(f'{where}: ["dance", "happy" | "gentle", bars 1…8, {{ "bpm": 60…180 }}] — got {js(step)}')
         if step in ('cheer', ['cheer']) and height > width * 1.2 and actor in names and not names[actor]['_pet']: return "['cheer', { narrow: true }]"
         # ĐỢT 35 — dụng cụ & hồ sơ: kiểm tra đối số ngay ở đây (lỗi rõ ràng thay cho lỗi của trình duyệt lúc dựng).
         care = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
@@ -2501,6 +2540,23 @@ def main():
                     mover = names.get(turn.get('who'))
                     if mover and isinstance(step[2], (int, float)): mover['x'] = float(mover['x']) + float(step[2]) * mover['_unit']
                     gear_ops.append({'turn': emitted[0], 'kind': 'walk', 'who': turn.get('who'), 'target': None, 'dur': float(step[1])})
+                # ĐỢT 42 D: chạy / nhảy / múa — chạy dời chỗ đứng (như `walk`); `["run", "@tên"]` thành quãng tới đứng cạnh người / con vật ấy.
+                motion = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+                if motion in MOTION_42D and turn.get('who') in names and not names[turn['who']]['_pet']:
+                    mover, aim = names[turn['who']], None
+                    if motion == 'run' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str):
+                        aim = step[1][1:] if step[1].startswith('@') else None
+                        if aim not in names or aim == turn['who']: fail(f'{where}: ["run", "@<name>"] runs up to another character or pet of the scene — got {js(step)}')
+                        other = names[aim]
+                        ox = float(other['x']) + other.get('_drop', 0)
+                        side = 1 if ox >= float(mover['x']) else -1
+                        half = 0.12 * other['_host_height'] if other['_pet'] else 0.1 * other['_host_height']        # nửa bề ngang thân nó, chừng
+                        goal = ox - side * (half + RUN_GAP_42D * 0.5 * mover['_host_height'])
+                        step[1] = round((goal - float(mover['x'])) / mover['_unit'])
+                        RUN_TO_42D[id(step)] = aim
+                    if motion == 'run' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], (int, float)) and not isinstance(step[1], bool):
+                        mover['x'] = float(mover['x']) + float(step[1]) * mover['_unit']
+                    gear_ops.append({'turn': emitted[0], 'kind': 'motion42d', 'name': motion, 'who': turn.get('who'), 'target': aim})
                 if isinstance(step, list) and step and step[0] in ('shine', 'examine'):
                     target = step[1][1:] if len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') else None
                     gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': target})
@@ -2686,6 +2742,16 @@ def main():
             # đầu ở mép (cảnh thử đợt 24).
             group = entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]
             if any(isinstance(step, list) and step and step[0] == 'walk' for turn in group if isinstance(turn, dict) for step in (turn.get('do') or [])): beat['move'] = True
+            # ĐỢT 42 D: chạy / nhảy / múa — góc TOÀN (cả người, bàn chân), đo cả ở đỉnh cú nhảy; chạy là nhịp có người đi, chạy tới ai thì lấy cả người ấy.
+            moving = [(turn, step) for turn in group if isinstance(turn, dict) and turn.get('who') in names and not names[turn['who']]['_pet']
+                      for step in (turn.get('do') or []) if (step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in MOTION_42D]
+            if moving and beat.get('subjects') and not beat.get('fixed'):
+                beat['size'] = 'full'; beat['body42d'] = True
+                beat.pop('mid', None)
+                beat['move'] = True             # như nhịp có người đi: đổi góc sau 1 s (không giữ góc cũ 2,5 s — cú nhảy đầu tiên lọt ra ngoài góc cận trước)
+                for turn, step in moving:
+                    for name in [names[turn['who']]['name']] + ([names[RUN_TO_42D[id(step)]]['name']] if isinstance(step, list) and id(step) in RUN_TO_42D else []):
+                        if name not in beat['subjects']: beat['subjects'].append(name)
             beats.append(beat)
 
     camera_notes = []
@@ -3336,11 +3402,15 @@ def main():
                 if hold and not beat.get('drift') and not beat.get('fixed'): time = f"Math.max({time}, {hold})"
                 if beat.get('drift'): hold = f"T0 + talk.turns[{beat['first']}].start + {beat['drift'] * 0.75:g}"
                 items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '')
-                         + (f", hands: handTimes({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat['size'] != 'full' and gestured else '') + ' }')
+                         + (f", hands: handTimes({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat['size'] != 'full' and gestured else '')
+                         + (f", peaks42d: bodyTimes42d({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat.get('body42d') else '') + ' }')
             # ĐỘNG TÁC TAY trong nhịp (đợt 33): các lúc (40 / 55 / 70 % bước) người trong chủ thể vẫy / chỉ / giơ ngón — `direct` lấy cả
             # hai bàn tay vào góc trung / cận ở các lúc ấy.
             hand_code = ("    const handTimes = (a, b, rigs) => talk.turns.slice(a, b + 1).filter((turn) => rigs.includes(turn.rig)).flatMap((turn) => turn.steps.filter((step) => "
                          + js(list(GESTURES)) + ".includes(step.name)).flatMap((step) => [0.4, 0.55, 0.7].map((f) => T0 + step.start + step.duration * f)));\n") if gestured else ''
+            # ĐỢT 42 D: các lúc (mỗi 10 % bước) người trong chủ thể chạy / nhảy / múa — khung lấy cả người ở đỉnh cú nhảy, lúc tay giơ cao.
+            hand_code += ("    const bodyTimes42d = (a, b, rigs) => talk.turns.slice(a, b + 1).filter((turn) => rigs.includes(turn.rig)).flatMap((turn) => turn.steps.filter((step) => "
+                          + js(list(MOTION_42D)) + ".includes(step.name)).flatMap((step) => [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map((f) => T0 + step.start + step.duration * f)));\n") if any(b.get('body42d') for b in beats) else ''
             moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n" + hand_code +
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:
@@ -3398,7 +3468,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_38)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_38) | set(MOTION_42D)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>
