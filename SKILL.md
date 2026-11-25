@@ -38,7 +38,7 @@ output. (The two rig source files and the studio's UI are Vietnamese; you need n
 
 | Kind | Built in | Customisable |
 |---|---|---|
-| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`; samples `receptionist`, `barista`, `granny`, `grandpa`, `clerk`, `girl`, `boy`, `manager` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
+| People | `default`, `vet`, `surgeon`, `nurse`, `doctor`; samples `receptionist`, `barista`, `granny`, `grandpa`, `clerk`, `girl`, `boy`, `manager`, `owner_woman`, `owner_man`, `mother`, `pharmacist` | everything: face, hair, hat, beard, glasses, outfit, accessories, colours, proportions, rest pose |
 | Pets | `dog`, `shiba`, `cat`, `orange_cat`, `black_cat` | body shape (seven dials) and colours |
 
 `docs/characters.png` shows them all; `sh tools/gallery.sh out.png` regenerates it.

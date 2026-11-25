@@ -10,6 +10,7 @@
 //   clerk          shirt and a clipboard
 //   girl, boy      children: body preset, ready-made hair, dress / hoodie
 //   manager        tall body preset, suit
+//   owner_woman, owner_man, mother, pharmacist   adults: pet owners and the pharmacy counter
 import receptionist from './receptionist.js';
 import barista from './barista.js';
 import granny from './granny.js';
@@ -18,5 +19,9 @@ import clerk from './clerk.js';
 import girl from './girl.js';
 import boy from './boy.js';
 import manager from './manager.js';
+import owner_woman from './owner_woman.js';
+import owner_man from './owner_man.js';
+import mother from './mother.js';
+import pharmacist from './pharmacist.js';
 
-export default [receptionist, barista, granny, grandpa, clerk, girl, boy, manager];
+export default [receptionist, barista, granny, grandpa, clerk, girl, boy, manager, owner_woman, owner_man, mother, pharmacist];
