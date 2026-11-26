@@ -922,6 +922,61 @@ with tempfile.TemporaryDirectory() as work:
     reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scene.py'), encoding='utf-8').read())] if item), None)
     if not reception42c or abs(int(reception42c.group(1)) + 300) < 80: problems.append('reception preset: the laptop must not stand in front of the receptionist spot (x -300)')
 
+    # ĐỢT 44 B (khung hình): (1) góc CHỈ CÓ CON VẬT của đạo diễn tự động (nhóm toàn thú, không "view") — con vật ≥ 35 % khung (trước: 15–24 %);
+    # (2) view con vật 42 C có người đứng sát — không còn cái THÂN KHÔNG ĐẦU (`--torso44b`); (3) người SAU QUẦY thấy mặt / ngực (đo bằng pixel — nhà
+    # thuốc: màn hình che 33 % đầu dược sĩ); (4) `pickUp` tự động: người và món đồ dưới sàn trong khung lúc nhặt; (5) đồ đạc không lẹm mép — góc vẫy tay
+    # của `welcomeHome` (TV lẹm 38 % giữa lúc lia), góc mở đầu khi lượt đầu là chó đuổi đuôi (sofa 31 %, TV 67 %), góc cận con vật ở nhà thuốc (quầy lẹm);
+    # (6) phòng khám bốn người — góc cận đo nhiệt mặt bác sĩ ≥ 36 % khung (trước: 33 %, thành góc trung ba người).
+    shots44b = (
+        ({'id': 'auto44b', 'camera': 'auto', 'set': {'preset': 'living-room'},
+          'characters': [{'name': 'be', 'id': 'boy', 'x': -600, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -60, 'z': -560}, {'name': 'tho', 'species': 'rabbit', 'x': 110, 'z': -600}],
+          'script': [{'who': 'be', 'say': 'Nhìn hai bé kìa.', 'dur': 3.5}, {'together': [{'who': 'cho', 'do': [['bark']]}, {'who': 'tho', 'do': [['binky']]}]}, {'who': 'be', 'say': 'Dễ thương quá.', 'dur': 1.8}]},
+         ('cho bark — big enough in the frame', 'tho binky — big enough in the frame'), (), False),
+        ({'id': 'torso44b', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'me', 'id': 'granny', 'x': -150, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500}],
+          'script': [{'who': 'me', 'say': 'Xin chào cả nhà.', 'dur': 2}, {'together': [{'who': 'me', 'say': 'Nhìn thỏ kìa.', 'dur': 2.5}, {'who': 'tho', 'do': [['binky']]}], 'view': {'on': ['tho', 'me'], 'size': 'medium'}}]},
+         ('tho binky — big enough in the frame', 'no headless body at'), (), True),
+        ({'id': 'desk44b', 'camera': 'auto', 'set': {'preset': 'pharmacy'},
+          'characters': [{'name': 'duoc_si', 'id': 'pharmacist', 'x': 0, 'z': -620, 'faces': 'khach'}, {'name': 'khach', 'id': 'owner_woman', 'x': 330, 'z': -300, 'faces': 'duoc_si'}],
+          'script': [{'who': 'duoc_si', 'say': 'Chào chị, chị cần gì ạ?', 'dur': 2}, {'who': 'duoc_si', 'do': ['wave']}, {'who': 'khach', 'say': 'Cho tôi thuốc nhỏ mắt.', 'dur': 2}]},
+         ('duoc_si behind the counter — face and chest seen', 'furniture inside the frame'), (), False),
+        ({'id': 'rec44b', 'camera': 'auto', 'set': {'preset': 'reception'},
+          'characters': [{'name': 'le_tan', 'id': 'clerk', 'x': -300, 'z': -620, 'faces': 'be'}, {'name': 'be', 'id': 'boy', 'x': 250, 'z': -380, 'faces': 'le_tan'}],
+          'script': [{'who': 'le_tan', 'say': 'Chào em.', 'dur': 2}, {'who': 'le_tan', 'do': ['wave']}]},
+         ('le_tan behind the counter — face and chest seen',), (), False),
+        ({'id': 'pick44b', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'be', 'id': 'boy', 'x': 0, 'z': -560}],
+          'script': [{'who': 'be', 'say': 'Con dọn đồ chơi đây.', 'do': ['tidyToys']}]},
+         ('be pickUp — the item and the person in the frame at the grasp', 'furniture inside the frame'), (), False),
+        ({'id': 'edge44b', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'bo', 'id': 'owner_man', 'z': -560, 'x': -150}, {'name': 'cho', 'species': 'shiba', 'z': -560, 'x': 150}],
+          'script': [{'who': 'bo', 'say': 'Bố về rồi đây!'}, {'who': 'bo', 'do': ['wave']}, {'together': [{'who': 'bo', 'do': ['kneel']}, {'who': 'cho', 'do': [['greet', 1.4]]}]}, {'together': [{'who': 'bo', 'do': [['stroke', '@cho']]}, {'who': 'cho', 'do': ['wagTail']}]}]},
+         ('furniture inside the frame at',), (), False),
+        ({'id': 'open44b', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'cho', 'species': 'corgi', 'x': 150, 'z': -560}, {'name': 'meo', 'species': 'cat', 'x': -250, 'z': -560}],
+          'script': [{'who': 'cho', 'do': [['chaseTail']]}, {'who': 'meo', 'do': [['loaf', 3]]}, {'who': 'cho', 'do': [['bark']]}]},
+         ('furniture inside the frame at 1 s (opening)', 'cho chaseTail — big enough in the frame'), (), False),
+        ({'id': 'pharm44b', 'camera': 'auto', 'set': {'preset': 'pharmacy'},
+          'characters': [{'name': 'duoc_si', 'id': 'pharmacist', 'x': 0, 'z': -620}, {'name': 'khach', 'id': 'owner_woman', 'x': 150, 'z': -300, 'faces': 'duoc_si'}, {'name': 'cho', 'species': 'dog', 'x': 330, 'z': -300}, {'name': 'meo', 'species': 'cat', 'x': -150, 'z': -300}],
+          'script': [{'who': 'khach', 'say': 'Chào chị.', 'dur': 1.5}, {'who': 'cho', 'do': [['bark']]}, {'who': 'meo', 'do': [['groomFace']]}]},
+         ('cho bark — big enough in the frame', 'meo groomFace — big enough in the frame'), ('(allowed: counter',), False),
+        ({'id': 'exam44b', 'camera': 'auto', 'set': {'preset': 'exam'},
+          'characters': [{'name': 'le_tan', 'id': 'receptionist', 'x': -120, 'z': -560, 'faces': 'chu'}, {'name': 'bac_si', 'id': 'vet', 'x': 40, 'z': -560, 'faces': 'cho'},
+                         {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si'}, {'name': 'chu', 'id': 'granny', 'x': -420, 'z': -560, 'faces': 'le_tan'}],
+          'script': [{'who': 'le_tan', 'say': 'Mời bác sĩ.', 'dur': 1.5}, {'who': 'bac_si', 'do': [['takeTemp', '@cho', 1.5, {'reading': '38.5°C'}]]}, {'who': 'bac_si', 'do': [['givePill', '@cho']]}]},
+         ('bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen', 'people inside the frame'), (), False))
+    for scene44b, needles44b, banned44b, torso44b in shots44b:
+        path = os.path.join(os.path.dirname(stage), '_check_' + scene44b['id'] + '.json')
+        try:
+            json.dump(scene44b, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, scene44b['id']))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f"{scene44b['id']}: the scene does not build: " + done.stderr.strip()[:300]); continue
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, scene44b['id'])] + (['--torso44b'] if torso44b else []), capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f"{scene44b['id']}: " + (done.stdout.strip() or done.stderr.strip())[-700:])
+        else:
+            for needle in needles44b:
+                if needle not in done.stdout: problems.append(f"{scene44b['id']}: acting_check did not measure {needle!r}")
+            for needle in banned44b:
+                if needle in done.stdout: problems.append(f"{scene44b['id']}: acting_check still reports {needle!r}:\n" + '\n'.join(line for line in done.stdout.splitlines() if needle in line)[:500])
+
     # Đợt 35: PHÒNG KHÁM — bác sĩ cân con chó (đặt lên cái cân "can" rồi bế về), đo nhiệt độ (con chó quay đuôi lại), cho uống thuốc
     # (con chó há miệng rồi nhai). acting_check: con chó đứng trên bệ cân lúc đọc số, tay tới nó lúc bế, lúc đo nhiệt, lúc đưa thuốc.
     care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},

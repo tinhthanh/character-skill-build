@@ -192,7 +192,8 @@ clips for every voice file.
    ready-to-run scripts: `references/lighting.md`, `examples/lighting/`). Long shadows climb the walls
    they reach; a lit floor reflects its colour onto legs and bellies.
    Easiest: `"camera": "auto"` at the top — the camera chooses every shot (speaker with listener, close on
-   a pet's expression, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
+   a pet's expression — big enough to read, no furniture cut at the edge —
+   a full shot when someone picks something up from the floor, never cutting faster than every 2.5 s). Or per turn: `"view": "close"` (a close shot of that turn's character, then back) or `{ "on": ["vet", "dog"],
    "size": "medium" }` — worked out for you. `"mark": "?"` puts a comic mark over a head; `"sounds": { "bark":
    "bark.wav" }` plays a sound each time an action plays.
    **Look at the moves first.** Before you write the script, see what each action looks like on the

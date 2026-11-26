@@ -294,6 +294,131 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
             os.rmdir(out)
 
 
+def person_pixels_44b(folder, jobs):
+    """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC BAO NHIÊU, đo bằng pixel (như `pet_pixels`). `jobs`: [(lúc, tên, khung đầu, khung ngực)]. Ở mỗi lúc
+    chụp ba ảnh: a — như thường; b — ẩn host người ấy; c — host người ấy lên lớp trên cùng. Trong mỗi khung: phần điểm ảnh của hình người ấy
+    (c khác b) mà ảnh thường cũng thấy (a khác b) — mặt quầy, máy tính, màn hình trước họ che thì không thấy. Trả về {(lúc, tên): (đầu, ngực)}."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    import tempfile
+    html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
+    comp = re.search(r'data-composition-id="([^"]+)"', html).group(1)
+    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
+    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
+    with socket.socket() as probe_socket:
+        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
+    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={os.path.abspath(folder)}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    out = tempfile.mkdtemp(prefix='clerk-seen-')
+    try:
+        url = f'http://127.0.0.1:{port}/__project/index.html'
+        for _ in range(50):
+            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
+            time.sleep(0.1)
+        tl = f'window.__timelines[{json.dumps(comp)}]'
+        steps, bases = [], []
+        for n, (t, name, _, _) in enumerate(jobs):
+            host = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(name)} + '\"]')"
+            base = os.path.join(out, f'clerk{n}')
+            # Người / con vật KHÁC ẩn đi ở cả ba ảnh: chỉ đo quầy và đồ trên quầy che (khách đứng trước quầy che mặt dược sĩ là chuyện dàn cảnh).
+            others = f"window.__set.actingProbe().map((a) => a.name).filter((other) => other !== {json.dumps(name)}).map((other) => document.querySelector('[data-set3d][data-name=\"' + other + '\"]')).filter(Boolean)"
+            steps += [{'eval': f'(() => {{ {tl}.seek({t}, false); window.__set.update(); for (const h of {others}) h.style.visibility = "hidden"; return 0; }})()'},
+                      {'screenshot': base + '-a.png'},
+                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()"},
+                      {'screenshot': base + '-b.png'},
+                      {'eval': f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()"},
+                      {'screenshot': base + '-c.png'},
+                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; for (const o of document.querySelectorAll('[data-set3d][data-name]')) o.style.visibility = ''; return 0; }})()"}]
+            bases.append(base)
+        plan = os.path.join(out, 'steps.json')
+        json.dump(steps, open(plan, 'w', encoding='utf-8'))
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
+                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan], capture_output=True, text=True)
+        if done.returncode != 0: return None
+        differ = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > 12
+        result = {}
+        for (t, name, head, chest), base in zip(jobs, bases):
+            a, b, c = (Image.open(base + k).convert('RGB') for k in ('-a.png', '-b.png', '-c.png'))
+            W, H = a.size
+            pa, pb, pc = a.load(), b.load(), c.load()
+            def share(box):
+                total = shown = 0
+                for y in range(max(0, int(box['y0'])), min(H, int(box['y1']) + 1), 2):
+                    for x in range(max(0, int(box['x0'])), min(W, int(box['x1']) + 1), 2):
+                        if not differ(pc[x, y], pb[x, y]): continue
+                        total += 1; shown += differ(pa[x, y], pb[x, y])
+                return shown / total if total >= 20 else None
+            result[(t, name)] = (share(head), share(chest))
+        return result
+    finally:
+        server.terminate()
+        for item in os.listdir(out): os.remove(os.path.join(out, item))
+        os.rmdir(out)
+
+
+CLERK_HEAD, CLERK_CHEST = 0.85, 0.5      # đợt 44 B: người sau quầy — thấy ≥ 85 % đầu (mặt), ≥ 50 % ngực (dải dưới cằm)
+
+
+def check_clerk_44b(folder, moments, shots):
+    """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC (lễ tân, dược sĩ): ở mỗi khoảnh khắc của moments.json người ấy trong khung (đầu trong khung), thấy
+    ≥ 85 % hình đầu và ≥ 50 % dải ngực ngay dưới cằm (bề ngang bằng đầu, cao 18 % chiều cao người) — mặt quầy, máy tính trên quầy không che
+    (0.82.0: máy tính đứng chắn ngực người ngồi quầy; CI chỉ soát chỗ đặt máy tính). Chỉ ở góc mở đầu và các lúc chính người ấy diễn (góc cận
+    con vật dưới sàn thì người sau quầy khuất sau mặt quầy là đúng); người / con vật khác đứng trước không tính."""
+    W, H = frame_size(folder)
+    jobs = []
+    for m in moments:
+        if not isinstance(m.get('t'), (int, float)): continue
+        what = str(m.get('what', ''))
+        for a in shots.get(float(m['t']), []):
+            hb = a.get('headBox')
+            if not a.get('person') or not a.get('counter44b') or not hb or not a.get('tall'): continue
+            if what != 'opening' and what.split(' ')[0] != a['name']: continue
+            if (hb['x0'] + hb['x1']) / 2 < 0 or (hb['x0'] + hb['x1']) / 2 > W or hb['y1'] < 0 or hb['y0'] > H: continue
+            cx, hw = (hb['x0'] + hb['x1']) / 2, (hb['x1'] - hb['x0']) / 2
+            jobs.append((float(m['t']), a['name'], hb, {'x0': cx - hw, 'x1': cx + hw, 'y0': hb['y1'], 'y1': hb['y1'] + 0.18 * a['tall']}))
+    seen = {}
+    for job in jobs: seen.setdefault((job[0], job[1]), job)
+    jobs = list(seen.values())
+    if not jobs: return []
+    found = person_pixels_44b(folder, jobs)
+    if found is None: return [{'scene': folder, 'what': 'the person behind the counter is seen', 'ok': None, 'note': 'not measured (no PIL or no capture)'}]
+    out = []
+    for t, name, _, _ in jobs:
+        head, chest = found.get((t, name), (None, None))
+        if head is None: continue
+        ok = head >= CLERK_HEAD and (chest is None or chest >= CLERK_CHEST)
+        out.append({'scene': folder, 'what': f'{name} behind the counter — face and chest seen at {t:g} s', 'ok': ok,
+                    'note': f'{head * 100:.0f} % of the head (least {CLERK_HEAD * 100:g} %), ' + (f'{chest * 100:.0f} % of the chest (least {CLERK_CHEST * 100:g} %)' if chest is not None else 'chest out of the frame') + ' not hidden by the counter or what stands on it'})
+    return out
+
+
+TORSO_44B = False      # đợt 44 B: `--torso44b` — chấm cả "thân không đầu" (xem check_torso_44b)
+
+
+def check_torso_44b(folder, moments, shots):
+    """ĐỢT 44 B — THÂN KHÔNG ĐẦU: ở mỗi khoảnh khắc của moments.json, không người nào bị mép TRÊN khung cắt quá 15 % chiều cao đầu mà thân áo (dải
+    30 % chiều cao người ngay dưới cằm) vẫn thấy ≥ 6 % chiều cao khung và ≥ 30 % bề ngang thân (≈ bề ngang đầu) trong khung (góc cận con vật 42 C: bé đứng ngay
+    sau con mèo — thấy cái áo, mất đầu). Chỉ chạy với `--torso44b`: góc `alone` (cố ý bỏ qua người khác) vẫn để lẹm như cũ."""
+    W, H = frame_size(folder)
+    out = []
+    for m in moments:
+        if not isinstance(m.get('t'), (int, float)): continue
+        bad = []
+        for a in shots.get(float(m['t']), []):
+            hb, b = a.get('headBox'), a.get('body')
+            if not a.get('person') or not hb or not b or not a.get('tall') or b['x1'] <= b['x0']: continue
+            head = hb['y1'] - hb['y0']
+            if head <= 0 or hb['y0'] >= -0.15 * head: continue
+            # Bề ngang thân áo ≈ bề ngang đầu (người chibi) — khung chụp `body` rộng hơn nhiều: mép váy / khuỷu tay ở mép khung không phải là thân.
+            x0, x1 = hb['x0'] + 0.1 * (hb['x1'] - hb['x0']), hb['x1'] - 0.1 * (hb['x1'] - hb['x0'])
+            across = max(0, min(x1, W) - max(x0, 0)) / (x1 - x0)
+            torso = min(H, hb['y1'] + 0.3 * a['tall']) - max(0, hb['y1'])
+            if across > 0.3 and torso > 0.06 * H: bad.append(f'{a["name"]} — {min(1, -hb["y0"] / head) * 100:.0f} % of the head above the frame, {torso / H * 100:.0f} % of the frame height of body below it')
+        out.append({'scene': folder, 'what': f'no headless body at {m["t"]:g} s ({m.get("what", "")})', 'ok': not bad, 'note': '; '.join(bad) or 'every head in the frame (or the whole body out)'})
+    return out
+
+
 HAZE = 30             # đợt 35: một lớp mờ của bối cảnh đổi màu bàn tay ≤ 30 — vẫn là thấy được (xem pet_pixels)
 SMALL_HAND = 1000      # bàn tay < 1000 px (CSS) trong ảnh — cỡ 30 × 30 — thì đo lại ở 2× (đợt 34)
 
@@ -2572,6 +2697,14 @@ def check_floor42e(folder, c, frames):
             off = (a['feet'] - a['ground']) / tall
             ok('feet on the floor while squatting', abs(off) <= FEET, f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)')
         ok('squatting at the grasp', q['squat'] > 0.9, f'squat {q["squat"] * 100:.0f} % in at {t:g} s')
+        # ĐỢT 44 B: món đồ dưới sàn VÀ người nhặt (cả đầu) trong khung lúc nắm lấy — góc trung của câu nói trước còn giữ thì món đồ ở ngoài
+        # đáy khung (`tidyToys` phải tự cho "view" góc toàn).
+        if item and item.get('at'):
+            W, H = frame_size(folder)
+            hb = a.get('headBox') or {}
+            inside = 0.02 * W <= item['at']['x'] <= 0.98 * W and 0 <= item['at']['y'] <= 0.98 * H
+            head = bool(hb) and hb['y0'] >= -0.05 * (hb['y1'] - hb['y0']) and hb['x0'] >= -0.05 * (hb['x1'] - hb['x0']) and hb['x1'] <= W + 0.05 * (hb['x1'] - hb['x0'])
+            ok('the item and the person in the frame at the grasp', inside and head, f'at {t:g} s: the {item["kind"]} ' + ('in the frame' if inside else f'outside the frame ({item["at"]["x"]:.0f}, {item["at"]["y"]:.0f} px)') + ', the head ' + ('in the frame' if head else 'cut by the frame edge'))
         t, a = seen[-1]
         q = a['floor42e']; pick = q.get('pick') or {}
         item = next((it for n, it in enumerate(q.get('items') or []) if n == pick.get('n')), None)
@@ -2599,6 +2732,8 @@ def check_scene(folder):
     global TARGETS_40A
     TARGETS_40A = {c['target'] for c in checks if c.get('kind') == 'petAct' and c.get('name') in PET_40A and c.get('target')}
     results += check_people_framed(folder, moments, shots)
+    results += check_clerk_44b(folder, moments, shots)       # đợt 44 B
+    if TORSO_44B: results += check_torso_44b(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] == 'motion42d':       # đợt 42 D
@@ -2804,8 +2939,10 @@ if __name__ == '__main__':
     parser.add_argument('scenes', nargs='+', help='scene folders built by tools/scene.py')
     parser.add_argument('--json', help='also write the measurements here')
     parser.add_argument('--keep', help='keep the frames captured to see how much of each pet shows')
+    parser.add_argument('--torso44b', action='store_true', help='also fail a person cut at the neck by the top edge (a body without a head) — not on by default: "alone" pet close-ups still let people behind be cut')
     args = parser.parse_args()
     KEEP = args.keep
+    TORSO_44B = args.torso44b
     results = [r for folder in args.scenes for r in check_scene(folder)]
     for r in results: print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))}: {r["what"]} — {r["note"]}')
     bad = [r for r in results if r['ok'] is False]
