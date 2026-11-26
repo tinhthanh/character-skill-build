@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.83.0
+
+Added: 15 combos (wave 43, two Opus agents in parallel), built only from existing actions, most of them from wave 42's.
+Each one works as a step in `sequence()`, in scene files and in Vietnamese scripts. It is in the action catalog and the
+Combos table of `references/actions.md`, and is measured by `tools/acting_check.py`. That makes 31 combos.
+
+- **At home** (43 A):
+  - `bathTime(pet)`: bathe, towel-dry, thumbs up.
+  - `floorCuddle(pet)`: sit on the floor, stroke the pet, carry it onto the lap.
+  - `napWithPet(pet)`: lie asleep on the sofa, with the pet's `sleep` beside.
+  - `welcomeHome(pet)`, dogs: wave, kneel while the dog greets, stroke while it wags.
+  - `playFetch(pet)`, dogs: throw the ball while the dog fetches, stroke, thumbs up.
+  - `danceWithKid(kid)`: dance together, then a high five.
+  - `tidyToys()`: pick a toy up, put it away, nod.
+  - Scripts: "tắm cho thú", "ngồi bệt ôm thú", "ngủ trưa cùng thú", "chào thú khi về nhà", "chơi ném bóng", "nhảy cùng bé",
+    "dọn đồ chơi".
+- **Clinic, pharmacy and pets** (43 B):
+  - `dispenseMedicine(customer)`: read the prescription, count the doses, hand over the bag, wave.
+  - `newPatientCheckIn(pet, owner)`: waves, bow, scan the chip, read the chart.
+  - `dentalCare(pet)`: look at the teeth while the pet opens its mouth, brush them, thumbs up.
+  - `comfortOwner(owner)`: a sad face while the owner wipes tears, a pat on the shoulder, a hug.
+  - `fullSpa(pet)`: bathe, towel-dry, brush the teeth, clean the ears, thumbs up.
+  - `postSurgeryCheck(pet)`: listen, take the temperature, read the chart, while the pet looks unwell.
+  - For pets, `zoomies` (dog: chase its tail, jump, pant) and `sleepyPet` (yawn, stretch, sleep).
+  - Scripts: "phát thuốc", "tiếp nhận thú mới", "chăm sóc răng", "an ủi chủ", "spa trọn gói" / "tắm sấy trọn gói",
+    "tái khám sau mổ", "chó tăng động", "ngáp rồi ngủ".
+- **CI scenes**: `home43a`, `play43a`, `clinic43b`, `home43b`, `pharm43b`, plus a script-word check for each branch.
+
+Fixed
+- `handOverBag` accepts a person holding a visible bag whose other hand's item is put away (`"holdsHidden": ["L"]`).
+  In scripts, a bag plus a clipboard now gives a visible bag in the right hand and a put-away clipboard in the left,
+  instead of both put away.
+
+Known
+- **`bathTime` on the floor**: it passes only with the tub on a table. On the living-room floor the person's head cannot
+  bend far enough toward the pet (acting_check 60–64 %, limit 50 %).
+- **`playFetch`**: it throws to the right, so the dog must face right. The stroke needs the dog within about 120 units.
+- **Staging the scripts don't do**:
+  - `napWithPet` needs the person standing at the sofa.
+  - `tidyToys` needs a full-shot `view`, or the toy is cropped out.
+  - In the pharmacy preset, `script.py` places the customer behind the counter, so the handover is hidden.
+- **Measured problems in older actions**:
+  - With `owner_woman`, `owner_man` and `mother`, `patShoulder` misses the shoulder by about 7 % of their height, and `hug`
+    fails for `owner_woman`.
+  - Between the pharmacist and `owner_woman`, `handOverBag` jumps 3.0 % between frames at the usual spacing.
+- **Not done**:
+  - `zoomies` and `sleepyPet` are not in the action catalog.
+  - Not reviewed by Gemini on rendered films.
+
 ## 0.82.0
 
 Added: wave 42, six branches in parallel (A–F). New actions work as a rig method, in `sequence()`, in scene files, in
