@@ -1532,6 +1532,35 @@ with tempfile.TemporaryDirectory() as work:
         if '__OUTRO' in html or 'set.cut("' in html: problems.append('outro42: a camera cut is given the outro placeholder instead of the start view')
         if 'frameAt(T0 + talk.turns[2].start, [cho], "close"' not in html: problems.append('outro42: the "view" on the "together" entry does not point the camera at the dog during the voice-over')
 
+    # ĐỢT 42 E — SÁT SÀN: mẹ ngồi bệt, mèo tới, vuốt rồi bế mèo lên lòng; bé nằm ngủ trên sofa, chó nằm cạnh (`floor42e`); bé nhặt quả bóng cạnh
+    # con corgi, đưa cho mẹ, nằm xuống sàn, mẹ ngồi bệt (`pick42e`). Mỗi cảnh phải qua acting_check (mông trên sàn, thân nằm ngang trên sàn / mặt
+    # sofa, tay tới quả bóng lúc nắm, quả bóng trong tay); script.py: "ngồi bệt", "nằm sofa", "bé → chó: nhặt" ra đúng bước.
+    scenes42e = {'floor42e': {"id": "floor42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 200, "z": -560, "faces": "meo"}, {"name": "be", "id": "boy", "x": -520, "z": -848, "faces": "me"}, {"name": "cho", "species": "dog", "x": -160, "z": -720, "faces": "be"}, {"name": "meo", "species": "cat", "x": 480, "z": -560, "faces": "me"}], "script": [{"who": "me", "say": "Mèo ơi, lại đây với mẹ nào.", "do": ["sitOnFloor"]}, {"who": "me", "do": [["stroke", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Lên đây mẹ bế nào.", "do": [["carry", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "be", "say": "Mẹ ơi, con buồn ngủ quá.", "do": [["lieDown", "sofa", {"sleep": True}]]}, {"who": "cho", "do": [["walk", 4, -40], "lieDown"]}, {"who": "me", "say": "Ngủ ngon nhé con.", "view": {"on": ["me", "be", "cho"], "size": "full"}}, {"who": "be", "do": ["standUp"]}]},
+                 'pick42e': {"id": "pick42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 260, "z": -560, "faces": "be", "holds": "toy", "holdsHidden": True}, {"name": "be", "id": "boy", "x": -160, "z": -560, "faces": "me"}, {"name": "cho", "species": "corgi", "x": 20, "z": -700, "faces": "be"}], "script": [{"who": "me", "say": "Con nhặt quả bóng cho mẹ nhé."}, {"who": "be", "do": [["pickUp", "@cho"]], "view": {"on": ["be", "cho"], "size": "full"}}, {"who": "be", "do": [["handOver", "@me"]]}, {"who": "be", "say": "Con nằm nghỉ một chút.", "do": [["walk", 4, -200], "lieDown"]}, {"who": "me", "do": ["sitOnFloor", "nod"]}, {"who": "be", "do": ["standUp", "wave"]}]}}
+    for name, scene42e in scenes42e.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
+        try:
+            json.dump(scene42e, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
+        for needle in (('"sitOnFloor"', "['lieDown', 'sofa', {", '"standUp"') if name == 'floor42e' else ('"pickUp"', '["take", be]', '"lieDown"')):
+            if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'floor42e' not in done.stdout and 'sitOnFloor' not in done.stdout: problems.append(f'{name}: acting_check measured nothing on the floor')
+    text = os.path.join(work, 'floor42e.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nmẹ (receptionist) · bé (boy) · chó (dog)\n\nmẹ: [ngồi bệt]\nbé → chó: nhặt\nbé: [nằm sofa]\nbé: [đứng dậy, ngồi xếp bằng]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py floor 42 E: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'floor42e.scene.json'), encoding='utf-8'))
+        steps = [t['do'] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = [['sitOnFloor'], [['pickUp', '@cho']], [['lieDown', 'sofa']], ['standUp', 'sitOnFloor']]
+        if steps != want: problems.append(f'script.py floor 42 E: steps {steps}, want {want}')
+
     # ĐỢT 41 — COMBO CHO ĐỢT 38–40: chăm sóc tổng hợp + chuẩn bị khám; tiêm có y tá giữ; thanh toán tại quầy; tiễn khách + ăn mừng cùng bé
     # + chó / mèo / thỏ. Mỗi cảnh phải qua acting_check, composition không còn tên combo; chữ: "chuẩn bị khám", "chó vui"… ra đúng bước.
     bag41 = {'name': 'bac_si', 'id': 'vet', 'x': -150, 'z': -560, 'faces': 'be'}

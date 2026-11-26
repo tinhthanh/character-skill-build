@@ -171,9 +171,204 @@ function attachShade(svg, root) {
 }
 return { localMatrix, outlinePoints, attachShade };
 })();
+__m['runtime/parts.js'] = (function () {
+function roundGlasses(c, { x = 20, y = 2, r = 12, color = null, width = 2.4 } = {}) {
+  const stroke = color || c.accent || c.lineStroke;
+  return `
+            <g fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round">
+              <circle cx="${-x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
+              <circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
+              <path d="M ${-x + r} ${y - 2} Q 0 ${y - 7} ${x - r} ${y - 2}"/>
+              <path d="M ${-x - r} ${y - 2} L -47 ${y - 6} M ${x + r} ${y - 2} L 47 ${y - 6}"/>
+            </g>`;
+}
+function shortBeard(c, { color = null, chin = 54, mouthY = 30, width = 43 } = {}) {
+  const fill = color || c.hair;
+  return `
+            <path fill="${fill}" d="M ${-width} 10 Q ${-width - 2} ${chin - 12} ${-width * 0.55} ${chin - 1} Q 0 ${chin + 6} ${width * 0.55} ${chin - 1}
+              Q ${width + 2} ${chin - 12} ${width} 10 Q ${width - 5} ${mouthY - 8} ${width * 0.42} ${mouthY - 9}
+              Q 0 ${mouthY - 13} ${-width * 0.42} ${mouthY - 9} Q ${-width + 5} ${mouthY - 8} ${-width} 10 Z"/>
+            <path fill="${c.skin}" d="M -13 ${mouthY - 5} Q 0 ${mouthY - 9} 13 ${mouthY - 5} Q 14 ${mouthY + 7} 0 ${mouthY + 9} Q -14 ${mouthY + 7} -13 ${mouthY - 5} Z"/>`;
+}
+function moustache(c, { color = null, mouthY = 30, width = 17 } = {}) {
+  const fill = color || c.hair;
+  return `
+            <path fill="${fill}" d="M 0 ${mouthY - 9} Q ${-width * 0.5} ${mouthY - 13} ${-width} ${mouthY - 5} Q ${-width * 0.55} ${mouthY - 3.5} 0 ${mouthY - 5.5}
+              Q ${width * 0.55} ${mouthY - 3.5} ${width} ${mouthY - 5} Q ${width * 0.5} ${mouthY - 13} 0 ${mouthY - 9} Z"/>`;
+}
+const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
+function wrinkles(c, { color = null, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true } = {}) {
+  const stroke = color || c.skinShadow || '#c9987a';
+  return `
+            <g fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" opacity=".8">
+              ${[-1, 1].map((g) => `
+              <path d="M ${g * (eyeX + 15)} ${eyeY - 3} l ${g * 5} -3 M ${g * (eyeX + 16)} ${eyeY + 2} l ${g * 5.500} 1"/>
+              <path d="M ${g * 15} ${mouthY - 14} Q ${g * 21} ${mouthY - 5} ${g * 18} ${mouthY + 3}"/>`).join('')}
+              ${forehead ? `<path d="M -15 ${eyeY - 31} Q 0 ${eyeY - 34} 15 ${eyeY - 31} M -11 ${eyeY - 25} Q 0 ${eyeY - 27.500} 11 ${eyeY - 25}"/>` : ''}
+            </g>`;
+}
+function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
+  const fill = color || c.skirt || c.accent || c.topShadow, line = lineOf(c);
+  return `
+        <path d="M ${-width + 2} ${top} Q ${-(width + 11) / 2} ${(top - 103) / 2 + 2} -9 -103 M ${width - 2} ${top} Q ${(width + 11) / 2} ${(top - 103) / 2 + 2} 9 -103" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+        <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
+}
+const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
+  const line = lineOf(c), band = (x, len) =>
+    `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
+  return `
+        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
+};
+const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
+  const line = lineOf(c);
+  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
+  return `
+        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
+};
+function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true, open = false, full = false } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-cup="${open || full ? 'open' : 'lid'}"${full ? ' data-full="1"' : ''} transform="translate(0 12) rotate(90) scale(${size})">
+          <path data-cupbody="${color}" d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${open || full ? '#e3f1f7' : color}" fill-opacity="${open || full ? 0.6 : 1}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
+          <path data-level="1" d="${open || full ? 'M -8.3 -15 L 8.3 -15 L 6.5 13 Q 0 15 -6.5 13 Z' : ''}" fill="#8a5432" style="${open || full ? '' : 'display:none'}"/>
+          <path data-sleeve="1" d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}" style="${open || full ? 'display:none' : ''}"/>
+          <path data-lid="1" d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round" style="${open || full ? 'display:none' : ''}"/>
+          <circle data-mouth="1" cx="0" cy="-17" r="0.6" fill="none"/>
+        </g>${grip ? gripFingers(c) : ''}`;
+}
+function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
+          <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
+          <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
+          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
+          <g data-page="-29"><path data-sheet="1" data-paper="${paper}" d="M -12 -29 H 12 V 3 H -12 Z" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
+            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
+          <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
+        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
+}
+const tingBadge = (x = 27) => `
+        <g data-ting="1" style="display:none"><g transform="translate(${x} 10)"><circle r="8.6" fill="#2fbf71" stroke="#16794a" stroke-width="1.2"/>
+          <path d="M 4 -3 L -1.2 3.8 L -4.6 0" transform="rotate(90)" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 0 -12.5 q 8 -2 14 0 M 0 12.5 q 8 2 14 0" stroke="#2fbf71" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".85"/></g></g>`;
+function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
+  const line = lineOf(c);
+  const clip = 'vgPhoneClip' + (phoneClipCount++);
+  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
+          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
+  return `
+        <g transform="translate(0 10) rotate(90)">
+          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
+          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
+          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
+        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}${tingBadge()}`;
+}
+let phoneClipCount = 0;
+function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-syringe="1" transform="translate(0 10) rotate(90) translate(0 -4)">
+          <g data-plunger="9"><rect x="-1.4" y="-26" width="2.8" height="14" fill="#c9ced6" stroke="${line}" stroke-width=".7"/><rect x="-5" y="-28" width="10" height="3" rx="1.2" fill="#e8ebef" stroke="${line}" stroke-width=".8"/></g>
+          <rect x="-4" y="-14" width="8" height="24" rx="1.5" fill="#f4f8fb" fill-opacity=".85" stroke="${line}" stroke-width=".9"/>
+          <rect x="-3.2" y="-3" width="6.4" height="12.4" fill="${liquid}" opacity=".85"/>
+          <path d="M -4 -6 h 3 M -4 -1 h 3 M -4 4 h 3" stroke="${line}" stroke-width=".6" opacity=".6"/>
+          <rect x="-6" y="-15.5" width="12" height="2.4" rx="1" fill="#e8ebef" stroke="${line}" stroke-width=".7"/>
+          <path d="M -1.6 10 h 3.2 l -1 3 h -1.2 z" fill="#c9ced6" stroke="${line}" stroke-width=".5"/>
+          <path d="M 0 13 V 25" stroke="#9aa3ad" stroke-width="1" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
+}
+function leash(c, { color = '#c0392b', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-leash="1" transform="translate(0 12)">
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${line}" stroke-width=".7" opacity=".5"/>
+          <rect x="-7.5" y="-3" width="15" height="6" rx="2.5" fill="${color}" stroke="${line}" stroke-width=".9"/>
+        </g>${grip ? gripFingers(c, { reach: 15 }) : ''}`;
+}
+function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(0 12) rotate(90)">
+          <rect x="-9" y="-13" width="18" height="24" rx="3" fill="${color}" stroke="${line}" stroke-width="1"/>
+          <rect x="-10" y="-19" width="20" height="7" rx="2" fill="${cap}" stroke="${line}" stroke-width="1"/>
+          <rect x="-7" y="-7" width="14" height="10" rx="1.2" fill="${label}" stroke="${line}" stroke-width=".6"/>
+          <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
+}
+function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-bag="1" transform="translate(0 10) rotate(90)">
+          <path d="M -6 3 Q -6 -8 0 -8 Q 6 -8 6 3" fill="none" stroke="#c9b48f" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M -15 3 L 15 3 L 16.5 40 Q 0 42 -16.5 40 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -15 3 L 15 3 L 15.2 8 L -15.2 8 Z" fill="#e8e3d8" stroke="${line}" stroke-width=".7"/>
+          <path d="M -15.6 30 L 15.6 30 L 16.1 36 L -16.1 36 Z" fill="${band}"/>
+          <circle cx="0" cy="19" r="7.5" fill="${band}"/>
+          <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
+}
+function card(c, { color = '#2f6fd0', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-card="1" transform="translate(0 10) rotate(90)">
+          <rect x="-15" y="-21" width="30" height="20" rx="2.6" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <path d="M -15 -9 H 15" stroke="#ffffff" stroke-width="1.6" opacity=".35"/>
+          <rect x="-11" y="-18" width="7" height="5.4" rx="1.2" fill="#f2c94c" stroke="#a88424" stroke-width=".6"/>
+          <path d="M -11 -5 h 9 M 3 -5 h 7" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+          <path d="M 7 -17 q 2 2 0 4 M 9.5 -18.5 q 3.4 3.5 0 7" stroke="#ffffff" stroke-width="1" fill="none" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}${tingBadge(26)}`;
+}
+function stampcard(c, { color = '#ffffff', band = '#2f9e8f', stamped = false, grip = true } = {}) {
+  const line = lineOf(c);
+  const ring = (x, y, done) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${band}" stroke-width=".8" opacity=".8"/>${done ? `<circle cx="${x}" cy="${y}" r="2" fill="${band}" opacity=".7"/>` : ''}`;
+  return `
+        <g data-stampcard="1" transform="translate(0 10) rotate(90)"><circle data-stampspot="1" cx="13.5" cy="-16" r="0.6" fill="none"/>
+          <rect x="-20" y="-28" width="40" height="27" rx="2.4" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <rect x="-20" y="-28" width="40" height="7" rx="2.4" fill="${band}"/><path d="M -15 -24.5 h 12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+          ${[-13.5, -4.5, 4.5, 13.5].map((x, n) => ring(x, -16, n < 3)).join('')}${[-13.5, -4.5, 4.5, 13.5].map((x) => ring(x, -7, false)).join('')}
+          <g data-stampink="${stamped ? 'always' : '1'}" style="${stamped ? '' : 'display:none'}" transform="translate(13.5 -16)">
+            <circle r="5.6" fill="#e8f0f0" fill-opacity=".2" stroke="#d1263b" stroke-width="1.6"/><circle r="3.4" fill="none" stroke="#d1263b" stroke-width=".9"/>
+            <path d="M -2 1.4 h 4 M -1.2 -0.6 l 1.2 -1.6 l 1.2 1.6" stroke="#d1263b" stroke-width="1" fill="none" stroke-linecap="round"/></g>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+const banknote = (fill = '#bfe3c6', edge = '#2f7a4f', mark = '#2f7a4f') => `
+          <rect x="-15" y="-7" width="30" height="14" rx="1.6" fill="${fill}" stroke="${edge}" stroke-width="1"/>
+          <rect x="-12.6" y="-4.8" width="25.2" height="9.6" rx="1" fill="none" stroke="${mark}" stroke-width=".6" opacity=".7"/>
+          <circle cx="-5" cy="0" r="3.3" fill="${mark}" opacity=".55"/><path d="M 1.5 -2.4 h 8 M 1.5 0.4 h 6 M 1.5 3 h 8" stroke="${mark}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`;
+function cash(c, { grip = true } = {}) {
+  return `
+        <g data-cash="1" transform="translate(0 10) rotate(90)">
+          <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
+        </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
+}
+const toyShape42e = (color = '#f2b134', band = '#e0533d') => `
+          <circle cx="0" cy="-11" r="11" fill="${color}" stroke="#a8701a" stroke-width="1.2"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="${band}" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="#ffffff" stroke-width=".8" opacity=".5"/>
+          <circle cx="-4" cy="-16" r="2.6" fill="#ffffff" opacity=".55"/>`;
+const bowlShape42e = (color = '#d9534f', food = '#a0643a') => `
+          <ellipse cx="0" cy="-12" rx="17" ry="4" fill="${food}"/>
+          <path d="M -18 -12 Q -17 -1 -10 0 L 10 0 Q 17 -1 18 -12 Q 0 -8 -18 -12 Z" fill="${color}" stroke="#8c2f2b" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -18 -12 Q 0 -16 18 -12" fill="none" stroke="#8c2f2b" stroke-width="1.1"/>
+          <path d="M -12 -6 Q 0 -3 12 -6" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".35"/>`;
+function toy42e(c, { color = '#f2b134', band = '#e0533d', grip = true } = {}) {
+  return `
+        <g data-toy42e="1" transform="translate(0 6) rotate(90) translate(11 11)">${toyShape42e(color, band)}</g>${grip ? gripFingers(c, { reach: 19, from: -3 }) : ''}`;
+}
+function bowl42e(c, { color = '#d9534f', food = '#a0643a', grip = true } = {}) {
+  return `
+        <g data-bowl42e="1" transform="translate(0 4) rotate(90) translate(26 12)">${bowlShape42e(color, food)}</g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, leash, pills, bag, card, stampcard, banknote, cash, toyShape42e, bowlShape42e, toy42e, bowl42e };
+})();
 __m['runtime/rig-svg.js'] = (function () {
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
 const { attachShade, outlinePoints } = __m['runtime/shading.js'];
+const { toy42e, bowl42e, leash, toyShape42e, bowlShape42e } = __m['runtime/parts.js'];
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
 const NGHI = Object.freeze({
@@ -185,6 +380,7 @@ const NGHI = Object.freeze({
   seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
   ride: 0,                 // 0…1 CẦM LÁI xe máy (`ride`): nghiêng hẳn, đùi nằm ngang ra trước, hai tay nắm tay lái (xem apDung)
   kneel: 0,                // 0…1 QUỲ (cộng với `seat` = 1): ống chân cũng chĩa về phía người xem, rút ngắn một nửa — người hạ thêm
+  floor42e: 0, squat42e: 0, lie42e: 0, lieDir42e: -1, lieLift42e: 0, nap42e: 0, picked42e: 0,
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
@@ -334,6 +530,9 @@ const RIDE_THIGH = 84;                    // cầm lái: đùi gần (độ) xoa
 const RIDE_KNEE = 76;                     // …ống chân gập lại gần thẳng đứng, bàn chân hơi ra trước (sàn để chân)
 const RIDE_LEAN = 7;                      // …lưng hơi đổ về trước
 const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, về phía mặt): bắp tay ra trước–xuống, cẳng tay ngang hơn tới tay lái
+const FLOOR42E = { thigh: 72, seen: 0.38, knee: 150, thighSide: 84, kneeSide: 158 };
+const SQUAT42E = { thigh: 100, knee: 125, lean: 30 };
+const LIE42E = { tilt: 9 };               // nằm: thân xoay (90 − tilt)° — phía đầu nhấc lên chút, gối lên cánh tay / gối tựa
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
 const CHART_POSE = { hold: [24, -112], flip: [26, -122], zoom: 1.7 };
@@ -660,6 +859,7 @@ class RigSVG {
   static { this.DONG_TAC.push('wipeCounter'); this.EXCHANGE.push('giveChange', 'takeChange', 'takeCard'); this.WITH_ITEM.push('payByQR', 'payByCard', 'stampCard', 'pourDrink'); }       // đợt 39 A
   static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   static { this.DONG_TAC.push('jump', 'dance'); this.DI_NGANG.push('run'); }       // đợt 42 D — nhảy lên, nhảy múa (tại chỗ); chạy (dời `x`, quay ngang)
+  static { this.STANCE.push('sitOnFloor', 'lieDown'); this.EXCHANGE.push('pickUp'); }       // đợt 42 E — ngồi bệt / nằm (thế giữ tới `standUp`); nhặt đồ (kết thúc với món đồ trong tay)
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
   static traNgau(state) { if (state !== null && hatHienTai !== null) hatHienTai = state; }
@@ -1043,6 +1243,10 @@ class RigSVG {
   <g id="${p}-ring" style="display:none"><ellipse rx="40" ry="36" fill="#e6f3fa" fill-opacity=".72" stroke="#8fb8cf" stroke-width="3"/>
     <ellipse rx="28" ry="25" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".6"/>
     <path d="M -36 14 Q -32 -14 -12 -30" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
+  <!-- ĐỢT 42 E: dưới người NẰM — bóng dài trên sàn và gối tựa dưới đầu (khung gốc, không xoay theo người); món đồ nằm dưới sàn chờ NHẶT (\`pickUp\`). -->
+  <g id="${p}-under42e" style="display:none"><ellipse cx="0" cy="0" rx="1" ry="1" fill="#000" opacity=".26"/>
+    <g data-pillow="1"><rect x="-1" y="-1" width="2" height="2" rx="1" fill="#f3e3c3" stroke="#c9b28a" stroke-width="2"/><path d="M 0 0" stroke="#e1cda6" stroke-width="2" fill="none" data-seam="1"/></g></g>
+  <g id="${p}-drop42e"></g>
   <g id="${p}-goc">
     <ellipse id="${p}-bong" cx="200" cy="428" rx="62" ry="8" fill="#000" opacity=".28"/>
     <g id="${p}-sauChan"></g>
@@ -1180,6 +1384,7 @@ class RigSVG {
         R: Object.fromEntries([...q('tayR').children].map((g) => [g.dataset.tay, g])),
       },
     };
+    Object.assign(this.el, { under42e: q('under42e'), drop42e: q('drop42e') });      // đợt 42 E
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
     this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
     this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
@@ -1194,6 +1399,8 @@ class RigSVG {
     const nhac = clamp(-s.y / 40 + bay42d / 50, 0, 1);
     e.bong.setAttribute('transform', `translate(200 ${428 - doiChan - (seatDrop - bay42d) / (s.co || 1)}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);   // trừ seatDrop: bóng nằm lại dưới bàn chân; cộng bay42d: bóng ở lại trên sàn
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
+    const goc42e = this.#goc42e(seatDrop, doiChan);
+    if (goc42e) { e.goc.setAttribute('transform', goc42e.transform); if (goc42e.blend) e.bong.setAttribute('opacity', ((0.28 - nhac * 0.12) * (1 - goc42e.blend)).toFixed(3)); }
     const h = s.huong, ah = Math.abs(h);
     const { daiDui, daiOng, dayChan, cachChan, coBanChan } = this.nv;
     const turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9), legShift = Math.sign(h) * turnDetail * 3;
@@ -1207,14 +1414,15 @@ class RigSVG {
     }
     const dauH = Math.sign(h || 1);
     const ride = clamp(s.ride || 0, 0, 1);
-    const legDui = (ben) => s['dui' + ben] - dauH * ride * (ben === (h >= 0 ? 'L' : 'R') ? RIDE_THIGH : RIDE_THIGH - 6);
-    const legOng = (ben) => s['ong' + ben] + dauH * ride * RIDE_KNEE;
+    const legDui = (ben) => s['dui' + ben] - dauH * ride * (ben === (h >= 0 ? 'L' : 'R') ? RIDE_THIGH : RIDE_THIGH - 6) + this.#legAdd42e(ben, 'dui', h);      // + ngồi bệt / ngồi xổm (đợt 42 E)
+    const legOng = (ben) => s['ong' + ben] + dauH * ride * RIDE_KNEE + this.#legAdd42e(ben, 'ong', h);
     const goc = (dui, ong) => ah * dauH * (RigSVG.#lanBanChan(dauH * dui, dauH * ong) - dauH * (dui + ong));
     for (const ben of ['L', 'R']) {
       const dui = legDui(ben), ong = legOng(ben);
-      e['ban' + ben].setAttribute('opacity', 1 - ah);
-      e['banNg' + ben].setAttribute('opacity', ah);
-      const tf = `rotate(${goc(dui, ong)} 0 ${DAI.ong}) scale(${h < 0 ? -1 : 1} 1)`;
+      const foot42e = this.#foot42e(ben, h, dui, ong);
+      e['ban' + ben].setAttribute('opacity', foot42e ? 1 - foot42e.side : 1 - ah);
+      e['banNg' + ben].setAttribute('opacity', foot42e ? foot42e.side : ah);
+      const tf = foot42e ? `rotate(${goc(dui, ong) * (1 - foot42e.flat) + foot42e.flat * foot42e.turn} 0 ${DAI.ong}) scale(${foot42e.mirror} 1)` : `rotate(${goc(dui, ong)} 0 ${DAI.ong}) scale(${h < 0 ? -1 : 1} 1)`;
       e['ban' + ben].setAttribute('transform', tf);
       e['banNg' + ben].setAttribute('transform', tf);
     }
@@ -1268,8 +1476,9 @@ class RigSVG {
       const arm = e['bat' + ben];
       if (arm.parentNode !== e.tren) continue;
       const beforeHead = !!(arm.compareDocumentPosition(e.dau) & Node.DOCUMENT_POSITION_FOLLOWING);
-      if (s['sauDau' + ben] >= 0.5 && !beforeHead) e.tren.insertBefore(arm, e.dau);
-      else if (s['sauDau' + ben] < 0.5 && beforeHead) e.tren.insertBefore(arm, e.phuKienTren);
+      const back = s['sauDau' + ben] >= 0.5 || this.#pillowArm42e() === ben;          // đợt 42 E: tay kê dưới đầu lúc nằm — đầu tựa lên nó
+      if (back && !beforeHead) e.tren.insertBefore(arm, e.dau);
+      else if (!back && beforeHead) e.tren.insertBefore(arm, e.phuKienTren);
     }
     e.phuKienTren.style.display = ah > 0.12 ? 'none' : '';
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
@@ -1324,7 +1533,7 @@ class RigSVG {
     const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah) * (1 - clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1)));
     const sideSit = clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1));
     const sitFold = -Math.sign(h) * 75 * sideSit;                                      // xoay dương = về bên trái màn hình
-    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD) * this.#seen42e(ah), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
     e.chanL.setAttribute('transform', `rotate(${legDui('L') + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
     e.chanR.setAttribute('transform', `rotate(${legDui('R') - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
     e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${legOng('L') - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
@@ -1511,6 +1720,7 @@ class RigSVG {
       rotation['bat' + side] += (-dauH * RIDE_ARM[0] - rotation['bat' + side]) * w;
       rotation['cang' + side] += (-dauH * RIDE_ARM[1] - rotation['cang' + side]) * w;
     }
+    const under42e = this.#arms42e(rotation, pivot, nhacY, cradle);
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
     for (const ben of ['L', 'R']) {
@@ -1603,7 +1813,7 @@ class RigSVG {
         `scale(${guong * lat} 1) rotate(${-12 * (1 - xoe)}) scale(${0.68 + 0.32 * xoe} 1)`);
       if (chon === 'chao') e.tayG[ben].setAttribute('transform', `scale(${(guong * lat * hz).toFixed(3)} ${hz.toFixed(3)})`);
     }
-    const mi = Math.max(0.05, 1 - s.matY);
+    const mi = Math.max(0.05, 1 - Math.max(s.matY, clamp(s.nap42e || 0, 0, 1)));      // đợt 42 E: `nap42e` — nằm ngủ, mắt nhắm
     const mc = this.nv.matCo;
     e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -hd) * 0.3)} ${mc * mi})`);
     e.matR.setAttribute('transform', `translate(${this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, hd) * 0.3)} ${mc * mi})`);
@@ -1628,6 +1838,7 @@ class RigSVG {
     this.#drawNote();
     this.#drawReadout();
     this.#drawSign39();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
+    this.#draw42e(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
     this.#drawScales();
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
@@ -1802,6 +2013,8 @@ class RigSVG {
   }
   shotBox(kind = 'face') {
     const nv = this.nv, s = this.s;
+    const lying = this.#shotBox42e(kind);                     // đợt 42 E: người NẰM — khung ôm thân nằm ngang
+    if (lying) return lying;
     const drop = this.hangChan() + this.#lowered() + s.y - Math.max(0, s.lift42d || 0);      // đợt 42 D: đang bay khỏi sàn
     const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
     const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
@@ -1863,6 +2076,7 @@ class RigSVG {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     so.seat = this.s.seat; so.huong = this.s.huong; so.kneel = this.s.kneel; so.ride = this.s.ride;
+    for (const k of ['floor42e', 'lie42e', 'lieDir42e', 'lieLift42e', 'nap42e', 'picked42e']) so[k] = this.s[k];      // đợt 42 E: ngồi bệt, nằm, ngủ, đồ đã nhặt — thế giữ
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
@@ -2066,6 +2280,7 @@ class RigSVG {
   }
   #lowered() {
     const nv = this.nv, s = this.s;
+    if (s.floor42e > 0 || s.squat42e > 0) return this.#contactDrop42e();       // đợt 42 E: ngồi bệt / ngồi xổm — hạ đúng tới chỗ chân chạm sàn
     return DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + DAI.ong * nv.daiOng * nv.coChan * KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)
       + DAI.dui * nv.daiDui * nv.coChan * clamp(s.ride || 0, 0, 1);          // cầm lái: đùi nằm ngang — hông hạ đúng một đùi, bàn chân vẫn trên nền
   }
@@ -3055,6 +3270,7 @@ class RigSVG {
     this.#khep(t, 0.45, 0.45 + dur);
     return t;
   }
+  static FLOOR_FORE42E = 92;            // đợt 42 E: ngồi bệt vuốt con vật — cẳng tay gập tối đa (độ) khi dò chỗ đặt bàn tay lên đầu nó
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
   static STROKE_GLIDE = 0.2; static STROKE_MAX = 10; static STROKE_LIFT = 4; static STROKE_SUNK = 0.25; static STROKE_TOUCH = 0.16; static STROKE_BAND = 1.2;
   #reachLow(target, hand = null, part = 'head', maxCrouch = 0.5) {
@@ -3086,12 +3302,12 @@ class RigSVG {
     }
     let k = hand || (tx < HONG.x ? 'L' : 'R');
     if (!hand && this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
-    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const crouch = s.seat > 0.5 || s.floor42e > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
     const across = (k === 'L') !== (tx < HONG.x);
     let shoulder = { x: HONG.x + (VAI[k].x - HONG.x) * this.nv.coThan, y: this.#shoulderY() };
     let lean = clamp((tx - HONG.x) * 0.06, -9, 9), tilt = Math.abs(lean), bend = 0;
-    if (s.seat > 0.5 && !across) {
+    if ((s.seat > 0.5 || s.floor42e > 0.5) && !across) {          // đợt 42 E: ngồi bệt cũng cúi qua đầu gối tới con vật
       const px = HONG.x, py = HONG.y + this.hangChan() + this.#lowered(), bx = this.#shoulderX(k), by = this.#shoulderY();
       const dir = tx >= px ? 1 : -1, far = (armUpper + armFore) * 0.92;
       const at = (deg) => { const a = dir * deg * Math.PI / 180; return { x: px + (bx - px) * Math.cos(a) - (by - py) * Math.sin(a), y: py + (bx - px) * Math.sin(a) + (by - py) * Math.cos(a) }; };
@@ -3145,7 +3361,8 @@ class RigSVG {
     return Number.isFinite(bottom) ? { x0, x1, bottom, columns } : null;
   }
   stroke(target = null) {
-    const t = this.tl(), reach = this.#reachLow(target), { k, upper, fore } = reach, s = this.s;
+    const t = this.tl(), reach = this.#reachLow(target), { k } = reach, s = this.s;
+    let { upper, fore } = reach;
     this.#leanTo(t, reach, 'xoe');          // bàn tay XOÈ úp lên lưng con vật; dáng thả lỏng nhìn cạnh ở đầu một cánh tay duỗi chéo chỉ là một cái gai
     const glide = reach.span && !reach.across ? Math.min(RigSVG.STROKE_MAX, reach.span * RigSVG.STROKE_GLIDE) : 0;
     let box = { x: -20, y: -23, width: 31, height: 61 }, scale = 0.9;
@@ -3164,6 +3381,7 @@ class RigSVG {
       for (let n = 0; n < 4; n++) pose = reach.solve(x, y - below(pose.dir));
       return pose;
     };
+    if (s.floor42e > 0.5) { const p = place(reach.tx); upper = p.upper; fore = Math.min(p.fore, RigSVG.FLOOR_FORE42E); t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.45, ease: 'power2.out' }, 0); }
     const reachable = (sign) => {
       let g = glide, pose = place(reach.tx + sign * g);
       while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
@@ -3173,7 +3391,7 @@ class RigSVG {
       const limit = (sign) => { let g = 0; while (g < 40 && place(reach.tx + sign * (g + 1)).bent) g += 1; return reach.tx + sign * g; };
       const bentHere = reach.solve(reach.tx, reach.ty).bent, far = bentHere ? limit(1) : reach.tx + glide, near = bentHere ? limit(-1) : reach.tx - glide;
       const crowned = !!(reach.crown && this.el['coTay' + k] && reach.crown(reach.tx - 1, reach.tx + 1, 1));      // đích 'crown' đo được đỉnh đầu
-      const back = reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
+      const back = s.floor42e > 0.5 ? Math.min(2, reachable(-1)) : reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
       const ease = (f) => (1 - Math.cos(Math.PI * f)) / 2;
       t.to(glider, { u: 1, duration: span, ease: 'none', onUpdate: () => {
         if (glider.u <= 0) return;                                  // tua về trước lúc trượt: để các tween cúi người lo
@@ -3191,7 +3409,9 @@ class RigSVG {
         const apply = (q) => { s['bat' + k] = upper + (q.upper - upper) * w; s['cang' + k] = fore + (q.fore - fore) * w; };
         if (crowned) {
           const judge = (h) => {
-            const q = place(x, h); apply(q);
+            const q = place(x, h);
+            if (s.floor42e > 0.5 && q.fore > RigSVG.FLOOR_FORE42E) return null;          // đợt 42 E: xem trên
+            apply(q);
             const extra = this.bakeBreath, was = { than: s.than, tho: s.tho };
             if (extra) { s.than = was.than + extra.than; s.tho = Math.min(1, was.tho + extra.tho); }
             this.apDung();
@@ -3216,7 +3436,7 @@ class RigSVG {
           const search = () => {
             let best = null;
             if (last !== null) for (let d = -6; d <= 6; d += 2) best = better(best, judge(y + last + d));
-            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d));
+            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d + (s.floor42e > 0.5 ? 6 : 0)));      // đợt 42 E: ngồi bệt — dò thấp hơn một chút (bàn tay hay lơ lửng trên đầu nó)
             if (best) { const coarse = best.h; for (const d of [-2, -1, 1, 2]) best = better(best, judge(coarse + d)); const fine = best.h; for (const d of [-0.5, 0.5]) best = better(best, judge(fine + d)); }
             return best;
           };
@@ -5748,6 +5968,325 @@ class RigSVG {
     this.#khep(t, 0.6, 0.05, { seat: 1, kneel: 1 });
     return t;
   }
+  #legAdd42e(ben, joint, h) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), sq = clamp(s.squat42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    if (!fl && !sq && !L) return 0;
+    const ah = Math.min(1, Math.abs(h)), dauH = Math.sign(h || 1), side = ben === 'L' ? 1 : -1, near = ben === (h >= 0 ? 'L' : 'R');
+    const F = FLOOR42E, Q = this.#squatAngles42e(), ahF = clamp((ah - 0.7) / 0.3, 0, 1);
+    const top = L * (1 - fl) * (ben === (s.lieDir42e < 0 ? 'R' : 'L') ? 1 : 0), towards = s.lieDir42e < 0 ? 1 : -1;
+    if (joint === 'dui') return fl * ((1 - ahF) * side * F.thigh - ahF * dauH * F.thighSide * (near ? 1 : 0.9)) - sq * dauH * (near ? Q.thigh : Q.farThigh) + top * towards * 14;
+    return fl * (-(1 - ahF) * side * F.knee + ahF * dauH * F.kneeSide) + sq * dauH * (near ? Q.knee : Q.farKnee) - top * towards * 26;
+  }
+  #squatAngles42e() {
+    const nv = this.nv, S = SQUAT42E, far = S.thigh - 6, r = (nv.daiDui || 1) / (nv.daiOng || 1);
+    const c = clamp(Math.cos((S.knee - S.thigh) * RAD) + r * (Math.cos(S.thigh * RAD) - Math.cos(far * RAD)), -1, 1);
+    return { thigh: S.thigh, knee: S.knee, farThigh: far, farKnee: Math.acos(c) / RAD + far };
+  }
+  #seen42e(ah) { return 1 - FLOOR42E.seen * clamp(this.s.floor42e || 0, 0, 1) * (1 - clamp((ah - 0.7) / 0.3, 0, 1)); }
+  #foot42e(ben, h, dui, ong) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), sq = clamp(s.squat42e || 0, 0, 1);
+    if (!fl && !sq) return null;
+    const ah = Math.min(1, Math.abs(h)), front = fl * (1 - clamp((ah - 0.7) / 0.3, 0, 1));
+    return { side: Math.max(ah, fl), flat: Math.max(fl, sq), turn: -(dui + ong), mirror: front > 0.5 ? (ben === 'L' ? 1 : -1) : (h < 0 ? -1 : 1) };
+  }
+  #legGeo42e(h = this.s.huong) {
+    const s = this.s, nv = this.nv, ah = Math.abs(h), dauH = Math.sign(h || 1), ride = clamp(s.ride || 0, 0, 1);
+    const seat = clamp(s.seat, 0, 1), kneel = clamp(s.kneel || 0, 0, 1);
+    const splay = RigSVG.SEAT_SPLAY * seat * (1 - ah) * (1 - seat * clamp(ah / 0.2, 0, 1) * (1 - kneel));
+    const sitFold = -Math.sign(h) * 75 * seat * clamp(ah / 0.2, 0, 1) * (1 - kneel);
+    const seen = (1 - seat * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD) * this.#seen42e(ah);
+    const shift = Math.sign(h) * Math.sin(Math.PI * Math.min(1, ah) * 0.9) * 3, Lt = DAI.dui * nv.daiDui, Ls = DAI.ong * nv.daiOng, out = {};
+    for (const ben of ['L', 'R']) {
+      const sign = ben === 'L' ? 1 : -1, near = ben === (h >= 0 ? 'L' : 'R');
+      const dui = s['dui' + ben] - dauH * ride * (near ? RIDE_THIGH : RIDE_THIGH - 6) + this.#legAdd42e(ben, 'dui', h);
+      const ong = s['ong' + ben] + dauH * ride * RIDE_KNEE + this.#legAdd42e(ben, 'ong', h);
+      const a = (dui + sign * (s['nhac' + ben] * 6 + splay) + sitFold) * RAD, b = (ong - sign * splay - sitFold) * RAD;
+      const lift = 1 - s['nhac' + ben] * 0.42, hx = -sign * (nv.cachChan * (1 - ah * 0.7) + ah * 3) + shift;
+      const knee = { x: hx - Math.sin(a) * Lt * lift * seen, y: Math.cos(a) * Lt * lift * seen };
+      const vx = -Math.sin(b) * Ls, vy = Math.cos(b) * Ls * lift * (1 - KNEEL_SHIN * kneel);
+      out[ben] = { hip: { x: hx, y: 0 }, knee, ankle: { x: knee.x + vx * Math.cos(a) - vy * Math.sin(a), y: knee.y + vx * Math.sin(a) + vy * Math.cos(a) }, shin: a + b };
+    }
+    return out;
+  }
+  #legLow42e(g) {
+    const nv = this.nv, foot = 10 * nv.coBanChan;
+    let low = 0;
+    for (const leg of [g.L, g.R]) {
+      const c = Math.abs(Math.cos(leg.shin));
+      low = Math.max(low, leg.knee.y + 8 * nv.dayChan, leg.ankle.y + foot * c + 11 * nv.dayChan * (1 - c));
+    }
+    return low;
+  }
+  #contactDrop42e() {
+    const nv = this.nv, standing = DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan;
+    return Math.max(0, standing - this.#legLow42e(this.#legGeo42e())) * nv.coChan;
+  }
+  #fromTorso42e(p) {
+    const s = this.s, nv = this.nv, h = s.huong, wide = clamp(nv.torsoWidth || 1, 0.7, 1.6), stoop = clamp(nv.stoop || 0, 0, 1);
+    const a = (s.than + h * stoop * 10 + Math.sign(h || 1) * clamp(s.ride || 0, 0, 1) * RIDE_LEAN) * RAD, x = p.x * nv.coThan * wide, y = p.y * nv.coThan * (1 - stoop * 0.05);
+    return { x: HONG.x + x * Math.cos(a) - y * Math.sin(a), y: HONG.y + x * Math.sin(a) + y * Math.cos(a) };
+  }
+  #toTorso42e(p) {
+    const s = this.s, nv = this.nv, h = s.huong, wide = clamp(nv.torsoWidth || 1, 0.7, 1.6), stoop = clamp(nv.stoop || 0, 0, 1);
+    const a = -(s.than + h * stoop * 10 + Math.sign(h || 1) * clamp(s.ride || 0, 0, 1) * RIDE_LEAN) * RAD, dx = p.x - HONG.x, dy = p.y - HONG.y;
+    return { x: (dx * Math.cos(a) - dy * Math.sin(a)) / (nv.coThan * wide), y: (dx * Math.sin(a) + dy * Math.cos(a)) / (nv.coThan * (1 - stoop * 0.05)) };
+  }
+  #ik42e(from, to, out) {
+    const a = DAI.canhTay * this.nv.daiCanhTay, b = DAI.cangTay * this.nv.daiCangTay, dx = to.x - from.x, dy = to.y - from.y;
+    const d = clamp(Math.hypot(dx, dy), Math.abs(a - b) + 0.5, a + b - 0.5), dir = Math.atan2(-dx, dy);
+    const alpha = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1)), up = dir - out * alpha;
+    const elbow = { x: from.x - a * Math.sin(up), y: from.y + a * Math.cos(up) };
+    const fore = Math.hypot(dx, dy) > a + b - 0.5 ? up : Math.atan2(-(to.x - elbow.x), to.y - elbow.y);
+    return { upper: up / RAD, fore: chuanHoaGoc((fore - up) / RAD), elbow, wrist: { x: elbow.x - b * Math.sin(fore), y: elbow.y + b * Math.cos(fore) } };
+  }
+  #headTorso42e() {
+    const s = this.s, nv = this.nv, stoop = clamp(nv.stoop || 0, 0, 1), wide = clamp(nv.torsoWidth || 1, 0.7, 1.6);
+    return { x: s.dauX + s.huong * (2.5 + stoop * 7), y: -103 + nv.dauLech + s.dauY + stoop * 9 - 62 * nv.coDau, rx: 64 * nv.coDau / wide, ry: 64 * nv.coDau };
+  }
+  #pillowArm42e() { return this.s.lie42e > 0.5 ? (this.s.lieDir42e < 0 ? 'L' : 'R') : null; }
+  #pillowPose42e(k) {
+    const hd = this.#headTorso42e(), out = k === 'L' ? -1 : 1, from = { x: out * CHOT_VAI.x, y: CHOT_VAI.y };
+    return this.#ik42e(from, { x: hd.x + out * hd.rx * 0.85, y: hd.y - hd.ry * 1.3 }, out);
+  }
+  #arms42e(rotation, pivot, nhacY, cradle) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    if (!fl && !L) return null;
+    const free = (side) => clamp(1 - (Math.abs(s['bat' + side] - this.#restArm(side)[0]) - 40) / 40, 0, 1) * (1 - clamp(s['ov' + side], 0, 1)) * (1 - clamp(s['aim' + side], 0, 1))
+      * (1 - clamp(s['phone' + side], 0, 1)) * (1 - cradle) * (this.holds[side] && s['item' + side] > 0.5 ? 0 : 1);
+    let legs = null;
+    for (const side of ['L', 'R']) {
+      const out = side === 'L' ? -1 : 1, from = { x: pivot[side].x, y: pivot[side].y + nhacY };
+      let w = 0, pose = null;
+      if (fl > 0.001 && L < 0.999) {
+        legs = legs || this.#legGeo42e();
+        const knee = legs[side].knee, nv = this.nv, at = { x: HONG.x + knee.x - out * 3, y: HONG.y + (knee.y - 12 * nv.dayChan) * nv.coChan };
+        pose = this.#ik42e(from, this.#toTorso42e(at), out); w = fl * (1 - L) * free(side);
+      }
+      if (L > 0.001 && side === (s.lieDir42e < 0 ? 'L' : 'R')) { pose = this.#pillowPose42e(side); w = L * free(side); }
+      if (!pose || w <= 0) continue;
+      rotation['bat' + side] += (pose.upper - rotation['bat' + side]) * w;
+      rotation['cang' + side] += (chuanHoaGoc(pose.fore) - rotation['cang' + side]) * w;
+    }
+    return null;
+  }
+  #lay42e(seatDrop, doiChan) {
+    const s = this.s, nv = this.nv, L = clamp(s.lie42e || 0, 0, 1), dir = s.lieDir42e < 0 ? -1 : 1;
+    const angle = dir * (90 - LIE42E.tilt) * L, c = Math.cos(angle * RAD), n = Math.sin(angle * RAD);
+    const turn = (p) => ({ x: HONG.x + (p.x - HONG.x) * c - (p.y - HONG.y) * n, y: HONG.y + (p.x - HONG.x) * n + (p.y - HONG.y) * c });
+    const legs = this.#legGeo42e(), pts = [];
+    const leg = (p, r) => pts.push({ ...turn({ x: HONG.x + p.x, y: HONG.y + p.y * nv.coChan }), r: r * nv.coChan });
+    for (const side of ['L', 'R']) { const g = legs[side]; leg(g.knee, 13 * nv.dayChan); leg(g.ankle, 12 * nv.dayChan); leg({ x: g.hip.x - (side === 'L' ? 1 : -1) * 13 * nv.dayChan, y: 0 }, 0); }
+    for (const q of [{ x: -36, y: -88 }, { x: 36, y: -88 }, { x: -31, y: -30 }, { x: 31, y: -30 }, { x: -30, y: 18 }, { x: 30, y: 18 }]) pts.push({ ...turn(this.#fromTorso42e(q)), r: 0 });
+    const hd = this.#headTorso42e(), head = { ...turn(this.#fromTorso42e(hd)), r: hd.ry * nv.coThan * 0.94 };
+    pts.push(head);
+    const k = this.#pillowArm42e();
+    if (k) { const pose = this.#pillowPose42e(k); for (const q of [pose.elbow, pose.wrist]) pts.push({ ...turn(this.#fromTorso42e(q)), r: 10 * nv.dayTay * nv.coThan }); }
+    const low = Math.max(...pts.map((p) => p.y + p.r)), x0 = Math.min(...pts.map((p) => p.x - p.r)), x1 = Math.max(...pts.map((p) => p.x + p.r));
+    const floor = 428 - doiChan - (s.lieLift42e || 0), blend = clamp(L * 2.5, 0, 1);
+    const dy = (floor - low - seatDrop) * blend, dx = (HONG.x - (x0 + x1) / 2) * blend;
+    return { angle, dx, dy, blend, pts, head, low, floor, span: [x0, x1], turn };
+  }
+  #goc42e(seatDrop, doiChan) {
+    const s = this.s, sq = clamp(s.squat42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    this.lay42e = null;
+    if (!sq && !L) return null;
+    let x = s.x, y = s.y + seatDrop + DOI_Y + doiChan, rot = '', blend = 0;
+    if (sq) { const g = this.#legGeo42e(), near = s.huong >= 0 ? 'L' : 'R'; x -= g[near].ankle.x - g[near].hip.x; }
+    if (L) {
+      const lay = this.#lay42e(seatDrop, doiChan), co = s.co;
+      x += lay.dx; y += lay.dy; rot = ` rotate(${lay.angle.toFixed(3)} ${HONG.x} ${HONG.y})`; blend = lay.blend;
+      const root = (p) => ({ x: x + 200 + co * (p.x - 200), y: y + 428 + co * (p.y - 428) });
+      this.lay42e = { ...lay, root, head: { ...root(lay.head), r: lay.head.r * co }, floorY: root({ x: 0, y: lay.floor }).y, x0: root({ x: lay.span[0], y: 0 }).x, x1: root({ x: lay.span[1], y: 0 }).x,
+                      hip: root(lay.turn({ x: HONG.x, y: HONG.y })), pts: lay.pts.map((p) => ({ ...root(p), r: p.r * co })) };
+    }
+    return { transform: `translate(${x} ${y}) translate(200 428) scale(${s.co}) translate(-200 -428)${rot}`, blend };
+  }
+  #draw42e() {
+    const e = this.el, s = this.s, lay = this.lay42e;
+    if (e.under42e) {
+      e.under42e.style.display = lay && lay.blend > 0.01 ? '' : 'none';
+      if (lay && lay.blend > 0.01) {
+        const [shadow, pillow] = e.under42e.children, len = lay.x1 - lay.x0, hd = lay.head;
+        shadow.setAttribute('cx', ((lay.x0 + lay.x1) / 2).toFixed(2)); shadow.setAttribute('cy', (lay.floorY + 1.5).toFixed(2));
+        shadow.setAttribute('rx', (len * 0.5).toFixed(2)); shadow.setAttribute('ry', '8'); shadow.setAttribute('opacity', (0.26 * lay.blend * clamp(s.mo, 0, 1)).toFixed(3));
+        const top = hd.y + hd.r * 0.45, cushion = (s.lieLift42e || 0) > 1 && lay.floorY - top > 4 && s.lie42e > 0.5;
+        pillow.style.display = cushion ? '' : 'none';
+        if (cushion) {
+          const w = hd.r * 1.9, rect = pillow.firstElementChild, seam = pillow.lastElementChild, x0 = hd.x - w / 2, hgt = lay.floorY - top + 2;
+          Object.entries({ x: x0, y: top, width: w, height: hgt, rx: Math.min(hgt / 2, 12) }).forEach(([key, v]) => rect.setAttribute(key, v.toFixed(2)));
+          seam.setAttribute('d', `M ${(x0 + 8).toFixed(1)} ${(top + hgt * 0.5).toFixed(1)} Q ${hd.x.toFixed(1)} ${(top + hgt * 0.62).toFixed(1)} ${(x0 + w - 8).toFixed(1)} ${(top + hgt * 0.5).toFixed(1)}`);
+        }
+      }
+    }
+    const list = this.picks42e || [];
+    if (e.drop42e && e.drop42e.childElementCount !== list.length) {
+      e.drop42e.innerHTML = list.map((item) => `<g transform="translate(${item.x.toFixed(2)} ${item.y.toFixed(2)})" data-drop42e="${item.kind}" style="display:none">${item.el ? '' : RigSVG.#floorShape42e(item.kind)}</g>`).join('');
+    }
+    list.forEach((item, n) => {
+      const down = s.picked42e < n + 0.5, g = e.drop42e && e.drop42e.children[n];
+      if (g) g.style.display = down && !item.el ? '' : 'none';
+      if (item.el && item.el.style) { const v = down ? '' : 'hidden'; if (item.el.style.visibility !== v) item.el.style.visibility = v; }      // đạo cụ thật được nhặt lên: ẩn nó đi
+    });
+  }
+  static #floorShape42e(kind) {
+    if (kind === 'bowl') return bowlShape42e();
+    if (kind === 'leash') return `<path d="M -16 -3 Q -18 -14 -4 -13 Q 10 -12 6 -4 Q 2 2 -8 -1 M 6 -4 Q 14 -2 18 -1" fill="none" stroke="#c0392b" stroke-width="3.4" stroke-linecap="round"/>
+          <rect x="-20" y="-6" width="9" height="6" rx="2" fill="#c0392b" stroke="#7d241a" stroke-width=".8"/>`;
+    return toyShape42e();
+  }
+  #pickSpot42e(target) {
+    const s = this.s, live = target && target.live ? target.live : target;
+    const toFrame = (sx, sy) => {
+      const sv = this.svg.getBoundingClientRect(), unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;
+      const ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+      return { x: (sx - ox) / unit - s.x, y: (sy - oy) / unit - s.y - DOI_Y };
+    };
+    if (live === null || live === undefined) return { x: HONG.x + 78 * this.nv.coThan, y: 428, el: null };
+    if (typeof live === 'number' && Number.isFinite(live)) return { x: HONG.x + live, y: 428, el: null };
+    if (typeof live.x === 'number' && !live.el && !live.getBoundingClientRect) return { x: live.x - s.x, y: typeof live.y === 'number' ? Math.min(428, live.y - s.y - DOI_Y) : 428, el: null };
+    if (live.el && live.svg) {
+      const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => live.el[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+      const body = live.svg.getBoundingClientRect(), drawn = live.el.than ? live.el.than.getBoundingClientRect() : body;
+      const bottom = paws.length ? Math.max(...paws.map((r) => r.bottom)) : body.bottom, mine = this.centerX();
+      const edge = mine < drawn.left + drawn.width / 2 ? drawn.left : drawn.right, p = toFrame(edge, bottom);
+      return { x: p.x + (mine < drawn.left + drawn.width / 2 ? -16 : 16), y: Math.min(428, p.y), el: null };
+    }
+    if (live.getBoundingClientRect) { const r = live.getBoundingClientRect(), p = toFrame(r.left + r.width / 2, r.bottom); return { x: p.x, y: Math.min(428, p.y), el: live }; }
+    throw new Error('[character] pickUp(target): target must be null, a distance, { x, y }, a pet rig or an element');
+  }
+  pickUp(target = null, { item = 'toy', side = 'auto' } = {}) {
+    if (!['toy', 'bowl', 'leash'].includes(item)) throw new Error(`[character] pickUp: item must be 'toy', 'bowl' or 'leash', got ${JSON.stringify(item)}`);
+    if (side !== 'auto' && side !== 'L' && side !== 'R') throw new Error(`[character] pickUp: side must be 'auto', 'L' or 'R', got ${JSON.stringify(side)}`);
+    const s = this.s;
+    if (s.lie42e > 0.5 || s.floor42e > 0.5 || s.seat > 0.5 || s.ride > 0.5) throw new Error('[character] pickUp: stand up first (standUp / getOff) — the character picks things up from standing');
+    if (s.om >= 0.5) throw new Error('[character] pickUp: the character is carrying a pet — putDown() first');
+    const spot = this.#pickSpot42e(target), dir = spot.x >= HONG.x ? 1 : -1, near = dir > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    const auto = (k) => !!(this.autoItem42e && typeof this.autoItem42e[k] === 'number' && s.picked42e < this.autoItem42e[k] + 0.5);
+    const busy = (k) => this.holds[k] && s['item' + k] > 0.5 && !auto(k), stored = (k) => this.holds[k] && !busy(k);
+    const k = side !== 'auto' ? side : stored(near) ? near : stored(far) ? far : !busy(near) ? near : far;
+    if (busy(k)) throw new Error(`[character] pickUp: hand ${k} already holds an item — put it away (hideItem) or hand it over first`);
+    const fresh = !this.holds[k];
+    if (fresh) {
+      const keepArms = Object.fromEntries(['batL', 'cangL', 'tayL', 'batR', 'cangR', 'tayR', 'itemL', 'itemR'].map((key) => [key, s[key]]));
+      const draw = item === 'bowl' ? bowl42e : item === 'leash' ? leash : toy42e; this.setItem(k, (p, c) => draw(c), { shown: false });
+      Object.assign(this.s, keepArms); this.apDung();
+    }
+    const list = this.picks42e = this.picks42e || [], rootX = spot.x + s.x, rootY = spot.y + DOI_Y;
+    let n = list.findIndex((it) => it.kind === item && it.el === spot.el && Math.abs(it.x - rootX) < 0.5 && Math.abs(it.y - rootY) < 0.5);
+    if (n < 0) { list.push({ kind: item, x: rootX, y: rootY, el: spot.el }); n = list.length - 1; }
+    this.pick42e = { k, n, x: rootX, y: rootY, kind: item };
+    if (fresh || auto(k)) this.autoItem42e = { ...(this.autoItem42e || {}), [k]: n };
+    const t = this.tl(), N = this.NGHI, was = s.huong;
+    if (auto(k) && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);          // món rig tự cho, trạng thái đầu cảnh ghi nó "đang hiện": cất đi
+    const grab = { x: spot.x, y: spot.y - (item === 'bowl' ? 8 : 11) };
+    const saved = { huong: s.huong, squat42e: s.squat42e, seat: s.seat, kneel: s.kneel, than: s.than };
+    let pose = null, lean = SQUAT42E.lean, shift = 0;
+    try {
+      Object.assign(s, { huong: dir, squat42e: 1, seat: 0, kneel: 0 });
+      const g = this.#legGeo42e(), back = g[near].ankle.x - g[near].hip.x, arm = DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay + 8 * this.nv.coThan;
+      const fits = (deg, extra) => {
+        const geo = this.#poseGeo({ huong: dir, lean: dir * deg, step: -back + dir * extra }), sh = geo[k];
+        pose = this.#palmTo(k, grab, geo);
+        return Math.hypot(grab.x - sh.x, grab.y - sh.y) <= arm;
+      };
+      let done = false;
+      for (; lean <= 45 && !(done = fits(lean, 0)); lean += 3);
+      if (!done) for (lean = 42, shift = 5; shift <= 70 && !fits(lean, shift); shift += 5);
+      lean = Math.min(lean, 45); shift = Math.min(shift, 70);
+    } finally { Object.assign(s, saved); }
+    if (shift) t.to(s, { x: s.x + dir * shift, duration: 0.45, ease: 'sine.inOut' }, 0);
+    t.to(s, { huong: dir, ['carry' + k]: 0, cuoi: 0.7, nhinX: dir * 2, duration: 0.35, ease: 'power2.inOut' }, 0);
+    t.to(s, { ['aim' + k]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3);
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.32);
+    const o = k === 'L' ? 'R' : 'L', hang = -dir * (18 + lean), free = !busy(o);
+    if (free) { t.to(s, { ['aim' + o]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3); t.set(s, { ['tay' + o]: 'mo' }, 0.32); }
+    t.to(s, { squat42e: 1, than: N.than + dir * lean, dau: N.dau - dir * lean * 0.45, dauY: 6, nhinY: 2.6, ['bat' + k]: pose.bat, ['cang' + k]: pose.cang,
+              ...(free ? { ['bat' + o]: o === 'L' ? hang : -hang, ['cang' + o]: o === 'L' ? -12 * dir : 12 * dir } : {}), duration: 0.65, ease: 'power2.inOut' }, 0.35);
+    t.set(s, { ['tay' + k]: 'nam' }, 1.02);
+    t.to(s, { picked42e: n + 1, duration: 0.02 }, 1.04);
+    t.to(s, { ['item' + k]: 1, duration: 0.08 }, 1.04);
+    t.to(s, { squat42e: 0, than: N.than, dau: N.dau, dauY: 0, nhinY: 0, duration: 0.6, ease: 'power2.inOut' }, 1.35);
+    t.to(s, { ['aim' + k]: 0, ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ...(free ? { ['aim' + o]: 0, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o] } : {}), duration: 0.55, ease: 'power2.inOut' }, 1.4);
+    this.#khep(t, 0.45, 1.95, { ['item' + k]: 1, picked42e: n + 1, huong: was });
+    return t;
+  }
+  sitOnFloor() {
+    const t = this.tl(), s = this.s;
+    if (s.lie42e > 0.5) throw new Error('[character] sitOnFloor: the character is lying down — standUp() first');
+    if (s.floor42e > 0.5) return this.#khep(t, 0.3, 0);
+    if (s.ride > 0.5) throw new Error('[character] sitOnFloor: the character is riding — getOff() first');
+    t.to(s, { dauY: 4, nhinY: 1.4, than: 0, cuoi: 0.6, duration: 0.3, ease: 'power2.in' }, 0);
+    t.to(s, { seat: 1, kneel: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { seat: 0, kneel: 0, floor42e: 1, duration: 0.6, ease: 'sine.inOut' }, 0.5);
+    this.#khep(t, 0.4, 1.1, { floor42e: 1, seat: 0, kneel: 0 });
+    return t;
+  }
+  lieDown(where = 'floor', { head = null, sleep = false, lift = null } = {}) {
+    if (where !== 'floor' && where !== 'sofa') throw new Error(`[character] lieDown(where): where must be 'floor' or 'sofa', got ${JSON.stringify(where)}`);
+    if (head !== null && head !== 'left' && head !== 'right') throw new Error(`[character] lieDown: head must be 'left' or 'right', got ${JSON.stringify(head)}`);
+    const t = this.tl(), s = this.s;
+    if (s.ride > 0.5) throw new Error('[character] lieDown: the character is riding — getOff() first');
+    if (s.om >= 0.5) throw new Error('[character] lieDown: the character is carrying a pet — putDown() first');
+    const dir = head === 'left' ? -1 : head === 'right' ? 1 : s.huong > 0.1 ? 1 : -1;
+    if (lift !== null && !(typeof lift === 'number' && lift >= 0 && lift < 300)) throw new Error(`[character] lieDown: lift must be a height in frame units (0…300), got ${JSON.stringify(lift)}`);
+    const surface = where === 'sofa' ? (lift !== null ? lift : Math.max(0, 428 + DOI_Y - this.seatY())) : 0;
+    const keep = { lie42e: 1, lieDir42e: dir, lieLift42e: surface, nap42e: sleep ? 1 : 0, floor42e: 0, seat: 0, kneel: 0, huong: 0 };
+    if (s.lie42e > 0.5) { t.to(s, { lieDir42e: dir, lieLift42e: surface, duration: 0.01 }, 0); return this.#khep(t, 0.5, 0.02, keep); }
+    t.set(s, { lieDir42e: dir }, 0.01);
+    t.to(s, { lieLift42e: surface, duration: 0.02 }, 0);
+    const seated = s.floor42e > 0.5 || (s.seat > 0.5 && !(s.kneel > 0.5)), from = seated ? 0 : 0.95;
+    if (seated) t.to(s, { huong: 0, dauY: 3, duration: 0.3, ease: 'sine.inOut' }, 0);
+    else {
+      t.to(s, { huong: 0, dauY: 4, nhinY: 1.4, cuoi: 0.6, duration: 0.3, ease: 'power2.in' }, 0);
+      t.to(s, { seat: 1, kneel: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
+      t.to(s, { seat: 0, kneel: 0, floor42e: 1, duration: 0.5, ease: 'sine.inOut' }, 0.45);
+    }
+    t.to(s, { lie42e: 1, seat: 0, kneel: 0, floor42e: 0, dauY: 0, nhinY: 0, cuoi: 0.5, duration: 0.85, ease: 'sine.inOut' }, from);
+    if (sleep) t.to(s, { nap42e: 1, cuoi: 0.25, duration: 0.5, ease: 'sine.inOut' }, from + 0.8);
+    this.#khep(t, 0.4, from + 0.95, keep);
+    return t;
+  }
+  #rise42e(t) {
+    const s = this.s, lying = s.lie42e > 0.5, sofa = lying && (s.lieLift42e || 0) > 1;
+    t.to(s, { nap42e: 0, dauY: 3, cuoi: 0.5, duration: 0.25, ease: 'sine.inOut' }, 0);
+    let at = 0.1;
+    if (sofa) { t.to(s, { lie42e: 0, seat: 1, kneel: 0, duration: 0.85, ease: 'sine.inOut' }, at); at += 0.85; }
+    else if (lying) { t.to(s, { lie42e: 0, floor42e: 1, duration: 0.8, ease: 'sine.inOut' }, at); at += 0.8; }
+    if (!sofa) { t.to(s, { floor42e: 0, seat: 1, kneel: 1, duration: 0.5, ease: 'sine.inOut' }, at); at += 0.5; }
+    t.to(s, { lieLift42e: 0, duration: 0.02 }, at);
+    this.#khep(t, 0.6, at, { seat: 0, kneel: 0, floor42e: 0, lie42e: 0, lieLift42e: 0, nap42e: 0 });
+    return t;
+  }
+  lapY42e() {
+    const nv = this.nv, s = this.s, drop = this.hangChan() + this.#lowered() + s.y;
+    return HONG.y + DOI_Y + drop + 13 * nv.dayChan * nv.coChan;
+  }
+  #shotBox42e(kind) {
+    if (!(this.s.lie42e > 0.5)) return null;
+    this.apDung();
+    const lay = this.lay42e;
+    if (!lay) return null;
+    const nv = this.nv, hd = lay.head, box = (x0, y0, x1, y1) => ({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
+    if (kind === 'face') { const half = 64 * nv.coDau * nv.coThan * 1.2; return box(hd.x - half, hd.y - half, hd.x + half, hd.y + half); }
+    const all = lay.pts, xs = all.map((p) => [p.x - p.r, p.x + p.r]).flat(), top = Math.min(...all.map((p) => p.y - p.r)) - 14;
+    if (kind === 'chest') {
+      const hipX = lay.hip.x, x0 = Math.min(hd.x - hd.r, hipX), x1 = Math.max(hd.x + hd.r, hipX);
+      return box(x0 - 14, Math.min(top, hd.y - hd.r - 14), x1 + 14, lay.floorY + 10);
+    }
+    if (kind === 'full') return box(Math.min(...xs) - 16, top, Math.max(...xs) + 16, lay.floorY + 14);
+    throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+  }
+  floorProbe42e() {
+    this.apDung();
+    const s = this.s, nv = this.nv, lay = this.lay42e, drop = this.hangChan() + this.#lowered() + s.y;
+    const legs = this.#legGeo42e(), at = (p) => ({ x: s.x + HONG.x + p.x, y: HONG.y + DOI_Y + drop + p.y * nv.coChan });
+    const hip = lay ? lay.hip : { x: s.x + HONG.x, y: HONG.y + DOI_Y + drop };
+    const low = lay ? Math.max(...lay.pts.map((p) => p.y + p.r)) : HONG.y + DOI_Y + drop + this.#legLow42e(legs) * nv.coChan;
+    const items = (this.picks42e || []).map((it, n) => ({ kind: it.kind, x: it.x, y: it.y, down: s.picked42e < n + 0.5, prop: !!it.el }));
+    return { sit: +s.floor42e || 0, squat: +s.squat42e || 0, lie: +s.lie42e || 0, angle: lay ? lay.angle : 0, sofa: (s.lieLift42e || 0) > 1, hip,
+             seat: { x: hip.x, y: hip.y + 13 * nv.dayChan * nv.coChan }, low, floor: lay ? lay.floorY : 428 + DOI_Y, head: lay ? { x: lay.head.x, y: lay.head.y } : null,
+             ankles: lay ? null : [at(legs.L.ankle), at(legs.R.ankle)], items, pick: this.pick42e || null };
+  }
   carry(pet) {
     if (!pet || !pet.svg || typeof pet.apDung !== 'function' || !pet.el || !pet.el.dau || pet instanceof RigSVG) throw new Error('[character] carry(pet): pet must be a pet rig (createPet(...).rig)');
     if (this.carried && this.carried.pet !== pet && this.s.om >= 0.5) throw new Error('[character] carry: already carrying another pet — putDown() first');
@@ -5808,6 +6347,7 @@ class RigSVG {
   }
   standUp() {
     const t = this.tl(), s = this.s;
+    if (s.floor42e > 0.5 || s.lie42e > 0.5) return this.#rise42e(t);      // đợt 42 E: dậy từ sàn — qua dáng quỳ
     t.to(s, { dauY: 2.5, duration: 0.2, ease: 'power2.in' }, 0);
     this.#khep(t, s.kneel > 0.5 ? 0.65 : 0.5, 0.05, { seat: 0, kneel: 0 });
     return t;
@@ -9192,182 +9732,6 @@ const tufts = () => (p, c) => group(p, c, `
 const bald = () => (p, c) => group(p, c, '');
 return { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald };
 })();
-__m['runtime/parts.js'] = (function () {
-function roundGlasses(c, { x = 20, y = 2, r = 12, color = null, width = 2.4 } = {}) {
-  const stroke = color || c.accent || c.lineStroke;
-  return `
-            <g fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round">
-              <circle cx="${-x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
-              <circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
-              <path d="M ${-x + r} ${y - 2} Q 0 ${y - 7} ${x - r} ${y - 2}"/>
-              <path d="M ${-x - r} ${y - 2} L -47 ${y - 6} M ${x + r} ${y - 2} L 47 ${y - 6}"/>
-            </g>`;
-}
-function shortBeard(c, { color = null, chin = 54, mouthY = 30, width = 43 } = {}) {
-  const fill = color || c.hair;
-  return `
-            <path fill="${fill}" d="M ${-width} 10 Q ${-width - 2} ${chin - 12} ${-width * 0.55} ${chin - 1} Q 0 ${chin + 6} ${width * 0.55} ${chin - 1}
-              Q ${width + 2} ${chin - 12} ${width} 10 Q ${width - 5} ${mouthY - 8} ${width * 0.42} ${mouthY - 9}
-              Q 0 ${mouthY - 13} ${-width * 0.42} ${mouthY - 9} Q ${-width + 5} ${mouthY - 8} ${-width} 10 Z"/>
-            <path fill="${c.skin}" d="M -13 ${mouthY - 5} Q 0 ${mouthY - 9} 13 ${mouthY - 5} Q 14 ${mouthY + 7} 0 ${mouthY + 9} Q -14 ${mouthY + 7} -13 ${mouthY - 5} Z"/>`;
-}
-function moustache(c, { color = null, mouthY = 30, width = 17 } = {}) {
-  const fill = color || c.hair;
-  return `
-            <path fill="${fill}" d="M 0 ${mouthY - 9} Q ${-width * 0.5} ${mouthY - 13} ${-width} ${mouthY - 5} Q ${-width * 0.55} ${mouthY - 3.5} 0 ${mouthY - 5.5}
-              Q ${width * 0.55} ${mouthY - 3.5} ${width} ${mouthY - 5} Q ${width * 0.5} ${mouthY - 13} 0 ${mouthY - 9} Z"/>`;
-}
-const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
-function wrinkles(c, { color = null, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true } = {}) {
-  const stroke = color || c.skinShadow || '#c9987a';
-  return `
-            <g fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" opacity=".8">
-              ${[-1, 1].map((g) => `
-              <path d="M ${g * (eyeX + 15)} ${eyeY - 3} l ${g * 5} -3 M ${g * (eyeX + 16)} ${eyeY + 2} l ${g * 5.500} 1"/>
-              <path d="M ${g * 15} ${mouthY - 14} Q ${g * 21} ${mouthY - 5} ${g * 18} ${mouthY + 3}"/>`).join('')}
-              ${forehead ? `<path d="M -15 ${eyeY - 31} Q 0 ${eyeY - 34} 15 ${eyeY - 31} M -11 ${eyeY - 25} Q 0 ${eyeY - 27.500} 11 ${eyeY - 25}"/>` : ''}
-            </g>`;
-}
-function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
-  const fill = color || c.skirt || c.accent || c.topShadow, line = lineOf(c);
-  return `
-        <path d="M ${-width + 2} ${top} Q ${-(width + 11) / 2} ${(top - 103) / 2 + 2} -9 -103 M ${width - 2} ${top} Q ${(width + 11) / 2} ${(top - 103) / 2 + 2} 9 -103" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
-        <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
-}
-const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
-  const line = lineOf(c), band = (x, len) =>
-    `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
-  return `
-        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
-};
-const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
-  const line = lineOf(c);
-  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
-  return `
-        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
-};
-function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true, open = false, full = false } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-cup="${open || full ? 'open' : 'lid'}"${full ? ' data-full="1"' : ''} transform="translate(0 12) rotate(90) scale(${size})">
-          <path data-cupbody="${color}" d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${open || full ? '#e3f1f7' : color}" fill-opacity="${open || full ? 0.6 : 1}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
-          <path data-level="1" d="${open || full ? 'M -8.3 -15 L 8.3 -15 L 6.5 13 Q 0 15 -6.5 13 Z' : ''}" fill="#8a5432" style="${open || full ? '' : 'display:none'}"/>
-          <path data-sleeve="1" d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}" style="${open || full ? 'display:none' : ''}"/>
-          <path data-lid="1" d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round" style="${open || full ? 'display:none' : ''}"/>
-          <circle data-mouth="1" cx="0" cy="-17" r="0.6" fill="none"/>
-        </g>${grip ? gripFingers(c) : ''}`;
-}
-function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
-          <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
-          <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
-          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
-          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
-          <g data-page="-29"><path data-sheet="1" data-paper="${paper}" d="M -12 -29 H 12 V 3 H -12 Z" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
-            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
-          <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
-        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
-}
-const tingBadge = (x = 27) => `
-        <g data-ting="1" style="display:none"><g transform="translate(${x} 10)"><circle r="8.6" fill="#2fbf71" stroke="#16794a" stroke-width="1.2"/>
-          <path d="M 4 -3 L -1.2 3.8 L -4.6 0" transform="rotate(90)" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M 0 -12.5 q 8 -2 14 0 M 0 12.5 q 8 2 14 0" stroke="#2fbf71" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".85"/></g></g>`;
-function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
-  const line = lineOf(c);
-  const clip = 'vgPhoneClip' + (phoneClipCount++);
-  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
-          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
-  return `
-        <g transform="translate(0 10) rotate(90)">
-          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
-          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
-          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
-        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}${tingBadge()}`;
-}
-let phoneClipCount = 0;
-function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-syringe="1" transform="translate(0 10) rotate(90) translate(0 -4)">
-          <g data-plunger="9"><rect x="-1.4" y="-26" width="2.8" height="14" fill="#c9ced6" stroke="${line}" stroke-width=".7"/><rect x="-5" y="-28" width="10" height="3" rx="1.2" fill="#e8ebef" stroke="${line}" stroke-width=".8"/></g>
-          <rect x="-4" y="-14" width="8" height="24" rx="1.5" fill="#f4f8fb" fill-opacity=".85" stroke="${line}" stroke-width=".9"/>
-          <rect x="-3.2" y="-3" width="6.4" height="12.4" fill="${liquid}" opacity=".85"/>
-          <path d="M -4 -6 h 3 M -4 -1 h 3 M -4 4 h 3" stroke="${line}" stroke-width=".6" opacity=".6"/>
-          <rect x="-6" y="-15.5" width="12" height="2.4" rx="1" fill="#e8ebef" stroke="${line}" stroke-width=".7"/>
-          <path d="M -1.6 10 h 3.2 l -1 3 h -1.2 z" fill="#c9ced6" stroke="${line}" stroke-width=".5"/>
-          <path d="M 0 13 V 25" stroke="#9aa3ad" stroke-width="1" stroke-linecap="round"/>
-        </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
-}
-function leash(c, { color = '#c0392b', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-leash="1" transform="translate(0 12)">
-          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
-          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${line}" stroke-width=".7" opacity=".5"/>
-          <rect x="-7.5" y="-3" width="15" height="6" rx="2.5" fill="${color}" stroke="${line}" stroke-width=".9"/>
-        </g>${grip ? gripFingers(c, { reach: 15 }) : ''}`;
-}
-function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g transform="translate(0 12) rotate(90)">
-          <rect x="-9" y="-13" width="18" height="24" rx="3" fill="${color}" stroke="${line}" stroke-width="1"/>
-          <rect x="-10" y="-19" width="20" height="7" rx="2" fill="${cap}" stroke="${line}" stroke-width="1"/>
-          <rect x="-7" y="-7" width="14" height="10" rx="1.2" fill="${label}" stroke="${line}" stroke-width=".6"/>
-          <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
-        </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
-}
-function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-bag="1" transform="translate(0 10) rotate(90)">
-          <path d="M -6 3 Q -6 -8 0 -8 Q 6 -8 6 3" fill="none" stroke="#c9b48f" stroke-width="2.4" stroke-linecap="round"/>
-          <path d="M -15 3 L 15 3 L 16.5 40 Q 0 42 -16.5 40 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
-          <path d="M -15 3 L 15 3 L 15.2 8 L -15.2 8 Z" fill="#e8e3d8" stroke="${line}" stroke-width=".7"/>
-          <path d="M -15.6 30 L 15.6 30 L 16.1 36 L -16.1 36 Z" fill="${band}"/>
-          <circle cx="0" cy="19" r="7.5" fill="${band}"/>
-          <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
-        </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
-}
-function card(c, { color = '#2f6fd0', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-card="1" transform="translate(0 10) rotate(90)">
-          <rect x="-15" y="-21" width="30" height="20" rx="2.6" fill="${color}" stroke="${line}" stroke-width=".9"/>
-          <path d="M -15 -9 H 15" stroke="#ffffff" stroke-width="1.6" opacity=".35"/>
-          <rect x="-11" y="-18" width="7" height="5.4" rx="1.2" fill="#f2c94c" stroke="#a88424" stroke-width=".6"/>
-          <path d="M -11 -5 h 9 M 3 -5 h 7" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
-          <path d="M 7 -17 q 2 2 0 4 M 9.5 -18.5 q 3.4 3.5 0 7" stroke="#ffffff" stroke-width="1" fill="none" stroke-linecap="round"/>
-        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}${tingBadge(26)}`;
-}
-function stampcard(c, { color = '#ffffff', band = '#2f9e8f', stamped = false, grip = true } = {}) {
-  const line = lineOf(c);
-  const ring = (x, y, done) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${band}" stroke-width=".8" opacity=".8"/>${done ? `<circle cx="${x}" cy="${y}" r="2" fill="${band}" opacity=".7"/>` : ''}`;
-  return `
-        <g data-stampcard="1" transform="translate(0 10) rotate(90)"><circle data-stampspot="1" cx="13.5" cy="-16" r="0.6" fill="none"/>
-          <rect x="-20" y="-28" width="40" height="27" rx="2.4" fill="${color}" stroke="${line}" stroke-width=".9"/>
-          <rect x="-20" y="-28" width="40" height="7" rx="2.4" fill="${band}"/><path d="M -15 -24.5 h 12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-          ${[-13.5, -4.5, 4.5, 13.5].map((x, n) => ring(x, -16, n < 3)).join('')}${[-13.5, -4.5, 4.5, 13.5].map((x) => ring(x, -7, false)).join('')}
-          <g data-stampink="${stamped ? 'always' : '1'}" style="${stamped ? '' : 'display:none'}" transform="translate(13.5 -16)">
-            <circle r="5.6" fill="#e8f0f0" fill-opacity=".2" stroke="#d1263b" stroke-width="1.6"/><circle r="3.4" fill="none" stroke="#d1263b" stroke-width=".9"/>
-            <path d="M -2 1.4 h 4 M -1.2 -0.6 l 1.2 -1.6 l 1.2 1.6" stroke="#d1263b" stroke-width="1" fill="none" stroke-linecap="round"/></g>
-        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
-}
-const banknote = (fill = '#bfe3c6', edge = '#2f7a4f', mark = '#2f7a4f') => `
-          <rect x="-15" y="-7" width="30" height="14" rx="1.6" fill="${fill}" stroke="${edge}" stroke-width="1"/>
-          <rect x="-12.6" y="-4.8" width="25.2" height="9.6" rx="1" fill="none" stroke="${mark}" stroke-width=".6" opacity=".7"/>
-          <circle cx="-5" cy="0" r="3.3" fill="${mark}" opacity=".55"/><path d="M 1.5 -2.4 h 8 M 1.5 0.4 h 6 M 1.5 3 h 8" stroke="${mark}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`;
-function cash(c, { grip = true } = {}) {
-  return `
-        <g data-cash="1" transform="translate(0 10) rotate(90)">
-          <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
-        </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
-}
-return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, leash, pills, bag, card, stampcard, banknote, cash };
-})();
 __m['runtime/schema.js'] = (function () {
 const DEFINITION_KEYS = {
   name: 'ten', colors: 'mau', restPose: 'nghi',
@@ -10537,14 +10901,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
-          const across = actor.width * 0.32 * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 150, 0.6, 1) : 1), deep = across * 0.55, lifted = (rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1)
+          let across = actor.width * 0.32 * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 150, 0.6, 1) : 1), deep = across * 0.55, lifted = (rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1)
             * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 120, 0.55, 1) : 1);       // đợt 42 D: bay khỏi sàn (chạy, nhảy) — bóng ở lại, nhạt đi
+          const lay42e = rig && rig.lay42e && rig.s && rig.s.lie42e > 0.02 ? rig.lay42e : null, frame42e = actor.width / 400;
+          let shift42e = 0, up42e = 0;
+          if (lay42e) { const k = clamp(lay42e.blend, 0, 1); across += ((lay42e.x1 - lay42e.x0) * frame42e * 0.95 - across) * k; shift42e = ((lay42e.x0 + lay42e.x1) / 2 - 200 - (rig.s.x || 0)) * frame42e * k; up42e = (rig.s.lieLift42e || 0) * frame42e * k; deep = Math.max(deep, actor.width * 0.12); }
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
           castShadows(actor, rank, seen);
           wallShadow(actor, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
-            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+            transform: `translate3d(${(actor.where + shift42e - across / 2).toFixed(2)}px, ${(-actor.spot.y - up42e - (actor.spot.y > 0 || up42e ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         const own = rig.s.huong === actor.wrote ? actor.base : rig.s.huong;
@@ -10649,7 +11016,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       return frame;
     },
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null, fill: share = null } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null, fill: share = null, view42c = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -10671,14 +11038,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const upper = u && u.width ? { x0: toX(u.left), x1: toX(u.right) } : null;
         const coreEls = [actor.rig.el && actor.rig.el.dau, actor.rig.el && actor.rig.el.ao].filter(Boolean).map(drawnRect).filter((r) => r.width > 0);
         const core = coreEls.length && typeof actor.rig.seatY === 'function' ? { x0: toX(Math.min(...coreEls.map((r) => r.left))), x1: toX(Math.max(...coreEls.map((r) => r.right))) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig,
+                 lying: !!(actor.rig.s && actor.rig.s.lie42e > 0.5) };          // đợt 42 E: người NẰM — khung lấy cả thân nằm (xem `regionOf`)
       };
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
       const mixedClose = wanted.some((actor) => actor.rig && typeof actor.rig.seatY === 'function') && wanted.some((actor) => actor.rig && typeof actor.rig.seatY !== 'function');
       const regionOf = (m) => {
         const h = m.top - m.base;
         if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
-        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
+        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base, padX42c = tall && !share && size !== 'full' && !shots.some((q) => q.person) ? 0.015 : 0.1; return { x0: m.x0 - padX42c * w, x1: m.x1 + padX42c * w, y0: m.base, y1: m.top + 0.35 * h }; }
+        if (m.lying) { const w = m.x1 - m.x0; return { x0: m.x0 - 0.05 * w, x1: m.x1 + 0.05 * w, y0: m.base - 0.04 * h, y1: m.top + 0.1 * h }; }
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
         if (size === 'close' && mixedClose && m.head) {
           const hw = m.head.x1 - m.head.x0, pets = shots.filter((q) => !q.person), side = pets.length && (pets[0].x0 + pets[0].x1) / 2 > (m.head.x0 + m.head.x1) / 2 ? 1 : -1;
@@ -10687,7 +11056,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         return { x0: across.x0, x1: across.x1, y0: size === 'close' ? m.base + 0.62 * h : size === 'medium' ? m.base + 0.45 * h : m.base, y1: m.top + (size === 'close' ? 0.08 * h : 0) };
       };
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core), lying: !!(a.lying || b.lying) } : a || b);
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
       const mergeHead = (a, b) => (a && b ? merge(a, b) : a || b);
       const mergeOther = (a, b) => (a && b ? { ...merge(a, b), head: mergeHead(a.head, b.head) } : a || b);
@@ -10700,10 +11069,11 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       shots = shots.filter(Boolean);
       if (!shots.length) throw new Error('[character] set.frameOn: the subjects are not visible');
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
-      const fill = share || (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      const share0_42c = share, PET_ONLY_FILL_42c = { close: 0.85, medium: 0.66 }, petOnly42c = view42c && !shots.some((m) => m.person) ? PET_ONLY_FILL_42c[size] : null;      // chỉ góc "view" của kịch bản (`frameAt`) — góc tự chọn của `direct` giữ như cũ
+      const fill = share || petOnly42c || (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
-        const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
+        const across = wide || (H > W * 1.2 ? (petOnly42c && !share0_42c ? 0.985 : 0.9) : 0.75);      // đợt 42 C: khung dọc, con vật nằm ngang — bề ngang là giới hạn, cho tới 97 %
         const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (share * H), (region.x1 - region.x0) / (across * W)));
         const middle = H > W * 1.2 ? 0.55 : 0.5;
         return { x: (region.x0 + region.x1) / 2, y: (region.y0 + region.y1) / 2 - (0.57 - middle) * H * distance / k, distance };
@@ -10753,6 +11123,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
         if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3) && test.distance <= limit) { region = wider; cam = test; }
       }
+      const petView42c = !!petOnly42c && !(avoid && !avoid.length);
+      const body42c = () => { const q = shots.reduce((q, m) => ({ x0: Math.min(q.x0, m.x0), x1: Math.max(q.x1, m.x1) }), { x0: Infinity, x1: -Infinity }), pad = 0.06 * (q.x1 - q.x0); return { x0: q.x0 - pad, x1: q.x1 + pad }; };      // thân con vật + 6 % mỗi bên (đuôi, tai không chạm mép)
+      let propCut42c = () => false;      // đợt 42 C: đặt máy ở x thì còn đồ đạc lẹm mép? (gán ở khối đồ đạc dưới)
       let stillCut = 0;                                                                   // đồ đạc quan trọng còn lẹm mép (`direct`, đợt 31)
       {
         const zMeanProps = shots.reduce((sum, m) => sum + m.z, 0) / shots.length;
@@ -10760,6 +11133,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           .concat(actors.filter((actor) => !actor.rig && !actor.lamp && actor.content && actor.width).map((actor) => {
             const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z, near: actor.spot.z, far: actor.spot.z, kind: propKind(actor) };
           }));
+        propCut42c = (x) => spans.filter((span) => span.z <= zMeanProps + 150).reduce((sum, span) => {      // mức lẹm mép của đồ đạc nếu đặt máy ở x (0 = sạch)
+          const half = (W / 2) * cam.distance / k, f = cam.distance / (cam.distance + (zMeanProps - span.z)), a = x + (span.a - x) * f, b = x + (span.b - x) * f;
+          if (b - a > 2 * half) return sum;
+          const shown = (Math.min(b, x + half) - Math.max(a, x - half)) / (b - a);
+          return shown <= 0.01 || shown >= 0.99 ? sum : sum + Math.min(shown, 1 - shown) + 0.05;
+        }, 0);
         for (const span of spans) {
           const front = span.z > zMeanProps + 150;
           const half = (W / 2) * cam.distance / k, plane = (x) => cam.x + (x - cam.x) * cam.distance / (cam.distance + (zMeanProps - span.z));
@@ -10769,7 +11148,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const clear = a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97;
           if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || clear) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
-          const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
+          const fitBox42c = petView42c ? body42c() : region, fits = (x) => fitBox42c.x0 >= x - half && fitBox42c.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : petView42c ? 0.9 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
           if (fits(out)) cam = { ...cam, x: out }; else if (!front && fits(into)) cam = { ...cam, x: into };
           else if (!front && size === 'full') {
@@ -10792,7 +11171,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             region = wider; cam = test;
           }
         }
-        if (size !== 'close' || mixedClose) {
+        if (size !== 'close' || mixedClose || petView42c || tall) {      // đợt 42 C: góc cận khung dọc cũng né đồ đạc lẹm mép (chỉ dời / vào gần, không lùi)      // đợt 42 C: góc cận chỉ có con vật cũng né đồ đạc lẹm mép
           const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
           const backed = spans.filter((span) => span.z <= zMeanProps + 150).map((span) => ({ ...span, weight: limit === Infinity || importantProp(span) ? 1 : 0.25 }));
           let vital = 0;
@@ -10814,15 +11193,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           };
           let best = { cam: base, bad: badness(base), cost: 0, vital };
           if (best.bad > 0) {
-            const top = Math.min(size === 'full' ? (portrait ? 1.6 : 1.35) : (portrait ? 1.6 : 1.45), limit / base.distance);
-            for (let factor = 1; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
-              const distance = Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;
-              const shift = size === 'full' ? Infinity : half * (portrait ? 0.7 : 0.35);
-              const lo = Math.max(region.x1 - half, base.x - shift), hi = Math.min(region.x0 + half, base.x + shift);
+            const top = Math.min(size === 'full' ? (portrait ? 1.6 : 1.35) : petView42c ? 1.1 : size === 'close' && !mixedClose ? 1 : (portrait ? 1.6 : 1.45), limit / base.distance);      // petOnly42c: lùi quá 10 % là con vật bé lại
+            const zoomIn42c = petView42c ? 0.65 : tall && size === 'close' && !mixedClose ? 0.8 : 1;
+            for (let factor = zoomIn42c; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
+              const distance = zoomIn42c < 1 ? Math.max(250, base.distance * factor) : Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;      // petView42c: cũng thử VÀO gần hơn (đồ đạc ra hẳn khung, con vật to hơn)
+              const shift = size === 'full' ? Infinity : half * (portrait || petView42c ? 0.9 : 0.35);
+              const fitBox = petView42c ? body42c() : region, lo = Math.max(fitBox.x1 - half, base.x - shift), hi = Math.min(fitBox.x0 + half, base.x + shift);
               if (lo > hi) continue;
               for (let n = 0; n <= 24; n++) {
                 const c = { ...base, x: lo + (hi - lo) * n / 24, y: base.y - c0 * (distance - base.distance), distance };
-                const bad = badness(c), cost = (factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
+                const bad = badness(c), cost = Math.abs(factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
                 if (bad < best.bad - 1e-6 || (Math.abs(bad - best.bad) < 1e-6 && cost < best.cost)) best = { cam: c, bad, cost, vital };
               }
             }
@@ -10845,7 +11225,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!cut) break;
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
         const x = outside(cut, half, margin, (cut.x0 + cut.x1) / 2 < cam.x);
-        if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) cam = { ...cam, x };
+        else if (petOnly42c) {
+          const body = body42c();
+          if (body.x0 >= x - half && body.x1 <= x + half && propCut42c(x) <= propCut42c(cam.x)) { cam = { ...cam, x }; continue; }      // không đổi người lẹm lấy TV lẹm
+          if (cut.person) {
+            const keep = cam, tighter = solve({ x0: body.x0, x1: body.x1, y0: region.y0, y1: region.y1 }, 0.95, 0.96);
+            cam = { ...tighter, x: (body.x0 + body.x1) / 2 };
+            const m = inPlane(cut.raw || cut), h2 = (W / 2) * cam.distance / k, seen2 = Math.max(0, Math.min(m.x1, cam.x + h2) - Math.max(m.x0, cam.x - h2));
+            if (tighter.distance < keep.distance && seen2 === 0 && propCut42c(cam.x) <= propCut42c(keep.x)) continue;
+            cam = keep;
+          }
+          break;
+        }
         else if (size === 'close' && cut.person) {
           const rig = (cut.raw || cut).rig;
           if (rig && !list.includes(rig)) { try { return set.frameOn([...list, rig], 'medium', { avoid, lens, zoom, at, seek, lamps, tight, limit }); } catch (error) { /* giữ cách cũ */ } }
@@ -10868,7 +11260,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             const lift = m.top - bottom + slack;
             if (region.y1 <= cam.y + above + lift - (above + below) * 0.02) { cam = { ...cam, y: cam.y + lift }; continue; }
             const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-            if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+            if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) { cam = { ...cam, x }; continue; }
             const pad = (region.y1 - region.y0) * 0.04, frame = region.y1 + pad - (m.top + slack);
             if (frame >= (region.y1 - region.y0) * 1.05) {
               const distance = frame * k / H, top = region.y1 + pad;
@@ -10883,14 +11275,23 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               const noted = (how) => set.ruleLog.push({ rule: 'petBottom', how, size, shown: +shown.toFixed(3) });
               if (test.distance <= cam.distance * 1.8 && test.distance <= limit) { region = wider; cam = test; noted('widen'); continue; }
               const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-              if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; noted('shift'); continue; }
+              if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) { cam = { ...cam, x }; noted('shift'); continue; }
             }
           }
           const ceiling = cam.y + above;
           if (m.person && m.top > ceiling && m.base < ceiling - (above + below) * 0.02 && m.base > region.y0 - (above + below) * 0.5) {
             const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-            if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
-            else {
+            if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) cam = { ...cam, x };
+            else if (petView42c) {
+              const petTop = Math.max(...shots.map((q) => q.top)), petBase = Math.min(...shots.map((q) => q.base)), h = petTop - petBase;
+              const chin = m.raw.head ? cam.y + (m.raw.head.base - cam.y) * depthF(m.raw) : m.top - 0.3 * (m.top - m.base);
+              const top = chin - 0.1 * h, bottom = petBase - 0.06 * h, distance = (top - bottom) * k / H;
+              if (petTop + 0.04 * h <= top && distance < cam.distance && distance >= 250) {
+                const body = body42c(), half2 = (W / 2) * distance / k, x2 = Math.min(Math.max(cam.x, body.x1 - half2), body.x0 + half2);
+                if (body.x0 >= x2 - half2 && body.x1 <= x2 + half2) cam = { ...cam, x: x2, distance, y: top - 0.57 * H * distance / k };
+              }
+            }
+            else {      // petView42c: giữ cỡ, không nới khung lấy người (con vật bé lại)
               const wider = { ...region, y1: Math.max(region.y1, m.top + (m.top - m.base) * 0.12) }, test = solve(wider, Math.max(fill, 0.8));      // chừa 12 %: đổi độ sâu chỉ gần đúng
               if (test.distance <= cam.distance * 2.5 && size === 'close' && m.rig && !list.includes(m.rig)) {
                 try { return set.frameOn([...list, m.rig], 'medium', { avoid, lens, zoom, at, seek, lamps, tight, limit }); } catch (error) { /* giữ cách cũ */ }
@@ -10923,24 +11324,24 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     ruleLog: [],                                                                           // luật khung hình đã chạy (đợt 32: con vật ở mép dưới)
     direct(tl, beats, { minShot = 2.5, pan = 1.2 } = {}) {
       const cuts = [], same = (a, b) => a.length === b.length && a.every((rig) => b.includes(rig));
-      const edgeCut = (v) => {
+      const edgeCut = (v, minorToo42c = false) => {
         const kept = { ...camera };
         trial = { ...v }; set.update();
-        const cut = set.propFraming().filter((p) => !p.minor && !p.front);
+        const cut = set.propFraming().filter((p) => (!p.minor || minorToo42c) && !p.front);      // minorToo42c: góc mở đầu — đồ phụ cũng không được lẹm (acting_check chấm vậy)
         trial = null; Object.assign(camera, kept); set.update();
         return cut;
       };
       const tallView = view.clientHeight > view.clientWidth * 1.2;
       const nameOfRig = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.id || actor.host.dataset.name || '' : ''; };
-      const nudge = (v, subjects) => {
-        const cut = edgeCut(v);
+      const nudge = (v, subjects, minorToo42c = false) => {
+        const cut = edgeCut(v, minorToo42c);
         if (!cut.length) return v;
         const names = subjects.map(nameOfRig), toward = cut[0].edge === 'right' ? 1 : -1;
         for (const sign of [toward, -toward]) for (const grow of [1, 1.04, 1.08, 1.12, 1.2, 1.3, 1.45]) for (const d of [0, 8, 16, 24, 32, 48, 64, 80]) {
           if (grow === 1 && !d) continue;
           const test = { ...v, x: +(v.x + sign * d).toFixed(1), distance: +(v.distance * grow).toFixed(1) }, kept = { ...camera };
           trial = { ...test }; set.update();
-          const props = set.propFraming().filter((p) => !p.minor && !p.front), people = set.framing().filter((c) => names.includes(c.name));
+          const props = set.propFraming().filter((p) => (!p.minor || minorToo42c) && !p.front), people = set.framing().filter((c) => names.includes(c.name));
           trial = null; Object.assign(camera, kept); set.update();
           if (props.length < cut.length && !people.length) { set.ruleLog.push({ rule: 'nudge', from: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), by: sign * d, grow }); return test; }
         }
@@ -11060,7 +11461,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
                              ...(reaction ? { then: { t: +reaction.at.toFixed(2), until: +reaction.until.toFixed(2), subjects: reaction.subjects.map(nameOf) } } : {}) });
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
-        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1));
+        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1), index === 0 && size === 'full');
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
@@ -11086,9 +11487,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const rig = actor.rig, e = rig.el || {}, person = typeof rig.seatY === 'function', at = set.project(actor.where, actor.spot.y, actor.spot.z), carried = !actor.host.contains(rig.svg);
         const feet = ['banL', 'banR', 'banNgL', 'banNgR'].map((key) => e[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0).map(rect);
         const hands = person ? ['L', 'R'].map((side) => e['coTay' + side] && { side, ...point(e['coTay' + side], 0, 10), box: rect(drawnRect(e['coTay' + side])) }).filter((h) => h && Number.isFinite(h.x)) : [];
-        const sitting = person && rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5);
-        const under = sitting ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
-        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.seatY()) : null;
+        const sitting = person && rig.s && ((rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)) || rig.s.floor42e > 0.5);          // đợt 42 E: ngồi bệt — lòng là đường "mặt ghế"
+        const under = sitting && !(rig.s.floor42e > 0.5) ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
+        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.s.floor42e > 0.5 && typeof rig.lapY42e === 'function' ? rig.lapY42e() : rig.seatY()) : null;
         const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
@@ -11105,7 +11506,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }) : [];
         const parts = !person && e.dau ? Object.fromEntries([['head', e.dau], ['back', e.than]].filter(([, el]) => el).map(([key, el]) => [key, rect(drawnRect(el))])
           .filter(([, r]) => r.x1 > r.x0 && r.y1 > r.y0)) : null;
-        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
+        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!sitting, ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
           paws: !person && !carried ? ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => e[key]).filter(Boolean).map((el) => rect(drawnRect(el))).filter((r) => r.y1 > r.y0) : [],
@@ -11121,6 +11522,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             tilt: +(rig.s.headTilt || 0).toFixed(2), x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, h: r.y1 - r.y0, pitchDeg: (rig.constructor && rig.constructor.LOOK_PITCH_DEG) || 32 }; })() : null,
           readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
+          floor42e: person && typeof rig.floorProbe42e === 'function' ? (() => { const q = rig.floorProbe42e(), P = (p) => p && point(rig.svg, p.x, p.y);
+            const under = props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60);
+            return { sit: q.sit, squat: q.squat, lie: q.lie, angle: q.angle, sofa: q.sofa, hip: P(q.hip), seat: P(q.seat), low: P({ x: q.hip.x, y: q.low }), floor: P({ x: q.hip.x, y: q.floor }), head: P(q.head),
+              ankles: q.ankles ? q.ankles.map(P) : null, items: q.items.map((it) => ({ ...it, at: P(it) })), pick: q.pick, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null }; })() : null,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           head: person && rig.s && rig.NGHI ? { tilt: +((rig.s.dau || 0) - (rig.NGHI.dau || 0)).toFixed(2), down: +((rig.s.dauY || 0) - (rig.NGHI.dauY || 0)).toFixed(2), pitch: +(rig.s.headPitch || 0).toFixed(3) } : null,
           gadgets: person ? ['L', 'R'].map((side) => { const el = e['gadget' + side]; if (!el || el.style.display === 'none') return null; const r = drawnRect(el);
@@ -11844,6 +12249,7 @@ const { child, teen, adult, tall, stocky } = __m['runtime/bodies.js'];
 const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald } = __m['runtime/hair.js'];
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash, bag } = __m['runtime/parts.js'];
 const { card, stampcard, cash } = __m['runtime/parts.js'];
+const { toy42e, bowl42e } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
@@ -11999,6 +12405,7 @@ function applyConfig(rig, config) {
 const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
+Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
 function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false, wear = [] } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;

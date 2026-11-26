@@ -180,6 +180,7 @@ SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 TARGETED.update({'tắm': ('bathPet', None), 'tắm cho': ('bathPet', None), 'tắm rửa': ('bathPet', None), 'đánh răng': ('brushTeeth', None), 'đánh răng cho': ('brushTeeth', None),
                  'chải răng': ('brushTeeth', None), 'lau khô': ('towelDry', None), 'lau khô lông': ('towelDry', None), 'lau khô cho': ('towelDry', None)})      # ĐỢT 42 F — tắm (con vật tự vào chậu tắm), đánh răng, lau khô bằng khăn
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
+ACTIONS.update({'ngồi bệt': 'sitOnFloor', 'ngồi xếp bằng': 'sitOnFloor', 'ngồi bệt xuống': 'sitOnFloor', 'nằm xuống': 'lieDown', 'nằm sàn': 'lieDown', 'nằm sofa': ['lieDown', 'sofa'], 'nằm ngủ': ['lieDown', 'floor', {'sleep': True}], 'nhặt': 'pickUp', 'nhặt lên': 'pickUp', 'nhặt đồ chơi': 'pickUp', 'nhặt bóng': 'pickUp'}); TARGETED.update({'nhặt': ('pickUp', None), 'nhặt lên': ('pickUp', None), 'nhặt đồ chơi': ('pickUp', None)})      # ĐỢT 42 E — sát sàn: ngồi bệt, nằm (sàn / sofa), nhặt đồ ("bé → chó: nhặt" — đồ chơi cạnh con chó)
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
 # ĐỢT 39 C — NGƯỜI DẪN (chỉ người): "bác sĩ: [giơ bảng: Giảm 20%]" (chữ trên bảng: 1–3 dòng ngắn, ngắt bằng "|"; có dấu phẩy thì đặt trong ngoặc kép —
 # [giơ bảng: "Giảm 20%, hôm nay"]), "[to cỡ này]" / "[nhỏ cỡ này]" / "[ra dấu kích thước]", "[selfie]" / "[chụp ảnh tự sướng]" / "[chụp hình]" (tự có điện thoại

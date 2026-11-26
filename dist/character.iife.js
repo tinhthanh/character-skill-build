@@ -238,6 +238,301 @@ function attachShade(svg, root) {
 return { localMatrix, outlinePoints, attachShade };
 })();
 
+/* ───── runtime/parts.js ───── */
+__m['runtime/parts.js'] = (function () {
+// parts.js — vài BỘ PHẬN vẽ sẵn cho nhân vật tuỳ chỉnh: kính, râu, ria, nếp nhăn, yếm tạp dề,
+// và đồ vật cầm tay (cốc, bìa kẹp hồ sơ, điện thoại).
+//
+// Mỗi hàm trả về một chuỗi SVG trong HỆ TOẠ ĐỘ TÂM ĐẦU, để đặt vào slot `faceExtras`
+// (kính) hoặc `beard` (râu, ria). `c` là bảng màu của nhân vật; màu mặc định lấy từ đó,
+// truyền `color` để chỉ định riêng.
+
+/** Kính gọng tròn. `x`, `y`: tâm tròng kính (mặc định khớp mắt chuẩn), `r`: bán kính tròng. */
+function roundGlasses(c, { x = 20, y = 2, r = 12, color = null, width = 2.4 } = {}) {
+  const stroke = color || c.accent || c.lineStroke;
+  return `
+            <g fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round">
+              <circle cx="${-x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
+              <circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
+              <path d="M ${-x + r} ${y - 2} Q 0 ${y - 7} ${x - r} ${y - 2}"/>
+              <path d="M ${-x - r} ${y - 2} L -47 ${y - 6} M ${x + r} ${y - 2} L 47 ${y - 6}"/>
+            </g>`;
+}
+
+/**
+ * Râu quai nón ngắn ôm hàm, có khoét quanh miệng. `chin`: cao độ đáy cằm của khuôn mặt
+ * (mặc định 54 — khớp cằm chuẩn; mặt ngắn hơn thì giảm), `mouthY`: cao độ miệng.
+ */
+function shortBeard(c, { color = null, chin = 54, mouthY = 30, width = 43 } = {}) {
+  const fill = color || c.hair;
+  return `
+            <path fill="${fill}" d="M ${-width} 10 Q ${-width - 2} ${chin - 12} ${-width * 0.55} ${chin - 1} Q 0 ${chin + 6} ${width * 0.55} ${chin - 1}
+              Q ${width + 2} ${chin - 12} ${width} 10 Q ${width - 5} ${mouthY - 8} ${width * 0.42} ${mouthY - 9}
+              Q 0 ${mouthY - 13} ${-width * 0.42} ${mouthY - 9} Q ${-width + 5} ${mouthY - 8} ${-width} 10 Z"/>
+            <path fill="${c.skin}" d="M -13 ${mouthY - 5} Q 0 ${mouthY - 9} 13 ${mouthY - 5} Q 14 ${mouthY + 7} 0 ${mouthY + 9} Q -14 ${mouthY + 7} -13 ${mouthY - 5} Z"/>`;
+}
+
+/** Ria mép. `mouthY`: cao độ miệng của nhân vật. */
+function moustache(c, { color = null, mouthY = 30, width = 17 } = {}) {
+  const fill = color || c.hair;
+  return `
+            <path fill="${fill}" d="M 0 ${mouthY - 9} Q ${-width * 0.5} ${mouthY - 13} ${-width} ${mouthY - 5} Q ${-width * 0.55} ${mouthY - 3.5} 0 ${mouthY - 5.5}
+              Q ${width * 0.55} ${mouthY - 3.5} ${width} ${mouthY - 5} Q ${width * 0.5} ${mouthY - 13} 0 ${mouthY - 9} Z"/>`;
+}
+
+// Màu nét cho các bộ phận dưới đây. Base `default` để trống `lineStroke` (rig tự suy khi vẽ áo),
+// nên phải có đường lui — nếu không sẽ ra `stroke="null"`.
+const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
+
+/** Nếp nhăn tuổi tác: hai vết chân chim ở đuôi mắt, hai rãnh má, hai nếp trán. Đặt vào `faceExtras`. */
+function wrinkles(c, { color = null, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true } = {}) {
+  const stroke = color || c.skinShadow || '#c9987a';
+  return `
+            <g fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" opacity=".8">
+              ${[-1, 1].map((g) => `
+              <path d="M ${g * (eyeX + 15)} ${eyeY - 3} l ${g * 5} -3 M ${g * (eyeX + 16)} ${eyeY + 2} l ${g * 5.500} 1"/>
+              <path d="M ${g * 15} ${mouthY - 14} Q ${g * 21} ${mouthY - 5} ${g * 18} ${mouthY + 3}"/>`).join('')}
+              ${forehead ? `<path d="M -15 ${eyeY - 31} Q 0 ${eyeY - 34} 15 ${eyeY - 31} M -11 ${eyeY - 25} Q 0 ${eyeY - 27.500} 11 ${eyeY - 25}"/>` : ''}
+            </g>`;
+}
+
+/**
+ * YẾM tạp dề: tấm che ngực và hai dây vòng qua cổ, trong hệ toạ độ THÂN. Đặt vào `accessories`
+ * (bên trong nhóm `<g id="${p}-accessories">`), ghép với `skirt: { kind: 'apron' }` cho phần dưới hông.
+ * `top`: cao độ mép trên của yếm (y, âm là lên; −70 ≈ ngang ngực) · `width`: NỬA bề ngang mép trên (16;
+ * người to ngang thì 22–26) · `waist`: cao độ mép dưới (y, 14 ≈ ngay trên gấu áo). Dây đeo tự nối từ hai
+ * góc trên lên cổ, yếm rộng hay hẹp cũng vậy.
+ */
+function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
+  const fill = color || c.skirt || c.accent || c.topShadow, line = lineOf(c);
+  return `
+        <path d="M ${-width + 2} ${top} Q ${-(width + 11) / 2} ${(top - 103) / 2 + 2} -9 -103 M ${width - 2} ${top} Q ${(width + 11) / 2} ${(top - 103) / 2 + 2} 9 -103" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+        <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
+}
+
+/* ── ĐỒ VẬT CẦM TAY — hệ toạ độ CỔ TAY: lòng bàn tay quanh (0, 10), ngón chỉ xuống +y.
+      Đặt vào `heldItemL` / `heldItemR`; nên cho bàn tay ấy nắm lại (`handL: 'fist'` trong restPose). */
+
+// Bốn ngón tay ÔM PHÍA TRƯỚC món đồ, vẽ SAU món đồ nên nằm trên nó. Rig vẽ bàn tay trước rồi mới tới món đồ: không
+// có lớp này thì cả bàn tay nằm sau cái cốc, chỉ ló mấy đầu ngón ở một mép — cốc trông như dán vào bụng hoặc cắm vào
+// cổ tay chứ không được cầm. Hệ toạ độ cổ tay: ngón chạy theo +y (hướng cẳng tay) từ mép phía cổ tay, vắt ngang món
+// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. NGÓN CÁI ló ra phía trên ngón trỏ, chếch về phía
+// miệng món đồ (+x): thiếu nó thì bốn ngón đọc thành bốn viên thuốc dán lên cốc. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
+// chảy liền vào các ngón; rig ẩn nắm tay phía sau món đồ khi có nhóm `data-grip` (nắm tay ló ra ở mép bên kia cái cốc,
+// đọc thành một bàn tay thứ hai).
+const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
+  const line = lineOf(c), band = (x, len) =>
+    `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
+  return `
+        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
+};
+
+// Món đồ DẸT (bìa hồ sơ, điện thoại) cầm kiểu khác: bốn ngón đỡ phía SAU, chỉ NGÓN CÁI đè lên mặt trước — vẽ bốn ngón
+// vắt ngang thì che mất tờ giấy hay màn hình. `far`: vị trí mép bên kia của món đồ (y); cho vào thì vẽ thêm ba đầu ngón
+// ló ra ở mép ấy.
+const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
+  const line = lineOf(c);
+  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
+  return `
+        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
+};
+
+/** Cốc giấy có nắp (cà phê mang đi), bàn tay nắm ngang thân cốc: bốn ngón ôm phía trước cốc (`grip: false` để bỏ). */
+// Đợt 39 A: `open: true` — cốc THUỶ TINH không nắp, đầy cà phê (cốc `pourDrink` rót vào). Rig đổi cốc nào cũng thành dáng ấy khi
+// kênh `brewL/R` > 0 (mức nước = kênh): `data-cup`, `data-cupbody`, `data-level` (mặt nước), `data-sleeve`, `data-lid`, `data-mouth` (miệng cốc).
+function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true, open = false, full = false } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-cup="${open || full ? 'open' : 'lid'}"${full ? ' data-full="1"' : ''} transform="translate(0 12) rotate(90) scale(${size})">
+          <path data-cupbody="${color}" d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${open || full ? '#e3f1f7' : color}" fill-opacity="${open || full ? 0.6 : 1}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
+          <path data-level="1" d="${open || full ? 'M -8.3 -15 L 8.3 -15 L 6.5 13 Q 0 15 -6.5 13 Z' : ''}" fill="#8a5432" style="${open || full ? '' : 'display:none'}"/>
+          <path data-sleeve="1" d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}" style="${open || full ? 'display:none' : ''}"/>
+          <path data-lid="1" d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round" style="${open || full ? 'display:none' : ''}"/>
+          <circle data-mouth="1" cx="0" cy="-17" r="0.6" fill="none"/>
+        </g>${grip ? gripFingers(c) : ''}`;
+}
+
+/** Bìa kẹp hồ sơ, cầm ở mép dưới: ngón cái đè lên mặt trước (`grip: false` để bỏ). */
+function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
+          <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
+          <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
+          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
+          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
+          <g data-page="-29"><path data-sheet="1" data-paper="${paper}" d="M -12 -29 H 12 V 3 H -12 Z" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
+            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
+          <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
+        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
+}
+
+
+// Đợt 39 A — "TING": dấu tick xanh trong vòng tròn + hai cung âm thanh, bật bởi kênh `ting` (`payByQR` / `payByCard`). Đặt trong hệ của MÓN ĐỒ
+// (đứng thẳng như món đồ), lệch lên phía trên (x dương) — `data-ting` để rig vẽ độ hiện / cỡ.
+const tingBadge = (x = 27) => `
+        <g data-ting="1" style="display:none"><g transform="translate(${x} 10)"><circle r="8.6" fill="#2fbf71" stroke="#16794a" stroke-width="1.2"/>
+          <path d="M 4 -3 L -1.2 3.8 L -4.6 0" transform="rotate(90)" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 0 -12.5 q 8 -2 14 0 M 0 12.5 q 8 2 14 0" stroke="#2fbf71" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".85"/></g></g>`;
+
+/**
+ * Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ).
+ * `image`: ảnh hiện trên màn hình (đường dẫn hay data URL — giao diện app chẳng hạn), lấp đầy màn hình, cắt theo góc bo.
+ * Có sẵn MẶT LƯNG (`data-back`, ẩn) — rig lật sang nó khi áp điện thoại lên má (`call`), xem trạng thái `itemBack`.
+ */
+function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
+  const line = lineOf(c);
+  // Mã cắt riêng cho từng lần vẽ: hai nhân vật cùng cầm điện thoại có ảnh thì clipPath không được trùng id.
+  const clip = 'vgPhoneClip' + (phoneClipCount++);
+  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
+          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
+  return `
+        <g transform="translate(0 10) rotate(90)">
+          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
+          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
+          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
+        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}${tingBadge()}`;
+}
+let phoneClipCount = 0;
+
+/**
+ * ỐNG TIÊM cầm dọc, mũi kim chúc xuống: thân trong suốt có vạch, thuốc màu `liquid`, pít-tông (`data-plunger`) trượt
+ * xuống khi tiêm (`rig.inject()` lái kênh `plunger`). Ngón cái đè lên mặt trước. `data-syringe` để `inject` nhận ra.
+ */
+function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-syringe="1" transform="translate(0 10) rotate(90) translate(0 -4)">
+          <g data-plunger="9"><rect x="-1.4" y="-26" width="2.8" height="14" fill="#c9ced6" stroke="${line}" stroke-width=".7"/><rect x="-5" y="-28" width="10" height="3" rx="1.2" fill="#e8ebef" stroke="${line}" stroke-width=".8"/></g>
+          <rect x="-4" y="-14" width="8" height="24" rx="1.5" fill="#f4f8fb" fill-opacity=".85" stroke="${line}" stroke-width=".9"/>
+          <rect x="-3.2" y="-3" width="6.4" height="12.4" fill="${liquid}" opacity=".85"/>
+          <path d="M -4 -6 h 3 M -4 -1 h 3 M -4 4 h 3" stroke="${line}" stroke-width=".6" opacity=".6"/>
+          <rect x="-6" y="-15.5" width="12" height="2.4" rx="1" fill="#e8ebef" stroke="${line}" stroke-width=".7"/>
+          <path d="M -1.6 10 h 3.2 l -1 3 h -1.2 z" fill="#c9ced6" stroke="${line}" stroke-width=".5"/>
+          <path d="M 0 13 V 25" stroke="#9aa3ad" stroke-width="1" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
+}
+
+/** QUAI DÂY DẮT (vòng quai và một đoạn dây thả xuống): cầm để `leash(pet)` — dây tới vòng cổ con vật do rig vẽ. */
+function leash(c, { color = '#c0392b', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-leash="1" transform="translate(0 12)">
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${line}" stroke-width=".7" opacity=".5"/>
+          <rect x="-7.5" y="-3" width="15" height="6" rx="2.5" fill="${color}" stroke="${line}" stroke-width=".9"/>
+        </g>${grip ? gripFingers(c, { reach: 15 }) : ''}`;
+}
+
+/** LỌ THUỐC (hộp thuốc viên có nắp, nhãn): đưa cho chủ nuôi, giới thiệu đơn thuốc. */
+function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g transform="translate(0 12) rotate(90)">
+          <rect x="-9" y="-13" width="18" height="24" rx="3" fill="${color}" stroke="${line}" stroke-width="1"/>
+          <rect x="-10" y="-19" width="20" height="7" rx="2" fill="${cap}" stroke="${line}" stroke-width="1"/>
+          <rect x="-7" y="-7" width="14" height="10" rx="1.2" fill="${label}" stroke="${line}" stroke-width=".6"/>
+          <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
+}
+
+/**
+ * TÚI THUỐC (đợt 38 C): túi giấy nhỏ của nhà thuốc, cầm ở QUAI — thân túi treo dưới bàn tay; dải màu phòng khám và một dấu
+ * cộng trắng trên vòng tròn. `data-bag` để `handOverBag` / `takeBag` nhận ra. Hệ toạ độ như các món khác (−y là phía trên).
+ */
+function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-bag="1" transform="translate(0 10) rotate(90)">
+          <path d="M -6 3 Q -6 -8 0 -8 Q 6 -8 6 3" fill="none" stroke="#c9b48f" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M -15 3 L 15 3 L 16.5 40 Q 0 42 -16.5 40 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -15 3 L 15 3 L 15.2 8 L -15.2 8 Z" fill="#e8e3d8" stroke="${line}" stroke-width=".7"/>
+          <path d="M -15.6 30 L 15.6 30 L 16.1 36 L -16.1 36 Z" fill="${band}"/>
+          <circle cx="0" cy="19" r="7.5" fill="${band}"/>
+          <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
+        </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
+}
+
+/**
+ * ĐỢT 39 A — THẺ NGÂN HÀNG (`payByCard`): thẻ nhựa xanh có chip vàng, cầm dọc mép dưới (ngón cái ở mặt trước). `data-card` để rig
+ * nhận ra. Hệ toạ độ như điện thoại.
+ */
+function card(c, { color = '#2f6fd0', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-card="1" transform="translate(0 10) rotate(90)">
+          <rect x="-15" y="-21" width="30" height="20" rx="2.6" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <path d="M -15 -9 H 15" stroke="#ffffff" stroke-width="1.6" opacity=".35"/>
+          <rect x="-11" y="-18" width="7" height="5.4" rx="1.2" fill="#f2c94c" stroke="#a88424" stroke-width=".6"/>
+          <path d="M -11 -5 h 9 M 3 -5 h 7" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+          <path d="M 7 -17 q 2 2 0 4 M 9.5 -18.5 q 3.4 3.5 0 7" stroke="#ffffff" stroke-width="1" fill="none" stroke-linecap="round"/>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}${tingBadge(26)}`;
+}
+
+/**
+ * ĐỢT 39 A — THẺ TÍCH ĐIỂM / SỔ TIÊM (`stampCard`): thẻ trắng dải màu phòng khám, tám ô tròn — ba ô đã có dấu chân, ô thứ tư nhận
+ * DẤU ĐỎ (`data-ink`, rig bật theo kênh `inkL/R`; `stamped: true` = đã đóng sẵn). `data-stampcard` để rig nhận ra.
+ */
+function stampcard(c, { color = '#ffffff', band = '#2f9e8f', stamped = false, grip = true } = {}) {
+  const line = lineOf(c);
+  const ring = (x, y, done) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${band}" stroke-width=".8" opacity=".8"/>${done ? `<circle cx="${x}" cy="${y}" r="2" fill="${band}" opacity=".7"/>` : ''}`;
+  return `
+        <g data-stampcard="1" transform="translate(0 10) rotate(90)"><circle data-stampspot="1" cx="13.5" cy="-16" r="0.6" fill="none"/>
+          <rect x="-20" y="-28" width="40" height="27" rx="2.4" fill="${color}" stroke="${line}" stroke-width=".9"/>
+          <rect x="-20" y="-28" width="40" height="7" rx="2.4" fill="${band}"/><path d="M -15 -24.5 h 12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+          ${[-13.5, -4.5, 4.5, 13.5].map((x, n) => ring(x, -16, n < 3)).join('')}${[-13.5, -4.5, 4.5, 13.5].map((x) => ring(x, -7, false)).join('')}
+          <g data-stampink="${stamped ? 'always' : '1'}" style="${stamped ? '' : 'display:none'}" transform="translate(13.5 -16)">
+            <circle r="5.6" fill="#e8f0f0" fill-opacity=".2" stroke="#d1263b" stroke-width="1.6"/><circle r="3.4" fill="none" stroke="#d1263b" stroke-width=".9"/>
+            <path d="M -2 1.4 h 4 M -1.2 -0.6 l 1.2 -1.6 l 1.2 1.6" stroke="#d1263b" stroke-width="1" fill="none" stroke-linecap="round"/></g>
+        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+
+// Một tờ tiền (hệ cục bộ: tâm ở gốc, nằm ngang 30 × 14): giấy xanh nhạt, viền đậm, ô chân dung, hai dòng số — đủ rõ ở cảnh trung.
+const banknote = (fill = '#bfe3c6', edge = '#2f7a4f', mark = '#2f7a4f') => `
+          <rect x="-15" y="-7" width="30" height="14" rx="1.6" fill="${fill}" stroke="${edge}" stroke-width="1"/>
+          <rect x="-12.6" y="-4.8" width="25.2" height="9.6" rx="1" fill="none" stroke="${mark}" stroke-width=".6" opacity=".7"/>
+          <circle cx="-5" cy="0" r="3.3" fill="${mark}" opacity=".55"/><path d="M 1.5 -2.4 h 8 M 1.5 0.4 h 6 M 1.5 3 h 8" stroke="${mark}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`;
+
+/**
+ * ĐỢT 39 A — XẤP TIỀN (`giveChange` / `takeChange`): vài tờ tiền xếp chồng, xoè lệch nhau, cầm ở một đầu (ngón cái đè lên mặt trước).
+ * `data-cash` để rig nhận ra. Hệ toạ độ như điện thoại.
+ */
+function cash(c, { grip = true } = {}) {
+  return `
+        <g data-cash="1" transform="translate(0 10) rotate(90)">
+          <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
+        </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
+}
+
+// ĐỢT 42 E — đồ NHẶT DƯỚI SÀN lên (`pickUp`): quả bóng đồ chơi và cái bát ăn của thú. Cùng hình với món đồ rig vẽ nằm dưới sàn (`toyShape42e`,
+// `bowlShape42e`: hệ cục bộ, đáy món đồ ở y = 0, tâm ngang ở x = 0), để lúc bàn tay nắm lấy món đồ trong tay trông đúng là món dưới sàn.
+const toyShape42e = (color = '#f2b134', band = '#e0533d') => `
+          <circle cx="0" cy="-11" r="11" fill="${color}" stroke="#a8701a" stroke-width="1.2"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="${band}" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="#ffffff" stroke-width=".8" opacity=".5"/>
+          <circle cx="-4" cy="-16" r="2.6" fill="#ffffff" opacity=".55"/>`;
+const bowlShape42e = (color = '#d9534f', food = '#a0643a') => `
+          <ellipse cx="0" cy="-12" rx="17" ry="4" fill="${food}"/>
+          <path d="M -18 -12 Q -17 -1 -10 0 L 10 0 Q 17 -1 18 -12 Q 0 -8 -18 -12 Z" fill="${color}" stroke="#8c2f2b" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -18 -12 Q 0 -16 18 -12" fill="none" stroke="#8c2f2b" stroke-width="1.1"/>
+          <path d="M -12 -6 Q 0 -3 12 -6" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".35"/>`;
+
+/** ĐỢT 42 E — QUẢ BÓNG ĐỒ CHƠI cầm trong tay (sau `pickUp`; đưa cho người khác bằng `handOver`): các ngón ôm phía trước quả bóng. */
+function toy42e(c, { color = '#f2b134', band = '#e0533d', grip = true } = {}) {
+  return `
+        <g data-toy42e="1" transform="translate(0 6) rotate(90) translate(11 11)">${toyShape42e(color, band)}</g>${grip ? gripFingers(c, { reach: 19, from: -3 }) : ''}`;
+}
+
+/** ĐỢT 42 E — BÁT ĂN của thú cầm ở vành (sau `pickUp`): ngón cái đè lên vành bát. */
+function bowl42e(c, { color = '#d9534f', food = '#a0643a', grip = true } = {}) {
+  return `
+        <g data-bowl42e="1" transform="translate(0 4) rotate(90) translate(26 12)">${bowlShape42e(color, food)}</g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+
+return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, leash, pills, bag, card, stampcard, banknote, cash, toyShape42e, bowlShape42e, toy42e, bowl42e };
+})();
+
 /* ───── runtime/rig-svg.js ───── */
 __m['runtime/rig-svg.js'] = (function () {
 // rig-svg.js — Nhân vật 2D SVG thuần, điều khiển bằng GSAP (global `gsap`).
@@ -262,6 +557,8 @@ __m['runtime/rig-svg.js'] = (function () {
 
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
 const { attachShade, outlinePoints } = __m['runtime/shading.js'];
+// đợt 42 E: món đồ nhặt dưới sàn lên (`pickUp`) — quả bóng, bát ăn, dây dắt
+const { toy42e, bowl42e, leash, toyShape42e, bowlShape42e } = __m['runtime/parts.js'];
 
 const KHUNG = { w: 400, h: 470 };
 const DOI_Y = 30;                              // chừa chỗ phía trên cho đầu to / tóc búi            // bao được tư thế rộng nhất (present)
@@ -275,6 +572,11 @@ const NGHI = Object.freeze({
   seat: 0,                 // 0…1 ngồi: đùi rút ngắn về phía người xem, ống chân giữ nguyên (xem apDung)
   ride: 0,                 // 0…1 CẦM LÁI xe máy (`ride`): nghiêng hẳn, đùi nằm ngang ra trước, hai tay nắm tay lái (xem apDung)
   kneel: 0,                // 0…1 QUỲ (cộng với `seat` = 1): ống chân cũng chĩa về phía người xem, rút ngắn một nửa — người hạ thêm
+  // ĐỢT 42 E — SÁT SÀN: `floor42e` 0…1 NGỒI BỆT xếp bằng (hai đùi xoè ngang, hai ống chân gập chéo trước bụng, mông chạm sàn — `sitOnFloor`);
+  // `squat42e` 0…1 NGỒI XỔM nhìn nghiêng (đùi chĩa ra trước–lên, gót sau gối, bàn chân áp sàn — `pickUp`); `lie42e` 0…1 NẰM (cả người xoay
+  // quanh hông tới gần nằm ngang — `lieDown`), `lieDir42e` −1 đầu về bên trái / +1 bên phải, `lieLift42e` mặt nằm cao hơn sàn bao nhiêu (đơn vị
+  // khung: 0 sàn, mặt sofa), `nap42e` 0…1 mắt nhắm (ngủ); `picked42e` số món đồ đã NHẶT khỏi sàn (món thứ n nằm dưới sàn khi `picked42e` < n − 0,5).
+  floor42e: 0, squat42e: 0, lie42e: 0, lieDir42e: -1, lieLift42e: 0, nap42e: 0, picked42e: 0,
   matY: 0, nhinX: 0, nhinY: 0,
   mayL: 0, mayR: 0, mieng: 0, chum: 0, cuoi: 0.35,
   itemL: 1, itemR: 1,      // độ hiện của đồ vật cầm ở tay trái / phải (0 = cất đi)
@@ -532,6 +834,13 @@ const RIDE_THIGH = 84;                    // cầm lái: đùi gần (độ) xoa
 const RIDE_KNEE = 76;                     // …ống chân gập lại gần thẳng đứng, bàn chân hơi ra trước (sàn để chân)
 const RIDE_LEAN = 7;                      // …lưng hơi đổ về trước
 const RIDE_ARM = [56, 24];                // …hai tay (góc trên màn hình, về phía mặt): bắp tay ra trước–xuống, cẳng tay ngang hơn tới tay lái
+// ĐỢT 42 E — sát sàn (độ / tỉ lệ). NGỒI BỆT nhìn thẳng: đùi xoè ra ngang (`thigh`), rút ngắn vì chĩa cả về phía người xem (`seen`), ống chân gập
+// ngược vào (`knee`, so với đùi) gần nằm ngang chéo trước bụng; nhìn nghiêng: đùi chĩa ra trước (`thighSide`), ống chân gập về sau dưới đùi (`kneeSide`).
+const FLOOR42E = { thigh: 72, seen: 0.38, knee: 150, thighSide: 84, kneeSide: 158 };
+// NGỒI XỔM (nhìn nghiêng): đùi ra trước, đầu gối cao hơn hông một chút (`thigh`), ống chân chéo về sau (gót sau gối: `knee` so với đùi), lưng
+// đổ về trước `lean` độ — lưng thẳng, gập ở hông và gối, không cúi khom.
+const SQUAT42E = { thigh: 100, knee: 125, lean: 30 };
+const LIE42E = { tilt: 9 };               // nằm: thân xoay (90 − tilt)° — phía đầu nhấc lên chút, gối lên cánh tay / gối tựa
 // Đợt 35 — dụng cụ & hồ sơ ở phòng khám.
 const BANDAGE_LOOP = 7;                   // bàn tay quấn băng đi một vòng elip bán kính chừng ấy quanh ống chân (đơn vị khung)
 const CONE_GRIP = 26;                     // loa chống liếm cầm ở mép: tâm vành cách lòng bàn tay chừng ấy (đơn vị khung, dọc cẳng tay)
@@ -1085,6 +1394,7 @@ class RigSVG {
   static { this.DONG_TAC.push('wipeCounter'); this.EXCHANGE.push('giveChange', 'takeChange', 'takeCard'); this.WITH_ITEM.push('payByQR', 'payByCard', 'stampCard', 'pourDrink'); }       // đợt 39 A
   static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   static { this.DONG_TAC.push('jump', 'dance'); this.DI_NGANG.push('run'); }       // đợt 42 D — nhảy lên, nhảy múa (tại chỗ); chạy (dời `x`, quay ngang)
+  static { this.STANCE.push('sitOnFloor', 'lieDown'); this.EXCHANGE.push('pickUp'); }       // đợt 42 E — ngồi bệt / nằm (thế giữ tới `standUp`); nhặt đồ (kết thúc với món đồ trong tay)
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return hatHienTai; }
@@ -1561,6 +1871,10 @@ class RigSVG {
   <g id="${p}-ring" style="display:none"><ellipse rx="40" ry="36" fill="#e6f3fa" fill-opacity=".72" stroke="#8fb8cf" stroke-width="3"/>
     <ellipse rx="28" ry="25" fill="none" stroke="#8fb8cf" stroke-width="1.6" opacity=".6"/>
     <path d="M -36 14 Q -32 -14 -12 -30" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/></g>
+  <!-- ĐỢT 42 E: dưới người NẰM — bóng dài trên sàn và gối tựa dưới đầu (khung gốc, không xoay theo người); món đồ nằm dưới sàn chờ NHẶT (\`pickUp\`). -->
+  <g id="${p}-under42e" style="display:none"><ellipse cx="0" cy="0" rx="1" ry="1" fill="#000" opacity=".26"/>
+    <g data-pillow="1"><rect x="-1" y="-1" width="2" height="2" rx="1" fill="#f3e3c3" stroke="#c9b28a" stroke-width="2"/><path d="M 0 0" stroke="#e1cda6" stroke-width="2" fill="none" data-seam="1"/></g></g>
+  <g id="${p}-drop42e"></g>
   <g id="${p}-goc">
     <ellipse id="${p}-bong" cx="200" cy="428" rx="62" ry="8" fill="#000" opacity=".28"/>
     <g id="${p}-sauChan"></g>
@@ -1701,6 +2015,7 @@ class RigSVG {
         R: Object.fromEntries([...q('tayR').children].map((g) => [g.dataset.tay, g])),
       },
     };
+    Object.assign(this.el, { under42e: q('under42e'), drop42e: q('drop42e') });      // đợt 42 E
     if (this.el.tocSau) this.el.tocSau.style.display = 'none';   // slot kiểu cũ: rig tự sinh tóc sau đầu
     // Dấu cảm xúc: cạnh góc trên bên phải đầu (toạ độ trong nhóm đầu, tâm mặt ở 0, −62) — cao hơn nữa thì ra khỏi khung SVG.
     this.markEl = attachMark(this.el.dau, [70, -128], 1.35);
@@ -1730,6 +2045,10 @@ class RigSVG {
     // trong hệ của `goc` bàn chân nằm ở 428 − doiChan chứ không phải 428.
     e.bong.setAttribute('transform', `translate(200 ${428 - doiChan - (seatDrop - bay42d) / (s.co || 1)}) scale(${1 - nhac * 0.25} 1) translate(-200 -428)`);   // trừ seatDrop: bóng nằm lại dưới bàn chân; cộng bay42d: bóng ở lại trên sàn
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
+    // ĐỢT 42 E: NGỒI XỔM — cả người lùi về sau đúng chừng bàn chân trượt ra trước (bàn chân đứng yên); NẰM — cả người xoay quanh hông, hạ
+    // xuống / dời ngang cho chỗ thấp nhất nằm đúng trên mặt sàn (mặt sofa) và thân nằm giữa chỗ đứng. Bóng trong khung thì mờ đi (bóng dài vẽ riêng).
+    const goc42e = this.#goc42e(seatDrop, doiChan);
+    if (goc42e) { e.goc.setAttribute('transform', goc42e.transform); if (goc42e.blend) e.bong.setAttribute('opacity', ((0.28 - nhac * 0.12) * (1 - goc42e.blend)).toFixed(3)); }
 
     // nhacL/R: gối đưa về phía người xem → chân ngắn lại (rút gọn phối cảnh), hơi xoè ra
     // Xoay người sang bên (huong: 0 = nhìn thẳng, 1 = nghiêng phải khi đi ngang):
@@ -1757,14 +2076,17 @@ class RigSVG {
     // chân gập lại gần thẳng đứng, bàn chân hơi đưa ra trước lên sàn để chân. Cộng vào chứ không ghi đè `dui`/`ong`: động
     // tác nào xong cũng khép hai kênh ấy về 0, còn `ride` là thế giữ (xem #khep).
     const ride = clamp(s.ride || 0, 0, 1);
-    const legDui = (ben) => s['dui' + ben] - dauH * ride * (ben === (h >= 0 ? 'L' : 'R') ? RIDE_THIGH : RIDE_THIGH - 6);
-    const legOng = (ben) => s['ong' + ben] + dauH * ride * RIDE_KNEE;
+    const legDui = (ben) => s['dui' + ben] - dauH * ride * (ben === (h >= 0 ? 'L' : 'R') ? RIDE_THIGH : RIDE_THIGH - 6) + this.#legAdd42e(ben, 'dui', h);      // + ngồi bệt / ngồi xổm (đợt 42 E)
+    const legOng = (ben) => s['ong' + ben] + dauH * ride * RIDE_KNEE + this.#legAdd42e(ben, 'ong', h);
     const goc = (dui, ong) => ah * dauH * (RigSVG.#lanBanChan(dauH * dui, dauH * ong) - dauH * (dui + ong));
     for (const ben of ['L', 'R']) {
       const dui = legDui(ben), ong = legOng(ben);
-      e['ban' + ben].setAttribute('opacity', 1 - ah);
-      e['banNg' + ben].setAttribute('opacity', ah);
-      const tf = `rotate(${goc(dui, ong)} 0 ${DAI.ong}) scale(${h < 0 ? -1 : 1} 1)`;
+      // ĐỢT 42 E: ngồi bệt / ngồi xổm — giày nhìn nghiêng, ÁP ĐẾ xuống sàn (xoay ngược đúng góc ống chân); ngồi bệt nhìn thẳng: mũi giày
+      // chĩa ra ngoài, về phía bàn chân ấy nằm (bàn chân trái nằm bên phải, dưới đùi phải).
+      const foot42e = this.#foot42e(ben, h, dui, ong);
+      e['ban' + ben].setAttribute('opacity', foot42e ? 1 - foot42e.side : 1 - ah);
+      e['banNg' + ben].setAttribute('opacity', foot42e ? foot42e.side : ah);
+      const tf = foot42e ? `rotate(${goc(dui, ong) * (1 - foot42e.flat) + foot42e.flat * foot42e.turn} 0 ${DAI.ong}) scale(${foot42e.mirror} 1)` : `rotate(${goc(dui, ong)} 0 ${DAI.ong}) scale(${h < 0 ? -1 : 1} 1)`;
       e['ban' + ben].setAttribute('transform', tf);
       e['banNg' + ben].setAttribute('transform', tf);
     }
@@ -1884,8 +2206,9 @@ class RigSVG {
       const arm = e['bat' + ben];
       if (arm.parentNode !== e.tren) continue;
       const beforeHead = !!(arm.compareDocumentPosition(e.dau) & Node.DOCUMENT_POSITION_FOLLOWING);
-      if (s['sauDau' + ben] >= 0.5 && !beforeHead) e.tren.insertBefore(arm, e.dau);
-      else if (s['sauDau' + ben] < 0.5 && beforeHead) e.tren.insertBefore(arm, e.phuKienTren);
+      const back = s['sauDau' + ben] >= 0.5 || this.#pillowArm42e() === ben;          // đợt 42 E: tay kê dưới đầu lúc nằm — đầu tựa lên nó
+      if (back && !beforeHead) e.tren.insertBefore(arm, e.dau);
+      else if (!back && beforeHead) e.tren.insertBefore(arm, e.phuKienTren);
     }
     e.phuKienTren.style.display = ah > 0.12 ? 'none' : '';
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
@@ -1981,7 +2304,7 @@ class RigSVG {
     const sitFold = -Math.sign(h) * 75 * sideSit;                                      // xoay dương = về bên trái màn hình
     // Phần thẳng đứng của đùi luôn bằng của dáng nhìn thẳng (1 − 0,72 × seat): đùi xoay φ thì dài thêm 1/cos φ — quay dở
     // (đang vuốt con chó, huong −0,3) mà để đùi dài theo `sideSit` thì đầu gối thấp quá, bàn chân lún 4,5 % chiều cao.
-    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
+    const thighSeen = (1 - clamp(s.seat, 0, 1) * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD) * this.#seen42e(ah), shinFix = ` scale(1 ${((1 - KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)) / thighSeen).toFixed(4)})`;
     e.chanL.setAttribute('transform', `rotate(${legDui('L') + s.nhacL * 6 + splay + sitFold}) scale(1 ${(1 - s.nhacL * 0.42) * thighSeen})`);
     e.chanR.setAttribute('transform', `rotate(${legDui('R') - s.nhacR * 6 - splay + sitFold}) scale(1 ${(1 - s.nhacR * 0.42) * thighSeen})`);
     e.ongL.setAttribute('transform', `translate(0 ${DAI.dui * daiDui})${shinFix} rotate(${legOng('L') - splay - sitFold})`);      // co ngược TRƯỚC rồi mới xoay: xoay trước thì phép co làm ống chân xiên đi
@@ -2293,6 +2616,8 @@ class RigSVG {
       rotation['bat' + side] += (-dauH * RIDE_ARM[0] - rotation['bat' + side]) * w;
       rotation['cang' + side] += (-dauH * RIDE_ARM[1] - rotation['cang' + side]) * w;
     }
+    // ĐỢT 42 E: NGỒI BỆT — hai bàn tay đặt lên hai đầu gối; NẰM — tay phía dưới kê dưới đầu. Tay đang diễn (giơ hẳn lên, `aim`, `ov`, bế) thì nhả.
+    const under42e = this.#arms42e(rotation, pivot, nhacY, cradle);
     e.batL.setAttribute('transform', `translate(${pivot.L.x} ${pivot.L.y}) rotate(${rotation.batL}) scale(1 ${(1 - (1 - tL.co) * cF) * shrink.L})`);
     e.batR.setAttribute('transform', `translate(${pivot.R.x} ${pivot.R.y}) rotate(${rotation.batR}) scale(1 ${(1 - (1 - tR.co) * cF) * shrink.R})`);
 
@@ -2458,7 +2783,7 @@ class RigSVG {
       if (chon === 'chao') e.tayG[ben].setAttribute('transform', `scale(${(guong * lat * hz).toFixed(3)} ${hz.toFixed(3)})`);
     }
 
-    const mi = Math.max(0.05, 1 - s.matY);
+    const mi = Math.max(0.05, 1 - Math.max(s.matY, clamp(s.nap42e || 0, 0, 1)));      // đợt 42 E: `nap42e` — nằm ngủ, mắt nhắm
     // `matCo` nhân vào CẢ HAI trục của phép co sẵn có (nheo theo góc xoay,
     // nhắm theo `matY`), nên nháy mắt và liếc mắt vẫn đúng ở mọi cỡ.
     const mc = this.nv.matCo;
@@ -2491,6 +2816,7 @@ class RigSVG {
     this.#drawNote();
     this.#drawReadout();
     this.#drawSign39();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
+    this.#draw42e(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
     this.#drawScales();
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
@@ -2798,6 +3124,8 @@ class RigSVG {
    */
   shotBox(kind = 'face') {
     const nv = this.nv, s = this.s;
+    const lying = this.#shotBox42e(kind);                     // đợt 42 E: người NẰM — khung ôm thân nằm ngang
+    if (lying) return lying;
     const drop = this.hangChan() + this.#lowered() + s.y - Math.max(0, s.lift42d || 0);      // đợt 42 D: đang bay khỏi sàn
     const headY = HONG.y + (nv.coDau * -62 + (-103 + nv.dauLech)) * nv.coThan + DOI_Y + drop;
     const head = 64 * nv.coDau * nv.coThan;                    // nửa bề cao đầu, tính cả tóc
@@ -2920,6 +3248,7 @@ class RigSVG {
     const so = {};
     for (const k in this.NGHI) if (typeof this.NGHI[k] === 'number' && k !== 'x') so[k] = this.NGHI[k];
     so.seat = this.s.seat; so.huong = this.s.huong; so.kneel = this.s.kneel; so.ride = this.s.ride;
+    for (const k of ['floor42e', 'lie42e', 'lieDir42e', 'lieLift42e', 'nap42e', 'picked42e']) so[k] = this.s[k];      // đợt 42 E: ngồi bệt, nằm, ngủ, đồ đã nhặt — thế giữ
     so.itemL = this.s.itemL; so.itemR = this.s.itemR;          // đồ vật đã cất thì vẫn cất
     so.phoneL = this.s.phoneL; so.phoneR = this.s.phoneR;      // đang áp điện thoại thì vẫn áp
     so.om = this.s.om; so.omRise = this.s.omRise;              // đang bế thú thì vẫn bế
@@ -3240,6 +3569,7 @@ class RigSVG {
   // Người HẠ XUỐNG bao nhiêu (đơn vị khung) vì ngồi (`seat`: đùi rút) và quỳ (`kneel`: ống chân rút thêm).
   #lowered() {
     const nv = this.nv, s = this.s;
+    if (s.floor42e > 0 || s.squat42e > 0) return this.#contactDrop42e();       // đợt 42 E: ngồi bệt / ngồi xổm — hạ đúng tới chỗ chân chạm sàn
     return DAI.dui * nv.daiDui * nv.coChan * 0.72 * clamp(s.seat, 0, 1) + DAI.ong * nv.daiOng * nv.coChan * KNEEL_SHIN * clamp(s.kneel || 0, 0, 1)
       + DAI.dui * nv.daiDui * nv.coChan * clamp(s.ride || 0, 0, 1);          // cầm lái: đùi nằm ngang — hông hạ đúng một đùi, bàn chân vẫn trên nền
   }
@@ -4564,6 +4894,7 @@ class RigSVG {
 
   // ĐÍCH THẤP (con vật dưới đất / trên bàn): tay nào vươn tới, góc bắp / cẳng, độ ngả người và độ khuỵu gối. `hand`: ép
   // dùng tay ấy (tay đang cầm ống tiêm); bỏ trống = tay ở phía con vật, tay ấy đang cầm đồ thì tay kia.
+  static FLOOR_FORE42E = 92;            // đợt 42 E: ngồi bệt vuốt con vật — cẳng tay gập tối đa (độ) khi dò chỗ đặt bàn tay lên đầu nó
   static SEATED_LEAN = 25;              // người ngồi cúi qua đầu gối tới con vật dưới sàn: tối đa bấy nhiêu độ (đợt 30)
   // VUỐT (đợt 32): bàn tay trượt ± 20 % bề ngang đầu con vật (tối đa 10 đơn vị khung), mép dưới bàn tay cao hơn đích 4 đơn vị —
   // đo trên b1 / b2 (tools/acting_check.py, dải mốc vuốt): rộng 30 % thì tay lún qua tai con mèo 22 %, không nâng thì 19 %.
@@ -4614,7 +4945,7 @@ class RigSVG {
     if (!hand && this.holds[k] && s['item' + k] > 0.5) k = k === 'L' ? 'R' : 'L';
     // Đích thấp hơn hông (con vật dưới đất) thì KHUỴU GỐI xuống — mượn kênh `seat` — cho bàn tay tới gần hơn; vai hạ
     // theo đúng phần thân vừa hạ, nên góc tay tính từ vai ĐÃ HẠ.
-    const crouch = s.seat > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
+    const crouch = s.seat > 0.5 || s.floor42e > 0.5 ? 0 : clamp((ty - HONG.y) / 140, 0, maxCrouch), drop = DAI.dui * this.nv.daiDui * this.nv.coChan * 0.72 * crouch;
     const armUpper = DAI.canhTay * this.nv.daiCanhTay, armFore = DAI.cangTay * this.nv.daiCangTay;
     // Tay Ở PHÍA con vật: duỗi thẳng tới nó. Tay BÊN KIA (vì tay phía con vật đang cầm đồ): không duỗi thẳng tới được —
     // cánh tay phải vắt ngang qua thân — nên gập cẳng tay đưa bàn tay sang phía con vật, trước bụng.
@@ -4624,7 +4955,7 @@ class RigSVG {
     let shoulder = { x: HONG.x + (VAI[k].x - HONG.x) * this.nv.coThan, y: this.#shoulderY() };
     // Thân ngả về phía con vật làm cánh tay bên ấy nhấc lên đúng chừng ấy độ — trừ đi, không thì bàn tay chĩa cao hơn đích.
     let lean = clamp((tx - HONG.x) * 0.06, -9, 9), tilt = Math.abs(lean), bend = 0;
-    if (s.seat > 0.5 && !across) {
+    if ((s.seat > 0.5 || s.floor42e > 0.5) && !across) {          // đợt 42 E: ngồi bệt cũng cúi qua đầu gối tới con vật
       // NGƯỜI NGỒI (đợt 30): vai thật đã hạ theo chỗ ngồi (`#shoulderY`) — tính từ vai đứng (`VAI`) thì góc tay dốc quá, bàn
       // tay đặt xuống đùi mình. Con vật dưới sàn ngoài đầu gối thì CÚI NGƯỜI qua đầu gối về phía nó (thân xoay quanh hông,
       // tới SEATED_LEAN độ) cho tới khi đầu nó vào tầm tay — bà trên sofa vuốt mèo: tay đặt trên gối mình, cách đầu mèo
@@ -4707,7 +5038,8 @@ class RigSVG {
    * một phần tử, hoặc { x, y } trong hệ viewBox — rồi vuốt ba nhịp. Không có đích thì vuốt một thứ ở cạnh chân phải.
    */
   stroke(target = null) {
-    const t = this.tl(), reach = this.#reachLow(target), { k, upper, fore } = reach, s = this.s;
+    const t = this.tl(), reach = this.#reachLow(target), { k } = reach, s = this.s;
+    let { upper, fore } = reach;
     this.#leanTo(t, reach, 'xoe');          // bàn tay XOÈ úp lên lưng con vật; dáng thả lỏng nhìn cạnh ở đầu một cánh tay duỗi chéo chỉ là một cái gai
     // TRƯỢT THEO ĐẦU (đợt 32): bàn tay đi tới đi lui giữa hai điểm trên cùng đường ngang của đích (đỉnh đầu con vật), mỗi điểm
     // một lời giải hai đốt tay — trước đây lắc khớp ±(4°, 9°) nên bàn tay vẽ một cung: nhấc khỏi đầu rồi lún qua viền nó (bà vuốt
@@ -4735,6 +5067,9 @@ class RigSVG {
     };
     // Trong TẦM TAY: điểm xa quá thì cánh tay duỗi thẳng mà cổ tay vẫn không xuống tới đường (bà ngồi sofa đã cúi hết 25°) —
     // bàn tay hở khỏi đầu con vật. Thu quãng trượt phía ấy lại cho tới khi khuỷu còn gập.
+    // ĐỢT 42 E: NGỒI BỆT — vai thấp, đỉnh đầu con vật ngang vai: dáng với tới ĐỈNH ĐẦU (`#reachLow`) gập khuỷu hất bàn tay lên quá đầu nó. Với tới
+    // đường MÉP DƯỚI bàn tay ngay từ đầu (như khi trượt); khi dò độ cao cổ tay bỏ các lời giải cẳng tay gập quá `FLOOR_FORE42E` (cẳng tay dựng đứng).
+    if (s.floor42e > 0.5) { const p = place(reach.tx); upper = p.upper; fore = Math.min(p.fore, RigSVG.FLOOR_FORE42E); t.to(s, { ['bat' + k]: upper, ['cang' + k]: fore, duration: 0.45, ease: 'power2.out' }, 0); }
     const reachable = (sign) => {
       let g = glide, pose = place(reach.tx + sign * g);
       while (g > 1 && !pose.bent && reach.solve(reach.tx, reach.ty).bent) { g *= 0.7; pose = place(reach.tx + sign * g); }
@@ -4750,7 +5085,8 @@ class RigSVG {
       const bentHere = reach.solve(reach.tx, reach.ty).bent, far = bentHere ? limit(1) : reach.tx + glide, near = bentHere ? limit(-1) : reach.tx - glide;
       const crowned = !!(reach.crown && this.el['coTay' + k] && reach.crown(reach.tx - 1, reach.tx + 1, 1));      // đích 'crown' đo được đỉnh đầu
       // `lead`: hoà dần từ dáng cúi (tween của `#leanTo`, xong ở 0,45 s) sang dáng bám đầu TRƯỚC khi trượt — tới 0,45 s đã bám trọn.
-      const back = reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
+      // đợt 42 E: NGỒI BỆT — vai ngang đầu con vật: kéo bàn tay về phía người thì khuỷu gập, bàn tay hất lên khỏi đầu nó. Chỉ trượt ra phía trước.
+      const back = s.floor42e > 0.5 ? Math.min(2, reachable(-1)) : reachable(-1), ahead = reachable(1), knots = [0, -1, 1, -1, 1, -1, 1], glider = { u: 0 }, lead = 0.23, span = 1.2 + lead;
       const ease = (f) => (1 - Math.cos(Math.PI * f)) / 2;
       t.to(glider, { u: 1, duration: span, ease: 'none', onUpdate: () => {
         if (glider.u <= 0) return;                                  // tua về trước lúc trượt: để các tween cúi người lo
@@ -4780,7 +5116,9 @@ class RigSVG {
         // bàn tay với điểm cao nhất của đầu thì bàn tay lơ lửng: ngón cái thõng ở chỗ đầu thấp, tai nhô dưới các ngón kia.
         if (crowned) {
           const judge = (h) => {
-            const q = place(x, h); apply(q);
+            const q = place(x, h);
+            if (s.floor42e > 0.5 && q.fore > RigSVG.FLOOR_FORE42E) return null;          // đợt 42 E: xem trên
+            apply(q);
             // nhịp thở `sequence` sẽ cộng vào khung này (thân đung đưa ±0,7°: vai dời, đáy bàn tay dời cả đơn vị)
             const extra = this.bakeBreath, was = { than: s.than, tho: s.tho };
             if (extra) { s.than = was.than + extra.than; s.tho = Math.min(1, was.tho + extra.tho); }
@@ -4810,7 +5148,7 @@ class RigSVG {
           const search = () => {
             let best = null;
             if (last !== null) for (let d = -6; d <= 6; d += 2) best = better(best, judge(y + last + d));
-            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d));
+            else for (let d = -24; d <= 12; d += 3) best = better(best, judge(y + d + (s.floor42e > 0.5 ? 6 : 0)));      // đợt 42 E: ngồi bệt — dò thấp hơn một chút (bàn tay hay lơ lửng trên đầu nó)
             if (best) { const coarse = best.h; for (const d of [-2, -1, 1, 2]) best = better(best, judge(coarse + d)); const fine = best.h; for (const d of [-0.5, 0.5]) best = better(best, judge(fine + d)); }
             return best;
           };
@@ -8279,6 +8617,425 @@ class RigSVG {
     return t;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  // ĐỢT 42 E — SÁT SÀN: NHẶT đồ dưới sàn (`pickUp`), NGỒI BỆT xếp bằng (`sitOnFloor`), NẰM trên sàn / sofa (`lieDown`). Hai thế giữ cuối dậy
+  // bằng `standUp` (qua dáng quỳ). Hình học chân mới: kênh `floor42e` / `squat42e` cộng thêm vào góc khớp chân (`#legAdd42e`), người hạ
+  // xuống đúng tới chỗ chân chạm sàn (`#contactDrop42e`); nằm: cả người xoay quanh hông (`lie42e`), chỗ thấp nhất đặt lên mặt sàn (`#lay42e`).
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+  // Góc cộng thêm vào khớp chân (độ), theo đúng quy ước vẽ chân của `apDung`: `joint` 'dui' (đùi) | 'ong' (ống chân so với đùi).
+  #legAdd42e(ben, joint, h) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), sq = clamp(s.squat42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    if (!fl && !sq && !L) return 0;
+    const ah = Math.min(1, Math.abs(h)), dauH = Math.sign(h || 1), side = ben === 'L' ? 1 : -1, near = ben === (h >= 0 ? 'L' : 'R');
+    // Ngồi bệt mà QUAY 3/4 (nhìn con vật cạnh mình): chân vẫn xếp bằng như nhìn thẳng — chỉ thân trên quay; dáng chân nhìn nghiêng chỉ khi quay hẳn.
+    const F = FLOOR42E, Q = this.#squatAngles42e(), ahF = clamp((ah - 0.7) / 0.3, 0, 1);
+    // Nằm nghiêng: chân PHÍA TRÊN (phía không chạm sàn) co gối nhẹ ra trước, chân dưới duỗi — dáng nằm thả lỏng, không đơ như khúc gỗ.
+    const top = L * (1 - fl) * (ben === (s.lieDir42e < 0 ? 'R' : 'L') ? 1 : 0), towards = s.lieDir42e < 0 ? 1 : -1;
+    if (joint === 'dui') return fl * ((1 - ahF) * side * F.thigh - ahF * dauH * F.thighSide * (near ? 1 : 0.9)) - sq * dauH * (near ? Q.thigh : Q.farThigh) + top * towards * 14;
+    return fl * (-(1 - ahF) * side * F.knee + ahF * dauH * F.kneeSide) + sq * dauH * (near ? Q.knee : Q.farKnee) - top * towards * 26;
+  }
+
+  // Ngồi xổm: góc đùi / gối của chân gần và chân xa. Chân xa đùi thấp hơn 6° (hai chân khỏi chồng khít), gối gập sao cho cổ chân vẫn ngang sàn.
+  #squatAngles42e() {
+    const nv = this.nv, S = SQUAT42E, far = S.thigh - 6, r = (nv.daiDui || 1) / (nv.daiOng || 1);
+    const c = clamp(Math.cos((S.knee - S.thigh) * RAD) + r * (Math.cos(S.thigh * RAD) - Math.cos(far * RAD)), -1, 1);
+    return { thigh: S.thigh, knee: S.knee, farThigh: far, farKnee: Math.acos(c) / RAD + far };
+  }
+
+  // Đùi rút ngắn thêm khi ngồi bệt nhìn thẳng (đùi chĩa cả về phía người xem).
+  #seen42e(ah) { return 1 - FLOOR42E.seen * clamp(this.s.floor42e || 0, 0, 1) * (1 - clamp((ah - 0.7) / 0.3, 0, 1)); }
+
+  // Bàn chân lúc ngồi bệt / ngồi xổm: { side: độ hiện giày nhìn nghiêng, flat: mức áp đế xuống sàn, turn: góc xoay để đế nằm ngang, mirror }.
+  #foot42e(ben, h, dui, ong) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), sq = clamp(s.squat42e || 0, 0, 1);
+    if (!fl && !sq) return null;
+    const ah = Math.min(1, Math.abs(h)), front = fl * (1 - clamp((ah - 0.7) / 0.3, 0, 1));
+    return { side: Math.max(ah, fl), flat: Math.max(fl, sq), turn: -(dui + ong), mirror: front > 0.5 ? (ben === 'L' ? 1 : -1) : (h < 0 ? -1 : 1) };
+  }
+
+  // HÌNH HỌC HAI CHÂN ở trạng thái hiện tại (chép đúng phép vẽ chân của `apDung`): hông, gối, cổ chân trong hệ nhóm chân (`chanG`, trước phép co
+  // dọc `coChan`), và góc ống chân (rad).
+  #legGeo42e(h = this.s.huong) {
+    const s = this.s, nv = this.nv, ah = Math.abs(h), dauH = Math.sign(h || 1), ride = clamp(s.ride || 0, 0, 1);
+    const seat = clamp(s.seat, 0, 1), kneel = clamp(s.kneel || 0, 0, 1);
+    const splay = RigSVG.SEAT_SPLAY * seat * (1 - ah) * (1 - seat * clamp(ah / 0.2, 0, 1) * (1 - kneel));
+    const sitFold = -Math.sign(h) * 75 * seat * clamp(ah / 0.2, 0, 1) * (1 - kneel);
+    const seen = (1 - seat * 0.72) / Math.cos(splay * RAD) / Math.cos(sitFold * RAD) * this.#seen42e(ah);
+    const shift = Math.sign(h) * Math.sin(Math.PI * Math.min(1, ah) * 0.9) * 3, Lt = DAI.dui * nv.daiDui, Ls = DAI.ong * nv.daiOng, out = {};
+    for (const ben of ['L', 'R']) {
+      const sign = ben === 'L' ? 1 : -1, near = ben === (h >= 0 ? 'L' : 'R');
+      const dui = s['dui' + ben] - dauH * ride * (near ? RIDE_THIGH : RIDE_THIGH - 6) + this.#legAdd42e(ben, 'dui', h);
+      const ong = s['ong' + ben] + dauH * ride * RIDE_KNEE + this.#legAdd42e(ben, 'ong', h);
+      const a = (dui + sign * (s['nhac' + ben] * 6 + splay) + sitFold) * RAD, b = (ong - sign * splay - sitFold) * RAD;
+      const lift = 1 - s['nhac' + ben] * 0.42, hx = -sign * (nv.cachChan * (1 - ah * 0.7) + ah * 3) + shift;
+      const knee = { x: hx - Math.sin(a) * Lt * lift * seen, y: Math.cos(a) * Lt * lift * seen };
+      const vx = -Math.sin(b) * Ls, vy = Math.cos(b) * Ls * lift * (1 - KNEEL_SHIN * kneel);
+      out[ben] = { hip: { x: hx, y: 0 }, knee, ankle: { x: knee.x + vx * Math.cos(a) - vy * Math.sin(a), y: knee.y + vx * Math.sin(a) + vy * Math.cos(a) }, shin: a + b };
+    }
+    return out;
+  }
+
+  // Đáy chân (đơn vị nhóm chân, dưới hông): thấp nhất trong gối và cổ chân + đế giày (ống chân nằm ngang thì là mép ống quần).
+  #legLow42e(g) {
+    const nv = this.nv, foot = 10 * nv.coBanChan;
+    let low = 0;
+    for (const leg of [g.L, g.R]) {
+      const c = Math.abs(Math.cos(leg.shin));
+      low = Math.max(low, leg.knee.y + 8 * nv.dayChan, leg.ankle.y + foot * c + 11 * nv.dayChan * (1 - c));
+    }
+    return low;
+  }
+
+  // Người HẠ bao nhiêu (đơn vị khung) để chỗ thấp nhất của hai chân chạm đúng sàn — dùng cho ngồi bệt / ngồi xổm (thay công thức của `seat`).
+  #contactDrop42e() {
+    const nv = this.nv, standing = DAI.dui * nv.daiDui + DAI.ong * nv.daiOng + 10 * nv.coBanChan;
+    return Math.max(0, standing - this.#legLow42e(this.#legGeo42e())) * nv.coChan;
+  }
+
+  // Điểm trong hệ THÂN (than) → hệ của `goc` (trước phép xoay lúc nằm).
+  #fromTorso42e(p) {
+    const s = this.s, nv = this.nv, h = s.huong, wide = clamp(nv.torsoWidth || 1, 0.7, 1.6), stoop = clamp(nv.stoop || 0, 0, 1);
+    const a = (s.than + h * stoop * 10 + Math.sign(h || 1) * clamp(s.ride || 0, 0, 1) * RIDE_LEAN) * RAD, x = p.x * nv.coThan * wide, y = p.y * nv.coThan * (1 - stoop * 0.05);
+    return { x: HONG.x + x * Math.cos(a) - y * Math.sin(a), y: HONG.y + x * Math.sin(a) + y * Math.cos(a) };
+  }
+  #toTorso42e(p) {
+    const s = this.s, nv = this.nv, h = s.huong, wide = clamp(nv.torsoWidth || 1, 0.7, 1.6), stoop = clamp(nv.stoop || 0, 0, 1);
+    const a = -(s.than + h * stoop * 10 + Math.sign(h || 1) * clamp(s.ride || 0, 0, 1) * RIDE_LEAN) * RAD, dx = p.x - HONG.x, dy = p.y - HONG.y;
+    return { x: (dx * Math.cos(a) - dy * Math.sin(a)) / (nv.coThan * wide), y: (dx * Math.sin(a) + dy * Math.cos(a)) / (nv.coThan * (1 - stoop * 0.05)) };
+  }
+
+  // Hai đốt tay từ `from` tới `to` (hệ thân): góc xoay của nhóm cánh tay (độ; dương = bàn tay về phía −x) và cẳng tay; khuỷu bẻ về phía `out` (±1 theo x).
+  #ik42e(from, to, out) {
+    const a = DAI.canhTay * this.nv.daiCanhTay, b = DAI.cangTay * this.nv.daiCangTay, dx = to.x - from.x, dy = to.y - from.y;
+    const d = clamp(Math.hypot(dx, dy), Math.abs(a - b) + 0.5, a + b - 0.5), dir = Math.atan2(-dx, dy);
+    const alpha = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1)), up = dir - out * alpha;
+    const elbow = { x: from.x - a * Math.sin(up), y: from.y + a * Math.cos(up) };
+    const fore = Math.hypot(dx, dy) > a + b - 0.5 ? up : Math.atan2(-(to.x - elbow.x), to.y - elbow.y);
+    return { upper: up / RAD, fore: chuanHoaGoc((fore - up) / RAD), elbow, wrist: { x: elbow.x - b * Math.sin(fore), y: elbow.y + b * Math.cos(fore) } };
+  }
+
+  // Tâm đầu và bán kính trong hệ thân (theo `shotBox`: tâm mặt ở 0, −62 của nhóm đầu).
+  #headTorso42e() {
+    const s = this.s, nv = this.nv, stoop = clamp(nv.stoop || 0, 0, 1), wide = clamp(nv.torsoWidth || 1, 0.7, 1.6);
+    return { x: s.dauX + s.huong * (2.5 + stoop * 7), y: -103 + nv.dauLech + s.dauY + stoop * 9 - 62 * nv.coDau, rx: 64 * nv.coDau / wide, ry: 64 * nv.coDau };
+  }
+
+  // Tay KÊ DƯỚI ĐẦU lúc nằm: tay phía mặt sàn (đầu về trái → tay trái màn hình). Không nằm: null.
+  #pillowArm42e() { return this.s.lie42e > 0.5 ? (this.s.lieDir42e < 0 ? 'L' : 'R') : null; }
+
+  // Dáng tay kê đầu (hệ thân): bắp tay giơ dọc bên đầu phía sàn, cẳng tay gập vào dưới đầu — đầu tựa lên cẳng tay.
+  #pillowPose42e(k) {
+    const hd = this.#headTorso42e(), out = k === 'L' ? -1 : 1, from = { x: out * CHOT_VAI.x, y: CHOT_VAI.y };
+    return this.#ik42e(from, { x: hd.x + out * hd.rx * 0.85, y: hd.y - hd.ry * 1.3 }, out);
+  }
+
+  // Tay ở thế sát sàn (gọi trong `apDung`, sau mọi luật chỉnh góc tay): ngồi bệt — hai bàn tay úp lên hai đầu gối; nằm — tay phía sàn kê dưới đầu.
+  // Tay đang diễn thì nhả dần: bắp tay giơ lệch dáng nghỉ quá 40° (vẫy, chỉ), `aim` (vuốt ve, bế), `ov`, áp điện thoại, đang bế, đang cầm đồ.
+  #arms42e(rotation, pivot, nhacY, cradle) {
+    const s = this.s, fl = clamp(s.floor42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    if (!fl && !L) return null;
+    const free = (side) => clamp(1 - (Math.abs(s['bat' + side] - this.#restArm(side)[0]) - 40) / 40, 0, 1) * (1 - clamp(s['ov' + side], 0, 1)) * (1 - clamp(s['aim' + side], 0, 1))
+      * (1 - clamp(s['phone' + side], 0, 1)) * (1 - cradle) * (this.holds[side] && s['item' + side] > 0.5 ? 0 : 1);
+    let legs = null;
+    for (const side of ['L', 'R']) {
+      const out = side === 'L' ? -1 : 1, from = { x: pivot[side].x, y: pivot[side].y + nhacY };
+      let w = 0, pose = null;
+      if (fl > 0.001 && L < 0.999) {
+        // Đầu gối CÙNG PHÍA (hệ nhóm chân → hệ `goc` → hệ thân), bàn tay úp lên mặt trên của nó.
+        legs = legs || this.#legGeo42e();
+        const knee = legs[side].knee, nv = this.nv, at = { x: HONG.x + knee.x - out * 3, y: HONG.y + (knee.y - 12 * nv.dayChan) * nv.coChan };
+        pose = this.#ik42e(from, this.#toTorso42e(at), out); w = fl * (1 - L) * free(side);
+      }
+      if (L > 0.001 && side === (s.lieDir42e < 0 ? 'L' : 'R')) { pose = this.#pillowPose42e(side); w = L * free(side); }
+      if (!pose || w <= 0) continue;
+      rotation['bat' + side] += (pose.upper - rotation['bat' + side]) * w;
+      rotation['cang' + side] += (chuanHoaGoc(pose.fore) - rotation['cang' + side]) * w;
+    }
+    return null;
+  }
+
+  // NẰM: góc xoay, các điểm mốc của thân (hệ `goc`, đã xoay) và phần hạ / dời để chỗ thấp nhất nằm trên mặt sàn (`lieLift42e` cao hơn sàn).
+  #lay42e(seatDrop, doiChan) {
+    const s = this.s, nv = this.nv, L = clamp(s.lie42e || 0, 0, 1), dir = s.lieDir42e < 0 ? -1 : 1;
+    const angle = dir * (90 - LIE42E.tilt) * L, c = Math.cos(angle * RAD), n = Math.sin(angle * RAD);
+    const turn = (p) => ({ x: HONG.x + (p.x - HONG.x) * c - (p.y - HONG.y) * n, y: HONG.y + (p.x - HONG.x) * n + (p.y - HONG.y) * c });
+    const legs = this.#legGeo42e(), pts = [];
+    const leg = (p, r) => pts.push({ ...turn({ x: HONG.x + p.x, y: HONG.y + p.y * nv.coChan }), r: r * nv.coChan });
+    for (const side of ['L', 'R']) { const g = legs[side]; leg(g.knee, 13 * nv.dayChan); leg(g.ankle, 12 * nv.dayChan); leg({ x: g.hip.x - (side === 'L' ? 1 : -1) * 13 * nv.dayChan, y: 0 }, 0); }
+    for (const q of [{ x: -36, y: -88 }, { x: 36, y: -88 }, { x: -31, y: -30 }, { x: 31, y: -30 }, { x: -30, y: 18 }, { x: 30, y: 18 }]) pts.push({ ...turn(this.#fromTorso42e(q)), r: 0 });
+    const hd = this.#headTorso42e(), head = { ...turn(this.#fromTorso42e(hd)), r: hd.ry * nv.coThan * 0.94 };
+    pts.push(head);
+    const k = this.#pillowArm42e();
+    if (k) { const pose = this.#pillowPose42e(k); for (const q of [pose.elbow, pose.wrist]) pts.push({ ...turn(this.#fromTorso42e(q)), r: 10 * nv.dayTay * nv.coThan }); }
+    const low = Math.max(...pts.map((p) => p.y + p.r)), x0 = Math.min(...pts.map((p) => p.x - p.r)), x1 = Math.max(...pts.map((p) => p.x + p.r));
+    const floor = 428 - doiChan - (s.lieLift42e || 0), blend = clamp(L * 2.5, 0, 1);
+    // Hạ: từ phần hạ thường lệ (đứng / quỳ) sang phần hạ cho chỗ thấp nhất chạm mặt nằm; dời ngang: giữa thân về chỗ đứng.
+    const dy = (floor - low - seatDrop) * blend, dx = (HONG.x - (x0 + x1) / 2) * blend;
+    return { angle, dx, dy, blend, pts, head, low, floor, span: [x0, x1], turn };
+  }
+
+  // Phép biến đổi của `goc` lúc ngồi xổm / nằm (null: như thường). Ghi lại hình học nằm (`this.lay42e`, khung gốc) cho bóng, gối, khung ngắm.
+  #goc42e(seatDrop, doiChan) {
+    const s = this.s, sq = clamp(s.squat42e || 0, 0, 1), L = clamp(s.lie42e || 0, 0, 1);
+    this.lay42e = null;
+    if (!sq && !L) return null;
+    let x = s.x, y = s.y + seatDrop + DOI_Y + doiChan, rot = '', blend = 0;
+    if (sq) { const g = this.#legGeo42e(), near = s.huong >= 0 ? 'L' : 'R'; x -= g[near].ankle.x - g[near].hip.x; }
+    if (L) {
+      const lay = this.#lay42e(seatDrop, doiChan), co = s.co;
+      x += lay.dx; y += lay.dy; rot = ` rotate(${lay.angle.toFixed(3)} ${HONG.x} ${HONG.y})`; blend = lay.blend;
+      const root = (p) => ({ x: x + 200 + co * (p.x - 200), y: y + 428 + co * (p.y - 428) });
+      this.lay42e = { ...lay, root, head: { ...root(lay.head), r: lay.head.r * co }, floorY: root({ x: 0, y: lay.floor }).y, x0: root({ x: lay.span[0], y: 0 }).x, x1: root({ x: lay.span[1], y: 0 }).x,
+                      hip: root(lay.turn({ x: HONG.x, y: HONG.y })), pts: lay.pts.map((p) => ({ ...root(p), r: p.r * co })) };
+    }
+    return { transform: `translate(${x} ${y}) translate(200 428) scale(${s.co}) translate(-200 -428)${rot}`, blend };
+  }
+
+  // Vẽ thêm (cuối `apDung`): bóng dài và gối dưới người nằm; các món đồ còn nằm dưới sàn chờ nhặt (hay ẩn đạo cụ đã được nhặt lên).
+  #draw42e() {
+    const e = this.el, s = this.s, lay = this.lay42e;
+    if (e.under42e) {
+      e.under42e.style.display = lay && lay.blend > 0.01 ? '' : 'none';
+      if (lay && lay.blend > 0.01) {
+        const [shadow, pillow] = e.under42e.children, len = lay.x1 - lay.x0, hd = lay.head;
+        shadow.setAttribute('cx', ((lay.x0 + lay.x1) / 2).toFixed(2)); shadow.setAttribute('cy', (lay.floorY + 1.5).toFixed(2));
+        shadow.setAttribute('rx', (len * 0.5).toFixed(2)); shadow.setAttribute('ry', '8'); shadow.setAttribute('opacity', (0.26 * lay.blend * clamp(s.mo, 0, 1)).toFixed(3));
+        // GỐI TỰA (nằm trên sofa — mặt nằm cao hơn sàn): một chiếc gối dưới đầu, từ mặt sofa lên tới gáy.
+        const top = hd.y + hd.r * 0.45, cushion = (s.lieLift42e || 0) > 1 && lay.floorY - top > 4 && s.lie42e > 0.5;
+        pillow.style.display = cushion ? '' : 'none';
+        if (cushion) {
+          const w = hd.r * 1.9, rect = pillow.firstElementChild, seam = pillow.lastElementChild, x0 = hd.x - w / 2, hgt = lay.floorY - top + 2;
+          Object.entries({ x: x0, y: top, width: w, height: hgt, rx: Math.min(hgt / 2, 12) }).forEach(([key, v]) => rect.setAttribute(key, v.toFixed(2)));
+          seam.setAttribute('d', `M ${(x0 + 8).toFixed(1)} ${(top + hgt * 0.5).toFixed(1)} Q ${hd.x.toFixed(1)} ${(top + hgt * 0.62).toFixed(1)} ${(x0 + w - 8).toFixed(1)} ${(top + hgt * 0.5).toFixed(1)}`);
+        }
+      }
+    }
+    const list = this.picks42e || [];
+    if (e.drop42e && e.drop42e.childElementCount !== list.length) {
+      e.drop42e.innerHTML = list.map((item) => `<g transform="translate(${item.x.toFixed(2)} ${item.y.toFixed(2)})" data-drop42e="${item.kind}" style="display:none">${item.el ? '' : RigSVG.#floorShape42e(item.kind)}</g>`).join('');
+    }
+    list.forEach((item, n) => {
+      const down = s.picked42e < n + 0.5, g = e.drop42e && e.drop42e.children[n];
+      if (g) g.style.display = down && !item.el ? '' : 'none';
+      if (item.el && item.el.style) { const v = down ? '' : 'hidden'; if (item.el.style.visibility !== v) item.el.style.visibility = v; }      // đạo cụ thật được nhặt lên: ẩn nó đi
+    });
+  }
+
+  // Hình món đồ NẰM DƯỚI SÀN (hệ cục bộ: đáy ở y = 0).
+  static #floorShape42e(kind) {
+    if (kind === 'bowl') return bowlShape42e();
+    if (kind === 'leash') return `<path d="M -16 -3 Q -18 -14 -4 -13 Q 10 -12 6 -4 Q 2 2 -8 -1 M 6 -4 Q 14 -2 18 -1" fill="none" stroke="#c0392b" stroke-width="3.4" stroke-linecap="round"/>
+          <rect x="-20" y="-6" width="9" height="6" rx="2" fill="#c0392b" stroke="#7d241a" stroke-width=".8"/>`;
+    return toyShape42e();
+  }
+
+  // Món đồ để nhặt → điểm đặt nó trong hệ của `#aimOf` (sàn ở y 428) và phần tử thật (đạo cụ) nếu có.
+  //   null → trước mặt bên phải · số → cách giữa người chừng ấy đơn vị khung (âm: bên trái) · { x, y } trong khung (y bỏ trống: trên sàn)
+  //   · rig con vật → cạnh chân trước nó, phía người · phần tử / đạo cụ → đáy giữa của nó (nó ẩn đi khi được nhặt lên).
+  #pickSpot42e(target) {
+    const s = this.s, live = target && target.live ? target.live : target;
+    const toFrame = (sx, sy) => {
+      const sv = this.svg.getBoundingClientRect(), unit = Math.min(sv.width / KHUNG.w, sv.height / KHUNG.h) || 1;
+      const ox = sv.left + (sv.width - KHUNG.w * unit) / 2, oy = sv.top + (sv.height - KHUNG.h * unit) / 2;
+      return { x: (sx - ox) / unit - s.x, y: (sy - oy) / unit - s.y - DOI_Y };
+    };
+    if (live === null || live === undefined) return { x: HONG.x + 78 * this.nv.coThan, y: 428, el: null };
+    if (typeof live === 'number' && Number.isFinite(live)) return { x: HONG.x + live, y: 428, el: null };
+    if (typeof live.x === 'number' && !live.el && !live.getBoundingClientRect) return { x: live.x - s.x, y: typeof live.y === 'number' ? Math.min(428, live.y - s.y - DOI_Y) : 428, el: null };
+    if (live.el && live.svg) {
+      // Con vật: đồ chơi nằm cạnh chân trước nó (phía người này), trên mặt sàn dưới chân nó.
+      const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => live.el[key]).filter(Boolean).map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+      const body = live.svg.getBoundingClientRect(), drawn = live.el.than ? live.el.than.getBoundingClientRect() : body;
+      const bottom = paws.length ? Math.max(...paws.map((r) => r.bottom)) : body.bottom, mine = this.centerX();
+      const edge = mine < drawn.left + drawn.width / 2 ? drawn.left : drawn.right, p = toFrame(edge, bottom);
+      return { x: p.x + (mine < drawn.left + drawn.width / 2 ? -16 : 16), y: Math.min(428, p.y), el: null };
+    }
+    if (live.getBoundingClientRect) { const r = live.getBoundingClientRect(), p = toFrame(r.left + r.width / 2, r.bottom); return { x: p.x, y: Math.min(428, p.y), el: live }; }
+    throw new Error('[character] pickUp(target): target must be null, a distance, { x, y }, a pet rig or an element');
+  }
+
+  /**
+   * NHẶT một món đồ dưới sàn lên: quay nghiêng về phía nó, NGỒI XỔM xuống (gập gối, lưng thẳng đổ về trước ~30°, gót sau gối), bàn tay
+   * với tới món đồ và nắm lại, rồi đứng thẳng lên cầm nó — món đồ thành đồ cầm ở tay ấy (như `heldItemR`), sẵn cho `handOver`. Quay về hướng cũ.
+   * `target`: bỏ trống (trước mặt), một quãng (đơn vị khung), { x, y }, một rig con vật (đồ chơi cạnh chân nó) hay một đạo cụ / phần tử.
+   * `item`: 'toy' (quả bóng) | 'bowl' (bát ăn) | 'leash' (dây dắt) — tay ấy chưa có đồ thì rig tự cho nó món ấy (đang cất) rồi nhặt.
+   */
+  pickUp(target = null, { item = 'toy', side = 'auto' } = {}) {
+    if (!['toy', 'bowl', 'leash'].includes(item)) throw new Error(`[character] pickUp: item must be 'toy', 'bowl' or 'leash', got ${JSON.stringify(item)}`);
+    if (side !== 'auto' && side !== 'L' && side !== 'R') throw new Error(`[character] pickUp: side must be 'auto', 'L' or 'R', got ${JSON.stringify(side)}`);
+    const s = this.s;
+    if (s.lie42e > 0.5 || s.floor42e > 0.5 || s.seat > 0.5 || s.ride > 0.5) throw new Error('[character] pickUp: stand up first (standUp / getOff) — the character picks things up from standing');
+    if (s.om >= 0.5) throw new Error('[character] pickUp: the character is carrying a pet — putDown() first');
+    const spot = this.#pickSpot42e(target), dir = spot.x >= HONG.x ? 1 : -1, near = dir > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    // Món đồ rig TỰ CHO ở lần dựng trước (`conversation()` / `sequence()` dựng mỗi bước hai lần, rồi trả trạng thái đầu — lúc ấy chưa có món
+    // đồ, `item` = 1) mà chưa được nhặt: coi như đang cất.
+    const auto = (k) => !!(this.autoItem42e && typeof this.autoItem42e[k] === 'number' && s.picked42e < this.autoItem42e[k] + 0.5);
+    const busy = (k) => this.holds[k] && s['item' + k] > 0.5 && !auto(k), stored = (k) => this.holds[k] && !busy(k);
+    // Tay đang CẤT một món đồ (`items` + `itemsHidden`, hay món rig tự cho) thì nhặt bằng tay ấy — ưu tiên tay gần; không thì tay gần (rảnh).
+    const k = side !== 'auto' ? side : stored(near) ? near : stored(far) ? far : !busy(near) ? near : far;
+    if (busy(k)) throw new Error(`[character] pickUp: hand ${k} already holds an item — put it away (hideItem) or hand it over first`);
+    // Tay ấy chưa có món đồ nào: cho nó món `item` ở trạng thái ĐANG CẤT (dựng lại SVG một lần, lúc dựng bước — như `createCharacter({ items, itemsHidden })`).
+    const fresh = !this.holds[k];
+    if (fresh) {
+      // `setItem` đặt lại góc tay ấy (và tay kia, nếu nó thôi đan tay) — giữ nguyên dáng đang có, để gọi thẳng và qua `sequence()` bắt đầu như nhau.
+      const keepArms = Object.fromEntries(['batL', 'cangL', 'tayL', 'batR', 'cangR', 'tayR', 'itemL', 'itemR'].map((key) => [key, s[key]]));
+      const draw = item === 'bowl' ? bowl42e : item === 'leash' ? leash : toy42e; this.setItem(k, (p, c) => draw(c), { shown: false });
+      Object.assign(this.s, keepArms); this.apDung();
+    }
+    // Món đồ dưới sàn (khung gốc). Giống hệt một món đã có (`sequence()` dựng mỗi bước hai lần) thì dùng lại số của nó.
+    const list = this.picks42e = this.picks42e || [], rootX = spot.x + s.x, rootY = spot.y + DOI_Y;
+    let n = list.findIndex((it) => it.kind === item && it.el === spot.el && Math.abs(it.x - rootX) < 0.5 && Math.abs(it.y - rootY) < 0.5);
+    if (n < 0) { list.push({ kind: item, x: rootX, y: rootY, el: spot.el }); n = list.length - 1; }
+    this.pick42e = { k, n, x: rootX, y: rootY, kind: item };
+    if (fresh || auto(k)) this.autoItem42e = { ...(this.autoItem42e || {}), [k]: n };
+    const t = this.tl(), N = this.NGHI, was = s.huong;
+    if (auto(k) && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);          // món rig tự cho, trạng thái đầu cảnh ghi nó "đang hiện": cất đi
+    // Góc tay lúc nắm: vai (đã hạ theo dáng ngồi xổm, đã dời lùi, đã đổ về trước), tới GIỮA món đồ. Với chưa tới thì đổ thêm lưng (tới 48°).
+    const grab = { x: spot.x, y: spot.y - (item === 'bowl' ? 8 : 11) };
+    const saved = { huong: s.huong, squat42e: s.squat42e, seat: s.seat, kneel: s.kneel, than: s.than };
+    let pose = null, lean = SQUAT42E.lean, shift = 0;
+    try {
+      Object.assign(s, { huong: dir, squat42e: 1, seat: 0, kneel: 0 });
+      const g = this.#legGeo42e(), back = g[near].ankle.x - g[near].hip.x, arm = DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay + 8 * this.nv.coThan;
+      // Thử đổ lưng thêm (tới 45°); vẫn chưa tới thì NHÍCH lại gần món đồ (tới 70 đơn vị khung) trong lúc quay người.
+      const fits = (deg, extra) => {
+        const geo = this.#poseGeo({ huong: dir, lean: dir * deg, step: -back + dir * extra }), sh = geo[k];
+        pose = this.#palmTo(k, grab, geo);
+        return Math.hypot(grab.x - sh.x, grab.y - sh.y) <= arm;
+      };
+      let done = false;
+      for (; lean <= 45 && !(done = fits(lean, 0)); lean += 3);
+      if (!done) for (lean = 42, shift = 5; shift <= 70 && !fits(lean, shift); shift += 5);
+      lean = Math.min(lean, 45); shift = Math.min(shift, 70);
+    } finally { Object.assign(s, saved); }
+    if (shift) t.to(s, { x: s.x + dir * shift, duration: 0.45, ease: 'sine.inOut' }, 0);
+    t.to(s, { huong: dir, ['carry' + k]: 0, cuoi: 0.7, nhinX: dir * 2, duration: 0.35, ease: 'power2.inOut' }, 0);
+    t.to(s, { ['aim' + k]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3);
+    t.set(s, { ['tay' + k]: 'xoe' }, 0.32);
+    // Tay kia (rảnh): buông thõng xuống trước đầu gối (góc trên màn hình) — để theo thân đổ tới thì nó chĩa ra sau lưng như cái đuôi.
+    const o = k === 'L' ? 'R' : 'L', hang = -dir * (18 + lean), free = !busy(o);
+    if (free) { t.to(s, { ['aim' + o]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3); t.set(s, { ['tay' + o]: 'mo' }, 0.32); }
+    t.to(s, { squat42e: 1, than: N.than + dir * lean, dau: N.dau - dir * lean * 0.45, dauY: 6, nhinY: 2.6, ['bat' + k]: pose.bat, ['cang' + k]: pose.cang,
+              ...(free ? { ['bat' + o]: o === 'L' ? hang : -hang, ['cang' + o]: o === 'L' ? -12 * dir : 12 * dir } : {}), duration: 0.65, ease: 'power2.inOut' }, 0.35);
+    // NẮM LẠI: bàn tay khép, món đồ rời sàn vào tay (tween rất ngắn, không `set` đúng mốc — xem `putDown`).
+    t.set(s, { ['tay' + k]: 'nam' }, 1.02);
+    t.to(s, { picked42e: n + 1, duration: 0.02 }, 1.04);
+    t.to(s, { ['item' + k]: 1, duration: 0.08 }, 1.04);
+    // ĐỨNG LÊN cầm món đồ: lưng thẳng lại, gối duỗi; tay về dáng cầm đồ; rồi quay về hướng cũ (`#khep`).
+    t.to(s, { squat42e: 0, than: N.than, dau: N.dau, dauY: 0, nhinY: 0, duration: 0.6, ease: 'power2.inOut' }, 1.35);
+    t.to(s, { ['aim' + k]: 0, ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ...(free ? { ['aim' + o]: 0, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o] } : {}), duration: 0.55, ease: 'power2.inOut' }, 1.4);
+    this.#khep(t, 0.45, 1.95, { ['item' + k]: 1, picked42e: n + 1, huong: was });
+    return t;
+  }
+
+  /**
+   * NGỒI BỆT xếp bằng trên sàn và GIỮ (thế giữ tới `standUp`): quỳ xuống rồi ngồi hẳn xuống, hai đùi xoè ngang, hai ống chân gập chéo trước
+   * bụng, mông chạm sàn, lưng thẳng, hai bàn tay úp lên hai đầu gối. Nói, gật, vẫy, vuốt con vật cạnh mình, bế con vật nhỏ lên lòng diễn khi
+   * vẫn ngồi. `standUp()` đứng dậy qua dáng quỳ.
+   */
+  sitOnFloor() {
+    const t = this.tl(), s = this.s;
+    if (s.lie42e > 0.5) throw new Error('[character] sitOnFloor: the character is lying down — standUp() first');
+    if (s.floor42e > 0.5) return this.#khep(t, 0.3, 0);
+    if (s.ride > 0.5) throw new Error('[character] sitOnFloor: the character is riding — getOff() first');
+    t.to(s, { dauY: 4, nhinY: 1.4, than: 0, cuoi: 0.6, duration: 0.3, ease: 'power2.in' }, 0);
+    // Quỳ xuống trước (gối chạm sàn), rồi ngồi hẳn xuống: chân quỳ chuyển dần sang chân xếp bằng — chân không xuyên sàn (hạ theo chỗ chạm).
+    t.to(s, { seat: 1, kneel: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
+    t.to(s, { seat: 0, kneel: 0, floor42e: 1, duration: 0.6, ease: 'sine.inOut' }, 0.5);
+    this.#khep(t, 0.4, 1.1, { floor42e: 1, seat: 0, kneel: 0 });
+    return t;
+  }
+
+  /**
+   * NẰM xuống và GIỮ (thế giữ tới `standUp`): `where` 'floor' — nằm nghiêng trên sàn, đầu gối lên cánh tay phía dưới; 'sofa' — nằm trên mặt
+   * sofa (cao `rig.seatY()` như người ngồi), đầu gối lên một chiếc gối tựa. `{ head }` 'left' | 'right' (đầu về bên nào; mặc định phía đang
+   * quay mặt, nhìn thẳng thì trái), `{ sleep }` true: mắt nhắm (ngủ). Đang ngồi bệt thì nằm thẳng từ đó; đứng thì quỳ xuống trước.
+   * Đặt người ở giữa chỗ nằm (sofa: giữa bề ngang sofa) — thân nằm ngang giữa chỗ đứng của nó.
+   */
+  lieDown(where = 'floor', { head = null, sleep = false, lift = null } = {}) {
+    if (where !== 'floor' && where !== 'sofa') throw new Error(`[character] lieDown(where): where must be 'floor' or 'sofa', got ${JSON.stringify(where)}`);
+    if (head !== null && head !== 'left' && head !== 'right') throw new Error(`[character] lieDown: head must be 'left' or 'right', got ${JSON.stringify(head)}`);
+    const t = this.tl(), s = this.s;
+    if (s.ride > 0.5) throw new Error('[character] lieDown: the character is riding — getOff() first');
+    if (s.om >= 0.5) throw new Error('[character] lieDown: the character is carrying a pet — putDown() first');
+    const dir = head === 'left' ? -1 : head === 'right' ? 1 : s.huong > 0.1 ? 1 : -1;
+    if (lift !== null && !(typeof lift === 'number' && lift >= 0 && lift < 300)) throw new Error(`[character] lieDown: lift must be a height in frame units (0…300), got ${JSON.stringify(lift)}`);
+    // Mặt nằm: sàn (0) hay mặt sofa — cao `lift` đơn vị khung (bối cảnh 3D: đúng mặt hộp sofa), mặc định bằng mặt ghế của chính nhân vật (`seatY`).
+    const surface = where === 'sofa' ? (lift !== null ? lift : Math.max(0, 428 + DOI_Y - this.seatY())) : 0;
+    const keep = { lie42e: 1, lieDir42e: dir, lieLift42e: surface, nap42e: sleep ? 1 : 0, floor42e: 0, seat: 0, kneel: 0, huong: 0 };
+    if (s.lie42e > 0.5) { t.to(s, { lieDir42e: dir, lieLift42e: surface, duration: 0.01 }, 0); return this.#khep(t, 0.5, 0.02, keep); }
+    t.set(s, { lieDir42e: dir }, 0.01);
+    t.to(s, { lieLift42e: surface, duration: 0.02 }, 0);
+    // Từ dáng ngồi bệt / ngồi ghế (sofa): ngả thẳng xuống. Đứng: quỳ xuống, ngồi bệt xuống, rồi mới ngả lưng — không đổ người như khúc gỗ.
+    const seated = s.floor42e > 0.5 || (s.seat > 0.5 && !(s.kneel > 0.5)), from = seated ? 0 : 0.95;
+    if (seated) t.to(s, { huong: 0, dauY: 3, duration: 0.3, ease: 'sine.inOut' }, 0);
+    else {
+      t.to(s, { huong: 0, dauY: 4, nhinY: 1.4, cuoi: 0.6, duration: 0.3, ease: 'power2.in' }, 0);
+      t.to(s, { seat: 1, kneel: 1, duration: 0.45, ease: 'power2.inOut' }, 0);
+      t.to(s, { seat: 0, kneel: 0, floor42e: 1, duration: 0.5, ease: 'sine.inOut' }, 0.45);
+    }
+    // Ngả xuống: thân xoay dần về nằm ngang quanh hông, chân duỗi ra; đầu tựa xuống tay / gối.
+    t.to(s, { lie42e: 1, seat: 0, kneel: 0, floor42e: 0, dauY: 0, nhinY: 0, cuoi: 0.5, duration: 0.85, ease: 'sine.inOut' }, from);
+    if (sleep) t.to(s, { nap42e: 1, cuoi: 0.25, duration: 0.5, ease: 'sine.inOut' }, from + 0.8);
+    this.#khep(t, 0.4, from + 0.95, keep);
+    return t;
+  }
+
+  // ĐỨNG DẬY từ sàn (`standUp` gọi): nằm — lật nghiêng, chống tay đẩy người lên thành dáng quỳ; ngồi bệt — nhổm lên quỳ; rồi đứng thẳng.
+  #rise42e(t) {
+    const s = this.s, lying = s.lie42e > 0.5, sofa = lying && (s.lieLift42e || 0) > 1;
+    t.to(s, { nap42e: 0, dauY: 3, cuoi: 0.5, duration: 0.25, ease: 'sine.inOut' }, 0);
+    let at = 0.1;
+    // Nằm trên SOFA: ngồi dậy trên mặt sofa (như người ngồi ghế). Nằm dưới SÀN: chống tay ngồi dậy thành dáng ngồi bệt.
+    if (sofa) { t.to(s, { lie42e: 0, seat: 1, kneel: 0, duration: 0.85, ease: 'sine.inOut' }, at); at += 0.85; }
+    else if (lying) { t.to(s, { lie42e: 0, floor42e: 1, duration: 0.8, ease: 'sine.inOut' }, at); at += 0.8; }
+    // Từ sàn: nhổm lên dáng quỳ — rồi đứng thẳng.
+    if (!sofa) { t.to(s, { floor42e: 0, seat: 1, kneel: 1, duration: 0.5, ease: 'sine.inOut' }, at); at += 0.5; }
+    t.to(s, { lieLift42e: 0, duration: 0.02 }, at);
+    this.#khep(t, 0.6, at, { seat: 0, kneel: 0, floor42e: 0, lie42e: 0, lieLift42e: 0, nap42e: 0 });
+    return t;
+  }
+
+  /** Đường LÒNG của người ngồi bệt (y trong khung 400 × 470): mặt trên hai ống chân xếp chéo — con vật được bế nằm trên đó (set3d: như mặt ghế). */
+  lapY42e() {
+    const nv = this.nv, s = this.s, drop = this.hangChan() + this.#lowered() + s.y;
+    return HONG.y + DOI_Y + drop + 13 * nv.dayChan * nv.coChan;
+  }
+
+  // Khung ngắm của người NẰM (khung gốc): 'face' quanh đầu, 'chest' đầu + thân trên, 'full' cả người — rộng, thấp.
+  #shotBox42e(kind) {
+    if (!(this.s.lie42e > 0.5)) return null;
+    this.apDung();
+    const lay = this.lay42e;
+    if (!lay) return null;
+    const nv = this.nv, hd = lay.head, box = (x0, y0, x1, y1) => ({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
+    if (kind === 'face') { const half = 64 * nv.coDau * nv.coThan * 1.2; return box(hd.x - half, hd.y - half, hd.x + half, hd.y + half); }
+    const all = lay.pts, xs = all.map((p) => [p.x - p.r, p.x + p.r]).flat(), top = Math.min(...all.map((p) => p.y - p.r)) - 14;
+    if (kind === 'chest') {
+      const hipX = lay.hip.x, x0 = Math.min(hd.x - hd.r, hipX), x1 = Math.max(hd.x + hd.r, hipX);
+      return box(x0 - 14, Math.min(top, hd.y - hd.r - 14), x1 + 14, lay.floorY + 10);
+    }
+    if (kind === 'full') return box(Math.min(...xs) - 16, top, Math.max(...xs) + 16, lay.floorY + 14);
+    throw new Error(`[character] no shot "${kind}" (available: face, chest, full)`);
+  }
+
+  /**
+   * SỐ ĐO SÁT SÀN cho tools/acting_check.py (set3d `actingProbe`), khung gốc 400 × 470 (sàn ở 458): ngồi bệt / ngồi xổm / nằm (0…1), góc thân
+   * (độ, 0 = đứng thẳng), hông, đáy mông, chỗ thấp nhất của người, mặt nằm, tâm đầu, hai cổ chân, món đồ dưới sàn (và đã nhặt chưa).
+   */
+  floorProbe42e() {
+    this.apDung();
+    const s = this.s, nv = this.nv, lay = this.lay42e, drop = this.hangChan() + this.#lowered() + s.y;
+    const legs = this.#legGeo42e(), at = (p) => ({ x: s.x + HONG.x + p.x, y: HONG.y + DOI_Y + drop + p.y * nv.coChan });
+    const hip = lay ? lay.hip : { x: s.x + HONG.x, y: HONG.y + DOI_Y + drop };
+    const low = lay ? Math.max(...lay.pts.map((p) => p.y + p.r)) : HONG.y + DOI_Y + drop + this.#legLow42e(legs) * nv.coChan;
+    const items = (this.picks42e || []).map((it, n) => ({ kind: it.kind, x: it.x, y: it.y, down: s.picked42e < n + 0.5, prop: !!it.el }));
+    return { sit: +s.floor42e || 0, squat: +s.squat42e || 0, lie: +s.lie42e || 0, angle: lay ? lay.angle : 0, sofa: (s.lieLift42e || 0) > 1, hip,
+             seat: { x: hip.x, y: hip.y + 13 * nv.dayChan * nv.coChan }, low, floor: lay ? lay.floorY : 428 + DOI_Y, head: lay ? { x: lay.head.x, y: lay.head.y } : null,
+             ankles: lay ? null : [at(legs.L.ankle), at(legs.R.ankle)], items, pick: this.pick42e || null };
+  }
+
   /**
    * BẾ một con vật lên: cúi xuống, hai tay đỡ lấy nó, nhấc lên ôm trước bụng — và GIỮ (thế bế): các động tác sau (nói,
    * gật, quay mặt, đi) diễn khi đang bế, con vật cuộn trong tay và vẫn tự diễn động tác của nó (gừ gừ, vẫy đuôi).
@@ -8380,6 +9137,7 @@ class RigSVG {
   /** ĐỨNG DẬY từ dáng ngồi. */
   standUp() {
     const t = this.tl(), s = this.s;
+    if (s.floor42e > 0.5 || s.lie42e > 0.5) return this.#rise42e(t);      // đợt 42 E: dậy từ sàn — qua dáng quỳ
     t.to(s, { dauY: 2.5, duration: 0.2, ease: 'power2.in' }, 0);
     this.#khep(t, s.kneel > 0.5 ? 0.65 : 0.5, 0.05, { seat: 0, kneel: 0 });
     return t;
@@ -13128,276 +13886,6 @@ const bald = () => (p, c) => group(p, c, '');
 return { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts, bald };
 })();
 
-/* ───── runtime/parts.js ───── */
-__m['runtime/parts.js'] = (function () {
-// parts.js — vài BỘ PHẬN vẽ sẵn cho nhân vật tuỳ chỉnh: kính, râu, ria, nếp nhăn, yếm tạp dề,
-// và đồ vật cầm tay (cốc, bìa kẹp hồ sơ, điện thoại).
-//
-// Mỗi hàm trả về một chuỗi SVG trong HỆ TOẠ ĐỘ TÂM ĐẦU, để đặt vào slot `faceExtras`
-// (kính) hoặc `beard` (râu, ria). `c` là bảng màu của nhân vật; màu mặc định lấy từ đó,
-// truyền `color` để chỉ định riêng.
-
-/** Kính gọng tròn. `x`, `y`: tâm tròng kính (mặc định khớp mắt chuẩn), `r`: bán kính tròng. */
-function roundGlasses(c, { x = 20, y = 2, r = 12, color = null, width = 2.4 } = {}) {
-  const stroke = color || c.accent || c.lineStroke;
-  return `
-            <g fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round">
-              <circle cx="${-x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
-              <circle cx="${x}" cy="${y}" r="${r}" fill="#ffffff" fill-opacity=".14"/>
-              <path d="M ${-x + r} ${y - 2} Q 0 ${y - 7} ${x - r} ${y - 2}"/>
-              <path d="M ${-x - r} ${y - 2} L -47 ${y - 6} M ${x + r} ${y - 2} L 47 ${y - 6}"/>
-            </g>`;
-}
-
-/**
- * Râu quai nón ngắn ôm hàm, có khoét quanh miệng. `chin`: cao độ đáy cằm của khuôn mặt
- * (mặc định 54 — khớp cằm chuẩn; mặt ngắn hơn thì giảm), `mouthY`: cao độ miệng.
- */
-function shortBeard(c, { color = null, chin = 54, mouthY = 30, width = 43 } = {}) {
-  const fill = color || c.hair;
-  return `
-            <path fill="${fill}" d="M ${-width} 10 Q ${-width - 2} ${chin - 12} ${-width * 0.55} ${chin - 1} Q 0 ${chin + 6} ${width * 0.55} ${chin - 1}
-              Q ${width + 2} ${chin - 12} ${width} 10 Q ${width - 5} ${mouthY - 8} ${width * 0.42} ${mouthY - 9}
-              Q 0 ${mouthY - 13} ${-width * 0.42} ${mouthY - 9} Q ${-width + 5} ${mouthY - 8} ${-width} 10 Z"/>
-            <path fill="${c.skin}" d="M -13 ${mouthY - 5} Q 0 ${mouthY - 9} 13 ${mouthY - 5} Q 14 ${mouthY + 7} 0 ${mouthY + 9} Q -14 ${mouthY + 7} -13 ${mouthY - 5} Z"/>`;
-}
-
-/** Ria mép. `mouthY`: cao độ miệng của nhân vật. */
-function moustache(c, { color = null, mouthY = 30, width = 17 } = {}) {
-  const fill = color || c.hair;
-  return `
-            <path fill="${fill}" d="M 0 ${mouthY - 9} Q ${-width * 0.5} ${mouthY - 13} ${-width} ${mouthY - 5} Q ${-width * 0.55} ${mouthY - 3.5} 0 ${mouthY - 5.5}
-              Q ${width * 0.55} ${mouthY - 3.5} ${width} ${mouthY - 5} Q ${width * 0.5} ${mouthY - 13} 0 ${mouthY - 9} Z"/>`;
-}
-
-// Màu nét cho các bộ phận dưới đây. Base `default` để trống `lineStroke` (rig tự suy khi vẽ áo),
-// nên phải có đường lui — nếu không sẽ ra `stroke="null"`.
-const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
-
-/** Nếp nhăn tuổi tác: hai vết chân chim ở đuôi mắt, hai rãnh má, hai nếp trán. Đặt vào `faceExtras`. */
-function wrinkles(c, { color = null, eyeX = 20, eyeY = 2, mouthY = 30, forehead = true } = {}) {
-  const stroke = color || c.skinShadow || '#c9987a';
-  return `
-            <g fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" opacity=".8">
-              ${[-1, 1].map((g) => `
-              <path d="M ${g * (eyeX + 15)} ${eyeY - 3} l ${g * 5} -3 M ${g * (eyeX + 16)} ${eyeY + 2} l ${g * 5.500} 1"/>
-              <path d="M ${g * 15} ${mouthY - 14} Q ${g * 21} ${mouthY - 5} ${g * 18} ${mouthY + 3}"/>`).join('')}
-              ${forehead ? `<path d="M -15 ${eyeY - 31} Q 0 ${eyeY - 34} 15 ${eyeY - 31} M -11 ${eyeY - 25} Q 0 ${eyeY - 27.500} 11 ${eyeY - 25}"/>` : ''}
-            </g>`;
-}
-
-/**
- * YẾM tạp dề: tấm che ngực và hai dây vòng qua cổ, trong hệ toạ độ THÂN. Đặt vào `accessories`
- * (bên trong nhóm `<g id="${p}-accessories">`), ghép với `skirt: { kind: 'apron' }` cho phần dưới hông.
- * `top`: cao độ mép trên của yếm (y, âm là lên; −70 ≈ ngang ngực) · `width`: NỬA bề ngang mép trên (16;
- * người to ngang thì 22–26) · `waist`: cao độ mép dưới (y, 14 ≈ ngay trên gấu áo). Dây đeo tự nối từ hai
- * góc trên lên cổ, yếm rộng hay hẹp cũng vậy.
- */
-function apronBib(c, { color = null, top = -70, width = 16, waist = 14 } = {}) {
-  const fill = color || c.skirt || c.accent || c.topShadow, line = lineOf(c);
-  return `
-        <path d="M ${-width + 2} ${top} Q ${-(width + 11) / 2} ${(top - 103) / 2 + 2} -9 -103 M ${width - 2} ${top} Q ${(width + 11) / 2} ${(top - 103) / 2 + 2} 9 -103" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <path d="M ${-width} ${top} H ${width} L ${width + 9} ${waist - 18} V ${waist} H ${-width - 9} V ${waist - 18} Z" fill="${fill}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
-        <path d="M -9 ${top + 22} h 18 v 12 q 0 3 -3 3 h -12 q -3 0 -3 -3 z" fill="none" stroke="${line}" stroke-width="1.100" stroke-linejoin="round" opacity=".7"/>`;
-}
-
-/* ── ĐỒ VẬT CẦM TAY — hệ toạ độ CỔ TAY: lòng bàn tay quanh (0, 10), ngón chỉ xuống +y.
-      Đặt vào `heldItemL` / `heldItemR`; nên cho bàn tay ấy nắm lại (`handL: 'fist'` trong restPose). */
-
-// Bốn ngón tay ÔM PHÍA TRƯỚC món đồ, vẽ SAU món đồ nên nằm trên nó. Rig vẽ bàn tay trước rồi mới tới món đồ: không
-// có lớp này thì cả bàn tay nằm sau cái cốc, chỉ ló mấy đầu ngón ở một mép — cốc trông như dán vào bụng hoặc cắm vào
-// cổ tay chứ không được cầm. Hệ toạ độ cổ tay: ngón chạy theo +y (hướng cẳng tay) từ mép phía cổ tay, vắt ngang món
-// đồ `reach` đơn vị; bốn ngón xếp cạnh nhau theo x quanh lòng bàn tay. NGÓN CÁI ló ra phía trên ngón trỏ, chếch về phía
-// miệng món đồ (+x): thiếu nó thì bốn ngón đọc thành bốn viên thuốc dán lên cốc. Chúng bắt đầu NGAY Ở CỔ TAY ÁO (y −5) để ống tay áo
-// chảy liền vào các ngón; rig ẩn nắm tay phía sau món đồ khi có nhóm `data-grip` (nắm tay ló ra ở mép bên kia cái cốc,
-// đọc thành một bàn tay thứ hai).
-const gripFingers = (c, { reach = 23, from = -5 } = {}) => {
-  const line = lineOf(c), band = (x, len) =>
-    `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
-  return `
-        <g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
-};
-
-// Món đồ DẸT (bìa hồ sơ, điện thoại) cầm kiểu khác: bốn ngón đỡ phía SAU, chỉ NGÓN CÁI đè lên mặt trước — vẽ bốn ngón
-// vắt ngang thì che mất tờ giấy hay màn hình. `far`: vị trí mép bên kia của món đồ (y); cho vào thì vẽ thêm ba đầu ngón
-// ló ra ở mép ấy.
-const gripThumb = (c, { reach = 13, from = -5, x = 0, far = null } = {}) => {
-  const line = lineOf(c);
-  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
-  return `
-        <g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
-};
-
-/** Cốc giấy có nắp (cà phê mang đi), bàn tay nắm ngang thân cốc: bốn ngón ôm phía trước cốc (`grip: false` để bỏ). */
-// Đợt 39 A: `open: true` — cốc THUỶ TINH không nắp, đầy cà phê (cốc `pourDrink` rót vào). Rig đổi cốc nào cũng thành dáng ấy khi
-// kênh `brewL/R` > 0 (mức nước = kênh): `data-cup`, `data-cupbody`, `data-level` (mặt nước), `data-sleeve`, `data-lid`, `data-mouth` (miệng cốc).
-function cup(c, { color = '#f4efe6', lid = '#4a3b33', sleeve = '#b9834f', size = 1.3, grip = true, open = false, full = false } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-cup="${open || full ? 'open' : 'lid'}"${full ? ' data-full="1"' : ''} transform="translate(0 12) rotate(90) scale(${size})">
-          <path data-cupbody="${color}" d="M -8.500 -17 L -6.500 13 Q 0 15 6.500 13 L 8.500 -17 Z" fill="${open || full ? '#e3f1f7' : color}" fill-opacity="${open || full ? 0.6 : 1}" stroke="${line}" stroke-width="1.100" stroke-linejoin="round"/>
-          <path data-level="1" d="${open || full ? 'M -8.3 -15 L 8.3 -15 L 6.5 13 Q 0 15 -6.5 13 Z' : ''}" fill="#8a5432" style="${open || full ? '' : 'display:none'}"/>
-          <path data-sleeve="1" d="M -8 -7 L -7.200 5 Q 0 7 7.200 5 L 8 -7 Q 0 -5 -8 -7 Z" fill="${sleeve}" style="${open || full ? 'display:none' : ''}"/>
-          <path data-lid="1" d="M -10 -21 h 20 v 4 h -20 z" fill="${lid}" stroke="${line}" stroke-width="1" stroke-linejoin="round" style="${open || full ? 'display:none' : ''}"/>
-          <circle data-mouth="1" cx="0" cy="-17" r="0.6" fill="none"/>
-        </g>${grip ? gripFingers(c) : ''}`;
-}
-
-/** Bìa kẹp hồ sơ, cầm ở mép dưới: ngón cái đè lên mặt trước (`grip: false` để bỏ). */
-function clipboard(c, { color = '#b9834f', paper = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g transform="translate(2 10) rotate(90)" data-clipboard="1">
-          <rect x="-15" y="-34" width="30" height="40" rx="2.500" fill="${color}" stroke="${line}" stroke-width="1.100"/>
-          <rect x="-12" y="-29" width="24" height="32" fill="${paper}"/>
-          <path d="M -8 -23 h 9 M -8 -17 h 16 M -8 -11 h 13 M -8 -5 h 7" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/>
-          <!-- TỜ TRÊN CÙNG (\`data-page\`: mép trên ở y −29) — \`readChart\` lật nó lên quanh mép kẹp; tờ dưới có dòng chữ khác. -->
-          <g data-page="-29"><path data-sheet="1" data-paper="${paper}" d="M -12 -29 H 12 V 3 H -12 Z" fill="${paper}" stroke="${line}" stroke-width=".5" stroke-opacity=".35"/>
-            <path data-ink="1" d="M -8 -21 h 16 M -8 -15 h 16 M -8 -9 h 11" stroke="${line}" stroke-width="1.200" stroke-linecap="round" opacity=".45"/></g>
-          <rect x="-6" y="-37" width="12" height="6" rx="2" fill="#aeb6c0" stroke="${line}" stroke-width="1"/>
-        </g>${grip ? gripThumb(c, { x: 1 }) : ''}`;
-}
-
-
-// Đợt 39 A — "TING": dấu tick xanh trong vòng tròn + hai cung âm thanh, bật bởi kênh `ting` (`payByQR` / `payByCard`). Đặt trong hệ của MÓN ĐỒ
-// (đứng thẳng như món đồ), lệch lên phía trên (x dương) — `data-ting` để rig vẽ độ hiện / cỡ.
-const tingBadge = (x = 27) => `
-        <g data-ting="1" style="display:none"><g transform="translate(${x} 10)"><circle r="8.6" fill="#2fbf71" stroke="#16794a" stroke-width="1.2"/>
-          <path d="M 4 -3 L -1.2 3.8 L -4.6 0" transform="rotate(90)" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M 0 -12.5 q 8 -2 14 0 M 0 12.5 q 8 2 14 0" stroke="#2fbf71" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".85"/></g></g>`;
-
-/**
- * Điện thoại, cầm dọc trong lòng bàn tay: ngón cái ở mặt trước, ba đầu ngón ló ra mép bên kia (`grip: false` để bỏ).
- * `image`: ảnh hiện trên màn hình (đường dẫn hay data URL — giao diện app chẳng hạn), lấp đầy màn hình, cắt theo góc bo.
- * Có sẵn MẶT LƯNG (`data-back`, ẩn) — rig lật sang nó khi áp điện thoại lên má (`call`), xem trạng thái `itemBack`.
- */
-function phone(c, { color = '#22262e', screen = '#8fd3ff', image = null, grip = true } = {}) {
-  const line = lineOf(c);
-  // Mã cắt riêng cho từng lần vẽ: hai nhân vật cùng cầm điện thoại có ảnh thì clipPath không được trùng id.
-  const clip = 'vgPhoneClip' + (phoneClipCount++);
-  const shot = image ? `<clipPath id="${clip}"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500"/></clipPath>
-          <image href="${String(image).replace(/"/g, '&quot;')}" x="-5.800" y="-16.500" width="11.600" height="21" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clip})"/>` : '';
-  return `
-        <g transform="translate(0 10) rotate(90)">
-          <rect x="-7.500" y="-19" width="15" height="28" rx="3" fill="${color}" stroke="${line}" stroke-width=".8"/>
-          <g data-front="1"><rect x="-5.800" y="-16.500" width="11.600" height="21" rx="1.500" fill="${screen}"/>${shot}</g>
-          <g data-back="1" style="display:none"><circle cx="-3.6" cy="-15" r="1.6" fill="#0d0f13"/><circle cx="-3.6" cy="-11" r="1.6" fill="#0d0f13"/></g>
-        </g>${grip ? `<g data-front="1">${gripThumb(c, { reach: 11, far: 18 })}</g><g data-back="1" style="display:none">${gripFingers(c, { reach: 15 })}</g>` : ''}${tingBadge()}`;
-}
-let phoneClipCount = 0;
-
-/**
- * ỐNG TIÊM cầm dọc, mũi kim chúc xuống: thân trong suốt có vạch, thuốc màu `liquid`, pít-tông (`data-plunger`) trượt
- * xuống khi tiêm (`rig.inject()` lái kênh `plunger`). Ngón cái đè lên mặt trước. `data-syringe` để `inject` nhận ra.
- */
-function syringe(c, { liquid = '#8fd0e8', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-syringe="1" transform="translate(0 10) rotate(90) translate(0 -4)">
-          <g data-plunger="9"><rect x="-1.4" y="-26" width="2.8" height="14" fill="#c9ced6" stroke="${line}" stroke-width=".7"/><rect x="-5" y="-28" width="10" height="3" rx="1.2" fill="#e8ebef" stroke="${line}" stroke-width=".8"/></g>
-          <rect x="-4" y="-14" width="8" height="24" rx="1.5" fill="#f4f8fb" fill-opacity=".85" stroke="${line}" stroke-width=".9"/>
-          <rect x="-3.2" y="-3" width="6.4" height="12.4" fill="${liquid}" opacity=".85"/>
-          <path d="M -4 -6 h 3 M -4 -1 h 3 M -4 4 h 3" stroke="${line}" stroke-width=".6" opacity=".6"/>
-          <rect x="-6" y="-15.5" width="12" height="2.4" rx="1" fill="#e8ebef" stroke="${line}" stroke-width=".7"/>
-          <path d="M -1.6 10 h 3.2 l -1 3 h -1.2 z" fill="#c9ced6" stroke="${line}" stroke-width=".5"/>
-          <path d="M 0 13 V 25" stroke="#9aa3ad" stroke-width="1" stroke-linecap="round"/>
-        </g>${grip ? gripThumb(c, { reach: 10, from: -2 }) : ''}`;
-}
-
-/** QUAI DÂY DẮT (vòng quai và một đoạn dây thả xuống): cầm để `leash(pet)` — dây tới vòng cổ con vật do rig vẽ. */
-function leash(c, { color = '#c0392b', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-leash="1" transform="translate(0 12)">
-          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
-          <path d="M -6 -2 Q -9 -14 0 -15 Q 9 -14 6 -2" fill="none" stroke="${line}" stroke-width=".7" opacity=".5"/>
-          <rect x="-7.5" y="-3" width="15" height="6" rx="2.5" fill="${color}" stroke="${line}" stroke-width=".9"/>
-        </g>${grip ? gripFingers(c, { reach: 15 }) : ''}`;
-}
-
-/** LỌ THUỐC (hộp thuốc viên có nắp, nhãn): đưa cho chủ nuôi, giới thiệu đơn thuốc. */
-function pills(c, { color = '#f2f4f7', cap = '#e46d5c', label = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g transform="translate(0 12) rotate(90)">
-          <rect x="-9" y="-13" width="18" height="24" rx="3" fill="${color}" stroke="${line}" stroke-width="1"/>
-          <rect x="-10" y="-19" width="20" height="7" rx="2" fill="${cap}" stroke="${line}" stroke-width="1"/>
-          <rect x="-7" y="-7" width="14" height="10" rx="1.2" fill="${label}" stroke="${line}" stroke-width=".6"/>
-          <path d="M -3.5 -2 h 7 M 0 -5.5 v 7" stroke="${cap}" stroke-width="2" stroke-linecap="round"/>
-        </g>${grip ? gripFingers(c, { reach: 21 }) : ''}`;
-}
-
-/**
- * TÚI THUỐC (đợt 38 C): túi giấy nhỏ của nhà thuốc, cầm ở QUAI — thân túi treo dưới bàn tay; dải màu phòng khám và một dấu
- * cộng trắng trên vòng tròn. `data-bag` để `handOverBag` / `takeBag` nhận ra. Hệ toạ độ như các món khác (−y là phía trên).
- */
-function bag(c, { color = '#fbfaf7', band = '#1f8a70', cross = '#ffffff', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-bag="1" transform="translate(0 10) rotate(90)">
-          <path d="M -6 3 Q -6 -8 0 -8 Q 6 -8 6 3" fill="none" stroke="#c9b48f" stroke-width="2.4" stroke-linecap="round"/>
-          <path d="M -15 3 L 15 3 L 16.5 40 Q 0 42 -16.5 40 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
-          <path d="M -15 3 L 15 3 L 15.2 8 L -15.2 8 Z" fill="#e8e3d8" stroke="${line}" stroke-width=".7"/>
-          <path d="M -15.6 30 L 15.6 30 L 16.1 36 L -16.1 36 Z" fill="${band}"/>
-          <circle cx="0" cy="19" r="7.5" fill="${band}"/>
-          <path d="M -4.2 19 h 8.4 M 0 14.8 v 8.4" stroke="${cross}" stroke-width="2.6" stroke-linecap="round"/>
-        </g>${grip ? gripFingers(c, { reach: 13, from: -9 }) : ''}`;
-}
-
-/**
- * ĐỢT 39 A — THẺ NGÂN HÀNG (`payByCard`): thẻ nhựa xanh có chip vàng, cầm dọc mép dưới (ngón cái ở mặt trước). `data-card` để rig
- * nhận ra. Hệ toạ độ như điện thoại.
- */
-function card(c, { color = '#2f6fd0', grip = true } = {}) {
-  const line = lineOf(c);
-  return `
-        <g data-card="1" transform="translate(0 10) rotate(90)">
-          <rect x="-15" y="-21" width="30" height="20" rx="2.6" fill="${color}" stroke="${line}" stroke-width=".9"/>
-          <path d="M -15 -9 H 15" stroke="#ffffff" stroke-width="1.6" opacity=".35"/>
-          <rect x="-11" y="-18" width="7" height="5.4" rx="1.2" fill="#f2c94c" stroke="#a88424" stroke-width=".6"/>
-          <path d="M -11 -5 h 9 M 3 -5 h 7" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
-          <path d="M 7 -17 q 2 2 0 4 M 9.5 -18.5 q 3.4 3.5 0 7" stroke="#ffffff" stroke-width="1" fill="none" stroke-linecap="round"/>
-        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}${tingBadge(26)}`;
-}
-
-/**
- * ĐỢT 39 A — THẺ TÍCH ĐIỂM / SỔ TIÊM (`stampCard`): thẻ trắng dải màu phòng khám, tám ô tròn — ba ô đã có dấu chân, ô thứ tư nhận
- * DẤU ĐỎ (`data-ink`, rig bật theo kênh `inkL/R`; `stamped: true` = đã đóng sẵn). `data-stampcard` để rig nhận ra.
- */
-function stampcard(c, { color = '#ffffff', band = '#2f9e8f', stamped = false, grip = true } = {}) {
-  const line = lineOf(c);
-  const ring = (x, y, done) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${band}" stroke-width=".8" opacity=".8"/>${done ? `<circle cx="${x}" cy="${y}" r="2" fill="${band}" opacity=".7"/>` : ''}`;
-  return `
-        <g data-stampcard="1" transform="translate(0 10) rotate(90)"><circle data-stampspot="1" cx="13.5" cy="-16" r="0.6" fill="none"/>
-          <rect x="-20" y="-28" width="40" height="27" rx="2.4" fill="${color}" stroke="${line}" stroke-width=".9"/>
-          <rect x="-20" y="-28" width="40" height="7" rx="2.4" fill="${band}"/><path d="M -15 -24.5 h 12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-          ${[-13.5, -4.5, 4.5, 13.5].map((x, n) => ring(x, -16, n < 3)).join('')}${[-13.5, -4.5, 4.5, 13.5].map((x) => ring(x, -7, false)).join('')}
-          <g data-stampink="${stamped ? 'always' : '1'}" style="${stamped ? '' : 'display:none'}" transform="translate(13.5 -16)">
-            <circle r="5.6" fill="#e8f0f0" fill-opacity=".2" stroke="#d1263b" stroke-width="1.6"/><circle r="3.4" fill="none" stroke="#d1263b" stroke-width=".9"/>
-            <path d="M -2 1.4 h 4 M -1.2 -0.6 l 1.2 -1.6 l 1.2 1.6" stroke="#d1263b" stroke-width="1" fill="none" stroke-linecap="round"/></g>
-        </g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
-}
-
-// Một tờ tiền (hệ cục bộ: tâm ở gốc, nằm ngang 30 × 14): giấy xanh nhạt, viền đậm, ô chân dung, hai dòng số — đủ rõ ở cảnh trung.
-const banknote = (fill = '#bfe3c6', edge = '#2f7a4f', mark = '#2f7a4f') => `
-          <rect x="-15" y="-7" width="30" height="14" rx="1.6" fill="${fill}" stroke="${edge}" stroke-width="1"/>
-          <rect x="-12.6" y="-4.8" width="25.2" height="9.6" rx="1" fill="none" stroke="${mark}" stroke-width=".6" opacity=".7"/>
-          <circle cx="-5" cy="0" r="3.3" fill="${mark}" opacity=".55"/><path d="M 1.5 -2.4 h 8 M 1.5 0.4 h 6 M 1.5 3 h 8" stroke="${mark}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`;
-
-/**
- * ĐỢT 39 A — XẤP TIỀN (`giveChange` / `takeChange`): vài tờ tiền xếp chồng, xoè lệch nhau, cầm ở một đầu (ngón cái đè lên mặt trước).
- * `data-cash` để rig nhận ra. Hệ toạ độ như điện thoại.
- */
-function cash(c, { grip = true } = {}) {
-  return `
-        <g data-cash="1" transform="translate(0 10) rotate(90)">
-          <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
-        </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
-}
-
-return { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, leash, pills, bag, card, stampcard, banknote, cash };
-})();
-
 /* ───── runtime/schema.js ───── */
 __m['runtime/schema.js'] = (function () {
 // schema.js — TỪ ĐIỂN giữa lược đồ CÔNG KHAI (tiếng Anh) và lược đồ NỘI BỘ của hai bộ rig.
@@ -15072,8 +15560,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
-          const across = actor.width * 0.32 * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 150, 0.6, 1) : 1), deep = across * 0.55, lifted = (rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1)
+          let across = actor.width * 0.32 * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 150, 0.6, 1) : 1), deep = across * 0.55, lifted = (rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1)
             * (rig && rig.s && rig.s.lift42d > 0 ? clamp(1 - rig.s.lift42d / 120, 0.55, 1) : 1);       // đợt 42 D: bay khỏi sàn (chạy, nhảy) — bóng ở lại, nhạt đi
+          // ĐỢT 42 E: người NẰM — bóng dài dưới cả thân nằm (giữa thân, đủ dài), không phải elip nhỏ dưới bàn chân. Nằm trên sofa: bóng nằm trên
+          // mặt sofa (dời lên chừng ấy — `lieLift42e`, đơn vị khung).
+          const lay42e = rig && rig.lay42e && rig.s && rig.s.lie42e > 0.02 ? rig.lay42e : null, frame42e = actor.width / 400;
+          let shift42e = 0, up42e = 0;
+          if (lay42e) { const k = clamp(lay42e.blend, 0, 1); across += ((lay42e.x1 - lay42e.x0) * frame42e * 0.95 - across) * k; shift42e = ((lay42e.x0 + lay42e.x1) / 2 - 200 - (rig.s.x || 0)) * frame42e * k; up42e = (rig.s.lieLift42e || 0) * frame42e * k; deep = Math.max(deep, actor.width * 0.12); }
           // Con vật đang được BẾ: SVG của nó nằm trong tay một người (rời khỏi host) — host trống, không có bóng trên sàn.
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
@@ -15081,7 +15574,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           wallShadow(actor, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
             // Đứng trên một hộp (mèo trên bàn khám): nhấc bóng lên khỏi mặt hộp rõ hơn — cùng mặt phẳng thì mặt bàn vẽ đè lên bóng.
-            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+            transform: `translate3d(${(actor.where + shift42e - across / 2).toFixed(2)}px, ${(-actor.spot.y - up42e - (actor.spot.y > 0 || up42e ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         // Máy quay lệch đi thì nhân vật 2D quay BÙ: mức quay của rig = mức do động tác đặt − góc máy / 90°. Giá trị do
@@ -15236,7 +15729,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
     // `limit` (đợt 31): khoảng cách máy tối đa — góc trung không lùi quá chừng ấy để lấy trọn đồ đạc; đồ đạc PHỤ (không phải TV,
     // không ai ngồi / đứng trên nó) thì được lẹm mép. `direct` đặt nó khi góc trung gần rộng bằng góc toàn.
     // `fill` (đợt 35, lượt ba): phần chiều cao khung chủ thể chiếm — thay số mặc định của cỡ cảnh (góc cận riêng một con vật đang diễn).
-    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null, fill: share = null } = {}) {
+    frameOn(subjects, size = 'medium', { avoid = null, lens = 1700, zoom = 1, at = null, seek = null, lamps = false, tight = false, limit = Infinity, roomy = false, core = false, hands = null, fill: share = null, view42c = false } = {}) {
       set.update();
       const W = view.clientWidth, H = view.clientHeight, list = Array.isArray(subjects) ? subjects : [subjects];
       const wanted = list.map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -15268,7 +15761,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // dùng mặc định: góc trung một người theo lõi là cái mặt choán cả khung dọc (0,43 góc toàn — thành góc cận).
         const coreEls = [actor.rig.el && actor.rig.el.dau, actor.rig.el && actor.rig.el.ao].filter(Boolean).map(drawnRect).filter((r) => r.width > 0);
         const core = coreEls.length && typeof actor.rig.seatY === 'function' ? { x0: toX(Math.min(...coreEls.map((r) => r.left))), x1: toX(Math.max(...coreEls.map((r) => r.right))) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig,
+                 lying: !!(actor.rig.s && actor.rig.s.lie42e > 0.5) };          // đợt 42 E: người NẰM — khung lấy cả thân nằm (xem `regionOf`)
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
@@ -15279,7 +15773,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Góc CẬN có cả người lẫn con vật (đợt 35, lượt ba — cho thuốc, đọc nhiệt kế): lấy ĐẦU con vật (chừa quanh nó), không lấy cả
         // con — con corgi nằm dài trên bàn thấp kéo khung từ đầu người xuống tận bụng nó, thành gần góc toàn (mặt nó 13 % khung).
         if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
-        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
+        if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base, padX42c = tall && !share && size !== 'full' && !shots.some((q) => q.person) ? 0.015 : 0.1; return { x0: m.x0 - padX42c * w, x1: m.x1 + padX42c * w, y0: m.base, y1: m.top + 0.35 * h }; }
+        // ĐỢT 42 E: người NẰM (ở một trong các mốc đo): cả thân nằm ngang sát sàn — lấy trọn khung vẽ, không chỉ "phần trên" (đầu ở sát sàn).
+        if (m.lying) { const w = m.x1 - m.x0; return { x0: m.x0 - 0.05 * w, x1: m.x1 + 0.05 * w, y0: m.base - 0.04 * h, y1: m.top + 0.1 * h }; }
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
@@ -15294,7 +15790,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core), lying: !!(a.lying || b.lying) } : a || b);
       // Người KHÁC cũng đo qua các mốc: bác sĩ bước tới khám rồi lùi về ngay trong nhịp — đo ở đầu / cuối nhịp thì không thấy
       // lúc họ đứng sát con vật (đợt 18: góc cận con mèo vẫn lẹm nửa mặt bác sĩ).
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -15317,12 +15813,14 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       const tall = H > W * 1.2, PORTRAIT = { close: 0.38, medium: 0.62, full: roomy ? 0.66 : 0.8 };
       // Góc cận người + con vật (đợt 35, lượt ba): vùng (mặt người … đầu con vật) chiếm 80 % chiều cao khung — 55 % thì mặt con corgi
       // chỉ 13,9 % khung, viên thuốc / miệng nó vài chục px (Gemini đọc ~1 khung / giây).
-      const fill = share || (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
+      // Đợt 42 C: view chỉ có CON VẬT mà không khai `fill` — con vật phải ≥ 35 % khung lúc làm động tác (tối qua 13–21 %): cận 0,62, trung 0,55.
+      const share0_42c = share, PET_ONLY_FILL_42c = { close: 0.85, medium: 0.66 }, petOnly42c = view42c && !shots.some((m) => m.person) ? PET_ONLY_FILL_42c[size] : null;      // chỉ góc "view" của kịch bản (`frameAt`) — góc tự chọn của `direct` giữ như cũ
+      const fill = share || petOnly42c || (size === 'close' && mixedClose && !tall ? 0.86 : tall && shots.some((m) => m.person) ? PORTRAIT[size] : FILL[shots.some((m) => m.person) ? 'person' : 'pet'][size]) || 0.5;
       const k = lens * zoom;
       const solve = (region, share = fill, wide = null) => {
         // Bề ngang được dùng: 75 % khung ngang; khung DỌC hẹp thì 90 % — không thì toàn cảnh dọc lùi quá xa, nửa trên là tường.
         // `wide`: bề ngang được dùng khác (bàn tay đang làm động tác chỉ cần nằm trong khung — đợt 33).
-        const across = wide || (H > W * 1.2 ? 0.9 : 0.75);
+        const across = wide || (H > W * 1.2 ? (petOnly42c && !share0_42c ? 0.985 : 0.9) : 0.75);      // đợt 42 C: khung dọc, con vật nằm ngang — bề ngang là giới hạn, cho tới 97 %
         const distance = Math.max(250, k * Math.max((region.y1 - region.y0) / (share * H), (region.x1 - region.x0) / (across * W)));
         // Điểm ngắm hiện ở 57 % chiều cao khung (`centre`): hạ điểm ngắm để giữa vùng nằm giữa khung. Khung DỌC: đặt vùng
         // THẤP hơn (55 %) — phụ đề hai dòng nằm trên đầu nhân vật, ở khoảng tường trống (phim dọc đợt 15: phụ đề ở giữa
@@ -15390,6 +15888,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const wider = { x0: Math.min(region.x0, lamp.x - 40), x1: Math.max(region.x1, lamp.x + 40), y0: region.y0, y1: Math.max(region.y1, lamp.y + 50) }, test = solve(wider);
         if (test.distance <= cam.distance * (size === 'full' ? 1.6 : 1.3) && test.distance <= limit) { region = wider; cam = test; }
       }
+      // Đợt 42 C: view con vật tự dựng (không phải `alone` — góc `alone` cố ý bỏ qua người khác) né đồ đạc / người theo THÂN con vật, không theo vùng đã chừa.
+      const petView42c = !!petOnly42c && !(avoid && !avoid.length);
+      const body42c = () => { const q = shots.reduce((q, m) => ({ x0: Math.min(q.x0, m.x0), x1: Math.max(q.x1, m.x1) }), { x0: Infinity, x1: -Infinity }), pad = 0.06 * (q.x1 - q.x0); return { x0: q.x0 - pad, x1: q.x1 + pad }; };      // thân con vật + 6 % mỗi bên (đuôi, tai không chạm mép)
+      let propCut42c = () => false;      // đợt 42 C: đặt máy ở x thì còn đồ đạc lẹm mép? (gán ở khối đồ đạc dưới)
       let stillCut = 0;                                                                   // đồ đạc quan trọng còn lẹm mép (`direct`, đợt 31)
       // ĐỒ VẬT BỊ MÉP KHUNG CẮT ĐÔI (TV, bàn nước — Gemini đợt 21): dời ngang tối đa 35 % nửa khung để nó ra hẳn hay vào trọn,
       // nếu chủ thể vẫn trọn trong khung. Vật ở tiền cảnh (gần máy hơn chủ thể) thì để: lấp ló ở mép là cách dựng tiền cảnh.
@@ -15401,6 +15903,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           .concat(actors.filter((actor) => !actor.rig && !actor.lamp && actor.content && actor.width).map((actor) => {
             const left = actor.where - actor.width / 2; return { a: left + actor.content[0] * actor.width, b: left + actor.content[2] * actor.width, z: actor.spot.z, near: actor.spot.z, far: actor.spot.z, kind: propKind(actor) };
           }));
+        propCut42c = (x) => spans.filter((span) => span.z <= zMeanProps + 150).reduce((sum, span) => {      // mức lẹm mép của đồ đạc nếu đặt máy ở x (0 = sạch)
+          const half = (W / 2) * cam.distance / k, f = cam.distance / (cam.distance + (zMeanProps - span.z)), a = x + (span.a - x) * f, b = x + (span.b - x) * f;
+          if (b - a > 2 * half) return sum;
+          const shown = (Math.min(b, x + half) - Math.max(a, x - half)) / (b - a);
+          return shown <= 0.01 || shown >= 0.99 ? sum : sum + Math.min(shown, 1 - shown) + 0.05;
+        }, 0);
         for (const span of spans) {
           // Tiền cảnh: chỉ đẩy ra hẳn một MẨU lấp ló ở mép (nhánh cây chọc vào khung — Gemini đợt 22), không kéo nó vào.
           const front = span.z > zMeanProps + 150;
@@ -15414,7 +15922,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           const clear = a >= cam.x - half * 0.97 && b <= cam.x + half * 0.97;
           if (front ? shown <= 0.01 || shown >= 0.35 : shown <= 0.02 || clear) continue;
           const margin = half * 0.04, left = (a + b) / 2 < cam.x;
-          const fits = (x) => region.x0 >= x - half && region.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : 0.35);      // khung dọc hẹp: dời xa hơn
+          const fitBox42c = petView42c ? body42c() : region, fits = (x) => fitBox42c.x0 >= x - half && fitBox42c.x1 <= x + half && Math.abs(x - cam.x) <= half * (H > W * 1.2 ? 0.7 : petView42c ? 0.9 : 0.35);      // khung dọc hẹp: dời xa hơn
           const out = left ? b + half + margin : a - half - margin, into = left ? a + half - margin : b - half + margin;
           if (fits(out)) cam = { ...cam, x: out }; else if (!front && fits(into)) cam = { ...cam, x: into };
           else if (!front && size === 'full') {
@@ -15448,7 +15956,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // TV lộ 49 % ở mép phải; góc trung lúc rọi đèn (khung dọc) cắt đôi TV và bàn nước. Thử một lượt các chỗ đặt máy (dời
         // ngang, góc toàn / trung lùi thêm chút) mà chủ thể vẫn trọn, lấy chỗ ít lẹm nhất: lẹm dở nặng hơn chạm mép.
         // Góc cận người + con vật (đợt 35, lượt bốn) cũng né đồ đạc lẹm mép: bàn khám con vật đứng trên bị mép phải cắt dở (87 %).
-        if (size !== 'close' || mixedClose) {
+        if (size !== 'close' || mixedClose || petView42c || tall) {      // đợt 42 C: góc cận khung dọc cũng né đồ đạc lẹm mép (chỉ dời / vào gần, không lùi)      // đợt 42 C: góc cận chỉ có con vật cũng né đồ đạc lẹm mép
           const portrait = H > W * 1.2, c0 = (0.57 - (portrait ? 0.55 : 0.5)) * H / k, base = cam;
           // `limit`: đồ đạc phụ được lẹm mép — chỉ TV và đồ đang được dùng phải trọn trong khung hay ra hẳn ngoài; đồ phụ lẹm
           // vẫn tính, nhẹ hơn bốn lần (đẩy được nó ra hẳn trong giới hạn thì tốt hơn). `vital`: phần do đồ quan trọng.
@@ -15475,15 +15983,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (best.bad > 0) {
             // Góc trung: lùi tới 1,45 / 1,6 (dọc) — góc trung hai người cách xa nhau (bà trên sofa, con mèo) thì xấp xỉ góc toàn; lùi
             // 1,2 thì TV vẫn chạm mép phải.
-            const top = Math.min(size === 'full' ? (portrait ? 1.6 : 1.35) : (portrait ? 1.6 : 1.45), limit / base.distance);
-            for (let factor = 1; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
-              const distance = Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;
-              const shift = size === 'full' ? Infinity : half * (portrait ? 0.7 : 0.35);
-              const lo = Math.max(region.x1 - half, base.x - shift), hi = Math.min(region.x0 + half, base.x + shift);
+            const top = Math.min(size === 'full' ? (portrait ? 1.6 : 1.35) : petView42c ? 1.1 : size === 'close' && !mixedClose ? 1 : (portrait ? 1.6 : 1.45), limit / base.distance);      // petOnly42c: lùi quá 10 % là con vật bé lại
+            const zoomIn42c = petView42c ? 0.65 : tall && size === 'close' && !mixedClose ? 0.8 : 1;
+            for (let factor = zoomIn42c; factor <= top + 1e-6 && best.bad > 0; factor += 0.05) {
+              const distance = zoomIn42c < 1 ? Math.max(250, base.distance * factor) : Math.max(base.distance, base.distance * factor), half = (W / 2) * distance / k;      // petView42c: cũng thử VÀO gần hơn (đồ đạc ra hẳn khung, con vật to hơn)
+              const shift = size === 'full' ? Infinity : half * (portrait || petView42c ? 0.9 : 0.35);
+              const fitBox = petView42c ? body42c() : region, lo = Math.max(fitBox.x1 - half, base.x - shift), hi = Math.min(fitBox.x0 + half, base.x + shift);
               if (lo > hi) continue;
               for (let n = 0; n <= 24; n++) {
                 const c = { ...base, x: lo + (hi - lo) * n / 24, y: base.y - c0 * (distance - base.distance), distance };
-                const bad = badness(c), cost = (factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
+                const bad = badness(c), cost = Math.abs(factor - 1) + Math.abs(c.x - base.x) / (W * distance / k);
                 if (bad < best.bad - 1e-6 || (Math.abs(bad - best.bad) < 1e-6 && cost < best.cost)) best = { cam: c, bad, cost, vital };
               }
             }
@@ -15513,11 +16022,27 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // Dời cho người ấy ra HẲN ngoài khung, nếu chủ thể vẫn trọn trong khung; không thì nới khung lấy trọn người ấy.
         const margin = half * 0.06;                                                       // tóc, tay đung đưa: chừa một khoảng
         const x = outside(cut, half, margin, (cut.x0 + cut.x1) / 2 < cam.x);
-        if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
+        if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) cam = { ...cam, x };
         // Góc CẬN: không đẩy ra được thì giữ cỡ cận — người bên cạnh lẹm vào mép (kiểu "cận bẩn" quen thuộc). Nới khung lấy
         // trọn họ thì góc cận con chó thành góc hai người nhỏ xíu (khung dọc, bác sĩ đứng sát bàn — cảnh thử đợt 15).
         // Góc cận, người bên cạnh không đẩy ra được: lấy trọn ĐẦU họ vào (góc hai nhân vật: đầu, vai người cạnh con vật) —
         // không để nửa khuôn mặt ở mép khung (Gemini, đợt 18). Vật / con vật khác thì giữ cỡ cận, cho lẹm mép.
+        else if (petOnly42c) {
+          // Đợt 42 C: view chỉ có con vật — GIỮ cỡ (không thành góc hai người nhỏ xíu, mèo 13 % khung). Người đứng sát: dời máy theo
+          // thân con vật (không kèm phần chừa quanh) cho người ra hẳn; không được thì giữ cỡ.
+          const body = body42c();
+          if (body.x0 >= x - half && body.x1 <= x + half && propCut42c(x) <= propCut42c(cam.x)) { cam = { ...cam, x }; continue; }      // không đổi người lẹm lấy TV lẹm
+          // Không dời ngang được (khung dọc hẹp, người đứng hai bên con vật): VÀO SÁT hơn, bề ngang chỉ vừa thân con vật — con vật to hơn,
+          // người ra hẳn khỏi khung. Chỉ nhận nếu sau đó người ấy hết lẹm.
+          if (cut.person) {
+            const keep = cam, tighter = solve({ x0: body.x0, x1: body.x1, y0: region.y0, y1: region.y1 }, 0.95, 0.96);
+            cam = { ...tighter, x: (body.x0 + body.x1) / 2 };
+            const m = inPlane(cut.raw || cut), h2 = (W / 2) * cam.distance / k, seen2 = Math.max(0, Math.min(m.x1, cam.x + h2) - Math.max(m.x0, cam.x - h2));
+            if (tighter.distance < keep.distance && seen2 === 0 && propCut42c(cam.x) <= propCut42c(keep.x)) continue;
+            cam = keep;
+          }
+          break;
+        }
         else if (size === 'close' && cut.person) {
           // Thành góc hai nhân vật: dựng hẳn góc TRUNG của cả hai, qua bước đồ đạc (đợt 31 — xem dưới).
           const rig = (cut.raw || cut).rig;
@@ -15547,7 +16072,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             if (region.y1 <= cam.y + above + lift - (above + below) * 0.02) { cam = { ...cam, y: cam.y + lift }; continue; }
             // Không nâng được (chủ thể sẽ bị cụt đầu): dời NGANG cho người ấy ra hẳn, nếu chủ thể vẫn trọn trong khung.
             const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-            if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; continue; }
+            if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) { cam = { ...cam, x }; continue; }
             // Không dời được (người ấy đứng sát chủ thể): SIẾT khung — vào gần hơn, đỉnh khung ngay trên chủ thể, cho tới khi
             // đáy khung qua khỏi người ấy; chỉ khi chủ thể vẫn chiếm không quá 95 % chiều cao khung.
             const pad = (region.y1 - region.y0) * 0.04, frame = region.y1 + pad - (m.top + slack);
@@ -15568,7 +16093,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               const noted = (how) => set.ruleLog.push({ rule: 'petBottom', how, size, shown: +shown.toFixed(3) });
               if (test.distance <= cam.distance * 1.8 && test.distance <= limit) { region = wider; cam = test; noted('widen'); continue; }
               const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-              if (region.x0 >= x - half && region.x1 <= x + half) { cam = { ...cam, x }; noted('shift'); continue; }
+              if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) { cam = { ...cam, x }; noted('shift'); continue; }
             }
           }
           // ĐỈNH khung cắt ngang một người đứng (góc cận con mèo dưới sàn, bà đứng ngay sau: thấy thân, mất đầu — cảnh thử
@@ -15577,8 +16102,19 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // Lộ dù chỉ 2 % khung (cằm, miệng ở mép trên) cũng là cắt dở — cảnh thử đợt 21 lộ 8 % mà trước đây bỏ qua.
           if (m.person && m.top > ceiling && m.base < ceiling - (above + below) * 0.02 && m.base > region.y0 - (above + below) * 0.5) {
             const margin = half * 0.06, x = outside(m, half, margin, (m.x0 + m.x1) / 2 < cam.x);
-            if (region.x0 >= x - half && region.x1 <= x + half) cam = { ...cam, x };
-            else {
+            if (region.x0 >= x - half && region.x1 <= x + half && (!petView42c || propCut42c(x) <= propCut42c(cam.x))) cam = { ...cam, x };
+            else if (petView42c) {
+              // Đợt 42 C: view con vật — không nới khung (con vật bé lại): VÀO GẦN hơn, đỉnh khung ngay dưới cằm người ấy, đáy khung
+              // dưới chân con vật — đầu người ra hẳn khỏi khung, con vật to hơn. Chỉ nhận nếu con vật vẫn trọn trong khung.
+              const petTop = Math.max(...shots.map((q) => q.top)), petBase = Math.min(...shots.map((q) => q.base)), h = petTop - petBase;
+              const chin = m.raw.head ? cam.y + (m.raw.head.base - cam.y) * depthF(m.raw) : m.top - 0.3 * (m.top - m.base);
+              const top = chin - 0.1 * h, bottom = petBase - 0.06 * h, distance = (top - bottom) * k / H;
+              if (petTop + 0.04 * h <= top && distance < cam.distance && distance >= 250) {
+                const body = body42c(), half2 = (W / 2) * distance / k, x2 = Math.min(Math.max(cam.x, body.x1 - half2), body.x0 + half2);
+                if (body.x0 >= x2 - half2 && body.x1 <= x2 + half2) cam = { ...cam, x: x2, distance, y: top - 0.57 * H * distance / k };
+              }
+            }
+            else {      // petView42c: giữ cỡ, không nới khung lấy người (con vật bé lại)
               // Không dời được (người ấy đứng ngay sau chủ thể): NỚI khung lấy trọn đầu họ, nếu chỉ phải lùi máy ≤ 2,5 lần — góc
               // cận thành góc hai nhân vật, không còn cái thân mất đầu (cảnh thử đợt 20, 21: bà sau con mèo — phải lùi 2,3 lần).
               // Khung mới là góc HAI nhân vật: vùng chiếm 86 % chiều cao như góc trung — không giữ tỉ lệ 45 % của góc cận con vật.
@@ -15636,10 +16172,10 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // acting_check chấm. Ước lượng phẳng của `frameOn` (`stillCut`) bỏ qua góc ngẩng / độ sâu.
       // Trả lại ĐÚNG máy cũ sau khi thử (đợt 32, lượt hai): `update` chép máy thử đè lên `camera` — để nguyên thì các phép đo sau
       // (`frameOn` chiếu bằng máy hiện có) đo từ góc thử cuối cùng: góc cận con mèo lệch sang, lẹm TV 97 % (`dem-mat-dien`).
-      const edgeCut = (v) => {
+      const edgeCut = (v, minorToo42c = false) => {
         const kept = { ...camera };
         trial = { ...v }; set.update();
-        const cut = set.propFraming().filter((p) => !p.minor && !p.front);
+        const cut = set.propFraming().filter((p) => (!p.minor || minorToo42c) && !p.front);      // minorToo42c: góc mở đầu — đồ phụ cũng không được lẹm (acting_check chấm vậy)
         trial = null; Object.assign(camera, kept); set.update();
         return cut;
       };
@@ -15648,8 +16184,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // đẩy người bên cạnh ra khỏi góc cận con mèo thì kéo nó tới mép) — thử dời máy về phía nó (hay ra xa nó) 0…80 đơn vị, lùi xa thêm 0…45 % (góc trung vẫn phải hẹp hơn 85 % góc toàn — `direct`),
       // nhận cách đầu tiên lẹm ít món hơn mà không chủ thể nào bị mép khung cắt.
       const nameOfRig = (rig) => { const actor = actors.find((item) => item.rig === rig); return actor ? actor.host.id || actor.host.dataset.name || '' : ''; };
-      const nudge = (v, subjects) => {
-        const cut = edgeCut(v);
+      const nudge = (v, subjects, minorToo42c = false) => {
+        const cut = edgeCut(v, minorToo42c);
         if (!cut.length) return v;
         const names = subjects.map(nameOfRig), toward = cut[0].edge === 'right' ? 1 : -1;
         // về phía món ấy (lấy trọn) trước, rồi ra xa nó (đẩy hẳn ra ngoài — cái bàn khám lộ 12 % ở mép góc trung bác sĩ)
@@ -15657,7 +16193,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           if (grow === 1 && !d) continue;
           const test = { ...v, x: +(v.x + sign * d).toFixed(1), distance: +(v.distance * grow).toFixed(1) }, kept = { ...camera };
           trial = { ...test }; set.update();
-          const props = set.propFraming().filter((p) => !p.minor && !p.front), people = set.framing().filter((c) => names.includes(c.name));
+          const props = set.propFraming().filter((p) => (!p.minor || minorToo42c) && !p.front), people = set.framing().filter((c) => names.includes(c.name));
           trial = null; Object.assign(camera, kept); set.update();
           if (props.length < cut.length && !people.length) { set.ruleLog.push({ rule: 'nudge', from: cut.map((p) => `${p.name} ${Math.round(p.shown * 100)} %`), by: sign * d, grow }); return test; }
         }
@@ -15821,7 +16357,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           // Thành góc toàn của đúng những chủ thể của góc đang có: giữ nguyên, không cắt.
           if (size === 'full' && shot && !shot.fixed && shot.size === 'full' && same(shot.subjects, beat.subjects)) continue;
         }
-        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1));
+        values = nudge(values, size === 'full' || !reaction ? beat.subjects : beat.subjects.slice(0, 1), index === 0 && size === 'full');
         const glide = shot && !shot.fixed && same(shot.subjects, beat.subjects);
         tl.add(glide ? set.move(values, pan, 'sine.inOut') : set.cut(values), at);
         if (!glide) cuts.push(at);
@@ -15862,9 +16398,9 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // NGƯỜI NGỒI trên một hộp (sofa, ghế đá): đường mặt ghế của rig (`seatY`, nơi mông đặt xuống) và mặt trên của hộp dưới
         // họ, cả hai đo trên màn hình — lệch nhau là người lơ lửng trên ghế hay lún vào nó (đợt 29).
         // QUỲ (bé quỳ vuốt con chó cạnh ghế đá) cũng mượn kênh `seat` — không phải ngồi trên hộp (đợt 30).
-        const sitting = person && rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5);
-        const under = sitting ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
-        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.seatY()) : null;
+        const sitting = person && rig.s && ((rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)) || rig.s.floor42e > 0.5);          // đợt 42 E: ngồi bệt — lòng là đường "mặt ghế"
+        const under = sitting && !(rig.s.floor42e > 0.5) ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
+        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.s.floor42e > 0.5 && typeof rig.lapY42e === 'function' ? rig.lapY42e() : rig.seatY()) : null;
         const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
@@ -15886,7 +16422,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // sau đầu gối người ngồi cạnh nó. `acting_check` đo tay tới những điểm trong hai khung ấy mà không bị người khác che.
         const parts = !person && e.dau ? Object.fromEntries([['head', e.dau], ['back', e.than]].filter(([, el]) => el).map(([key, el]) => [key, rect(drawnRect(el))])
           .filter(([, r]) => r.x1 > r.x0 && r.y1 > r.y0)) : null;
-        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
+        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!sitting, ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           // `lean` (đợt 31): thân người nghiêng bao nhiêu độ so với dáng nghỉ — người ngồi cúi qua đầu gối tới con vật.
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
@@ -15909,6 +16445,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
             tilt: +(rig.s.headTilt || 0).toFixed(2), x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, h: r.y1 - r.y0, pitchDeg: (rig.constructor && rig.constructor.LOOK_PITCH_DEG) || 32 }; })() : null,
           readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
+          // ĐỢT 42 E — SÁT SÀN (`rig.floorProbe42e()`, khung gốc → px trong `view`): ngồi bệt / ngồi xổm / nằm, góc thân, hông và đáy mông, chỗ thấp nhất,
+          // mặt nằm (sàn / mặt sofa), tâm đầu, hai cổ chân, món đồ dưới sàn; `top`: mặt trên của hộp dưới người (sofa) — người nằm trên đó.
+          floor42e: person && typeof rig.floorProbe42e === 'function' ? (() => { const q = rig.floorProbe42e(), P = (p) => p && point(rig.svg, p.x, p.y);
+            const under = props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60);
+            return { sit: q.sit, squat: q.squat, lie: q.lie, angle: q.angle, sofa: q.sofa, hip: P(q.hip), seat: P(q.seat), low: P({ x: q.hip.x, y: q.low }), floor: P({ x: q.hip.x, y: q.floor }), head: P(q.head),
+              ankles: q.ankles ? q.ankles.map(P) : null, items: q.items.map((it) => ({ ...it, at: P(it) })), pick: q.pick, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null }; })() : null,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
           // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
@@ -16873,6 +17415,8 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash, bag } = __m['runtime/parts.js'];
 // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền
 const { card, stampcard, cash } = __m['runtime/parts.js'];
+// đợt 42 E: quả bóng đồ chơi, bát ăn (nhặt dưới sàn lên — `pickUp`)
+const { toy42e, bowl42e } = __m['runtime/parts.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
@@ -17099,6 +17643,7 @@ function applyConfig(rig, config) {
 const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
+Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
 
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.

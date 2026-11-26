@@ -2526,6 +2526,58 @@ def check_motion42d(folder, c, shots):
     return out
 
 
+# ĐỢT 42 E — SÁT SÀN (`floor42e`, set3d `actingProbe` → `floor42e`): ngồi bệt — mông trên sàn (đáy mông cao hơn đường sàn ≤ FLOOR_SEAT_42E chiều
+# cao, không lún), chân chạm sàn; nằm — thân nằm ngang (≥ 70°), chỗ thấp nhất của người trên mặt nằm (sàn / mặt sofa, ±3 %); nhặt — lòng bàn
+# tay tới món đồ lúc nắm (≤ PICK_REACH_42E), bàn chân trên sàn lúc ngồi xổm, món đồ trong tay (và không còn dưới sàn) lúc xong bước.
+FLOOR_SEAT_42E = 0.09          # người ngồi bệt nhìn từ trước: hai ống chân chéo ở GẦN máy hơn mông — đáy mông cao hơn đường sàn dưới ống chân chừng ấy
+PICK_REACH_42E = 0.07
+
+
+def check_floor42e(folder, c, frames):
+    out, who, name = [], c['who'], c['name']
+    def ok(what, good, note): out.append({'scene': folder, 'what': f'{who} {name} — {what}', 'ok': good, 'note': note})
+    seen = [(t, f.get(who)) for t, f in zip(c['times'], frames) if f.get(who) and f[who].get('floor42e') and f[who].get('tall')]
+    if not seen:
+        out.append({'scene': folder, 'what': f'{who} {name}', 'ok': None, 'note': 'not in the frame (or built before the floor probe)'}); return out
+    if name == 'sitOnFloor':
+        for t, a in seen:
+            q, tall = a['floor42e'], a['tall']
+            if q['sit'] < 0.95: ok(f'sitting on the floor at {t:g} s', False, f'floor sitting only {q["sit"] * 100:.0f} % in'); continue
+            up = (a['ground'] - q['seat']['y']) / tall
+            ok(f'hips on the floor at {t:g} s', -FEET <= up <= FLOOR_SEAT_42E, f'the bottom of the hips is {up * 100:+.1f} % of height above the floor line (limit {-FEET * 100:g} … {FLOOR_SEAT_42E * 100:g} %)')
+            low = (q['low']['y'] - a['ground']) / tall
+            ok(f'legs on the floor at {t:g} s', abs(low) <= FEET, f'the lowest point of the folded legs is {low * 100:+.1f} % of height off the floor line (limit ±{FEET * 100:g} %; + sunk, − floating)')
+    elif name == 'lieDown':
+        for t, a in seen:
+            q, tall = a['floor42e'], a['tall']
+            ok(f'the body horizontal at {t:g} s', q['lie'] > 0.95 and abs(q['angle']) >= 70, f'lying {q["lie"] * 100:.0f} % in, the body turned {abs(q["angle"]):.0f}° from upright (least 70°)')
+            surface = q['top'] if c.get('sofa') and q.get('top') is not None else a['ground']
+            if c.get('sofa') and q.get('top') is None: ok(f'on the sofa at {t:g} s', False, 'no box (sofa) under the character'); continue
+            off = (q['low']['y'] - surface) / tall
+            ok(f'lying on the {"sofa" if c.get("sofa") else "floor"} at {t:g} s', abs(off) <= FEET, f'the lowest point of the body is {off * 100:+.1f} % of height off the {"top of the sofa" if c.get("sofa") else "floor line"} (limit ±{FEET * 100:g} %; + sunk, − floating)')
+    elif name == 'pickUp':
+        t, a = seen[min(1, len(seen) - 1)]
+        q, tall = a['floor42e'], a['tall']
+        pick = q.get('pick') or {}
+        item = next((it for n, it in enumerate(q.get('items') or []) if n == pick.get('n')), None)
+        if not item or not item.get('at') or not a.get('hands'): ok('hand at the item', False, f'no item / hands measured at {t:g} s')
+        else:
+            size = tall * 11 / 400          # quả bóng ~11 đơn vị khung: đo tới TÂM món đồ
+            d = min(((h['x'] - item['at']['x']) ** 2 + (h['y'] - item['at']['y'] + size) ** 2) ** 0.5 for h in a['hands']) / tall
+            ok('hand at the item when it closes', d <= PICK_REACH_42E, f'the palm is {d * 100:.1f} % of height from the {item["kind"]} at {t:g} s (limit {PICK_REACH_42E * 100:g} %)')
+        if a.get('feet') is not None:
+            off = (a['feet'] - a['ground']) / tall
+            ok('feet on the floor while squatting', abs(off) <= FEET, f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)')
+        ok('squatting at the grasp', q['squat'] > 0.9, f'squat {q["squat"] * 100:.0f} % in at {t:g} s')
+        t, a = seen[-1]
+        q = a['floor42e']; pick = q.get('pick') or {}
+        item = next((it for n, it in enumerate(q.get('items') or []) if n == pick.get('n')), None)
+        held = any(i['side'] == pick.get('k') for i in a.get('items') or [])
+        ok('the item in the hand at the end', held and bool(item) and not item.get('down'), f'at {t:g} s: ' + ('held in hand ' + str(pick.get('k')) if held else 'not in the hand') + ('' if item and not item.get('down') else ', still on the floor'))
+    return out
+
+
+
 def check_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
@@ -2606,6 +2658,9 @@ def check_scene(folder):
                                         'note': f'the pet\'s body moves at most {hop[1] * 100:.1f} % of {c["who"]}\'s height between two frames, measured against {c["who"]} (at {hop[0]:g} s; limit {PET_JUMP * 100:g} %)'})
         if c['kind'] == 'putDown':
             results.extend(check_put_down(folder, c, frames))
+            continue
+        if c['kind'] == 'floor42e':          # đợt 42 E
+            results.extend(check_floor42e(folder, c, frames))
             continue
         if c['kind'] == 'talk39':
             # đợt 39 C: tay trong khung ở lúc giữa (như `gesture`; tự sướng: bỏ lúc chớp sáng ở cuối) + số đo riêng của từng động tác
@@ -2730,7 +2785,7 @@ def check_scene(folder):
         # Chân của mọi người ở lúc tay gần đích nhất; người NGỒI trên hộp: mông trên mặt ghế (đợt 29).
         frame = frames[c['times'].index(best[0])]
         for name, a in frame.items():
-            if not a['person'] or a['feet'] is None or not a['tall']: continue
+            if not a['person'] or a['feet'] is None or not a['tall'] or ((a.get('floor42e') or {}).get('lie') or 0) > 0.05: continue          # đợt 42 E: người nằm — đo riêng (`floor42e`)
             off = (a['feet'] - a['ground']) / a['tall']
             if abs(off) > FEET: results.append({'scene': folder, 'what': f'{name} feet on the floor during {c["kind"]}', 'ok': False, 'note': f'{off * 100:+.1f} % of height at {best[0]:g} s'})
             seat = a.get('seat')

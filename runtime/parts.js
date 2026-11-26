@@ -262,3 +262,28 @@ export function cash(c, { grip = true } = {}) {
           <g transform="translate(-2 -22) rotate(-5)">${banknote('#cfe8d4')}</g><g transform="translate(0 -21) rotate(2)">${banknote('#bfe3c6')}</g><g transform="translate(2 -20) rotate(7)">${banknote('#d8e7c4', '#6b7f2e', '#6b7f2e')}</g>
         </g>${grip ? gripThumb(c, { reach: 11, x: 1 }) : ''}`;
 }
+
+// ĐỢT 42 E — đồ NHẶT DƯỚI SÀN lên (`pickUp`): quả bóng đồ chơi và cái bát ăn của thú. Cùng hình với món đồ rig vẽ nằm dưới sàn (`toyShape42e`,
+// `bowlShape42e`: hệ cục bộ, đáy món đồ ở y = 0, tâm ngang ở x = 0), để lúc bàn tay nắm lấy món đồ trong tay trông đúng là món dưới sàn.
+export const toyShape42e = (color = '#f2b134', band = '#e0533d') => `
+          <circle cx="0" cy="-11" r="11" fill="${color}" stroke="#a8701a" stroke-width="1.2"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="${band}" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M -10.4 -14.6 Q 0 -7 10.4 -14.6" fill="none" stroke="#ffffff" stroke-width=".8" opacity=".5"/>
+          <circle cx="-4" cy="-16" r="2.6" fill="#ffffff" opacity=".55"/>`;
+export const bowlShape42e = (color = '#d9534f', food = '#a0643a') => `
+          <ellipse cx="0" cy="-12" rx="17" ry="4" fill="${food}"/>
+          <path d="M -18 -12 Q -17 -1 -10 0 L 10 0 Q 17 -1 18 -12 Q 0 -8 -18 -12 Z" fill="${color}" stroke="#8c2f2b" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -18 -12 Q 0 -16 18 -12" fill="none" stroke="#8c2f2b" stroke-width="1.1"/>
+          <path d="M -12 -6 Q 0 -3 12 -6" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".35"/>`;
+
+/** ĐỢT 42 E — QUẢ BÓNG ĐỒ CHƠI cầm trong tay (sau `pickUp`; đưa cho người khác bằng `handOver`): các ngón ôm phía trước quả bóng. */
+export function toy42e(c, { color = '#f2b134', band = '#e0533d', grip = true } = {}) {
+  return `
+        <g data-toy42e="1" transform="translate(0 6) rotate(90) translate(11 11)">${toyShape42e(color, band)}</g>${grip ? gripFingers(c, { reach: 19, from: -3 }) : ''}`;
+}
+
+/** ĐỢT 42 E — BÁT ĂN của thú cầm ở vành (sau `pickUp`): ngón cái đè lên vành bát. */
+export function bowl42e(c, { color = '#d9534f', food = '#a0643a', grip = true } = {}) {
+  return `
+        <g data-bowl42e="1" transform="translate(0 4) rotate(90) translate(26 12)">${bowlShape42e(color, food)}</g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}

@@ -117,7 +117,10 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                other puts a pill in its mouth — the pet opens its mouth and chews by itself; both hands must be free).
                A pet's `"wears": "cone"` (or "bandage", or both in a list) keeps it on for the whole scene; a person's
                "wears": "mask" | "gloves" | "cap" (or a list). Pets: "greet", "play", ["goIn", 90] … ["comeOut", 90].
-               "kneel" … "standUp" (down at a pet on the floor); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
+               "kneel" … "standUp" (down at a pet on the floor); "sitOnFloor" … "standUp" (cross-legged on the floor: a pet
+               comes over to be stroked / carried onto the lap); ["lieDown", "floor" | "sofa", { "sleep": true }] … "standUp" (the
+               sofa: stand or sit the person at it — the seat height is the sofa box's); ["pickUp", "@dog"] (the toy by the dog —
+               the person steps up to it and gets a put-away toy; then ["handOver", "@mom"]); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
                is added at the same time; a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
                together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
                "ride" … "getOff": a person astride a scooter, side-on, hands on the bars. In a 3D set the easy way is
@@ -362,6 +365,63 @@ GESTURES += ('jump', 'dance')          # đợt 42 D — hai tay giơ cao lúc n
 MOTION_42D = ('run', 'jump', 'dance')
 RUN_GAP_42D = 0.42
 RUN_TO_42D = {}               # id(bước ["run", "@tên"]) → tên người / con vật chạy tới (nhịp máy quay lấy cả hai)
+# ĐỢT 42 E — SÁT SÀN: nhặt đồ dưới sàn (`pickUp`), ngồi bệt (`sitOnFloor`), nằm trên sàn / sofa (`lieDown`). acting_check đo mông chạm sàn, thân nằm
+# ngang trên mặt sàn / mặt sofa, bàn tay tới món đồ lúc nắm, món đồ trong tay sau đó (`floor42e`).
+FLOOR_42E = ('sitOnFloor', 'lieDown', 'pickUp')
+PICK_GAP_42E = 0.34          # nhặt đồ chơi cạnh con vật: giữa người cách giữa con vật chừng ấy × chiều cao người (món đồ vào tầm tay lúc ngồi xổm)
+FLOOR_TIMES_42E = {'sitOnFloor': (1.2, 1.5), 'lieDown': (1.9, 2.0), 'pickUp': (1.0, 2.6)}      # (đã vào thế, xong bước) giây từ đầu bước — runtime/rig-svg.js
+
+
+def floor_turn_42e(who, turn, undo):
+    """ĐỢT 42 E: người ĐANG Ở DƯỚI SÀN (ngồi bệt / nằm — từ một lượt trước, hay ngay trong lượt này) được xem như người NGỒI trong lượt ấy:
+    con vật đi tới họ (vuốt ve, bế lên lòng), họ không tự quỳ xuống / bước lại gần. Ghi `seated` tạm (trả lại bằng `restore_42e`)."""
+    steps = turn.get('do') if isinstance(turn.get('do'), list) else []
+    named = [step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None for step in steps]
+    down = who.get('_floor42e', False) or any(name in ('sitOnFloor', 'lieDown') for name in named)
+    for name in named:
+        if name in ('sitOnFloor', 'lieDown'): who['_floor42e'] = True
+        elif name == 'standUp': who['_floor42e'] = False
+    if down and not who.get('seated'):
+        undo.append((who, 'seated' in who, who.get('seated')))
+        who['seated'] = True
+
+
+def floor_step_42e(step, where, who, stage_set, fail):
+    """ĐỢT 42 E: kiểm tra `sitOnFloor` / `lieDown` / `pickUp` của một người; trả mã JS khi cần viết lại bước (nằm sofa trong bối cảnh 3D: `lift` =
+    chiều cao mặt sofa dưới người, đổi ra đơn vị khung của người ấy), không thì None."""
+    name, args = (step, []) if isinstance(step, str) else (step[0], list(step[1:]))
+    if who['_pet']:
+        if name == 'lieDown': return None                     # con vật có `lieDown` riêng
+        fail(f'{where}: "{name}" is done by a person — a pet cannot {name}')
+    if name == 'sitOnFloor' and args: fail(f'{where}: "sitOnFloor" takes no arguments — got {json.dumps(step, ensure_ascii=False)}')
+    if name == 'pickUp':
+        if args and not (args[0] is None or (isinstance(args[0], (int, float)) and not isinstance(args[0], bool)) or (isinstance(args[0], str) and args[0].startswith('@'))
+                         or (isinstance(args[0], dict) and set(args[0]) <= {'x', 'y'} and isinstance(args[0].get('x'), (int, float)))):
+            fail(f'{where}: ["pickUp", target, {{ "item": "toy" }}] — target is "@<pet>" (its toy), a distance in frame units, {{ "x": …, "y": … }} or null; got {json.dumps(args[0], ensure_ascii=False)}')
+        if len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'item', 'side'} and args[1].get('item', 'toy') in ('toy', 'bowl', 'leash') and args[1].get('side', 'auto') in ('auto', 'L', 'R')):
+            fail(f'{where}: ["pickUp", target, {{ "item": "toy" | "bowl" | "leash", "side": "L" | "R" }}] — got {json.dumps(args[1], ensure_ascii=False)}')
+        return None
+    if name != 'lieDown': return None
+    if args and args[0] not in ('floor', 'sofa'): fail(f'{where}: ["lieDown", "floor" | "sofa", {{ "head": "left" | "right", "sleep": true }}] — got {json.dumps(args[0], ensure_ascii=False)}')
+    if len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'head', 'sleep', 'lift'} and args[1].get('head', 'left') in ('left', 'right')):
+        fail(f'{where}: ["lieDown", where, {{ "head": "left" | "right", "sleep": true }}] — got {json.dumps(args[1], ensure_ascii=False)}')
+    if not args or args[0] != 'sofa' or stage_set is None: return None
+    x, z = float(who['x']), float(who.get('z', -300))
+    box = next((b for b in stage_set.get('boxes', []) if b.get('name') == who.get('on')), None) or next((b for b in stage_set.get('boxes', [])
+               if abs(x - float(b['x'])) <= float(b['width']) / 2 and -float(b['depth']) - 20 <= z - float(b['z']) <= 40), None)
+    if box is None: fail(f'{where}: ["lieDown", "sofa"] — "{who["name"]}" is not at a sofa: give them "on": "<sofa box>" and "seated": true, or stand them at its front (x within its width, z ≈ its z + 12)')
+    options = dict(args[1]) if len(args) > 1 else {}
+    options.setdefault('lift', round(float(box.get('height', 0)) * PERSON[1] / who['_host_height'], 1))
+    return f"['lieDown', 'sofa', {json.dumps(options, ensure_ascii=False)}]"
+
+
+def restore_42e(undo):
+    while undo:
+        who, had, value = undo.pop()
+        if had: who['seated'] = value
+        else: who.pop('seated', None)
+
+
 # ĐỢT 39 C — NGƯỜI DẪN: giơ bảng chữ, ra dấu kích thước, chụp ảnh tự sướng, ngáp vươn vai. Tay / bảng / điện thoại phải nằm trong khung
 # (cùng đường đo `GESTURES`); `acting_check` đo thêm tấm bảng (chữ đủ lớn, trước ngực), khe giữa hai tay, điện thoại + người chụp cùng, tay qua đầu.
 TALK_39 = ('holdSign', 'showSize', 'takeSelfie', 'yawnStretch')
@@ -493,6 +553,7 @@ ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
 # dấu thẻ (đưa cho người kia nếu có đích), rót đồ uống, lau quầy. `giveChange` / `stampCard` với đích là bước HAI NGƯỜI (như đưa túi thuốc): người
 # kia nhận (`takeChange` / `takeCard`) cùng lúc, có sẵn món đồ đang cất.
 ITEM_KINDS = ITEM_KINDS + ('card', 'stampcard', 'cash')
+ITEM_KINDS = ITEM_KINDS + ('toy', 'bowl')            # đợt 42 E: quả bóng đồ chơi, bát ăn — `pickUp` nhặt lên, người kia `take` (holds + holdsHidden)
 CUTOUT_KINDS = CUTOUT_KINDS + ('paystand',)
 CUTOUT_KINDS = CUTOUT_KINDS + ('tub',)                     # đợt 42 F: chậu tắm (con vật trong chậu: "inTub" trên con vật — chậu tự thêm vừa cỡ nó)
 DESK_39 = ('payByQR', 'payByCard', 'giveChange', 'stampCard', 'pourDrink', 'wipeCounter')
@@ -1100,6 +1161,30 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                 'check': {'kind': 'prep', 'name': op['name'], 'who': op['who'], 'times': mid, 'samples': [round(t0 + 0.1 * n, 2) for n in range(int((t1 - t0) * 10) + 1)],
                                           'after': [round(min(t1 + 0.3, end - 0.05), 2)]}})
             continue
+        if op['kind'] == 'floor42e':
+            # ĐỢT 42 E — SÁT SÀN: mốc theo runtime/rig-svg.js. Ngồi bệt / nằm: đã vào thế ở (độ dài bước − 0,35 / 0,4) — đo ở đó, cuối bước và
+            # 0,8 s sau (thế giữ). Nhặt: tay chạm món đồ ở 1,0 s (nắm lại ở 1,02), cầm nó đứng lên, xong bước thì món đồ trong tay.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, dur, name, who = float(step['start']), float(step['duration']), op['name'], op['who']
+            clip = lambda t: round(min(total - 0.05, t), 2)
+            if name == 'pickUp':
+                item = {'toy': 'toy ball', 'bowl': 'pet bowl', 'leash': 'leash'}.get(op.get('item') or 'toy', 'toy')
+                times = [clip(t0 + 0.92), clip(t0 + 1.0), clip(t0 + dur - 0.05)]
+                ask = [f'Is {who} squatting down (knees bent, back fairly straight, not a stiff bend) with a hand closing on a {item} on the floor?',
+                       f'Is the {item} in {who}\'s hand (not floating, not left on the floor) at the end?']
+                moments.append({'t': times[1], 'what': f'{who} pickUp', 'ask': ask, 'check': {'kind': 'floor42e', 'name': name, 'who': who, 'times': times, 'target': op.get('target'), 'item': op.get('item'), 'to': 'hands'}})      # `to: hands`: không đo "con vật thấy được" (acting_check `check_seen`)
+                continue
+            ready = dur - (0.35 if name == 'sitOnFloor' else 0.4)
+            times = [clip(t0 + ready), clip(t0 + dur - 0.02), clip(t0 + dur + 0.8)]
+            if name == 'sitOnFloor':
+                ask = [f'Is {who} sitting cross-legged on the floor (hips on the floor, shins folded in front), back upright, hands on the knees?']
+            else:
+                ask = [f'Is {who} lying down {"on the sofa, the head on a cushion" if op.get("sofa") else "on the floor, the head on an arm"} — the body horizontal, not floating above it or sunk into it?']
+                if op.get('sleep'): ask.append(f'Are {who}\'s eyes closed, asleep?')
+            moments.append({'t': times[1], 'what': f'{who} {name}', 'ask': ask, 'check': {'kind': 'floor42e', 'name': name, 'who': who, 'times': times, 'sofa': bool(op.get('sofa')), 'target': None, 'to': 'hands'}})
+            continue
         if op['kind'] == 'talk39':
             # NGƯỜI DẪN (đợt 39 C): mốc theo runtime/rig-svg.js — giơ bảng: bảng lên ở 0,87 s, hạ ở 0,87 + max(hold; 1,2); ra dấu: tay tới ở 0,45 s, buông ở
             # 0,45 + max(hold; 1,1); tự sướng: máy lên ở 0,5 s, chớp ở 0,75 + max(0,5; 0,45 × hold), xong ở 0,7 + max(hold; 1,2); ngáp: tay lên ở 0,55 s,
@@ -1624,6 +1709,12 @@ def main():
                     mine = {'R': who['holds']} if isinstance(who['holds'], str) else dict(who['holds'])
                     free = 'L' if 'R' in mine else 'R'
                     who['holds'] = dict(mine, **{free: item}); who['holdsHidden'] = [free]
+        # ĐỢT 42 E: người NHẶT đồ (`["pickUp", …, { "item": "bowl" }]`) mà không cầm gì: có sẵn món ấy ĐANG CẤT — `pickUp` lấy nó ra khi tay nắm
+        # lấy món đồ dưới sàn. (Rig tự cho món đồ khi gọi một mình; trong cả cảnh, trạng thái đầu cảnh phải biết trước là món đồ đang cất.)
+        picks_42e = [step for t in bag_turns if isinstance(t, dict) and t.get('who') == name and isinstance(t.get('do'), list) for step in t['do'] if step == 'pickUp' or (isinstance(step, list) and step and step[0] == 'pickUp')]
+        if not pet and picks_42e and 'holds' not in who:
+            options_42e = next((a for a in (picks_42e[0][1:] if isinstance(picks_42e[0], list) else []) if isinstance(a, dict)), {})
+            who['holds'], who['holdsHidden'] = options_42e.get('item', 'toy'), True
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
@@ -1975,6 +2066,11 @@ def main():
                 fail(f'{where}: "handOverBag" needs a medicine bag in hand — give "{actor}" "holds": "bag" (shown, not "holdsHidden")')
             if care == 'takeBag' and ('bag' not in held or not names[actor].get('holdsHidden')):
                 fail(f'{where}: "takeBag" needs a put-away medicine bag — give "{actor}" "holds": "bag" and "holdsHidden": true (["handOverBag", "@{actor}"] alone in a turn does it for you)')
+        # ĐỢT 42 E — SÁT SÀN: kiểm tra đối số; nằm SOFA trong bối cảnh 3D: mặt nằm cao đúng bằng mặt hộp dưới người (`lift`, đơn vị khung).
+        floor = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
+        if floor in FLOOR_42E and actor in names:
+            code = floor_step_42e(step, where, names[actor], stage_set, fail)
+            if code: return code
         if isinstance(step, str): return js(step)
         if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
         if step[0] in CARE_35: return care_code(step, where, actor)
@@ -2368,10 +2464,13 @@ def main():
                     turns.append((f'  // {pet["name"]} goes a rope\'s length from {person["name"]} for the "tugOfWar"', f"[{pet['name']}, ['walk', 4, {round(move / pet['_unit'])}]]"))
                     emitted[0] += 1
                     pet['x'] = float(pet['x']) + move
+        undo_42e = []
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
+            restore_42e(undo_42e)
             if not isinstance(turn, dict) or turn.get('who') not in names: continue
             who = names[turn['who']]
             if who['_pet']: continue
+            floor_turn_42e(who, turn, undo_42e)          # ĐỢT 42 E: đang ngồi bệt / nằm — như người ngồi (con vật đi tới, không tự quỳ)
             # QUỲ XUỐNG với con vật dưới SÀN (vuốt ve, cho ăn, khám, chải lông): người đứng thẳng thì tay chỉ tới lưng gần đuôi
             # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
             # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
@@ -2395,6 +2494,17 @@ def main():
                 move = wanted_x - float(who['x'])
                 if abs(move) > 0.04 * who['_host_height']:
                     turns.append((f'  // {who["name"]} steps up to the {"pay stand" if nm in DESK_PAY else "counter"} for "{nm}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                    emitted[0] += 1
+                    who['x'] = float(who['x']) + move
+            # ĐỢT 42 E: NHẶT đồ chơi cạnh một con vật (`["pickUp", "@cho"]`): bước lại cho món đồ (cạnh chân trước nó, phía người) vào tầm tay lúc ngồi
+            # xổm — giữa người cách giữa con vật `PICK_GAP_42E` × chiều cao người, ở phía đang đứng.
+            for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
+                if not (isinstance(step, list) and len(step) > 1 and step[0] == 'pickUp' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']): continue
+                pet = names[step[1][1:]]
+                px = float(pet['x']) + pet.get('_drop', 0)
+                move = px + (1 if float(who['x']) >= px else -1) * PICK_GAP_42E * who['_host_height'] - float(who['x'])
+                if abs(move) > 0.04 * who['_host_height']:
+                    turns.append((f'  // {who["name"]} steps up to {step[1][1:]} to "pickUp" the toy by it', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                     emitted[0] += 1
                     who['x'] = float(who['x']) + move
             # ĐỢT 39 C: chụp ảnh tự sướng cùng ai (`["takeSelfie", 1.6, { "with": "@boy" }]`): người kia bước lại sát người chụp (cùng phía họ
@@ -2573,6 +2683,7 @@ def main():
                 turns.append((f'  // {pet["name"]} turns its tail to {who["name"]} for "takeTemp"', f"[{pet['name']}, ['face', {js(away)}]]"))
                 emitted[0] += 1
                 turned_back.append((pet, who))
+        restore_42e(undo_42e)
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -2652,6 +2763,12 @@ def main():
                                      'size': (args_[0] if args_ else 'medium') if name == 'showSize' else None,
                                      'text': (' / '.join(args_[0]) if isinstance(args_[0], list) else str(args_[0]).replace('|', ' / ')) if name == 'holdSign' and args_ else None,
                                      'with': next((a['with'][1:] for a in args_[1:2] if isinstance(a, dict) and isinstance(a.get('with'), str)), None) if name == 'takeSelfie' else None})
+                # ĐỢT 42 E — SÁT SÀN: ngồi bệt, nằm, nhặt đồ — acting_check đo mông / thân trên mặt sàn, tay tới món đồ, món đồ trong tay (`floor42e`).
+                if name in FLOOR_42E and turn.get('who') in names and not names[turn['who']]['_pet']:
+                    args_ = step[1:] if isinstance(step, list) else []
+                    gear_ops.append({'turn': emitted[0], 'kind': 'floor42e', 'name': name, 'who': turn.get('who'), 'target': args_[0][1:] if args_ and isinstance(args_[0], str) and args_[0].startswith('@') else None,
+                                     'sofa': name == 'lieDown' and bool(args_) and args_[0] == 'sofa', 'sleep': name == 'lieDown' and len(args_) > 1 and isinstance(args_[1], dict) and bool(args_[1].get('sleep')),
+                                     'item': next((a.get('item') for a in args_ if isinstance(a, dict) and a.get('item')), 'toy') if name == 'pickUp' else None})
                 # RỬA TAY, ĐEO / THÁO GĂNG (đợt 38 B): bọt quanh hai tay lúc xoa, găng hiện / mất đúng lúc tay kia kéo nó (acting_check `prep`).
                 if name in PREP_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     gear_ops.append({'turn': emitted[0], 'kind': 'prep', 'name': name, 'who': turn.get('who'), 'target': None,
@@ -2728,6 +2845,10 @@ def main():
             # GÓC CẬN CON VẬT tự động (đợt 35, lượt ba): lượt riêng của con vật làm một động tác của nó (lăn ngửa, đuổi đuôi, nhào, gặm,
             # liếm) mà kịch bản không cho "view": cắt sang góc cận nó suốt lượt rồi trở lại. Liếm mặt người đang bế: góc cận người ấy.
             acts = [step if isinstance(step, str) else step[0] for step in entry.get('do') or [] if isinstance(step, (str, list)) and step]
+            # ĐỢT 42 E: lượt NGỒI BỆT / NẰM XUỐNG của một người mà kịch bản không cho "view": góc toàn người ấy suốt lượt — góc trung đặt theo dáng
+            # đứng lúc đầu lượt thì người vừa ngồi / nằm xuống tụt ra mép dưới khung (chỉ còn cái đầu).
+            if stage_set is not None and 'view' not in entry and not names[entry['who']]['_pet'] and any(name in ('sitOnFloor', 'lieDown') for name in acts):
+                entry['view'] = {'on': [entry['who']], 'size': 'full'}
             if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
                 carrier_40 = next((who for who, held in arms.items() if held == entry['who']), None) if 'struggle' in acts else None          # đợt 40 C: vùng vẫy trong tay — máy đặt tay vào ngực người bế (con vật nằm trong vòng tay: `on` con vật không dựng được góc), thấy cả hai tay đang giữ
                 licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
@@ -3626,7 +3747,7 @@ def main():
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_38) | set(MOTION_42D)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_38) | set(MOTION_42D) | set(FLOOR_42E)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>
