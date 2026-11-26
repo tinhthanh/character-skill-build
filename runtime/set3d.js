@@ -899,7 +899,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
-          const across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
+          let across = actor.width * 0.32, deep = across * 0.55, lifted = rig && rig.s && typeof rig.s.y === 'number' && rig.s.y < 0 ? clamp(1 + rig.s.y / 300, 0.4, 1) : 1;
+          // ĐỢT 42 E: người NẰM — bóng dài dưới cả thân nằm (giữa thân, đủ dài), không phải elip nhỏ dưới bàn chân. Nằm trên sofa: bóng nằm trên
+          // mặt sofa (dời lên chừng ấy — `lieLift42e`, đơn vị khung).
+          const lay42e = rig && rig.lay42e && rig.s && rig.s.lie42e > 0.02 ? rig.lay42e : null, frame42e = actor.width / 400;
+          let shift42e = 0, up42e = 0;
+          if (lay42e) { const k = clamp(lay42e.blend, 0, 1); across += ((lay42e.x1 - lay42e.x0) * frame42e * 0.95 - across) * k; shift42e = ((lay42e.x0 + lay42e.x1) / 2 - 200 - (rig.s.x || 0)) * frame42e * k; up42e = (rig.s.lieLift42e || 0) * frame42e * k; deep = Math.max(deep, actor.width * 0.12); }
           // Con vật đang được BẾ: SVG của nó nằm trong tay một người (rời khỏi host) — host trống, không có bóng trên sàn.
           const carried = rig && rig.svg && !host.contains(rig.svg);
           const seen = lifted * present * (rig && rig.s && typeof rig.s.mo === 'number' ? clamp(rig.s.mo, 0, 1) : 1) * (away || carried ? 0 : 1);
@@ -907,7 +912,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
           wallShadow(actor, seen);
           Object.assign(actor.shadow.style, { width: across + 'px', height: deep + 'px', opacity: seen.toFixed(3),
             // Đứng trên một hộp (mèo trên bàn khám): nhấc bóng lên khỏi mặt hộp rõ hơn — cùng mặt phẳng thì mặt bàn vẽ đè lên bóng.
-            transform: `translate3d(${(actor.where - across / 2).toFixed(2)}px, ${(-actor.spot.y - (actor.spot.y > 0 ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
+            transform: `translate3d(${(actor.where + shift42e - across / 2).toFixed(2)}px, ${(-actor.spot.y - up42e - (actor.spot.y > 0 || up42e ? 2.5 : 0.5)).toFixed(2)}px, ${(actor.spot.z - deep / 2).toFixed(2)}px) rotateX(90deg)` });
         }
         if (!actor.turn) return;
         // Máy quay lệch đi thì nhân vật 2D quay BÙ: mức quay của rig = mức do động tác đặt − góc máy / 90°. Giá trị do
@@ -1094,7 +1099,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // dùng mặc định: góc trung một người theo lõi là cái mặt choán cả khung dọc (0,43 góc toàn — thành góc cận).
         const coreEls = [actor.rig.el && actor.rig.el.dau, actor.rig.el && actor.rig.el.ao].filter(Boolean).map(drawnRect).filter((r) => r.width > 0);
         const core = coreEls.length && typeof actor.rig.seatY === 'function' ? { x0: toX(Math.min(...coreEls.map((r) => r.left))), x1: toX(Math.max(...coreEls.map((r) => r.right))) } : null;
-        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig };
+        return { x0: toX(r.left), x1: toX(r.right), top: toY(r.top), base: toY(r.bottom), z: actor.spot.z, person: !!(actor.rig && typeof actor.rig.seatY === 'function'), head, upper, core, rig: actor.rig,
+                 lying: !!(actor.rig.s && actor.rig.s.lie42e > 0.5) };          // đợt 42 E: người NẰM — khung lấy cả thân nằm (xem `regionOf`)
       };
       // Vùng cần lấy của từng chủ thể theo cỡ cảnh; phần khung hình (theo chiều cao) mà vùng ấy chiếm.
       const FILL = { person: { close: 0.55, medium: 0.86, full: 0.84 }, pet: { close: 0.45, medium: 0.32, full: 0.22 } };
@@ -1106,6 +1112,8 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // con — con corgi nằm dài trên bàn thấp kéo khung từ đầu người xuống tận bụng nó, thành gần góc toàn (mặt nó 13 % khung).
         if (!m.person && size === 'close' && mixedClose && m.head) { const w = m.head.x1 - m.head.x0, hh = m.head.top - m.head.base; return { x0: m.head.x0 - 0.35 * w, x1: m.head.x1 + 0.35 * w, y0: m.head.base - 0.45 * hh, y1: m.head.top + 0.3 * hh }; }
         if (!m.person) { const w = m.x1 - m.x0, h = m.top - m.base; return { x0: m.x0 - 0.1 * w, x1: m.x1 + 0.1 * w, y0: m.base, y1: m.top + 0.35 * h }; }
+        // ĐỢT 42 E: người NẰM (ở một trong các mốc đo): cả thân nằm ngang sát sàn — lấy trọn khung vẽ, không chỉ "phần trên" (đầu ở sát sàn).
+        if (m.lying) { const w = m.x1 - m.x0; return { x0: m.x0 - 0.05 * w, x1: m.x1 + 0.05 * w, y0: m.base - 0.04 * h, y1: m.top + 0.1 * h }; }
         // Góc cận: khoảng trống trên đầu 8 % (4 % là đầu chạm mép trên — Gemini đợt 21: "thiếu khoảng thở"); đáy khung dưới
         // vai một chút (0,62) — không cắt ngang giữa ngực.
         const across = size !== 'full' && core && m.core ? m.core : size !== 'full' && m.upper ? m.upper : m;     // góc trung / cận: bề ngang phần trên thân (đợt 32); `core`: lõi
@@ -1120,7 +1128,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       };
       // `at: [t0, t1, …]` + `seek(t)`: đo ở từng lúc rồi gộp — khung chứa mọi chỗ chủ thể đứng trong khoảng ấy.
       const spread = (a, b) => (a && b ? { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1) } : a || b);
-      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core) } : a || b);
+      const merge = (a, b) => (a && b ? { ...a, x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), top: Math.max(a.top, b.top), base: Math.min(a.base, b.base), upper: spread(a.upper, b.upper), core: spread(a.core, b.core), lying: !!(a.lying || b.lying) } : a || b);
       // Người KHÁC cũng đo qua các mốc: bác sĩ bước tới khám rồi lùi về ngay trong nhịp — đo ở đầu / cuối nhịp thì không thấy
       // lúc họ đứng sát con vật (đợt 18: góc cận con mèo vẫn lẹm nửa mặt bác sĩ).
       const otherActors = (avoid || actors.filter((actor) => !wanted.includes(actor) && actor.rig).map((actor) => actor.rig)).map((rig) => actors.find((actor) => actor.rig === rig)).filter(Boolean);
@@ -1686,9 +1694,9 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // NGƯỜI NGỒI trên một hộp (sofa, ghế đá): đường mặt ghế của rig (`seatY`, nơi mông đặt xuống) và mặt trên của hộp dưới
         // họ, cả hai đo trên màn hình — lệch nhau là người lơ lửng trên ghế hay lún vào nó (đợt 29).
         // QUỲ (bé quỳ vuốt con chó cạnh ghế đá) cũng mượn kênh `seat` — không phải ngồi trên hộp (đợt 30).
-        const sitting = person && rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5);
-        const under = sitting ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
-        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.seatY()) : null;
+        const sitting = person && rig.s && ((rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)) || rig.s.floor42e > 0.5);          // đợt 42 E: ngồi bệt — lòng là đường "mặt ghế"
+        const under = sitting && !(rig.s.floor42e > 0.5) ? props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60) : null;
+        const seatLine = sitting && typeof rig.seatY === 'function' ? point(rig.svg, 200, rig.s.floor42e > 0.5 && typeof rig.lapY42e === 'function' ? rig.lapY42e() : rig.seatY()) : null;
         const seat = seatLine ? { y: seatLine.y, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null } : null;
         const face = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('face')) : null;
         const body = typeof rig.shotBox === 'function' ? frameBox(rig, rig.shotBox('full')) : null;
@@ -1710,7 +1718,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         // sau đầu gối người ngồi cạnh nó. `acting_check` đo tay tới những điểm trong hai khung ấy mà không bị người khác che.
         const parts = !person && e.dau ? Object.fromEntries([['head', e.dau], ['back', e.than]].filter(([, el]) => el).map(([key, el]) => [key, rect(drawnRect(el))])
           .filter(([, r]) => r.x1 > r.x0 && r.y1 > r.y0)) : null;
-        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!(rig.s && rig.s.seat > 0.5 && !(rig.s.kneel > 0.5)), ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
+        return { name: actor.host.dataset.name || actor.host.id || '', person, carried, seated: !!sitting, ground: at.y, feet: feet.length && !carried ? Math.max(...feet.map((r) => r.y1)) : null,
           tall: (actor.height || 0) * at.scale, hands, face, body, x: at.x, seat, keySide: actor.keySide || 0, light: actor.lightInfo || null,
           // `lean` (đợt 31): thân người nghiêng bao nhiêu độ so với dáng nghỉ — người ngồi cúi qua đầu gối tới con vật.
           lean: person && rig.NGHI && typeof rig.s.than === 'number' ? +Math.abs(rig.s.than - (rig.NGHI.than || 0)).toFixed(1) : 0,
@@ -1733,6 +1741,12 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
             tilt: +(rig.s.headTilt || 0).toFixed(2), x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, h: r.y1 - r.y0, pitchDeg: (rig.constructor && rig.constructor.LOOK_PITCH_DEG) || 32 }; })() : null,
           readout: person && e.readout && e.readout.style.display !== 'none' ? rect(drawnRect(e.readout)) : null,          // thẻ số đo đang hiện (số cân, nhiệt độ)
           kneel: !!(person && rig.s && rig.s.kneel > 0.5),
+          // ĐỢT 42 E — SÁT SÀN (`rig.floorProbe42e()`, khung gốc → px trong `view`): ngồi bệt / ngồi xổm / nằm, góc thân, hông và đáy mông, chỗ thấp nhất,
+          // mặt nằm (sàn / mặt sofa), tâm đầu, hai cổ chân, món đồ dưới sàn; `top`: mặt trên của hộp dưới người (sofa) — người nằm trên đó.
+          floor42e: person && typeof rig.floorProbe42e === 'function' ? (() => { const q = rig.floorProbe42e(), P = (p) => p && point(rig.svg, p.x, p.y);
+            const under = props.find((prop) => prop.spec && actor.where >= prop.span[0] && actor.where <= prop.span[1] && actor.spot.z >= prop.front - prop.spec.depth - 40 && actor.spot.z <= prop.front + 60);
+            return { sit: q.sit, squat: q.squat, lie: q.lie, angle: q.angle, sofa: q.sofa, hip: P(q.hip), seat: P(q.seat), low: P({ x: q.hip.x, y: q.low }), floor: P({ x: q.hip.x, y: q.floor }), head: P(q.head),
+              ankles: q.ankles ? q.ankles.map(P) : null, items: q.items.map((it) => ({ ...it, at: P(it) })), pick: q.pick, top: under ? set.project(actor.where, under.top, Math.min(actor.spot.z, under.front)).y : null }; })() : null,
           legs, parts, layer: +(actor.host.style.zIndex || 0), shoulders: person ? ['L', 'R'].map((side) => e['vai' + side] && { side, ...point(e['vai' + side], 0, 0) }).filter((p) => p && Number.isFinite(p.x)) : [],
           // ĐỢT 35: đồ đang cầm thấy được (bìa hồ sơ — `readChart`) và đồ con vật đang đeo (băng, loa — `bandage`, `putCone`), khung trên màn hình.
           // `facing` (huong) và DỤNG CỤ đang hiện trong tay (`gadget` — vành loa, cuộn băng), đợt 35 lượt hai.
