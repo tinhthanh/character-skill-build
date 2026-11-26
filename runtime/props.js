@@ -99,6 +99,22 @@ const DRAW = {
     <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
     ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
   },
+  // ĐỢT 42 F — CHẬU TẮM thú cưng nhìn ngang (`bathPet`): lòng chậu (miệng elip, nước), thành trước bằng nhựa trắng xanh, vành trước dày (`data-tub-rim42f`).
+  // `w` dài, `height` = mép trên VÀNH TRƯỚC (giữa chậu) cao trên sàn khung — đặt con vật cùng đơn vị sau nó và cắt nó dưới vành
+  // (`pet.inTub42f(height)`, `pet.tubFit42f()` cho cỡ vừa con vật). `color`: màu sọc trang trí.
+  tub: ({ w = 240, height = 40, color, dark, line }) => {
+    const F = PROP_FRAME.floor, h = height, ry = Math.max(6, Math.min(12, w * 0.04)), cy = F - h - ry + 3, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    const front = `M ${x1} ${cy} A ${w / 2} ${ry} 0 0 1 ${x0} ${cy}`, back = `M ${x0} ${cy} A ${w / 2} ${ry} 0 0 1 ${x1} ${cy}`;
+    return `
+    <ellipse cx="200" cy="${cy}" rx="${w / 2}" ry="${ry}" fill="#cfe6ee"/>
+    <ellipse cx="200" cy="${cy + ry * 0.35}" rx="${w / 2 - 6}" ry="${ry * 0.6}" fill="#8fd0f0" opacity=".75"/>
+    <path d="${back}" fill="none" stroke="#6f97a8" stroke-width="7.400" stroke-linecap="round"/><path d="${back}" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    <rect x="${x0 + 16}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/><rect x="${x1 - 30}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/>
+    <path d="M ${x1} ${cy} L ${x1 - 12} ${F - 9} Q ${x1 - 14} ${F - 3} ${x1 - 22} ${F - 3} L ${x0 + 22} ${F - 3} Q ${x0 + 14} ${F - 3} ${x0 + 12} ${F - 9} L ${x0} ${cy} A ${w / 2} ${ry} 0 0 0 ${x1} ${cy} Z" fill="#eaf6fb" stroke="${line}" stroke-width="1.600" stroke-linejoin="round"/>
+    <path d="M ${x0 + 9} ${F - h * 0.42} q ${w / 8} -7 ${w / 4} 0 t ${w / 4} 0 t ${w / 4} 0 t ${w / 4 - 18} 0" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+    <path d="M ${x0 + 14} ${cy + ry + 6} Q ${x0 + 18} ${F - h * 0.3} ${x0 + 22} ${F - 10}" fill="none" stroke="#ffffff" stroke-width="3.400" stroke-linecap="round" opacity=".85"/>
+    <path d="${front}" fill="none" stroke="#6f97a8" stroke-width="8.400" stroke-linecap="round"/><path data-tub-rim42f="" d="${front}" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>`;
+  },
   // CÂY (ngoài trời: công viên, vỉa hè): thân nâu, tán tròn ba khối. Vẽ trong khung người nhưng cao hơn người — tán vượt
   // lên trên mép khung (tràn ra ngoài là cố ý). `color` là màu tán.
   tree: ({ w = 300, color, dark, line }) => {
@@ -278,18 +294,19 @@ function screen(x, y, w, h, image) {
 
 // Màu mặc định theo loại (đồ gỗ nâu; máy tính xám bạc / đen).
 const DEFAULT_COLOR = { paystand: '#2f9e8f', xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+DEFAULT_COLOR.tub = '#5fb8e8';                 // đợt 42 F: sọc xanh nước trên thành chậu tắm
 
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
  * Dựng một đạo cụ vào `host`.
- *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter' | 'xray' | 'paystand'
+ *   kind     'chair' | 'stool' | 'table' | 'counter' | 'plant' | 'laptop' | 'monitor' | 'bowl' | 'scale' | 'carrier' | 'tree' | 'lamp' | 'floorlamp' | 'tv' | 'scooter' | 'xray' | 'paystand' | 'tub'
  *   options  { for, color, width, height, back, on, image, facing, fill, reading, spot }
  *     spot     đèn đọc phim (`xray`): chỗ chỉ trên phim, [0…1, 0…1] tính từ góc trên trái tấm phim (mặc định [0.675, 0.74])
  *     for      rig NGƯỜI sẽ ngồi lên (ghế, ghế đẩu) — mặt ghế tự khớp chiều cao ngồi của nhân vật ấy
  *     color    màu chính (#rrggbb); màu tối và màu nét tự suy
  *     width    bề rộng, đơn vị khung (ghế 108, ghế đẩu 84, bàn 230, quầy 300, chậu cây 120)
- *     height   chiều cao bàn / quầy tính từ sàn, đơn vị khung (150)
+ *     height   chiều cao bàn / quầy tính từ sàn, đơn vị khung (150); chậu tắm (`tub`): mép trên vành trước (40)
  *     back     chiều cao lưng ghế tính từ mặt ghế (92)
  *     on       máy tính: chiều cao mặt bàn / quầy nó đặt lên, tính từ sàn (150 — khớp bàn, quầy mặc định)
  *     image    máy tính: ảnh trên màn hình (đường dẫn / URL); laptop chỉ hiện khi `facing: 'viewer'`

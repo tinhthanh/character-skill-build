@@ -2024,6 +2024,48 @@ try {
         }
         nurse.svg.remove(); pup.svg.remove();
       }
+      // ĐỢT 42 F — tắm, đánh răng, lau khô: vòi sen / bàn chải / khăn chỉ trong tay; con vật trong chậu bị cắt dưới vành; bọt nổi rồi xả hết; ướt rồi
+      // khô bông; miệng hé khi chải, liếm mép sau; con vật rũ nước theo người; không còn dụng cụ sau động tác; đối số sai bị từ chối.
+      {
+        const groomer = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+        const pup = L.createPet(spot('left:995px;top:118px;width:100px;height:82px'), { species: 'dog' }).rig;
+        pup.s.huong = -1; pup.apDung();
+        const fit = pup.tubFit42f(), tubHost = spot(`left:995px;top:${118 + 82 * (292 - 458) / 330}px;width:100px;height:${82 * 470 / 330}px`);
+        L.createProp(tubHost, 'tub', { width: fit.length, height: fit.rim }); pup.inTub42f(fit.rim);
+        if (pup.el.goc.getAttribute('clip-path') !== `url(#${pup.id}-tub42f)`) hong('bathPet', 'the pet in the tub is not cut below the rim');
+        const rimBox = tubHost.querySelector('[data-tub-rim42f]').getBoundingClientRect(), cut = pup.care42fProbe().rim;
+        if (!cut || cut.y < rimBox.top - 1.5 || cut.y > rimBox.bottom + 1.5) hong('bathPet', `the pet is not cut at the tub rim (cut at ${cut ? cut.y.toFixed(1) : '—'}, rim ${rimBox.top.toFixed(1)}–${rimBox.bottom.toFixed(1)})`);
+        const kind = () => ['L', 'R'].map((k) => Math.round(groomer.s['gadget' + k])).find((g) => g >= 40 && g <= 42) || 0;
+        const bath = L.sequence(groomer, [['bathPet', pup]]), d = bath.duration();
+        bath.time(1.3);
+        if (kind() !== 40 || !groomer.care42fProbe().spray) hong('bathPet', 'no shower head with a water spray in the hand while wetting');
+        bath.time(0.55 + 1.6 + 0.55 + 0.35 + 1.7);
+        if (!(pup.care42fProbe().foamLevel > 0.8) || !pup.care42fProbe().foam) hong('bathPet', 'no foam on the back while lathering');
+        if (!(pup.care42fProbe().ears < -0.5)) hong('bathPet', 'the pet does not put its ears back while bathed');
+        bath.time(groomer.constructor.bathShakeAt42f() + 0.4);
+        if (!(pup.care42fProbe().nuoc > 0.2)) hong('bathPet', 'the pet does not shake off water after the bath');
+        bath.time(d);
+        if (kind() || pup.care42fProbe().foam || !(pup.care42fProbe().wet > 0.9)) hong('bathPet', 'a tool or the foam stays afterwards, or the fur is not wet');
+        bath.kill();
+        const teeth = L.sequence(groomer, [['brushTeeth', pup]]);
+        teeth.time(1.6);
+        if (kind() !== 41 || !(pup.care42fProbe().gape > 0.35)) hong('brushTeeth', 'no toothbrush in the hand, or the mouth is not open while brushing');
+        teeth.time(0.95 + 2 + 0.98);
+        if (!(pup.care42fProbe().lick > 0.6)) hong('brushTeeth', 'the pet does not lick its lips after');
+        teeth.time(teeth.duration()); if (kind()) hong('brushTeeth', 'the toothbrush stays afterwards');
+        teeth.kill();
+        const dry = L.sequence(groomer, [['bathPet', pup], ['towelDry', pup]]), U = dry.duration() - 2.4;
+        dry.time(U - 1.2);
+        if (!pup.care42fProbe().towel || kind() === 42) hong('towelDry', 'the towel is not wrapped round the pet while rubbing');
+        dry.time(dry.duration());
+        if (pup.care42fProbe().towel || kind() || !(pup.care42fProbe().dry > 0.95) || !pup.care42fProbe().fluff) hong('towelDry', 'the towel stays, or the fur is not dry and fluffy afterwards');
+        dry.kill();
+        for (const [label, fn, needle] of [['bathPet', () => groomer.bathPet(pup, { hold: 30 }), 'hold'], ['brushTeeth', () => groomer.brushTeeth(groomer), 'pet rig'], ['towelDry', () => pup.inTub42f(-3), 'rim']]) {
+          let why = ''; try { fn(); } catch (error) { why = error.message; }
+          if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
+        }
+        groomer.svg.remove(); pup.svg.remove(); tubHost.remove();
+      }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;
       if (patient.el.cone.style.display === 'none') hong('wear', 'createPet({ wear: ["cone"] }) shows no cone');

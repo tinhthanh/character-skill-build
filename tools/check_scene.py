@@ -960,6 +960,60 @@ with tempfile.TemporaryDirectory() as work:
         want = [['clipNails', '@meo'], ['eyeDrops', '@meo'], ['cleanEars', '@meo'], ['scanChip', '@meo', {'id': '704 000 111 222'}]]
         if steps != want: problems.append(f'script.py care38: steps {steps}, want {want}')
 
+    # ĐỢT 42 F: tắm (chó corgi trong chậu tắm trên bàn khám: xối nước, xoa bọt hai tay, xả, lùi ra — con vật rũ nước), lau khô bằng khăn, đánh răng;
+    # một con mèo trong chậu do y tá đứng phía bên kia tắm. acting_check: tia nước rơi trên lưng, bọt trên lưng, hai tay trên con vật, con vật trong vành
+    # chậu, rũ nước khi đã buông, khăn quấn rồi về tay, lông khô bông, bàn chải ở miệng đang hé, liếm mép; đầu người quay về chỗ làm.
+    bath42f = {'id': 'bath42f', 'camera': 'auto', 'set': {'preset': 'exam'},
+               'characters': [{'name': 'bac_si', 'id': 'vet', 'x': 40, 'z': -560, 'faces': 'cho'},
+                              {'name': 'cho', 'species': 'corgi', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'bac_si', 'inTub': True}],
+               'script': [{'who': 'bac_si', 'do': [['bathPet', '@cho']]}, {'who': 'bac_si', 'do': [['towelDry', '@cho']]}, {'who': 'bac_si', 'do': [['brushTeeth', '@cho']]}]}
+    cat42f = {'id': 'cat42f', 'camera': 'auto', 'set': {'preset': 'exam'},
+              'characters': [{'name': 'y_ta', 'id': 'nurse', 'x': 360, 'z': -560, 'faces': 'meo'},
+                             {'name': 'meo', 'species': 'orange_cat', 'on': 'table', 'x': 200, 'z': -560, 'faces': 'y_ta', 'inTub': True}],
+              'script': [{'who': 'y_ta', 'do': [['bathPet', '@meo', {'hold': 1.6}]]}, {'who': 'y_ta', 'do': [['towelDry', '@meo']]}]}
+    for spec42f, needles42f in ((bath42f, ('bac_si bathPet cho — the water spray lands on its back', 'bac_si bathPet cho — foam builds up on its back', 'bac_si bathPet cho — both hands lather on it',
+                                           'bac_si bathPet cho — it stands inside the tub', 'bac_si bathPet cho — it shakes off water after the person steps back', 'bac_si bathPet — head turned to the shower head',
+                                           'bac_si towelDry cho — the towel comes in the hand, then wraps round it', 'bac_si towelDry cho — the fur goes from wet to fluffy',
+                                           'bac_si brushTeeth cho — the toothbrush at the mouth, the mouth open', 'bac_si brushTeeth cho — then it licks its lips, hands off')),
+                                (cat42f, ('y_ta bathPet meo — the water spray lands on its back', 'y_ta bathPet meo — it stands inside the tub', 'y_ta towelDry meo — both hands rub on the towel'))):
+        sid42f = spec42f['id']
+        path = os.path.join(os.path.dirname(stage), f'_check_{sid42f}.json')
+        try:
+            json.dump(spec42f, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, sid42f))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{sid42f}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, sid42f, 'index.html'), encoding='utf-8').read()
+        for needle in ('.inTub42f(', "createProp(tub42f_", '"bathPet", set.target(' if sid42f == 'bath42f' else '"towelDry", set.target('):
+            if needle not in html: problems.append(f'{sid42f}: {needle} is not in the composition')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, sid42f)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{sid42f}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        else:
+            for needle in needles42f:
+                if needle not in done.stdout: problems.append(f'{sid42f}: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
+    # Kịch bản chữ (đợt 42 F): "tắm" (con vật tự đứng trong chậu tắm), "lau khô lông", "đánh răng"; đối số sai bị từ chối.
+    text = os.path.join(work, 'bath42f.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn)\n\nbác sĩ → chó: tắm\nbác sĩ → chó: lau khô lông\nbác sĩ → chó: đánh răng\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py bath42f: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'bath42f.scene.json'), encoding='utf-8'))
+        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        if steps != [['bathPet', '@cho'], ['towelDry', '@cho'], ['brushTeeth', '@cho']]: problems.append(f'script.py bath42f: steps {steps}')
+        if not any(c.get('inTub') for c in made['characters'] if c.get('name') == 'cho'): problems.append('script.py bath42f: the bathed dog does not stand in a tub ("inTub")')
+    for label42f, step42f, needle42f, extra42f in (('bath hold too long', ['bathPet', '@cho', {'hold': 30}], 'hold must be', {}), ('teeth with extra words', ['brushTeeth', '@cho', 'fast'], '"brushTeeth" takes', {}),
+                                                   ('a person in a tub', ['towelDry', '@cho'], '"inTub" is for a pet', {'person_tub': True})):
+        bad42f = json.loads(json.dumps(bath42f)); bad42f['script'] = [{'who': 'bac_si', 'do': [step42f]}]
+        if extra42f.get('person_tub'): bad42f['characters'][0]['inTub'] = True
+        path = os.path.join(os.path.dirname(stage), '_check_bad42f.json')
+        try:
+            json.dump(bad42f, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, 'bad42f'))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode == 0 or needle42f not in done.stderr: problems.append(f'bad42f ({label42f}): should be refused with "{needle42f}" — got: ' + (done.stderr.strip()[-200:] or 'no error'))
+
     # Đợt 33: ĐỘNG TÁC TAY trong khung dọc — bé vẫy rồi chỉ tay ra xa (góc trung theo đầu + thân áo: tay chỉ ra ngoài mép phải 60 %
     # bàn tay ở 0.72.0). Góc trung nới theo bàn tay ở lượt có động tác tay, vẫn hẹp hơn 85 % góc toàn.
     gesture = {'id': 'gesture', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'street'}, 'characters': [{'name': 'be', 'id': 'boy', 'z': -400, 'x': 0}],

@@ -29,7 +29,7 @@ Một tệp kịch bản:
     mở đầu / kết thúc   tiêu đề | dòng phụ | nút (thẻ đầu / cuối phim) · logo  tệp ảnh · nhạc  tệp nhạc nền
   Dòng nhân vật: tên (mã, tuỳ chọn, …) nối bằng " · ". Mã: vet, boy, granny… hoặc loài thú dog, cat, corgi, calico,
     rabbit… Tuỳ chọn: "trên bàn" / "trên ghế" / "trên quầy" (đứng / ngồi trên hộp của bối cảnh), "ngồi" (người ngồi
-    trên ghế), "đeo loa", "băng chân", "giọng maichi" (tự tạo giọng đọc bằng voice-tts).
+    trên ghế), "đeo loa", "băng chân", "trong chậu" (thú đứng trong chậu tắm), "giọng maichi" (tự tạo giọng đọc bằng voice-tts).
   Dòng kịch bản:
     tên: lời thoại                     tên (tâm trạng): lời thoại
     tên: [hành động, hành động]        thú: [sợ] — một cảm xúc; [sợ, run] — giữ nét mặt sợ trong lúc run
@@ -45,6 +45,7 @@ Một tệp kịch bản:
                                        băng chân, đeo loa (băng / loa còn lại trên con vật)
                                        cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
                                        giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
+                                       tắm (con vật tự đứng trong chậu tắm: xối nước, xoa bọt, xả, rũ nước), đánh răng, lau khô (khăn tắm, lông bông)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
@@ -176,6 +177,8 @@ LIGHTS = {'ngày': 'day', 'ban ngày': 'day', 'chiều': 'evening', 'chạng v�
 # ĐỢT 40 C — thú ở phòng khám: sợ run trên bàn khám, giãy trong tay người bế, lừ đừ sau thuốc mê, cào cái loa chống liếm.
 ACTIONS.update({'run sợ': 'shiverAtVet', 'sợ run': 'shiverAtVet', 'giãy': 'struggle', 'giãy giụa': 'struggle', 'vùng vẫy': 'struggle', 'lừ đừ': 'groggy', 'chưa tỉnh thuốc': 'groggy', 'mơ màng': 'groggy', 'cào loa': 'pawAtCone', 'gỡ loa': 'pawAtCone'})
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
+TARGETED.update({'tắm': ('bathPet', None), 'tắm cho': ('bathPet', None), 'tắm rửa': ('bathPet', None), 'đánh răng': ('brushTeeth', None), 'đánh răng cho': ('brushTeeth', None),
+                 'chải răng': ('brushTeeth', None), 'lau khô': ('towelDry', None), 'lau khô lông': ('towelDry', None), 'lau khô cho': ('towelDry', None)})      # ĐỢT 42 F — tắm (con vật tự vào chậu tắm), đánh răng, lau khô bằng khăn
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
 # ĐỢT 39 C — NGƯỜI DẪN (chỉ người): "bác sĩ: [giơ bảng: Giảm 20%]" (chữ trên bảng: 1–3 dòng ngắn, ngắt bằng "|"; có dấu phẩy thì đặt trong ngoặc kép —
@@ -279,6 +282,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             elif low == 'đeo loa': entry.setdefault('wears', []).append('cone')
             elif low in ('băng chân', 'băng'): entry.setdefault('wears', []).append('bandage')
             elif low.startswith('giọng '): entry['voice'] = option.split(' ', 1)[1].strip()
+            elif low in ('trong chậu', 'trong chậu tắm') and pet: entry['inTub'] = True          # đợt 42 F
             else: raise ScriptError(f'{who["where"]}: không hiểu tuỳ chọn "{option}" của {who["label"]} (trên bàn, ngồi, đeo loa, băng chân, giọng …)')
         if 'on' in entry:
             x, z, width, depth = boxes[entry['on']]
@@ -455,6 +459,11 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         pet = next((c for c in characters if c['name'] == weighs[0][1]), None)
         side = -1 if not pet or float(pet.get('x', 0)) >= float(doer.get('x', 0)) else 1
         scene['set'].setdefault('cutouts', []).append({'kind': 'scale', 'name': SCALE_NAME, 'x': round(float(doer.get('x', 0)) + side * 160), 'z': doer.get('z', -560)})
+    # ĐỢT 42 F — TẮM: con vật được tắm đứng trong chậu tắm (tools/scene.py tự thêm chậu vừa cỡ nó) từ đầu cảnh.
+    bathed = {step[1][1:] for entry in script for turn in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry]) if isinstance(turn, dict)
+              for step in turn.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'bathPet' and isinstance(step[1], str)}
+    for c in characters:
+        if c['name'] in bathed and 'species' in c: c['inTub'] = True
     # CHỈ PHIM X-QUANG (đợt 35): đặt một đèn đọc phim ("xray") cạnh người chỉ — cùng chiều sâu, phía xa con vật / người khác.
     for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
         steps = turn.get('do', []) if isinstance(turn, dict) else []
