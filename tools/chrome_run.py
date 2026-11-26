@@ -12,7 +12,7 @@ page is ready, and gave half-rendered screenshots on larger compositions.
 Standard library only (a small WebSocket client is included). Exit codes: 0 finished,
 3 the page never reached a --wait title, 4 Chrome could not be started.
 """
-import argparse, base64, json, os, re, shutil, socket, struct, subprocess, sys, tempfile, time
+import argparse, base64, json, os, re, select, shutil, socket, struct, subprocess, sys, tempfile, time
 
 
 class DevTools:
@@ -22,7 +22,8 @@ class DevTools:
         host, port, path = re.match(r'ws://([^:/]+):(\d+)(/.*)', url).groups()
         # Chờ trả lời tới 300 s: trang kiểm tra có những đoạn chạy đồng bộ dài (hàng trăm rig dựng lại), trong lúc ấy trình
         # duyệt không trả lời lệnh nào — trên máy CI chậm, 30 s là không đủ.
-        self.sock = socket.create_connection((host, int(port)), timeout=300)
+        # Máy bận (nhiều Chrome song song) thì các đoạn ấy dài hơn: nhân theo CHROME_RUN_TIMEOUT_SCALE như --timeout.
+        self.sock = socket.create_connection((host, int(port)), timeout=300 * max(1.0, float(os.environ.get('CHROME_RUN_TIMEOUT_SCALE') or 1)))
         key = base64.b64encode(os.urandom(16)).decode()
         self.sock.sendall((f'GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
                            f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode())
@@ -97,6 +98,8 @@ def main():
     parser.add_argument('--steps', help='a JSON file: a list of {"eval": "JS"} and {"screenshot": "out.png"} run in order once the page is finished; '
                                         'the values of the evals are printed as a JSON list (tools/light_side.py)')
     args = parser.parse_args()
+    # Máy đang chạy nhiều Chrome cùng lúc (tools/check_scene.py -j) thì trang chậm hơn: hạn chờ nhân theo CHROME_RUN_TIMEOUT_SCALE.
+    args.timeout *= max(1.0, float(os.environ.get('CHROME_RUN_TIMEOUT_SCALE') or 1))
     if not args.chrome:
         print('chrome_run: no Chrome given (--chrome or $CHROME_BIN)', file=sys.stderr); sys.exit(4)
     width, height = (int(n) for n in args.size.lower().split('x'))
@@ -107,16 +110,30 @@ def main():
     # "Directory not empty" và biến một lượt chạy thành công thành thất bại.
     profile = tempfile.mkdtemp(prefix='chrome-run-')
     try:
-        chrome = subprocess.Popen([args.chrome, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
-                                   '--remote-debugging-port=0', f'--user-data-dir={profile}', 'about:blank'],
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-        try:
-            endpoint, started = None, time.time()
+        # Chrome đôi khi treo ngay lúc khởi động mà không in gì, không thoát (gặp khi nhiều Chrome khởi động cùng lúc —
+        # tools/check_scene.py -j): đọc stderr có hạn chờ (select), quá 30 s thì giết và thử lại, tối đa 3 lần.
+        endpoint = None
+        for attempt in range(3):
+            # macOS: khi màn hình tắt (máy khoá), cửa sổ bị coi là bị che → Chrome thôi vẽ khung → lệnh chụp ảnh treo mãi.
+            # Ba cờ dưới (như puppeteer) giữ trang luôn được vẽ, kể cả khi màn hình tắt (thử lại được: tắt màn hình giữa lúc
+            # acting_check chụp — không có cờ thì "socket.timeout", có cờ thì xong bình thường).
+            awake = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']
+            chrome = subprocess.Popen([args.chrome, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+                                       *awake, '--remote-debugging-port=0', f'--user-data-dir={profile}', 'about:blank'],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            said, started = b'', time.time()
             while time.time() - started < 30:
-                line = chrome.stderr.readline()
-                if not line and chrome.poll() is not None: break
-                found = re.search(r'DevTools listening on (ws://\S+)', line or '')
-                if found: endpoint = found.group(1); break
+                if select.select([chrome.stderr], [], [], 0.5)[0]:
+                    chunk = os.read(chrome.stderr.fileno(), 65536)
+                    if not chunk: break
+                    said += chunk
+                    found = re.search(rb'DevTools listening on (ws://\S+)', said)
+                    if found: endpoint = found.group(1).decode(); break
+                elif chrome.poll() is not None: break
+            if endpoint: break
+            chrome.kill(); chrome.wait()
+            shutil.rmtree(profile, ignore_errors=True); os.makedirs(profile, exist_ok=True)
+        try:
             if not endpoint:
                 print('chrome_run: Chrome did not start', file=sys.stderr); sys.exit(4)
             tools = DevTools(endpoint)

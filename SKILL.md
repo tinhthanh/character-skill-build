@@ -82,7 +82,13 @@ mid-action, and some failures are silent (see [Pitfalls](#pitfalls)).
    kit pieces alone; `receptionist.js`, `barista.js`, `granny.js`, `grandpa.js`, `clerk.js`
    show custom drawing, aprons, age cues and held items.
 4. **Run the check.** `sh tools/check.sh` rebuilds the bundle and runs every action of every
-   character in headless Chrome. It must print `PASS`.
+   character in headless Chrome. It must print `PASS`. While iterating, use the fast loop:
+   `sh tools/check.sh --changed` (only the scene cases your change touches, plus a smoke set),
+   `--only <case,glob,wNN>`, `--failed` (what failed last time); `python3 tools/check_scene.py --list`
+   lists the cases. The full run (no arguments) is still required before merge or release — a
+   change to a shared engine (camera, skeleton) can break scenes that `--changed` did not pick.
+   New checks for a wave go in a NEW module `tools/ci/wNN.py` (`@case('name')` functions taking
+   `work, problems`) — never append to another wave's module. See README, "The check".
 5. **Look at it.** `sh tools/shot.sh <id> out.png`, then open the PNG — a pose sheet: rest,
    close-ups, turns, sixteen mid-action frames, two held stances. Check that nothing is
    covered that should show, that the outfit reads when arms move and when the character

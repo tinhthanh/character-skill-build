@@ -59,12 +59,51 @@ folder.
 
 ```bash
 python3 tools/serve.py                          # http://127.0.0.1:8300/studio/
-sh tools/check.sh                               # every character × every action, headless → PASS / FAIL
+sh tools/check.sh                               # everything (cues, scenes, every character × every action) → PASS / FAIL
+sh tools/check.sh --changed                     # fast loop: only the scene cases your change touches (see below)
 sh tools/shot.sh receptionist /tmp/sheet.png    # pose sheet for one character
 sh tools/peek.sh examples/conversation/index.html  # timings + contact sheet of a composition
 sh tools/gallery.sh /tmp/all.png                # every registered character in one picture
 sh tools/lint-examples.sh --check               # hyperframes lint + check on every example (needs Node)
 ```
+
+### The check: fast loop, full run, adding a case
+
+`sh tools/check.sh` rebuilds `dist/`, runs the cue self-test, the scene self-test
+(`tools/check_scene.py`) and `tools/check.html` (every character × every action in headless Chrome).
+The scene self-test is split into independent cases under `tools/ci/` (one module per wave of work,
+`basics.py` for the opening checks); each case gets its own temp dir and they run in parallel.
+
+```bash
+sh tools/check.sh --changed          # cases the change vs main touches (+ a smoke set); prints why each was picked
+sh tools/check.sh --only pharm44a,w43  # cases by name, glob or module
+sh tools/check.sh --failed           # only what failed last time (.cache/ci-failed.txt)
+python3 tools/check_scene.py --list  # every case with its tags and `uses`
+```
+
+`--changed` picks a case when its own code changed, when a word of the changed hunks (an action,
+preset, character id, or a tool: `script`, `acting_check`, `page_eval`, `camera`…) is in its `uses`,
+or when it is tagged `smoke`. It is a fast loop, not a proof: a change to a shared engine
+(`runtime/set3d.js` camera, `runtime/rig-svg.js` skeleton, `tools/scene.py`) can break scenes that
+never name the changed words. **Run the full `sh tools/check.sh` (no arguments) before merging or
+releasing.** `tools/check.html` always runs whole, after the scene cases (≈ 4 min).
+
+**Adding checks for a new wave:** create `tools/ci/wNN.py` (do not edit other waves' modules):
+
+```python
+from .common import *
+
+@case('clinic45a')                       # unique name; tags=('smoke',) only for a few representative cases
+def clinic45a(work, problems):           # `work` is a fresh temp dir for this case alone
+    done = build(os.path.join(ROOT, 'examples', 'scene-3d', 'scene.json'), os.path.join(work, 'clinic45a'))
+    if done.returncode != 0: problems.append('clinic45a: the scene does not build: ' + done.stderr.strip()[:300])
+```
+
+`uses` is derived from the case's string literals and from what it built on its last passing run; pass
+`uses=(...)` only for words its source cannot show. Scene files written next to an example (so relative
+assets resolve) must carry `scratch(name)` in their file name so parallel cases do not collide.
+Cases run longest-first (times of the last run in `.cache/ci-times.json`); with `-j` > 1 every
+`tools/chrome_run.py` wait is tripled (`CHROME_RUN_TIMEOUT_SCALE`) because many Chromes share the CPU.
 
 ## A character in a dozen lines
 
