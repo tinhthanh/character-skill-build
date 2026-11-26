@@ -1626,7 +1626,12 @@ with tempfile.TemporaryDirectory() as work:
                    [{'who': 'cho', 'do': ['limp']}, {'who': 'me', 'do': [['rushToPet', '@cho']]}], ('"startle"', '"run"', '"stroke"', '"relief"')),
         'tidy43': ({'preset': 'living-room'}, [dict(name='be', id='girl', x=-60, z=-560, faces='me'), dict(name='cho', species='corgi', x=140, z=-560),
                                                dict(name='me', id='mother', x=-300, z=-560, faces='be', holds='toy', holdsHidden=True)],
-                   [{'who': 'be', 'do': [['tidyUp', '@cho', '@me']]}], ('"pickUp"', '"handOver"', '["take", be]'))}
+                   [{'who': 'be', 'do': [['tidyUp', '@cho', '@me']]}], ('"pickUp"', '"handOver"', '["take", be]')),
+        # nhóm 3 (của thú): chó và mèo ngáp rồi ngủ; mèo đen run sợ rồi chạy nấp sau ông (đứng sâu hơn ông 120 — gần hơn thì nó chạy xuyên chân ông).
+        'sleepy43': ({'preset': 'living-room'}, [dict(name='cho', species='corgi', x=-150, z=-560), dict(name='meo', species='calico', x=200, z=-560)],
+                     [{'who': 'cho', 'do': ['sleepyPet']}, {'who': 'meo', 'do': ['sleepyPet']}], ('"yawn"', '"sleep", 3')),
+        'scared43': ({'preset': 'living-room'}, [dict(name='ong', id='grandpa', x=0, z=-560), dict(name='meo', species='black_cat', x=-300, z=-680, faces='ong')],
+                     [{'who': 'meo', 'do': [['scaredPet', '@ong']]}], ('"tremble", 1.5', '"hide", set.target(meo, ong'))}
     for name, (stage_set, cast, turns, needles) in combo43.items():
         scene43 = {'id': name, 'camera': 'auto', 'set': stage_set, 'characters': cast, 'script': turns}
         path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
@@ -1639,7 +1644,7 @@ with tempfile.TemporaryDirectory() as work:
         html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
         for needle in needles:
             if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
-        for combo_name in ('bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp'):
+        for combo_name in ('bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'sleepyPet', 'scaredPet'):
             if combo_name in html: problems.append(f'{name}: combo name {combo_name} was left in the composition instead of its steps')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
         if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
@@ -1657,7 +1662,8 @@ with tempfile.TemporaryDirectory() as work:
     # nhóm 2 bằng chữ: các bước đúng, và mẹ (người nhận quả bóng) có quả bóng cất sẵn — không thì không đón lấy.
     text = os.path.join(work, 'combo43b.txt')
     open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nbé (girl) · chó (corgi) · mẹ (mother) · mèo (cat)\n\n'
-                                            'bé → chó → mẹ: nhặt đồ đưa\nmẹ → mèo: nghỉ trưa với thú\nmẹ → chó: hốt hoảng chạy tới\n')
+                                            'bé → chó → mẹ: nhặt đồ đưa\nmẹ → mèo: nghỉ trưa với thú\nmẹ → chó: hốt hoảng chạy tới\n'
+                                            'chó: [thú buồn ngủ]\nmèo → mẹ: thú sợ hãi\n')
     done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
     if done.returncode != 0: problems.append('script.py combos 43b: ' + (done.stderr or done.stdout).strip()[-300:])
     else:
@@ -1665,7 +1671,8 @@ with tempfile.TemporaryDirectory() as work:
         steps = [[(t['who'], t['do'][0]) for t in (e['together'] if 'together' in e else [e])] for e in made['script'] if isinstance(e, dict) and (e.get('do') or e.get('together'))]
         want = [[('be', ['pickUp', '@cho'])], [('be', ['handOver', '@me'])], [('me', 'sitOnFloor')], [('me', ['stroke', '@meo'])],
                 [('me', ['lieDown', 'floor', {'sleep': True}]), ('meo', ['sleep', 3])],
-                [('me', 'startle')], [('me', ['run', '@cho'])], [('me', ['stroke', '@cho'])], [('me', 'relief')]]
+                [('me', 'startle')], [('me', ['run', '@cho'])], [('me', ['stroke', '@cho'])], [('me', 'relief')],
+                [('cho', 'yawn')], [('cho', ['sleep', 3])], [('meo', ['tremble', 1.5])], [('meo', ['hide', '@me'])]]
         if steps != want: problems.append(f'script.py combos 43b: steps {steps}, want {want}')
         mom = next((c for c in made['characters'] if c['name'] == 'me'), {})
         if mom.get('holds') != 'toy' or not mom.get('holdsHidden'): problems.append(f'script.py combos 43b: the one given the ball has no ball put away to take it with ({mom})')

@@ -1828,7 +1828,10 @@ try {
       const lazy = L.combo(vet, 'lazyAfternoon', dog);
       if (lazy.length !== 3 || !lazy[2].together || lazy[2].together[0][1][0] !== 'lieDown' || lazy[2].together[1][1][0] !== 'sleep')
         hong('combo.lazyAfternoon', `combo() turns are wrong: ${JSON.stringify(lazy.map((turn) => (turn.together ? 'together' : turn[1])))}`);
-      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
+      const sleepy = L.sequence(dog, ['sleepyPet'], { breathe: false });
+      if (names(sleepy) !== 'yawn,sleep') hong('combo.sleepyPet', `sequence steps are ${names(sleepy)}`);
+      sleepy.kill();
+      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'sleepyPet', 'scaredPet']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.

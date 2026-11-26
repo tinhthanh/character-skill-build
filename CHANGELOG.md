@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Added: combos for wave 42 (wave 43, groups 1–2). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
+Added: combos for wave 42 (wave 43, groups 1–3). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
 are measured by `tools/acting_check.py`.
 
 - `bathTime(pet)`: `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp`. The pet needs `"inTub": true`. Scripts: "tắm trọn gói", "spa tắm".
@@ -17,10 +17,13 @@ are measured by `tools/acting_check.py`.
 - `tidyUp(pet, person)` (group 2): `pickUp` (the toy by the pet), `handOver(person)`. Scripts: "nhặt đồ đưa", "dọn đồ chơi".
 - **Handing an item over in scripts**: `tools/script.py` now gives whoever is handed an item (`handOver`) the same item put away,
   so they take it. Before, "bé → chó → mẹ: nhặt đồ đưa" left the ball floating in the air, because `take` needs one.
+- `sleepyPet` (group 3, dogs and cats): `yawn`, then `sleep(3)`; it stays lying. Scripts: "thú buồn ngủ", "ngáp rồi ngủ".
+- `scaredPet(person)` (group 3, dogs and cats): `tremble(1.5)`, then `hide(person)`. In a 3D set stand the pet ~120 further back
+  (z) than the person: at 80 the cat ran through the grandpa's legs. Scripts: "thú sợ hãi", "sợ nấp sau".
 - **`run(rig)`**: runs up beside another character or pet, measured on screen when the step is built, as scene files' `["run", "@dog"]`
   does. `rushToPet` needs it in `sequence()`. Before, `run` took only a number and threw.
-- That makes 23 combos.
-- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`, `lazy43`, `rush43`, `tidy43`. `tools/check_scene.py` now also refuses a combo word that is already
+- That makes 25 combos.
+- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`, `lazy43`, `rush43`, `tidy43`, `sleepy43`, `scared43`. `tools/check_scene.py` now also refuses a combo word that is already
   a single action's word in `tools/script.py`.
 
 Fixed
@@ -36,6 +39,9 @@ Known
   of its head (acting_check: 37–57 % of the head in view, it needs 60 %).
 - `playFetch` always throws to the right; the dog runs the way it faces.
 - A corgi's `greet` (rearing up) reads only weakly, because its legs are short.
+- `scaredPet` with a dog: it hides only partly behind the person (`hide` stops short of the middle so the head can peek out).
+  acting_check sees 91–95 % of a shiba (it needs at most 90 %). A plain `["hide", "@person"]` passes only just. This comes from
+  `hide`, not from the combo; the CI scene uses a cat.
 - `rushToPet`: when the dog faces the person, the stroking hand hides too much of its head (acting_check: 57 % of the head in
   view, it needs 60 %). The CI scene leaves the dog's facing alone.
 - Between `stroke` and `giveTreat`, `playFetch` stands up, steps closer and kneels again. This comes from how `tools/scene.py`

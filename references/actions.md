@@ -239,6 +239,8 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `lazyAfternoon` | `(pet)` | `sitOnFloor`, `stroke` (the pet comes over), `lieDown('floor', { sleep: true })` (the pet's `sleep(3)` at the same time) — they stay lying until `standUp` | nghỉ trưa với thú, chiều lười biếng |
 | `rushToPet` | `(pet)` | `startle`, `run` up to the pet, `stroke`, `relief` | hốt hoảng chạy tới, chạy tới xem thú |
 | `tidyUp` | `(pet, person)` | `pickUp` (the toy by the pet), `handOver(person)` — the person takes it only with the same item put away (`"holds": "toy", "holdsHidden": true`; `tools/script.py` gives it) | nhặt đồ đưa, dọn đồ chơi |
+| `sleepyPet` (dog, cat) | — | `yawn`, `sleep(3)` — it stays lying | thú buồn ngủ, ngáp rồi ngủ |
+| `scaredPet` (dog, cat) | `(person)` | `tremble(1.5)`, `hide(person)` — it stays there. In a 3D set stand it ~120 further back (z) than the person | thú sợ hãi, sợ nấp sau |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`
 injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `checkoutCounter` needs a cashier holding cash and a stamp card and a customer with a phone, and the pet must be

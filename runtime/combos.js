@@ -215,6 +215,18 @@ export const COMBOS = {
       ["handOver", "$person"]
     ],
     "vi": ["nhặt đồ đưa", "dọn đồ chơi", "nhặt đồ chơi đưa"]
+  },
+  "sleepyPet": {
+    "params": [],
+    "about": "a sleepy dog or cat: a big yawn, then it lies down and sleeps (it stays lying)",
+    "steps": ["yawn", ["sleep", 3]],
+    "vi": ["thú buồn ngủ", "buồn ngủ díp mắt", "ngáp rồi ngủ"]
+  },
+  "scaredPet": {
+    "params": ["person"],
+    "about": "a frightened pet: it trembles, then runs to hide behind the person and peeks out (it stays there) — in a 3D set stand it 60–120 further back (z) than the person",
+    "steps": [["tremble", 1.5], ["hide", "$person"]],
+    "vi": ["thú sợ hãi", "sợ chạy trốn", "sợ nấp sau"]
   }
 };
 // END COMBOS
