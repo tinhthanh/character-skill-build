@@ -89,7 +89,7 @@ BOXES = {'exam': {'table': (100, -480, 200, 160)}, 'reception': {'counter': (-52
          'pharmacy': {'counter': (-260, -420, 520, 130)}, 'park': {'bench': (220, -880, 340, 110)},
          'living-room': {'sofa': (-560, -860, 520, 180), 'coffee-table': (80, -700, 220, 120)}, 'street': {}}       # x, z, rộng, sâu
 STAFF_IDS_44A = {'pharmacist', 'clerk', 'receptionist', 'barista'}       # đợt 44 A: người đứng sau quầy nhà thuốc
-PHARMACY_STAFF_44A, PHARMACY_GUEST_44A = (-120, -580), (150, -380)       # quầy x −260…260, z −420…−550; màn hình x 120
+PHARMACY_STAFF_44A, PHARMACY_GUEST_44A = (0, -620), (150, -380)          # quầy x −260…260, z −420…−550; chỗ gợi ý của preset (màn hình x −230 — đợt 44 B)
 ON_WORDS = {'bàn': ('table', 'coffee-table', 'counter'), 'quầy': ('counter',), 'ghế': ('bench', 'sofa'), 'sofa': ('sofa',), 'ghế đá': ('bench',)}
 PERSON_MOODS = {'vui': 'happy', 'buồn': 'sad', 'ngạc nhiên': 'surprised', 'giận': 'angry', 'tức giận': 'angry', 'suy nghĩ': 'thinking', 'cười': 'laughing',
                 'cười lớn': 'laughing', 'lo': 'worried', 'lo lắng': 'worried', 'bối rối': 'confused', 'mệt': 'tired', 'khóc': 'crying', 'ngượng': 'embarrassed',

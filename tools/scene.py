@@ -481,7 +481,7 @@ SET_PRESETS = {
                   {'name': 'bench', 'x': 330, 'z': -820, 'width': 360, 'depth': 120, 'height': 90, 'color': '#9fc3cf', 'top': '#d8e9ef', 'side': '#86aebb'}],
         'panels': [{'wall': 'back', 'at': -480, 'y': 560, 'width': 360, 'height': 210, 'color': '#2b2f36', 'border': '10px solid #2b2f36'},
                    {'wall': 'back', 'at': 300, 'y': 580, 'width': 260, 'height': 160, 'color': '#e9f3f6', 'border': '10px solid #ffffff'}],
-        'cutouts': [{'kind': 'laptop', 'x': -430, 'z': -470, 'y': 190}, {'kind': 'plant', 'x': 780, 'z': 60, 'height': 600}],
+        'cutouts': [{'kind': 'laptop', 'x': -430, 'z': -470, 'y': 190}, {'kind': 'plant', 'x': 780, 'z': 60, 'height': 300}],
         'spots': 'receptionist behind the counter: x -300, z -620 · visitors: x 150…400, z -380',
     },
     'exam': {
@@ -490,7 +490,7 @@ SET_PRESETS = {
                   {'name': 'cabinet', 'x': -780, 'z': -1050, 'width': 260, 'depth': 120, 'height': 330, 'color': '#e9eef1', 'top': '#ffffff', 'side': '#ccd6dc'}],
         'panels': [{'wall': 'back', 'at': -380, 'y': 560, 'width': 260, 'height': 190, 'color': '#ffffff', 'border': '10px solid #dfe9ec'},
                    {'wall': 'back', 'at': 380, 'y': 600, 'width': 180, 'height': 240, 'color': '#d6ecf3', 'border': '8px solid #ffffff', 'window': True}],
-        'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 600}],
+        'cutouts': [{'kind': 'plant', 'x': 760, 'z': 80, 'height': 300}],
         # ĐÈN KHÁM treo trên bàn, sáng cả ban ngày: một vùng sáng tập trung trên bàn, bóng đổ rõ dưới bàn và dưới chân người
         # — phòng khám trắng sáng đều thì phẳng như tờ giấy (Gemini soát ánh sáng đợt 21: 2/10). Đèn ở SAU, lệch PHẢI bàn: bóng
         # bàn đổ chéo sang trái phía trước — thấy được cả ở khung dọc, nơi dải sàn trước bàn rất hẹp (đợt 24).
@@ -503,8 +503,9 @@ SET_PRESETS = {
                   {'name': 'shelf', 'x': -700, 'z': -1100, 'width': 1400, 'depth': 120, 'height': 420, 'color': '#c9ad8c', 'top': '#e7d7c2', 'side': '#b89a78'}],
         'panels': [{'wall': 'back', 'at': -120, 'y': 640, 'width': 240, 'height': 90, 'color': '#1f8a70', 'border': '6px solid #ffffff'}],
         # Đợt 44 B: màn hình sang mép trái quầy (x 120 → -230) — ở x 120 nó che 33 % đầu dược sĩ đứng ở chỗ gợi ý (acting_check đo bằng pixel);
-        # bên phải là chỗ khách đứng và đế thanh toán.
-        'cutouts': [{'kind': 'monitor', 'x': -230, 'z': -460, 'y': 180}],
+        # bên phải là chỗ khách đứng và đế thanh toán. Gộp đợt 44: cao 360 (mặc định to hơn) — góc máy lệch trái lúc vẫy chào vẫn đè màn hình
+        # lên mặt dược sĩ ở chỗ gợi ý (x 0); thấp đi thì mép trên dưới cằm.
+        'cutouts': [{'kind': 'monitor', 'x': -230, 'z': -460, 'y': 180, 'height': 300}],
         'spots': 'pharmacist behind the counter: x 0, z -620 · customer: x 0…250, z -300',
     },
     # NGOÀI TRỜI: tường sau là bầu trời + đồi xa (vẽ bằng dải màu), hai tường bên cùng màu trời để không thành vách phòng.
