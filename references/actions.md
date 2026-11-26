@@ -232,6 +232,14 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `happyDog` (dog) | — | `playBow`, `wagTail`, `carryToy(120)` | chó vui |
 | `cozyCat` (cat) | — | `groomFace`, `loaf`, `slowBlink` | mèo thư giãn |
 | `happyBunny` (rabbit) | — | `binky`, `periscope`, `noseTwitch` | thỏ vui |
+| `dispenseMedicine` | `(customer)` | `readChart` (the prescription), `countFingers(3)` (the doses), `handOverBag(customer)`, `wave`. Needs a shown bag and a put-away clipboard: `"holds": { "R": "bag", "L": "clipboard" }, "holdsHidden": ["L"]` (`tools/script.py` gives them). In the `pharmacy` preset stand both in front of the counter, about 210 units apart | phát thuốc, giao thuốc, bán thuốc |
+| `newPatientCheckIn` | `(pet, owner)` | `wave` (the owner's `wave` at the same time; `owner` may be left out), `bow`, `scanChip(pet)`, `readChart` | tiếp nhận thú mới, đăng ký khám |
+| `dentalCare` | `(pet)` | `examine` teeth (the pet's `openMouth` at the same time), `brushTeeth`, `thumbsUp` | chăm sóc răng, vệ sinh răng |
+| `comfortOwner` | `(owner)` | `express('sad', 1.6)` (the owner's `wipeTears` at the same time), `patShoulder(owner)`, `hug(owner)` | an ủi chủ, động viên chủ nuôi |
+| `fullSpa` | `(pet)` | `bathPet` (the pet `"inTub": true` — `tools/script.py` sets it), `towelDry`, `brushTeeth`, `cleanEars`, `thumbsUp`. No `clipNails`: in the tub the lifted paw stays behind the rim | spa trọn gói, tắm sấy trọn gói |
+| `postSurgeryCheck` | `(pet)` | `listen` (the pet's `unwell` at the same time — drowsy; a `"wears": "cone"` pet is fine), `takeTemp`, `readChart` | tái khám sau mổ, kiểm tra sau mổ |
+| `zoomies` (dog) | — | `chaseTail(3)`, `jump(2)`, `pant(1.4)` | chó tăng động, chạy lung tung, chó quậy |
+| `sleepyPet` (dog, cat) | — | `yawn`, `stretch`, `sleep(3)` | ngáp rồi ngủ, lăn ra ngủ, díp mắt |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`
 injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `checkoutCounter` needs a cashier holding cash and a stamp card and a customer with a phone, and the pet must be

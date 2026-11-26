@@ -2062,7 +2062,10 @@ def main():
                 fail(f'{where}: "{care}" needs the other person: ["{care}", "@<person name>"] — got {js(step)}')
             holds = names[actor].get('holds')
             held = [item if isinstance(item, str) else (item or {}).get('kind') for item in holds.values()] if isinstance(holds, dict) else [holds]
-            if care == 'handOverBag' and ('bag' not in held or names[actor].get('holdsHidden')):
+            # Đợt 43 B: túi đang cầm, món kia cất (`"holdsHidden": ["L"]` — phát thuốc: bìa đơn thuốc cất ở tay trái) cũng được.
+            hidden = names[actor].get('holdsHidden')
+            bag_hands = [k for k, item in holds.items() if (item if isinstance(item, str) else (item or {}).get('kind')) == 'bag'] if isinstance(holds, dict) else ['R']
+            if care == 'handOverBag' and ('bag' not in held or hidden is True or (isinstance(hidden, list) and all(k in hidden for k in bag_hands))):
                 fail(f'{where}: "handOverBag" needs a medicine bag in hand — give "{actor}" "holds": "bag" (shown, not "holdsHidden")')
             if care == 'takeBag' and ('bag' not in held or not names[actor].get('holdsHidden')):
                 fail(f'{where}: "takeBag" needs a put-away medicine bag — give "{actor}" "holds": "bag" and "holdsHidden": true (["handOverBag", "@{actor}"] alone in a turn does it for you)')

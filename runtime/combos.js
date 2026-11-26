@@ -148,6 +148,82 @@ export const COMBOS = {
     "about": "a happy rabbit: a binky leap, stands up to look around, twitches its nose",
     "steps": [["binky", 2], ["periscope", 1.6], ["noseTwitch", 1.6]],
     "vi": ["thỏ vui", "thỏ vui vẻ", "thỏ tung tăng"]
+  },
+  "dispenseMedicine": {
+    "params": ["customer"],
+    "about": "the pharmacist hands out medicine: reads the prescription (held clipboard), counts off the doses, hands the medicine bag over, waves",
+    "steps": [
+      "readChart",
+      ["countFingers", 3],
+      ["handOverBag", "$customer"],
+      "wave"
+    ],
+    "vi": ["phát thuốc", "giao thuốc", "bán thuốc"]
+  },
+  "newPatientCheckIn": {
+    "params": ["pet", "owner"],
+    "about": "check in a new patient: wave (the owner waves back at the same time), a bow, scan the pet's microchip, read the new record (held clipboard)",
+    "steps": [
+      { "step": "wave", "with": { "$owner": ["wave"] } },
+      "bow",
+      ["scanChip", "$pet"],
+      "readChart"
+    ],
+    "vi": ["tiếp nhận thú mới", "đăng ký khám", "nhận bệnh mới"]
+  },
+  "dentalCare": {
+    "params": ["pet"],
+    "about": "dental care: look at the teeth (the pet opens its mouth at the same time), brush them, thumbs up (no treat: after brushing, and a treat walk back to the front would hide the pet)",
+    "steps": [
+      { "step": ["examine", "$pet", "teeth"], "with": { "$pet": [["openMouth", 2.2]] } },
+      ["brushTeeth", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["chăm sóc răng", "vệ sinh răng", "chăm sóc răng miệng"]
+  },
+  "comfortOwner": {
+    "params": ["owner"],
+    "about": "comfort a worried owner: a sad, sympathetic face (the owner wipes tears at the same time), a pat on the shoulder, a hug",
+    "steps": [
+      { "step": ["express", "sad", 1.6], "with": { "$owner": ["wipeTears"] } },
+      ["patShoulder", "$owner"],
+      ["hug", "$owner"]
+    ],
+    "vi": ["an ủi chủ", "động viên chủ nuôi", "động viên chủ"]
+  },
+  "fullSpa": {
+    "params": ["pet"],
+    "about": "a full spa: bath (the pet stands in a tub — \"inTub\": true), towel-dry, brush the teeth, clean the ears, thumbs up (no nail trim: in the tub the lifted paw stays hidden behind the rim)",
+    "steps": [
+      ["bathPet", "$pet"],
+      ["towelDry", "$pet"],
+      ["brushTeeth", "$pet"],
+      ["cleanEars", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["spa trọn gói", "tắm spa trọn gói", "tắm sấy trọn gói"]
+  },
+  "postSurgeryCheck": {
+    "params": ["pet"],
+    "about": "a check-up after surgery: listen to the drowsy pet (it looks unwell at the same time — ears down, sleepy eyes), take its temperature, read the chart",
+    "steps": [
+      { "step": ["listen", "$pet"], "with": { "$pet": [["unwell", 2]] } },
+      ["takeTemp", "$pet"],
+      "readChart"
+    ],
+    "vi": ["tái khám sau mổ", "kiểm tra sau mổ", "khám sau mổ"]
+  },
+  "zoomies": {
+    "params": [],
+    "about": "a dog with the zoomies: chases its tail, hops for joy, pants",
+    "steps": [["chaseTail", 3], ["jump", 2], ["pant", 1.4]],
+    "vi": ["chó tăng động", "chạy lung tung", "chó quậy"]
+  },
+  "sleepyPet": {
+    "params": [],
+    "about": "a sleepy pet (dog or cat): a yawn, a stretch, then lies down and sleeps",
+    "steps": ["yawn", "stretch", ["sleep", 3]],
+    "vi": ["ngáp rồi ngủ", "lăn ra ngủ", "díp mắt"]
   }
 };
 // END COMBOS
