@@ -231,7 +231,7 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `welcomeHome` (dog) | `(pet)` | `wave`, `kneel` (the dog's `greet` at the same time), `stroke` (the dog's `wagTail` at the same time) — the dog close in front, facing the person | về nhà, chào thú khi về nhà |
 | `playFetch` (dog) | `(pet)` | `throwBall('right')` (the dog's `fetch(260)` at the same time — the dog faces right, as pets do by default), `stroke`, `thumbsUp` — keep the dog within about 120 units for the stroke | chơi ném bóng, chơi đón bóng |
 | `danceWithKid` | `(kid)` | both `face('front')`, both `dance('happy', 2)` at the same time, `idle(0.6)`, `highFive(kid)` | nhảy cùng bé, quẩy cùng bé |
-| `tidyToys` | — | `pickUp` (a toy in front), `hideItem('both')`, `nod` — the automatic shot of `pickUp` is a medium one that can leave the toy out; give that turn `"view": { "on": [...], "size": "full" }` | dọn đồ chơi, cất đồ chơi |
+| `tidyToys` | — | `pickUp` (a toy in front), `hideItem('both')`, `nod` — with `"camera": "auto"` the `pickUp` turn cuts to a full shot of the person in time, so the toy on the floor is in the frame | dọn đồ chơi, cất đồ chơi |
 | `assistedVaccination` | `(pet, nurse)` | `washHands`, `putOnGloves`, `inject` (the nurse's `restrain` at the same time), `takeOffGloves`, `giveTreat` | tiêm có người giữ |
 | `checkoutCounter` | `(customer)` | the cashier waits while the customer's `payByQR` runs, `giveChange(customer)`, `stampCard` (stamps, not handed over — a customer holding a phone has no free hand for a third item), `wave` | thanh toán tại quầy |
 | `farewellOwner` | `(owner)` | `handOverBag(owner)`, `patShoulder(owner)`, `wave` | tiễn khách, dặn dò ra về |

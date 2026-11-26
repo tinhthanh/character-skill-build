@@ -502,7 +502,9 @@ SET_PRESETS = {
         'boxes': [{'name': 'counter', 'x': -260, 'z': -420, 'width': 520, 'depth': 130, 'height': 180, 'color': '#f2f4f7', 'top': '#ffffff', 'side': '#d6dbe2'},
                   {'name': 'shelf', 'x': -700, 'z': -1100, 'width': 1400, 'depth': 120, 'height': 420, 'color': '#c9ad8c', 'top': '#e7d7c2', 'side': '#b89a78'}],
         'panels': [{'wall': 'back', 'at': -120, 'y': 640, 'width': 240, 'height': 90, 'color': '#1f8a70', 'border': '6px solid #ffffff'}],
-        'cutouts': [{'kind': 'monitor', 'x': 120, 'z': -460, 'y': 180}],
+        # Đợt 44 B: màn hình sang mép trái quầy (x 120 → -230) — ở x 120 nó che 33 % đầu dược sĩ đứng ở chỗ gợi ý (acting_check đo bằng pixel);
+        # bên phải là chỗ khách đứng và đế thanh toán.
+        'cutouts': [{'kind': 'monitor', 'x': -230, 'z': -460, 'y': 180}],
         'spots': 'pharmacist behind the counter: x 0, z -620 · customer: x 0…250, z -300',
     },
     # NGOÀI TRỜI: tường sau là bầu trời + đồi xa (vẽ bằng dải màu), hai tường bên cùng màu trời để không thành vách phòng.
@@ -3025,6 +3027,13 @@ def main():
                 for turn, step in moving:
                     for name in [names[turn['who']]['name']] + ([names[RUN_TO_42D[id(step)]]['name']] if isinstance(step, list) and id(step) in RUN_TO_42D else []):
                         if name not in beat['subjects']: beat['subjects'].append(name)
+            # ĐỢT 44 B: NHẶT ĐỒ dưới sàn (`pickUp` không nhắm con vật — món đồ chơi): góc TOÀN người ấy, đổi góc sau 1 s và CẮT thẳng (không lia)
+            # — góc trung của câu nói trước còn giữ lúc cúi nhặt thì món đồ ở ngoài đáy khung (`tidyToys` phải tự cho "view" góc toàn).
+            picks_44b = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in names and not names[turn['who']]['_pet']
+                         and any(step == 'pickUp' or (isinstance(step, list) and step and step[0] == 'pickUp' and not (len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@'))) for step in (turn.get('do') or []))]
+            if picks_44b and beat.get('subjects') and not beat.get('fixed'):
+                beat['size'] = 'full'; beat['floor44b'] = True
+                beat.pop('mid', None)
             beats.append(beat)
 
     camera_notes = []
@@ -3650,6 +3659,11 @@ def main():
                 aim = f"{{ ...frameAt(T0 + talk.turns[{first['turn']}].start, [{', '.join(auto['on'])}], {js(auto['size'])}{opts})" + (f", {values}" if values else '') + ' }'
             else: aim = f'{{ {values} }}'
             call = f"set.cut({aim})" if view['cut'] else f"set.move({aim}, {view['dur']:g}, {js(view['ease'])})"
+            # ĐỢT 44 B: góc cận TỰ ĐỘNG của con vật (`alone`) ở lượt ĐẦU cảnh (chó đuổi đuôi mở cảnh): giữ góc toàn mở đầu của đạo diễn tự động
+            # 1,6 s (≤ nửa lượt) rồi mới cắt vào — không thì góc mở đầu là góc cận ấy, sofa / TV lẹm ở mép (người chấm hỏi về đồ đạc ở đó).
+            if director and view['turn'] == 0 and isinstance(view.get('auto'), dict) and view['auto'].get('alone') and view['cut']:
+                moves.append(f"    tl.add({call}, Math.min(T0 + talk.turns[0].start + 1.6, T0 + (talk.turns[0].start + talk.turns[0].end) / 2));      // after the opening shot")
+                continue
             moves.append(f"    tl.add({call}, T0 + talk.turns[{view['turn']}].start);")
         for op in lamp_ops:
             if not lamp_names: fail(f'{op["where"]}: "lamp" — the set has no lamps (add set.lamps, or a "lamp" cutout)')
@@ -3682,7 +3696,7 @@ def main():
                 # ai thấy đèn sáng lên (đợt 24: đầu đèn đường ngoài khung lúc trời tối xong).
                 if hold and not beat.get('drift') and not beat.get('fixed'): time = f"Math.max({time}, {hold})"
                 if beat.get('drift'): hold = f"T0 + talk.turns[{beat['first']}].start + {beat['drift'] * 0.75:g}"
-                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '')
+                items.append(f"{{ time: {time}, fixed: true }}" if beat.get('fixed') else f"{{ time: {time}, end: {end}, subjects: [{', '.join(beat['subjects'])}], size: {js(beat['size'])}" + (', speech: true' if beat.get('speech') else '') + (', move: true' if beat.get('move') else '') + (', floor44b: true' if beat.get('floor44b') else '') + (', lamp: true' if beat.get('lamp') else '') + (', mid: true' if beat.get('mid') else '') + (f", drift: {beat['drift']:g}" if beat.get('drift') else '')
                          + (f", hands: handTimes({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat['size'] != 'full' and gestured else '')
                          + (f", peaks42d: bodyTimes42d({beat['first']}, {beat['last']}, [{', '.join(beat['subjects'])}])" if beat.get('body42d') else '') + ' }')
             # ĐỘNG TÁC TAY trong nhịp (đợt 33): các lúc (40 / 55 / 70 % bước) người trong chủ thể vẫy / chỉ / giơ ngón — `direct` lấy cả
