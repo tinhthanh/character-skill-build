@@ -281,6 +281,9 @@
     { "label": "dog: lick", "steps": [["lick", "@person", 4]], "species": "dog", "person": "boy", "personSteps": [["offerHand", "@pet", 1.8]] },
     { "label": "cat: lick", "steps": [["lick", "@person", 4]], "species": "cat", "person": "boy", "personSteps": [["offerHand", "@pet", 1.8]] },
     { "label": "hide", "steps": [["hide", "@person"]], "person": "boy", "personAt": 150 },
-    { "label": "rabbit: eatCarrot", "steps": [["eatCarrot", 6]], "species": "rabbit" }
+    { "label": "rabbit: eatCarrot", "steps": [["eatCarrot", 6]], "species": "rabbit" },
+    { "label": "combo zoomies", "steps": ["zoomies"], "species": "dog" },
+    { "label": "combo sleepyPet", "steps": ["sleepyPet"], "species": "dog" },
+    { "label": "cat: combo sleepyPet", "steps": ["sleepyPet"], "species": "cat" }
   ]
 }

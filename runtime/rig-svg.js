@@ -46,6 +46,9 @@ const NGHI = Object.freeze({
   itemTiltL: 0, itemTiltR: 0,   // độ nghiêng thêm của đồ vật về phía mặt (độ) — nghiêng cốc khi uống
   itemZoomL: 1, itemZoomR: 1,   // món đồ phóng to quanh lòng bàn tay — giơ điện thoại khoe màn hình cho người xem đọc được
   itemBackL: 0, itemBackR: 0,
+  // Đợt 44 A — NHẬN TÚI (`takeBag`): `bagMatch44a` 1…0 túi trong tay mình vẽ ĐÚNG CHỖ VÀ CỠ túi trong tay người đưa (người thứ
+  // `bagGiver44a` trong `rig.bagGivers44a`, đo trên màn hình lúc vẽ), rồi trượt về tay mình — túi không nhảy lúc sang tay dù máy quay nào.
+  bagMatch44a: 0, bagGiver44a: -1,
   phoneL: 0, phoneR: 0,
   toolL: 0, toolR: 0,
   gadgetL: 0, gadgetR: 0,       // dụng cụ nhỏ hiện trong tay ấy: 1 = đèn soi (`examine`), 2 = bánh thưởng, 3 = viên thuốc (`giveTreat`), 4 = lược (`brush`), 5 = đèn pin (`shine`), 6 = nhiệt kế (`takeTemp`), 7 = viên thuốc to (`givePill`), 8 = cuộn băng (`bandage`), 9 = loa cầm tay (`putCone`)
@@ -2138,7 +2141,9 @@ export class RigSVG {
       // Chỉ CỐC mới được nhấc lên khi nghiêng (cho miệng cốc tới môi). Ống tiêm nghiêng mũi kim mà bị nhấc thì nó rời hẳn
       // khỏi bàn tay, lơ lửng cạnh nắm tay.
       const lift = e['item' + side].querySelector('[data-syringe]') ? 0 : tilt * 0.6;
-      e['item' + side].setAttribute('transform', `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-lift).toFixed(2)})` + (zoom !== 1 ? ` translate(0 10) scale(${zoom.toFixed(3)}) translate(0 -10)` : ''));
+      const match = this.#bagMatch44a(side, zoom);
+      e['item' + side].setAttribute('transform', (match ? `translate(${match.dx.toFixed(2)} ${match.dy.toFixed(2)}) ` : '') + `rotate(${itemTurn.toFixed(2)} 0 10) translate(0 ${(-lift).toFixed(2)})`
+        + ((match ? match.zoom : zoom) !== 1 ? ` translate(0 10) scale(${(match ? match.zoom : zoom).toFixed(3)}) translate(0 -10)` : ''));
       // Mặt LƯNG của món đồ (`data-back`) hiện theo `itemBack`, mặt trước (`data-front`) ẩn đi tương ứng — đổi hẳn ở nửa
       // chừng, không hoà mờ (hai mặt chồng mờ lên nhau là một vệt xám).
       const back = s['itemBack' + side] >= 0.5 || phone >= 0.5;
@@ -6585,7 +6590,8 @@ export class RigSVG {
     t.to(s, { aimL: 1, aimR: 1, ['carry' + o]: 0, ['carry' + k]: 0, huong: turn, than: N.than - dir * 2, dau: N.dau + dir * 4, vai: N.vai + 3, duration: 0.45, ease: 'sine.inOut' }, 0);
     t.set(s, { ['tay' + k]: 'nam', ['tay' + o]: 'xoe' }, 0.02);
     // Nhìn tới một điểm, tính ở dáng đã khuỵu (mặt thấp hơn lúc dựng).
-    const look = (point, at, options = {}) => { const was = s.seat; if (crouch) s.seat = crouch; this.#lookTo(t, point, at, { huong: turn, ...options }); s.seat = was; };
+    // Đợt 44 A: đích dốc (con vật trong chậu dưới sàn) — quay mặt bớt về phía người xem cho hướng cúi chúc đúng xuống nó (`steep44a`).
+    const look = (point, at, options = {}) => { const was = s.seat; if (crouch) s.seat = crouch; this.#lookTo(t, point, at, { huong: turn, steep44a: true, ...options }); s.seat = was; };
     return { pet, base, k, o, dir, turn, keep, spot, arm, armDown, look, crouch, hand: cB };
   }
 
@@ -7166,6 +7172,7 @@ export class RigSVG {
   static LOOK_YAW = 0.75;         // tổng hướng đầu khi đích ở hẳn một bên (đơn vị `huong`: 1 = nghiêng hẳn) — ≈ 3/4, đọc ra ở cảnh trung
   static LOOK_TURN_MAX = 0.9;     // đầu quay thêm tối đa bấy nhiêu so với thân
   static LOOK_PITCH_DEG = 32;     // đích thấp hơn mặt chừng ấy độ (so với phương ngang) → cúi hẳn (`headPitch` 1)
+  static LOOK_STEEP_MIN44A = 0.3; // đợt 44 A: nhìn xuống đích rất dốc (`steep44a`) — đầu vẫn quay về phía đích ít nhất chừng ấy (≈ 27°)
   static LOOK_UP = 0.6;           // ngẩng tối đa (`headPitch` −0,6)
   static PITCH_SHIFT = 12;        // `headPitch` 1: cụm nét mặt trượt xuống bấy nhiêu đơn vị đầu (đầu cũng hạ 3)
   static LOOK_TILT = 7;           // nhìn chếch xuống sang bên: nghiêng đầu thêm tối đa bấy nhiêu độ
@@ -7209,13 +7216,20 @@ export class RigSVG {
   // GÓC NHÌN tới một điểm (hệ `#aimOf`): kênh đầu + mắt. `huong`: hướng THÂN lúc ấy (động tác quay người cùng lúc nhìn).
   // Đích ở một bên → tổng hướng đầu tới `LOOK_YAW` về phía ấy (thân đã quay xa hơn về phía ấy thì giữ); đích ngay trước / dưới mặt
   // → giữ hướng thân, chỉ cúi. Cúi theo góc từ mặt xuống đích.
-  #lookAngles(point, { head = 1, eyes = 1, huong = this.s.huong, up = RigSVG.LOOK_UP } = {}) {
+  #lookAngles(point, { head = 1, eyes = 1, huong = this.s.huong, up = RigSVG.LOOK_UP, steep44a = false } = {}) {
     const N = this.NGHI;
     if (!point) return { headTurn: 0, headPitch: 0, headTilt: 0, matY: N.matY, nhinX: N.nhinX, nhinY: N.nhinY };
     const f = this.#faceCentre(huong), dx = point.x - f.x, dy = point.y - f.y, side = dx < 0 ? -1 : 1;
     const w = clamp((Math.abs(dx) - f.r * 0.25) / (f.r * 1.1), 0, 1);       // đích lệch sang bên bao nhiêu (0: trước mặt, 1: hẳn một bên)
     const full = side * Math.max(RigSVG.LOOK_YAW, side * huong > 0 ? Math.abs(huong) : 0);
-    const total = huong * (1 - w) + full * w;
+    let total = huong * (1 - w) + full * w;
+    // ĐỢT 44 A — ĐÍCH DỐC HƠN ĐẦU CÚI ĐƯỢC (`steep44a`: chậu tắm dưới sàn cạnh chân): cúi hẳn rồi mà đầu vẫn quay ngang 3/4 thì hướng nhìn
+    // trên hình chỉ chúc ~33° — nhìn qua đầu con vật. Quay mặt VỀ PHÍA NGƯỜI XEM bớt (đầu quay ngược thân) cho hướng nhìn (quay θ, cúi hẳn
+    // φ = LOOK_PITCH_DEG) chiếu lên màn hình đúng hướng tới đích: sin θ = (ngang / dọc) · tan φ — như người cúi nhìn xuống chân mình.
+    if (steep44a && dy > 0 && Math.abs(dx) > 1e-6) {
+      const lean = Math.atan2(dy, Math.abs(dx)), max = RigSVG.LOOK_PITCH_DEG * Math.PI / 180;
+      if (lean > max) total = side * Math.max(RigSVG.LOOK_STEEP_MIN44A, Math.min(Math.abs(total), Math.asin(Math.min(1, Math.tan(max) / Math.tan(lean))) * 2 / Math.PI));
+    }
     const headTurn = clamp(total - huong, -RigSVG.LOOK_TURN_MAX, RigSVG.LOOK_TURN_MAX) * head;
     const angle = Math.atan2(dy, Math.max(Math.abs(dx), f.r * 0.8)) * 180 / Math.PI;
     const headPitch = clamp(angle / RigSVG.LOOK_PITCH_DEG, -up, 1) * head;
@@ -7229,8 +7243,8 @@ export class RigSVG {
   lookAngles(target, options = {}) { return this.#lookAngles(this.#lookPoint(target), options); }
 
   // Trong một động tác: NHÌN tới điểm `point` (hệ `#aimOf`) từ giây `at`.
-  #lookTo(t, point, at, { d = RigSVG.LOOK_DUR, huong = this.s.huong, head = 1, eyes = 1, ease = 'power2.inOut', up = RigSVG.LOOK_UP } = {}) {
-    t.to(this.s, { ...this.#lookAngles(point, { head, eyes, huong, up }), duration: d, ease }, at);
+  #lookTo(t, point, at, { d = RigSVG.LOOK_DUR, huong = this.s.huong, head = 1, eyes = 1, ease = 'power2.inOut', up = RigSVG.LOOK_UP, steep44a = false } = {}) {
+    t.to(this.s, { ...this.#lookAngles(point, { head, eyes, huong, up, steep44a }), duration: d, ease }, at);
   }
 
   /**
@@ -7539,6 +7553,7 @@ export class RigSVG {
   static HUG_HOLD = 1.9;           // giây ôm (lắc nhẹ hai nhịp)
   static PAT_TURN = 0.4;
   static PAT_OUT = 8; static PAT_DOWN = 17;   // vỗ vai: lòng bàn tay ở mép ngoài đầu vai người kia (đơn vị khung của họ)
+  static PAT_BODY_44A = 2.2;      // vỗ vai: bước tới nhưng hai thân còn cách nhau chừng ấy tổng nửa bề ngang thân (không đứng đè lên người kia)
   static WHISPER_TURN = 0.5;
   static WHISPER_GAP = 0.12;      // miệng dừng trước tai người nghe chừng ấy bán kính đầu — bàn tay khum nằm trong khoảng ấy, không khuất sau đầu họ
   static WHISPER_TALK = 2.0;       // giây thì thầm (miệng mấp máy)
@@ -7604,14 +7619,19 @@ export class RigSVG {
 
   // Góc tay để LÒNG BÀN TAY (điểm đo của tools/acting_check.py: 10 đơn vị quá cổ tay) tới `p`, từ vai ở dáng `geo` (đã ngả `lean`
   // độ — góc bắp tay trừ đi phần thân ngả, vì cánh tay xoay theo thân). Góc trên màn hình: dùng với `aim` = 1.
-  #palmTo(k, p, geo) {
+  #palmTo(k, p, geo, drawn44a = false) {
     // Lòng bàn tay cách cổ tay 10 đơn vị CỦA BÀN TAY — đổi ra đơn vị khung theo cỡ thật của bàn tay (trẻ con tay to so với thân), bỏ phần
     // phóng to bàn tay đang có (`handZoom`) lúc dựng.
     const m = this.el['coTay' + k] && this.el['coTay' + k].getScreenCTM && this.el['coTay' + k].getScreenCTM(), r = this.svg.getScreenCTM && this.svg.getScreenCTM();
     const ratio = m && r && Math.hypot(r.a, r.b) ? Math.hypot(m.a, m.b) / Math.hypot(r.a, r.b) / (this.s['handZoom' + k] || 1) : this.nv.coThan;
     const sh = geo[k], hand = 10 * (Number.isFinite(ratio) && ratio > 0 ? ratio : this.nv.coThan);
-    let a = this.#armTo(k, p.x, p.y, sh.x, sh.y);
-    for (let n = 0; n < 2; n++) a = this.#armTo(k, p.x - Math.cos(a.dir * RAD) * hand, p.y - Math.sin(a.dir * RAD) * hand, sh.x, sh.y);
+    // Đợt 44 A: cánh tay VẼ trong nhóm thân (`than` co theo `coThan`), còn `#armTo` tính với độ dài tay chưa co — người có thân nhỏ
+    // hơn 1 (y tá, dược sĩ, các chủ nuôi đợt 42 B: 0,92) thì bàn tay dừng ngắn ~8 % quãng từ vai: hai người cùng đưa tay tới một
+    // điểm (đưa túi thuốc) mà hai bàn tay cách nhau ~2 % chiều cao, túi nhảy lúc sang tay. Phóng điểm đích quanh vai theo 1 / coThan.
+    // Chỉ các động tác HAI NGƯỜI đợt 38 C (`drawn44a`): động tác quầy đợt 39 A đã chỉnh hằng số theo lời giải cũ.
+    const c = drawn44a ? this.nv.coThan || 1 : 1, arm = (x, y) => this.#armTo(k, sh.x + (x - sh.x) / c, sh.y + (y - sh.y) / c, sh.x, sh.y);
+    let a = arm(p.x, p.y);
+    for (let n = 0; n < 2; n++) a = arm(p.x - Math.cos(a.dir * RAD) * hand, p.y - Math.sin(a.dir * RAD) * hand);
     return { bat: a.bat + (k === 'R' ? 1 : -1) * geo.lean, cang: a.cang };
   }
 
@@ -7662,7 +7682,7 @@ export class RigSVG {
     };
     const low = lowFor(this, mine, k, meet);
     if (low.seat) mine = this.#poseGeo({ huong: dir * RigSVG.FIVE_TURN, seat: low.seat, kneel: low.kneel });
-    const hit = this.#palmTo(k, { x: meet.x + dir * 3, y: meet.y }, mine), up = this.#palmTo(k, wind, mine);
+    const hit = this.#palmTo(k, { x: meet.x + dir * 3, y: meet.y }, mine, true), up = this.#palmTo(k, wind, mine, true);
     // Người kia cũng có thể quỳ xuống (cùng phép tính, phía họ): nhìn vào mặt họ Ở DÁNG ẤY, đầu mình ở dáng của mình.
     const their0 = o.#poseGeo({ huong: -dir * RigSVG.FIVE_TURN }), theirLow = lowFor(o, their0, o.#holdsFree(dir > 0 ? 'L' : 'R'), pair.backThem(spot));
     const theirFace = theirLow.seat ? pair.them(o.#poseGeo({ huong: -dir * RigSVG.FIVE_TURN, seat: theirLow.seat, kneel: theirLow.kneel }).face) : theirs.face;
@@ -7720,8 +7740,8 @@ export class RigSVG {
     const highY = clamp(myLevel, top, low - 20 * pair.tu), lowY = clamp(highY + theirs.torso * pair.tu * 0.38, top, low);
     const backX = theirs.hip.X + dir * theirs.half * pair.tu * 0.6;
     const far = dir > 0 ? 'R' : 'L', near = far === 'R' ? 'L' : 'R';
-    const farArm = this.#palmTo(far, pair.back({ X: backX, Y: highY }), mine);
-    const nearArm = this.#palmTo(near, pair.back({ X: backX - dir * theirs.half * pair.tu * 0.9, Y: lowY }), mine);
+    const farArm = this.#palmTo(far, pair.back({ X: backX, Y: highY }), mine, true);
+    const nearArm = this.#palmTo(near, pair.back({ X: backX - dir * theirs.half * pair.tu * 0.9, Y: lowY }), mine, true);
     // Đầu: quay ngược về phía người xem, nghiêng về phía người kia (áp má), nhắm mắt.
     const keep = {};
     for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) { t.to(s, { ['item' + side]: 0, ['carry' + side]: 0, duration: 0.15 }, 0); keep['item' + side] = 1; }
@@ -7751,17 +7771,26 @@ export class RigSVG {
     const huong = dir * RigSVG.PAT_TURN, k = this.#holdsFree(dir > 0 ? 'R' : 'L');
     const slot = this.#pairSlot(o);
     t.to(s, { pairFront: 1, pairSlot: slot, duration: 0.02 }, 0);
-    const theirs = RigSVG.#screenGeo(o, pair.them, o.#poseGeo({ huong: 0 }));
+    // Đợt 44 A: vai người kia ở HƯỚNG THÂN THẬT của họ (đang quay về phía mình — `faces`), không ở dáng nhìn thẳng: quay 3/4 thì vai
+    // gần dồn vào giữa cả nửa bề ngang vai — tính ở hướng 0 thì bàn tay dừng ngoài vai ~7 % chiều cao (mọi người lớn đứng cách ~300).
+    // Họ không quay thân trong lượt này (`lookAt` chỉ quay đầu), nên đọc `s.huong` lúc dựng là đúng.
+    const theirs = RigSVG.#screenGeo(o, pair.them, o.#poseGeo({ huong: clamp(o.s.huong || 0, -1, 1) }));
     const shoulder = theirs[dir > 0 ? 'L' : 'R'];
     // Lòng bàn tay ôm lấy ĐẦU VAI phía ngoài (mép tay áo, dưới mép đầu): người kia đứng trước thì bàn tay đặt trên đỉnh vai khuất sau
     // đầu / tóc họ — ở mép ngoài thì thấy được dù ai vẽ trước.
     const rest = pair.back({ X: shoulder.X - dir * RigSVG.PAT_OUT * pair.tu, Y: shoulder.Y + RigSVG.PAT_DOWN * pair.tu });
     // Đứng xa quá tầm tay (trẻ con tay ngắn): BƯỚC tới một chút trong động tác (≤ 60 đơn vị), lùi về chỗ cũ lúc buông.
     const R = (DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay) * 0.9;
-    const reachX = Math.abs(rest.x - this.#poseGeo({ huong, lean: dir * 3 })[k].x), step = dir * clamp(reachX - 0.75 * R, 0, 60);
+    // Đợt 44 A: không bước lấn vào người kia — hai thân còn cách nhau ít nhất `PAT_BODY_44A` tổng nửa bề ngang thân (vai gần của người
+    // đang quay 3/4 nằm sâu vào trong: người thấp bước đủ 60 đơn vị thì đứng đè trước ngực họ, đầu che mặt họ).
+    const me0 = this.#poseGeo({ huong, lean: dir * 3 });
+    const room = Math.max(0, (Math.abs(pair.theirX - pair.myX) - RigSVG.PAT_BODY_44A * (me0.half * pair.u + theirs.half * pair.tu)) / pair.u);
+    const reachX = Math.abs(rest.x - me0[k].x), step = dir * clamp(reachX - 0.75 * R, 0, Math.min(60, room));
     let mine = this.#poseGeo({ huong, lean: dir * 3, step }), sh = mine[k], dx = rest.x - sh.x, low = { seat: 0, kneel: 0 };
     // Người kia THẤP hơn hẳn (người lớn vỗ vai trẻ con): vai họ dưới tầm tay — khuỵu gối / quỳ một gối xuống (`#lowerBy`).
-    if (rest.y > sh.y && Math.hypot(dx, rest.y - sh.y) > 0.9 * R) {
+    // (Đợt 44 A: chỉ khi hạ người giúp được — vai họ gần ngang vai mình mà ngoài tầm theo BỀ NGANG thì quỳ xuống cũng không với tới,
+    // chỉ tụt đầu xuống ngực họ.)
+    if (rest.y > sh.y && Math.hypot(dx, rest.y - sh.y) > 0.9 * R && (Math.abs(dx) < 0.9 * R || rest.y - sh.y > 0.25 * R)) {
       low = this.#lowerBy(rest.y - sh.y - Math.sqrt(Math.max(0, 0.81 * R * R - dx * dx)) + 6);
       mine = this.#poseGeo({ huong, lean: dir * 3, step, seat: low.seat, kneel: low.kneel }); sh = mine[k]; dx = rest.x - sh.x;
     }
@@ -7772,7 +7801,7 @@ export class RigSVG {
     // tay họ, ngang vai mình (thấy được, đọc thành "vỗ về").
     if (rest.y < mine.face.y) rest.y = sh.y + 0.1 * R;
     const lift = { x: rest.x, y: rest.y - 12 };
-    const on = this.#palmTo(k, rest, mine), up = this.#palmTo(k, lift, mine);
+    const on = this.#palmTo(k, rest, mine, true), up = this.#palmTo(k, lift, mine, true);
     const head = this.#lookAngles(pair.back(theirs.face), { huong, up: RigSVG.PAIR_UP });
     const keep = this.holds[k] && s['item' + k] > 0.5 ? { ['item' + k]: 1 } : {};
     if (keep['item' + k]) t.to(s, { ['item' + k]: 0, ['carry' + k]: 0, duration: 0.15 }, 0);
@@ -7805,7 +7834,7 @@ export class RigSVG {
     t.to(s, { pairFront: 1, pairSlot: slot, duration: 0.02 }, 0);
     const mine = this.#poseGeo({ huong: plan.huong, lean: plan.lean, step: plan.step, seat: plan.seat, kneel: plan.kneel, pitch: plan.pitch });
     // Bàn tay khum: giữa miệng mình và tai họ, ngang miệng, hơi ra trước.
-    const mouth = mine.mouth, cup = this.#palmTo(k, { x: mouth.x + dir * mine.face.r * 0.3, y: mouth.y + mine.face.r * 0.1 }, mine);
+    const mouth = mine.mouth, cup = this.#palmTo(k, { x: mouth.x + dir * mine.face.r * 0.3, y: mouth.y + mine.face.r * 0.1 }, mine, true);
     const keep = this.holds[k] && s['item' + k] > 0.5 ? { ['item' + k]: 1 } : {};
     if (keep['item' + k]) t.to(s, { ['item' + k]: 0, ['carry' + k]: 0, duration: 0.15 }, 0);
     t.set(s, { ['tay' + k]: 'xoe' }, 0.15);
@@ -7885,7 +7914,7 @@ export class RigSVG {
     if (!k) throw new Error('[character] handOverBag: this character is not holding a medicine bag — createCharacter(host, { id, items: { R: "bag" } })');
     const pair = this.#pair(other, 'handOverBag'), dir = pair.dir, t = this.tl(), N = this.NGHI, o = k === 'R' ? 'L' : 'R';
     const spot = RigSVG.#bagSpot(this, pair.other, pair, true), mine = this.#poseGeo({ huong: dir * RigSVG.BAG_TURN, lean: dir * 3 });
-    const hold = this.#palmTo(k, spot.handle, mine), out = this.#palmTo(k, { x: spot.handle.x - dir * 14, y: spot.handle.y + 6 }, mine), under = this.#palmTo(o, spot.giverBase, mine);
+    const hold = this.#palmTo(k, spot.handle, mine, true), out = this.#palmTo(k, { x: spot.handle.x - dir * 14, y: spot.handle.y + 6 }, mine, true), under = this.#palmTo(o, spot.giverBase, mine, true);
     const head = this.#lookAngles(spot.otherFace, { huong: dir * RigSVG.BAG_TURN, up: RigSVG.PAIR_UP });
     t.set(s, { ['tay' + o]: 'xoe' }, 0.2);
     t.to(s, { huong: dir * RigSVG.BAG_TURN, than: N.than + dir * 3, aimL: 1, aimR: 1, carryL: 0, carryR: 0, ['bat' + k]: out.bat, ['cang' + k]: out.cang, ['bat' + o]: under.bat, ['cang' + o]: under.cang,
@@ -7907,7 +7936,7 @@ export class RigSVG {
     if (!k) throw new Error('[character] takeBag: this character has no put-away medicine bag to receive — createCharacter(host, { id, items: { R: "bag" }, itemsHidden: true })');
     const pair = this.#pair(giver, 'takeBag'), dir = pair.dir, t = this.tl(), N = this.NGHI, o = k === 'R' ? 'L' : 'R';
     const spot = RigSVG.#bagSpot(pair.other, this, pair, false), mine = this.#poseGeo({ huong: dir * RigSVG.BAG_TURN, lean: dir * 2 });
-    const reach = this.#palmTo(k, { x: spot.handle.x - dir * 16, y: spot.handle.y + 4 }, mine), hold = this.#palmTo(k, spot.handle, mine), under = this.#palmTo(o, spot.takerBase, mine);
+    const reach = this.#palmTo(k, { x: spot.handle.x - dir * 16, y: spot.handle.y + 4 }, mine, true), hold = this.#palmTo(k, spot.handle, mine, true), under = this.#palmTo(o, spot.takerBase, mine, true);
     const head = this.#lookAngles(spot.otherFace, { huong: dir * RigSVG.BAG_TURN, up: RigSVG.PAIR_UP });
     t.set(s, { ['tay' + k]: 'mo', ['tay' + o]: 'xoe', ['carry' + k]: 0 }, 0);
     t.to(s, { huong: dir * RigSVG.BAG_TURN, than: N.than + dir * 2, aimL: 1, aimR: 1, carryL: 0, carryR: 0, ['bat' + k]: reach.bat, ['cang' + k]: reach.cang, ...head,
@@ -7919,10 +7948,33 @@ export class RigSVG {
     const giverSide = ['R', 'L'].find((side) => pair.other.holds[side] && pair.other.#isBag(side)) || 'R';
     t.set(s, { ['tay' + k]: 'nam', ['itemZoom' + k]: RigSVG.BAG_ZOOM * handScale(pair.other, giverSide) / (handScale(this, k) || 1) }, RigSVG.BAG_AT);
     t.to(s, { ['item' + k]: 1, duration: 0.06 }, RigSVG.BAG_AT);
+    // Đợt 44 A: túi hiện ra đúng chỗ, đúng cỡ túi trong tay người đưa (đo lúc vẽ), rồi trượt về tay mình trong lúc tay người đưa còn
+    // đặt yên trên quai (họ buông ở BAG_AT + 0,35).
+    const givers = this.bagGivers44a || (this.bagGivers44a = []);
+    let slot = givers.findIndex((g) => g.rig === pair.other && g.side === giverSide && g.k === k);
+    if (slot < 0) { givers.push({ rig: pair.other, side: giverSide, k }); slot = givers.length - 1; }
+    t.set(s, { bagGiver44a: slot, bagMatch44a: 1 }, RigSVG.BAG_AT);
+    t.to(s, { bagMatch44a: 0, duration: 0.33, ease: 'sine.inOut' }, RigSVG.BAG_AT + 0.02);
     // Ôm túi về dáng cầm, cười, gật cảm ơn.
     t.to(s, { dauY: 7, cuoi: 1, mieng: 0.15, duration: 0.2, ease: 'power2.out' }, RigSVG.BAG_AT + 0.85).to(s, { dauY: 0, mieng: 0, duration: 0.25, ease: 'power2.inOut' }, RigSVG.BAG_AT + 1.05);
     this.#khep(t, 0.6, RigSVG.BAG_AT + 0.35, { ['item' + k]: 1, itemZoomL: 1, itemZoomR: 1 });
     return t;
+  }
+
+  // ĐỢT 44 A — TÚI SANG TAY KHÔNG NHẢY. Chỗ trao túi tính lúc dựng, theo máy quay lúc ấy (góc toàn); hai người ở hai chiều sâu (dược sĩ sau
+  // quầy, khách trước quầy) thì ở góc cận tỉ lệ cỡ hai người khác hẳn — túi trong tay người nhận to hơn / lệch khỏi túi trong tay người
+  // đưa vài % chiều cao (tools/acting_check.py: nhảy 3–5 % một khung). Lúc vẽ, với `bagMatch44a` > 0: dời và phóng túi của tay `side` cho
+  // chốt quai (0, 10) và cỡ trùng túi trong tay người đưa (đo bằng getScreenCTM), pha dần về tay mình khi `bagMatch44a` về 0.
+  #bagMatch44a(side, zoom) {
+    const w = clamp(this.s.bagMatch44a || 0, 0, 1), giver = (this.bagGivers44a || [])[Math.round(this.s.bagGiver44a)];
+    if (!(w > 0) || !giver || side !== giver.k) return null;
+    const mine = this.el['item' + side], theirs = giver.rig.el && giver.rig.el['item' + giver.side];
+    const m = mine && mine.parentNode && mine.parentNode.getScreenCTM && mine.parentNode.getScreenCTM(), g = theirs && theirs.parentNode && theirs.parentNode.getScreenCTM && theirs.parentNode.getScreenCTM();
+    if (!m || !g) return null;
+    const scale = (q) => Math.sqrt(Math.abs(q.a * q.d - q.b * q.c)) || 1;
+    const P = new DOMPoint(0, 10).matrixTransform(g), local = P.matrixTransform(m.inverse());
+    const want = Math.max(0.05, (giver.rig.s['itemZoom' + giver.side] || 1) * scale(g) / scale(m));
+    return { dx: (local.x - 0) * w, dy: (local.y - 10) * w, zoom: zoom + (want - zoom) * w };
   }
 
   #isBag(side) {
@@ -7987,9 +8039,13 @@ export class RigSVG {
   /**
    * NÉM BÓNG: lấy đà (tay ra sau), vung tay ném quả bóng bay vòng cung về phía `direction` ('right' | 'left'), rơi xuống
    * sàn cách `distance` đơn vị (mặc định ra ngoài khung). Đi cặp với `fetch` của con vật trong một `together`.
+   * Đợt 44 A: `direction` là CON CHÓ (rig thú / mỏ neo của conversation) — ném về phía nó đang quay mặt, phía nó sẽ chạy theo
+   * (`fetch` chạy theo hướng mặt): chó quay trái thì bóng bay sang trái.
    */
   throwBall(direction = 'right', distance = 420) {
-    const t = this.tl(), s = this.s, N = this.NGHI, dir = direction === 'left' ? -1 : 1, m = dir;
+    const pet = direction && direction.live ? direction.live : direction;
+    if (pet && typeof pet === 'object' && !(pet.s && typeof pet.s.huong === 'number')) throw new Error('[character] throwBall(direction): direction is "right", "left" or a pet rig (the ball goes the way it faces)');
+    const t = this.tl(), s = this.s, N = this.NGHI, dir = pet && typeof pet === 'object' ? (pet.s.huong < 0 ? -1 : 1) : direction === 'left' ? -1 : 1, m = dir;
     // Ném bằng tay phía hướng ném; tay ấy đang cầm đồ thì tay kia.
     const k = this.#holdsFree(dir > 0 ? 'R' : 'L');
     if (this.holds[k] && s['item' + k] > 0.5) return this.#headGesture(t, 2, -5);

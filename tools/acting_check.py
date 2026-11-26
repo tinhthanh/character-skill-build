@@ -2253,7 +2253,10 @@ def check_pair(folder, c, shots, scales):
                 body, head = q.get('body'), q.get('headBox')
                 if not body or not head or len(p.get('hands') or []) < 2: worst, why = 1, 'not measured'; continue
                 x0, x1 = body['x0'] - 0.03 * tall, body['x1'] + 0.03 * tall
-                top, bottom = head['y1'] - 0.06 * tall, body['y0'] + (body['y1'] - body['y0']) * 0.7
+                # Đợt 44 A: đáy đầu = đáy KHUÔN MẶT (`gaze`), không đáy khung đầu — tóc dài (`owner_woman`) buông quá vai làm khung đầu
+                # dài xuống ngực, bàn tay ôm ngang bả vai (trên lớp tóc ấy) bị tính là "trên đầu".
+                chin = q['gaze']['y'] + q['gaze']['h'] / 2 if q.get('gaze') else head['y1']
+                top, bottom = min(head['y1'], chin) - 0.06 * tall, body['y0'] + (body['y1'] - body['y0']) * 0.7
                 for hand in p['hands']:
                     off = max(0, x0 - hand['x'], hand['x'] - x1, top - hand['y'], hand['y'] - bottom) / tall
                     if off > worst: worst, why = off, f'{p["name"]}\'s {hand["side"]} hand {off * 100:.1f} % outside {q["name"]}\'s body'

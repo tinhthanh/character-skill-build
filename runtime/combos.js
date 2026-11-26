@@ -111,9 +111,9 @@ export const COMBOS = {
   },
   "playFetch": {
     "params": ["pet"],
-    "about": "play fetch: throw a ball to the right while the dog (facing right) runs after it and brings it back, stroke it, thumbs up",
+    "about": "play fetch: throw a ball the way the dog faces (left or right) while it runs after it and brings it back, stroke it, thumbs up",
     "steps": [
-      { "step": ["throwBall", "right"], "with": { "$pet": [["fetch", 260]] } },
+      { "step": ["throwBall", "$pet"], "with": { "$pet": [["fetch", 260]] } },
       ["stroke", "$pet"],
       "thumbsUp"
     ],

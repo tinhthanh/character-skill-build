@@ -88,6 +88,8 @@ PRESETS = {'phòng khám': 'exam', 'khám': 'exam', 'lễ tân': 'reception', 'q
 BOXES = {'exam': {'table': (100, -480, 200, 160)}, 'reception': {'counter': (-520, -430, 440, 140), 'bench': (330, -820, 360, 120)},
          'pharmacy': {'counter': (-260, -420, 520, 130)}, 'park': {'bench': (220, -880, 340, 110)},
          'living-room': {'sofa': (-560, -860, 520, 180), 'coffee-table': (80, -700, 220, 120)}, 'street': {}}       # x, z, rộng, sâu
+STAFF_IDS_44A = {'pharmacist', 'clerk', 'receptionist', 'barista'}       # đợt 44 A: người đứng sau quầy nhà thuốc
+PHARMACY_STAFF_44A, PHARMACY_GUEST_44A = (-120, -580), (150, -380)       # quầy x −260…260, z −420…−550; màn hình x 120
 ON_WORDS = {'bàn': ('table', 'coffee-table', 'counter'), 'quầy': ('counter',), 'ghế': ('bench', 'sofa'), 'sofa': ('sofa',), 'ghế đá': ('bench',)}
 PERSON_MOODS = {'vui': 'happy', 'buồn': 'sad', 'ngạc nhiên': 'surprised', 'giận': 'angry', 'tức giận': 'angry', 'suy nghĩ': 'thinking', 'cười': 'laughing',
                 'cười lớn': 'laughing', 'lo': 'worried', 'lo lắng': 'worried', 'bối rối': 'confused', 'mệt': 'tired', 'khóc': 'crying', 'ngượng': 'embarrassed',
@@ -239,6 +241,33 @@ def parse(text, first_line=1):
     return head, cast, lines
 
 
+def stage_sofa_44a(script, characters, boxes, portrait):
+    """ĐỢT 44 A — NẰM SOFA ("bé: [nằm sofa]", "ngủ trưa cùng thú"): người có lượt `["lieDown", "sofa", …]` mà chưa ngồi trên hộp nào được đứng
+    sẵn ở mép trước sofa (x giữa sofa, z = mặt trước + 12 — như tools/scene.py đòi) từ đầu cảnh; con vật nằm ngủ cùng lượt ấy (`together`)
+    nằm trên sàn ngay trước sofa, lệch sang phải."""
+    if 'sofa' not in boxes: return
+    x0, z0, width, depth = boxes['sofa']
+    if portrait: x0, width = -470, 440                   # khung dọc: tools/scene.py thu sofa lại (SET_PRESETS['living-room']['vertical'])
+    by_name = {c['name']: c for c in characters}
+    sleepers, partners = [], []
+    for entry in script:
+        group = entry['together'] if isinstance(entry, dict) and 'together' in entry else [entry]
+        lies = [t['who'] for t in group if isinstance(t, dict) and any(isinstance(s, list) and s[:2] == ['lieDown', 'sofa'] for s in t.get('do', []))]
+        for who in lies:
+            c = by_name.get(who)
+            if c and 'species' not in c and 'on' not in c and c not in sleepers: sleepers.append(c)
+        if lies: partners += [by_name[t['who']] for t in group if isinstance(t, dict) and t.get('who') in by_name and 'species' in by_name[t['who']] and 'on' not in by_name[t['who']]]
+    for n, c in enumerate(sleepers):
+        c['x'], c['z'] = round(x0 + 40 + 220 * n), round(z0 + 12)          # nửa trái sofa (như cảnh CI home43a): con vật nằm bên phải người
+    for n, c in enumerate(dict.fromkeys(id(p) for p in partners)):
+        pet = next(p for p in partners if id(p) == c)
+        pet['x'], pet['z'] = round(x0 + 360 + 160 * n), round(z0 + 140)
+    # Những người / con vật còn lại dưới sàn đứng sang phải sofa — không chắn trước người đang nằm.
+    if sleepers:
+        rest = [c for c in characters if 'on' not in c and c not in sleepers and all(c is not p for p in partners)]
+        for n, c in enumerate(rest): c['x'] = round(x0 + width + 240 + 280 * n)
+
+
 def build_scene(text, base):
     return build_parsed(*parse(text), base)
 
@@ -301,6 +330,13 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         for c in floor:
             c['x'] = x
             x -= 400 if 'id' in c else 240        # đủ xa để góc trung cảnh của người bên cạnh không lẹm nửa người này (khung dọc)
+    elif preset == 'pharmacy':
+        # ĐỢT 44 A — NHÀ THUỐC: người bán (dược sĩ…) đứng SAU quầy, sát mép sau; khách (và thú của họ) đứng TRƯỚC quầy, sát mép trước, lệch
+        # sang phải của màn hình hiển thị — không đứng sau quầy và màn hình (trước đây ai cũng ở z −560: khách khuất sau quầy, túi thuốc
+        # trao sau màn hình). Hai mặt phẳng chỉ cách nhau ~200 (bề sâu quầy 130): trao túi qua quầy vẫn khớp tay.
+        staff = [c for c in floor if str(c.get('id', '')).lower() in STAFF_IDS_44A]
+        for n, c in enumerate(staff): c['x'], c['z'] = PHARMACY_STAFF_44A[0] - 220 * n, PHARMACY_STAFF_44A[1]
+        for n, c in enumerate(c for c in floor if c not in staff): c['x'], c['z'] = PHARMACY_GUEST_44A[0] + 250 * n, PHARMACY_GUEST_44A[1]
     else:
         step = 300
         for n, c in enumerate(floor): c['x'] = round((n - (len(floor) - 1) / 2) * step)
@@ -429,6 +465,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     if pending and script and not attach_toast_42a(script[-1], pending): raise ScriptError('thông báo: không có nhân vật nào trên hình để gắn thẻ — đặt nó trước lượt của một người hay con vật')
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
     script = expand_combos(script)              # combo → từng lượt: đồ cầm (ống tiêm, bìa hồ sơ), cái cân… tính như viết tay
+    stage_sofa_44a(script, characters, boxes, portrait)
 
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
