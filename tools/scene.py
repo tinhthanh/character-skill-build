@@ -346,7 +346,7 @@ SET_PRESETS = {
                   {'name': 'bench', 'x': 330, 'z': -820, 'width': 360, 'depth': 120, 'height': 90, 'color': '#9fc3cf', 'top': '#d8e9ef', 'side': '#86aebb'}],
         'panels': [{'wall': 'back', 'at': -480, 'y': 560, 'width': 360, 'height': 210, 'color': '#2b2f36', 'border': '10px solid #2b2f36'},
                    {'wall': 'back', 'at': 300, 'y': 580, 'width': 260, 'height': 160, 'color': '#e9f3f6', 'border': '10px solid #ffffff'}],
-        'cutouts': [{'kind': 'laptop', 'x': -300, 'z': -470, 'y': 190}, {'kind': 'plant', 'x': 780, 'z': 60, 'height': 600}],
+        'cutouts': [{'kind': 'laptop', 'x': -430, 'z': -470, 'y': 190}, {'kind': 'plant', 'x': 780, 'z': 60, 'height': 600}],
         'spots': 'receptionist behind the counter: x -300, z -620 · visitors: x 150…400, z -380',
     },
     'exam': {
@@ -2011,6 +2011,16 @@ def main():
     views, emitted, reach_notes, pace_notes = [], [flat], [], []
     # Máy quay HIỆN TẠI (để tính quãng lia của mỗi "view"): góc máy đầu cảnh, cộng dồn qua từng view.
     camera_now = {key: float(value) for key, value in dict(CAMERA_START, **(stage_set.get('camera', {}) if stage_set is not None else {})).items() if key in CAMERA_SPEED}
+    def pets_only_view_42c(turn, subjects, view):
+        """Đợt 42 C: view có CON VẬT đang làm động tác cùng người chỉ đứng đó / nói (lời dẫn) → chỉ lấy con vật làm chủ thể (người vẫn được
+        tránh mép khung): con vật ≥ 35 % khung. Có `fill` riêng, hay người cũng làm động tác (`do`) → giữ nguyên."""
+        if 'fill' in view or view.get('size', 'medium') == 'full' or any(name not in names for name in subjects): return subjects
+        turns = turn['together'] if isinstance(turn.get('together'), list) else [turn]
+        acts = {t.get('who'): bool(t.get('do')) for t in turns if isinstance(t, dict)}
+        pets = [name for name in subjects if names[name].get('_pet')]
+        if not pets or len(pets) == len(subjects) or not any(acts.get(name) for name in pets): return subjects
+        if any(acts.get(name) for name in subjects if name not in pets): return subjects
+        return pets
     def view_of(turn, where):
         view = turn.get('view')
         if view is None: return
@@ -2024,6 +2034,7 @@ def main():
         if isinstance(view, dict) and 'on' in view:
             known(f'{where}.view', view, VIEW_KEYS)
             subjects = view['on'] if isinstance(view['on'], list) else [view['on']]
+            subjects = pets_only_view_42c(turn, subjects, view)
             if not subjects or any(name not in names for name in subjects): fail(f'{where}: "view.on" must name characters in the scene — got {js(view["on"])}')
             if view.get('size', 'medium') not in VIEW_SIZES: fail(f'{where}: "view.size" must be {", ".join(VIEW_SIZES)} — got {js(view.get("size"))}')
             extra = {key: view[key] for key in ('yaw', 'pitch') if key in view}
@@ -3346,6 +3357,7 @@ def main():
         if autos:
             moves.insert(0, "    // Automatic views (\"view\": \"close\", { \"on\": … }): measured at build time, at the moment of their turn.\n"
                             "    const frameAt = (time, subjects, size, { span, ...opts } = {}) => { tl.seek(time, false); set.update();\n"
+                            "      opts = { view42c: true, ...opts };\n"
                             "      return set.frameOn(subjects, size, span ? { ...opts, at: [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => span[0] + (span[1] - span[0]) * f), seek: (t) => { tl.seek(t, false); set.update(); } } : opts); };")
             moves.append("    tl.seek(0, false); set.update();")
         if moves: view_code = '\n    // Camera: each "view" in the scene file starts with its turn.\n' + '\n'.join(moves)
