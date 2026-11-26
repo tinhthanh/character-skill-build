@@ -232,6 +232,10 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `happyDog` (dog) | — | `playBow`, `wagTail`, `carryToy(120)` | chó vui |
 | `cozyCat` (cat) | — | `groomFace`, `loaf`, `slowBlink` | mèo thư giãn |
 | `happyBunny` (rabbit) | — | `binky`, `periscope`, `noseTwitch` | thỏ vui |
+| `bathTime` | `(pet)` | `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp` — the pet needs `"inTub": true` | tắm trọn gói, spa tắm |
+| `playFetch` | `(pet)` | `throwBall('right')` (the dog's `fetch(260)` at the same time), `stroke`, `giveTreat` — stand the dog beside the person, facing right | chơi ném bóng, ném bóng cho chó |
+| `welcomeHome` | `(pet)` | `wave` (the pet's `greet(1.4)` at the same time), `stroke`, `laugh` (the pet's `wagTail` at the same time) | đón thú về, về nhà với thú |
+| `partyTime` | — | `jump(2)`, `dance('happy', 2)`, `cheer` | ăn mừng lớn, quẩy mừng, mở tiệc |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`
 injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `checkoutCounter` needs a cashier holding cash and a stamp card and a customer with a phone, and the pet must be
@@ -247,7 +251,12 @@ within reach. `tools/script.py` gives the items and the scale by itself.
   spoken first, as its own turn. The other keys go on the first step, and `exit` goes on the last.
   A combo inside `together` is refused.
 - To add a combo, add an entry between the `BEGIN` / `END COMBOS` lines (plain JSON). The
-  runtime, `tools/scene.py` and `tools/script.py` all read that one table.
+  runtime, `tools/scene.py` and `tools/script.py` all read that one table. Its Vietnamese words
+  must not already be a single action's word in `tools/script.py` (`tools/check_scene.py` refuses
+  a clash, e.g. "nhảy mừng" is `jump`).
+- In a scene file the person kneels and stands up by themselves for `stroke` / `giveTreat` on a pet
+  on the floor, so don't put `kneel` / `standUp` steps in a combo. End on a step that leaves the
+  pet's head in view: `giveTreat` hides part of it behind the hand when the pet faces the person.
 
 ## Pets — `VGCharacter.createPet(host, { species, config, wear }).rig`
 

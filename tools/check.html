@@ -1802,6 +1802,17 @@ try {
       try { L.sequence(vet, ['fullCheckup']); } catch (error) { refused = String(error.message); }
       if (!/needs "pet"/.test(refused)) hong('combo.fullCheckup', `without a pet: expected an error naming "pet", got ${JSON.stringify(refused)}`);
       if (!L.list().combos || !L.list().combos.dischargePet) hong('combo', 'list().combos does not list the combos');
+      // ĐỢT 43 — combo cho đợt 42: bung đúng bước trong `sequence()`; bước "with" của con thú thành `together` trong `combo()`.
+      const party = L.sequence(vet, ['partyTime'], { breathe: false });
+      if (names(party) !== 'jump,dance,cheer') hong('combo.partyTime', `sequence steps are ${names(party)}`);
+      party.kill();
+      const fetchLine = L.sequence(vet, [['playFetch', dog]], { breathe: false });
+      if (names(fetchLine) !== 'throwBall,stroke,giveTreat') hong('combo.playFetch', `sequence steps are ${names(fetchLine)}`);
+      fetchLine.kill();
+      const home = L.combo(vet, 'welcomeHome', dog);
+      if (home.length !== 3 || !home[0].together || home[0].together[1][1][0] !== 'greet' || !home[2].together || home[2].together[1][1] !== 'wagTail')
+        hong('combo.welcomeHome', `combo() turns are wrong: ${JSON.stringify(home.map((turn) => (turn.together ? 'together' : turn[1])))}`);
+      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.

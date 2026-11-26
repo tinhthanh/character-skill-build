@@ -53,7 +53,7 @@ Một tệp kịch bản:
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
                                        con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
     con vật: [lăn ngửa] [đuổi đuôi] [nhào] [gặm cà rốt]   chó / mèo lăn ngửa, chó đuổi đuôi, mèo nhào, thỏ gặm cà rốt
-    COMBO (cả một chuỗi):              bác sĩ → chó: khám tổng quát · bác sĩ → chó: tiêm phòng (cân, tiêm, cho bánh)
+    COMBO (cả một chuỗi):              bác sĩ → chó: khám tổng quát · bác sĩ → chó: tiêm phòng (cân, tiêm, cho bánh) · bé → chó: chơi ném bóng · bé: [quẩy mừng]
                                        bác sĩ → chó → bé trai: trả thú (bế, trao cho chủ, dặn ba điều, vẫy chào)
                                        lễ tân: [chào khách] · bé trai: [tin vui] / [tin buồn] / [sốt ruột]
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc

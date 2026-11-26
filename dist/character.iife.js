@@ -16890,6 +16890,43 @@ const COMBOS = {
     "about": "a happy rabbit: a binky leap, stands up to look around, twitches its nose",
     "steps": [["binky", 2], ["periscope", 1.6], ["noseTwitch", 1.6]],
     "vi": ["thỏ vui", "thỏ vui vẻ", "thỏ tung tăng"]
+  },
+  "bathTime": {
+    "params": ["pet"],
+    "about": "a whole bath: wash the pet in its tub (it shakes off), towel it dry (the fur turns fluffy), brush its teeth, then a thumbs up — the pet needs \"inTub\": true",
+    "steps": [
+      ["bathPet", "$pet"],
+      ["towelDry", "$pet"],
+      ["brushTeeth", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["tắm trọn gói", "tắm rửa trọn gói", "spa tắm", "tắm sấy đánh răng"]
+  },
+  "playFetch": {
+    "params": ["pet"],
+    "about": "play fetch: throw a ball to the right while the dog runs after it and brings it back, then stroke it and give a treat — stand the dog beside the person, facing right",
+    "steps": [
+      { "step": ["throwBall", "right"], "with": { "$pet": [["fetch", 260]] } },
+      ["stroke", "$pet"],
+      ["giveTreat", "$pet"]
+    ],
+    "vi": ["chơi ném bóng", "ném bóng cho chó", "chơi nhặt bóng"]
+  },
+  "welcomeHome": {
+    "params": ["pet"],
+    "about": "come home to a pet: wave while it rears up to greet you, stroke it (down at a pet on the floor by itself), then laugh while it wags its tail",
+    "steps": [
+      { "step": "wave", "with": { "$pet": [["greet", 1.4]] } },
+      ["stroke", "$pet"],
+      { "step": "laugh", "with": { "$pet": ["wagTail"] } }
+    ],
+    "vi": ["đón thú về", "về nhà với thú", "về nhà gặp thú", "chào thú cưng"]
+  },
+  "partyTime": {
+    "params": [],
+    "about": "celebrate big: jump for joy twice, a short dance, then a cheer",
+    "steps": [["jump", 2], ["dance", "happy", 2], "cheer"],
+    "vi": ["ăn mừng lớn", "quẩy mừng", "mở tiệc", "tiệc mừng"]
   }
 };
 // END COMBOS

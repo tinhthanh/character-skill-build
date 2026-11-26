@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Added: combos for wave 42 (wave 43, group 1). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
+are measured by `tools/acting_check.py`.
+
+- `bathTime(pet)`: `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp`. The pet needs `"inTub": true`. Scripts: "tắm trọn gói", "spa tắm".
+- `playFetch(pet)`: `throwBall('right')` while the dog does `fetch(260)`, then `stroke`, `giveTreat`. Stand the dog beside the
+  person, facing right. Scripts: "chơi ném bóng", "ném bóng cho chó".
+- `welcomeHome(pet)`: `wave` while the pet does `greet`, `stroke`, then `laugh` while it does `wagTail`. Scripts: "đón thú về",
+  "về nhà với thú".
+- `partyTime`: `jump(2)`, `dance('happy', 2)`, `cheer`. Scripts: "ăn mừng lớn", "quẩy mừng", "mở tiệc".
+- That makes 20 combos.
+- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`. `tools/check_scene.py` now also refuses a combo word that is already
+  a single action's word in `tools/script.py`.
+
+Known
+- `bathTime` and `welcomeHome` don't end on `giveTreat`: with the pet facing the person, the hand at the mouth hides too much
+  of its head (acting_check: 37–57 % of the head in view, it needs 60 %).
+- `playFetch` always throws to the right; the dog runs the way it faces.
+- A corgi's `greet` (rearing up) reads only weakly, because its legs are short.
+- Between `stroke` and `giveTreat`, `playFetch` stands up, steps closer and kneels again. This comes from how `tools/scene.py`
+  places a person for each step, not from the combo.
+
 ## 0.82.0
 
 Added: wave 42, six branches in parallel (A–F). New actions work as a rig method, in `sequence()`, in scene files, in
