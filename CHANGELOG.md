@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.82.0
+
+Added: wave 42, six branches in parallel (A–F). New actions work as a rig method, in `sequence()`, in scene files, in
+Vietnamese scripts and in the action catalog, and are measured by `tools/acting_check.py`.
+
+- **Voice-over in scripts** (42 A): `mẹ (lồng tiếng) → mèo: [chui hộp] | …` speaks over a pet's action. The full form is
+  `cùng lúc (quay mèo, cận): …`. An off-screen narrator is declared as `lời dẫn (lồng tiếng, giọng …)`, or in scene files as
+  `{ "narrator": true }`. A `together` group with a narrator frames whoever acts.
+- **Characters** (42 B): `owner_woman`, `owner_man`, `mother`, `pharmacist`.
+- **Camera** (42 C):
+  - Pets in pet-only views get a default fill and reach ≥ 35 % of the frame height; explicit `fill` still wins.
+  - Close and medium shots move or zoom so a person or a piece of furniture is either fully in or fully out, vertical
+    9:16 frames included.
+  - In the `reception` preset the laptop no longer hides the clerk behind the counter.
+- **Whole-body motion** (42 D): `run` (a real run with flight phases; `["run", "@dog"]` runs to someone), `jump`,
+  `dance(style, beats, { bpm })`. Scripts: "chạy tới", "nhảy cẫng", "nhảy" / "quẩy".
+- **On the floor** (42 E): `pickUp(target, { item })` (squat, grasp, stand up holding it), and the held stances
+  `sitOnFloor()` (cross-legged; `stroke` and `carry` a pet onto the lap work in it) and `lieDown('floor' | 'sofa',
+  { head, sleep })`. `standUp` gets up. Scripts: "nhặt", "ngồi bệt" / "ngồi xếp bằng", "nằm" / "nằm sofa".
+- **Bathing and grooming** (42 F): `bathPet` (a pet with `"inTub": true` stands in a tub sized to it), `brushTeeth`,
+  `towelDry`. The pet's wet, foamy and fluffy fur follows by itself. Scripts: "tắm", "đánh răng", "lau khô".
+- **Person actions**: 133 in all.
+- **CI scenes**: `mom42c`, `liv42c`, `vert42c`, `rec42c`, `motion42d`, `bad42d`, `floor42e`, `pick42e`, `bath42f`, `cat42f`.
+
+Fixed (merging the wave 42 branches): conflicts in `SKILL.md`, `tools/script.py`, `tools/scene.py`, `runtime/rig-svg.js`,
+`runtime/set3d.js` and `tools/acting_check.py` were merged by hand, keeping both sides. The floor shadow now both fades
+when a person is in the air (D) and stretches under a person lying down (E).
+
+Known
+- The automatic director's own pet reaction and insert shots don't get the new pet size (C), only views.
+- In 42 C's moved-in shots a person next to the pet can show as a torso without a head.
+- acting_check does not measure whether the reception clerk is visible; CI only checks the laptop's position.
+- In `floor42e` the dog only lies down near the end of the scene. On the sofa, the boy reads as lying on the seat only
+  roughly at that camera angle.
+- Branches C and E were finished by a second agent after the first ran into a usage limit.
+- Not reviewed by Gemini on rendered films.
+
 ## 0.81.0
 
 Added: pet actions (wave 40, three Sonnet agents in parallel) and combos for waves 38–40 (wave 41). Every action works as a rig
