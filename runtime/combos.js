@@ -71,6 +71,71 @@ export const COMBOS = {
     ],
     "vi": ["trả thú", "trả về", "giao thú", "xuất viện", "trả bé về"]
   },
+  "bathTime": {
+    "params": ["pet"],
+    "about": "bath time: bath the pet standing in its tub (shower, lather, rinse — it shakes off), towel it dry, thumbs up (the tub needs to stand raised — on a table; a stroke at the end would hide the pet's head behind the person)",
+    "steps": [
+      ["bathPet", "$pet"],
+      ["towelDry", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["tắm cho thú", "tắm cho bé cưng", "tắm rửa cho thú"]
+  },
+  "floorCuddle": {
+    "params": ["pet"],
+    "about": "a cuddle on the floor: sit down cross-legged, stroke the pet (it comes over), take it onto the lap",
+    "steps": [
+      "sitOnFloor",
+      ["stroke", "$pet"],
+      ["carry", "$pet"]
+    ],
+    "vi": ["ngồi bệt ôm thú", "ôm thú vào lòng", "ngồi ôm thú"]
+  },
+  "napWithPet": {
+    "params": ["pet"],
+    "about": "a nap with the pet: lie down on the sofa and fall asleep while the pet lies down and sleeps beside",
+    "steps": [
+      { "step": ["lieDown", "sofa", { "sleep": true }], "with": { "$pet": [["sleep", 3]] } }
+    ],
+    "vi": ["ngủ trưa cùng thú", "nằm nghỉ cùng thú", "ngủ cùng thú"]
+  },
+  "welcomeHome": {
+    "params": ["pet"],
+    "about": "coming home: wave, kneel while the pet rears up to greet, stroke it while it wags",
+    "steps": [
+      "wave",
+      { "step": "kneel", "with": { "$pet": [["greet", 1.4]] } },
+      { "step": ["stroke", "$pet"], "with": { "$pet": ["wagTail"] } }
+    ],
+    "vi": ["về nhà", "chào thú khi về nhà", "đi làm về"]
+  },
+  "playFetch": {
+    "params": ["pet"],
+    "about": "play fetch: throw a ball to the right while the dog (facing right) runs after it and brings it back, stroke it, thumbs up",
+    "steps": [
+      { "step": ["throwBall", "right"], "with": { "$pet": [["fetch", 260]] } },
+      ["stroke", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["chơi ném bóng", "chơi đón bóng", "ném bóng cho chó"]
+  },
+  "danceWithKid": {
+    "params": ["kid"],
+    "about": "dance with a child: both turn to the viewer and dance at the same time, settle a moment, then a high five",
+    "steps": [
+      { "step": ["face", "front"], "with": { "$kid": [["face", "front"]] } },
+      { "step": ["dance", "happy", 2], "with": { "$kid": [["dance", "happy", 2]] } },
+      ["idle", 0.6],
+      ["highFive", "$kid"]
+    ],
+    "vi": ["nhảy cùng bé", "quẩy cùng bé", "nhảy múa cùng bé"]
+  },
+  "tidyToys": {
+    "params": [],
+    "about": "tidy up the toys: pick a toy up from the floor, put it away (whichever hand took it), nod",
+    "steps": ["pickUp", ["hideItem", "both"], "nod"],
+    "vi": ["dọn đồ chơi", "cất đồ chơi", "dọn dẹp đồ chơi"]
+  },
   "groomingSession": {
     "params": ["pet"],
     "about": "a grooming session: trim the nails, put eye drops in, clean the ear, then a thumbs up (a final stroke leaves the pet half hidden behind the person when it stands on the exam table)",
@@ -149,84 +214,203 @@ export const COMBOS = {
     "steps": [["binky", 2], ["periscope", 1.6], ["noseTwitch", 1.6]],
     "vi": ["thỏ vui", "thỏ vui vẻ", "thỏ tung tăng"]
   },
-  "bathTime": {
+  "dispenseMedicine": {
+    "params": ["customer"],
+    "about": "the pharmacist hands out medicine: reads the prescription (held clipboard), counts off the doses, hands the medicine bag over, waves",
+    "steps": [
+      "readChart",
+      ["countFingers", 3],
+      ["handOverBag", "$customer"],
+      "wave"
+    ],
+    "vi": ["phát thuốc", "giao thuốc", "bán thuốc"]
+  },
+  "newPatientCheckIn": {
+    "params": ["pet", "owner"],
+    "about": "check in a new patient: wave (the owner waves back at the same time), a bow, scan the pet's microchip, read the new record (held clipboard)",
+    "steps": [
+      { "step": "wave", "with": { "$owner": ["wave"] } },
+      "bow",
+      ["scanChip", "$pet"],
+      "readChart"
+    ],
+    "vi": ["tiếp nhận thú mới", "đăng ký khám", "nhận bệnh mới"]
+  },
+  "dentalCare": {
     "params": ["pet"],
-    "about": "a whole bath: wash the pet in its tub (it shakes off), towel it dry (the fur turns fluffy), brush its teeth, then a thumbs up — the pet needs \"inTub\": true",
+    "about": "dental care: look at the teeth (the pet opens its mouth at the same time), brush them, thumbs up (no treat: after brushing, and a treat walk back to the front would hide the pet)",
+    "steps": [
+      { "step": ["examine", "$pet", "teeth"], "with": { "$pet": [["openMouth", 2.2]] } },
+      ["brushTeeth", "$pet"],
+      "thumbsUp"
+    ],
+    "vi": ["chăm sóc răng", "vệ sinh răng", "chăm sóc răng miệng"]
+  },
+  "comfortOwner": {
+    "params": ["owner"],
+    "about": "comfort a worried owner: a sad, sympathetic face (the owner wipes tears at the same time), a pat on the shoulder, a hug",
+    "steps": [
+      { "step": ["express", "sad", 1.6], "with": { "$owner": ["wipeTears"] } },
+      ["patShoulder", "$owner"],
+      ["hug", "$owner"]
+    ],
+    "vi": ["an ủi chủ", "động viên chủ nuôi", "động viên chủ"]
+  },
+  "fullSpa": {
+    "params": ["pet"],
+    "about": "a full spa: bath (the pet stands in a tub — \"inTub\": true), towel-dry, brush the teeth, clean the ears, thumbs up (no nail trim: in the tub the lifted paw stays hidden behind the rim)",
     "steps": [
       ["bathPet", "$pet"],
       ["towelDry", "$pet"],
       ["brushTeeth", "$pet"],
+      ["cleanEars", "$pet"],
       "thumbsUp"
     ],
-    "vi": ["tắm trọn gói", "tắm rửa trọn gói", "spa tắm", "tắm sấy đánh răng"]
+    "vi": ["spa trọn gói", "tắm spa trọn gói", "tắm sấy trọn gói"]
   },
-  "playFetch": {
+  "postSurgeryCheck": {
     "params": ["pet"],
-    "about": "play fetch: throw a ball to the right while the dog runs after it and brings it back, then stroke it and give a treat — stand the dog beside the person, facing right",
+    "about": "a check-up after surgery: listen to the drowsy pet (it looks unwell at the same time — ears down, sleepy eyes), take its temperature, read the chart",
     "steps": [
-      { "step": ["throwBall", "right"], "with": { "$pet": [["fetch", 260]] } },
-      ["stroke", "$pet"],
-      ["giveTreat", "$pet"]
+      { "step": ["listen", "$pet"], "with": { "$pet": [["unwell", 2]] } },
+      ["takeTemp", "$pet"],
+      "readChart"
     ],
-    "vi": ["chơi ném bóng", "ném bóng cho chó", "chơi nhặt bóng"]
+    "vi": ["tái khám sau mổ", "kiểm tra sau mổ", "khám sau mổ"]
   },
-  "welcomeHome": {
-    "params": ["pet"],
-    "about": "come home to a pet: wave while it rears up to greet you, stroke it (down at a pet on the floor by itself), then laugh while it wags its tail",
-    "steps": [
-      { "step": "wave", "with": { "$pet": [["greet", 1.4]] } },
-      ["stroke", "$pet"],
-      { "step": "laugh", "with": { "$pet": ["wagTail"] } }
-    ],
-    "vi": ["đón thú về", "về nhà với thú", "về nhà gặp thú", "chào thú cưng"]
+  "zoomies": {
+    "params": [],
+    "about": "a dog with the zoomies: chases its tail, hops for joy, pants",
+    "steps": [["chaseTail", 3], ["jump", 2], ["pant", 1.4]],
+    "vi": ["chó tăng động", "chạy lung tung", "chó quậy"]
+  },
+  "sleepyPet": {
+    "params": [],
+    "about": "a sleepy pet (dog or cat): a yawn, a stretch, then lies down and sleeps",
+    "steps": ["yawn", "stretch", ["sleep", 3]],
+    "vi": ["ngáp rồi ngủ", "lăn ra ngủ", "díp mắt"]
   },
   "partyTime": {
     "params": [],
     "about": "celebrate big: jump for joy twice, a short dance, then a cheer",
-    "steps": [["jump", 2], ["dance", "happy", 2], "cheer"],
-    "vi": ["ăn mừng lớn", "quẩy mừng", "mở tiệc", "tiệc mừng"]
+    "steps": [
+      [
+        "jump",
+        2
+      ],
+      [
+        "dance",
+        "happy",
+        2
+      ],
+      "cheer"
+    ],
+    "vi": [
+      "ăn mừng lớn",
+      "quẩy mừng",
+      "mở tiệc",
+      "tiệc mừng"
+    ]
   },
   "lazyAfternoon": {
-    "params": ["pet"],
+    "params": [
+      "pet"
+    ],
     "about": "a lazy afternoon on the floor: sit down cross-legged, stroke the pet (it comes over), then lie down and doze off while the pet sleeps — they stay lying; \"standUp\" gets up",
     "steps": [
       "sitOnFloor",
-      ["stroke", "$pet"],
-      { "step": ["lieDown", "floor", { "sleep": true }], "with": { "$pet": [["sleep", 3]] } }
+      [
+        "stroke",
+        "$pet"
+      ],
+      {
+        "step": [
+          "lieDown",
+          "floor",
+          {
+            "sleep": true
+          }
+        ],
+        "with": {
+          "$pet": [
+            [
+              "sleep",
+              3
+            ]
+          ]
+        }
+      }
     ],
-    "vi": ["nghỉ trưa với thú", "nằm nghỉ với thú", "chiều lười biếng"]
+    "vi": [
+      "nghỉ trưa với thú",
+      "nằm nghỉ với thú",
+      "chiều lười biếng"
+    ]
   },
   "rushToPet": {
-    "params": ["pet"],
+    "params": [
+      "pet"
+    ],
     "about": "a scare: startle, run to the pet, stroke it, then a relieved breath",
     "steps": [
       "startle",
-      ["run", "$pet"],
-      ["stroke", "$pet"],
+      [
+        "run",
+        "$pet"
+      ],
+      [
+        "stroke",
+        "$pet"
+      ],
       "relief"
     ],
-    "vi": ["hốt hoảng chạy tới", "chạy tới xem thú", "lo lắng chạy tới"]
+    "vi": [
+      "hốt hoảng chạy tới",
+      "chạy tới xem thú",
+      "lo lắng chạy tới"
+    ]
   },
   "tidyUp": {
-    "params": ["pet", "person"],
+    "params": [
+      "pet",
+      "person"
+    ],
     "about": "tidy up: pick up the toy by the pet, then hand it to someone",
     "steps": [
-      ["pickUp", "$pet"],
-      ["handOver", "$person"]
+      [
+        "pickUp",
+        "$pet"
+      ],
+      [
+        "handOver",
+        "$person"
+      ]
     ],
-    "vi": ["nhặt đồ đưa", "dọn đồ chơi", "nhặt đồ chơi đưa"]
-  },
-  "sleepyPet": {
-    "params": [],
-    "about": "a sleepy dog or cat: a big yawn, then it lies down and sleeps (it stays lying)",
-    "steps": ["yawn", ["sleep", 3]],
-    "vi": ["thú buồn ngủ", "buồn ngủ díp mắt", "ngáp rồi ngủ"]
+    "vi": [
+      "nhặt đồ đưa",
+      "nhặt đồ chơi đưa"
+    ]
   },
   "scaredPet": {
-    "params": ["person"],
+    "params": [
+      "person"
+    ],
     "about": "a frightened pet: it trembles, then runs to hide behind the person and peeks out (it stays there) — in a 3D set stand it 60–120 further back (z) than the person",
-    "steps": [["tremble", 1.5], ["hide", "$person"]],
-    "vi": ["thú sợ hãi", "sợ chạy trốn", "sợ nấp sau"]
+    "steps": [
+      [
+        "tremble",
+        1.5
+      ],
+      [
+        "hide",
+        "$person"
+      ]
+    ],
+    "vi": [
+      "thú sợ hãi",
+      "sợ chạy trốn",
+      "sợ nấp sau"
+    ]
   }
 };
 // END COMBOS

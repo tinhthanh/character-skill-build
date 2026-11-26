@@ -1802,16 +1802,10 @@ try {
       try { L.sequence(vet, ['fullCheckup']); } catch (error) { refused = String(error.message); }
       if (!/needs "pet"/.test(refused)) hong('combo.fullCheckup', `without a pet: expected an error naming "pet", got ${JSON.stringify(refused)}`);
       if (!L.list().combos || !L.list().combos.dischargePet) hong('combo', 'list().combos does not list the combos');
-      // ĐỢT 43 — combo cho đợt 42: bung đúng bước trong `sequence()`; bước "with" của con thú thành `together` trong `combo()`.
+      // ĐỢT 43 C — combo cho đợt 42: bung đúng bước trong `sequence()`; bước "with" của con thú thành `together` trong `combo()`.
       const party = L.sequence(vet, ['partyTime'], { breathe: false });
       if (names(party) !== 'jump,dance,cheer') hong('combo.partyTime', `sequence steps are ${names(party)}`);
       party.kill();
-      const fetchLine = L.sequence(vet, [['playFetch', dog]], { breathe: false });
-      if (names(fetchLine) !== 'throwBall,stroke,giveTreat') hong('combo.playFetch', `sequence steps are ${names(fetchLine)}`);
-      fetchLine.kill();
-      const home = L.combo(vet, 'welcomeHome', dog);
-      if (home.length !== 3 || !home[0].together || home[0].together[1][1][0] !== 'greet' || !home[2].together || home[2].together[1][1] !== 'wagTail')
-        hong('combo.welcomeHome', `combo() turns are wrong: ${JSON.stringify(home.map((turn) => (turn.together ? 'together' : turn[1])))}`);
       const rush = L.sequence(vet, [['rushToPet', dog]], { breathe: false });
       if (names(rush) !== 'startle,run,stroke,relief') hong('combo.rushToPet', `sequence steps are ${names(rush)}`);
       rush.kill();
@@ -1828,10 +1822,7 @@ try {
       const lazy = L.combo(vet, 'lazyAfternoon', dog);
       if (lazy.length !== 3 || !lazy[2].together || lazy[2].together[0][1][0] !== 'lieDown' || lazy[2].together[1][1][0] !== 'sleep')
         hong('combo.lazyAfternoon', `combo() turns are wrong: ${JSON.stringify(lazy.map((turn) => (turn.together ? 'together' : turn[1])))}`);
-      const sleepy = L.sequence(dog, ['sleepyPet'], { breathe: false });
-      if (names(sleepy) !== 'yawn,sleep') hong('combo.sleepyPet', `sequence steps are ${names(sleepy)}`);
-      sleepy.kill();
-      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'sleepyPet', 'scaredPet']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
+      for (const name of ['partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'scaredPet']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.

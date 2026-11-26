@@ -1561,6 +1561,48 @@ with tempfile.TemporaryDirectory() as work:
         want = [['sitOnFloor'], [['pickUp', '@cho']], [['lieDown', 'sofa']], ['standUp', 'sitOnFloor']]
         if steps != want: problems.append(f'script.py floor 42 E: steps {steps}, want {want}')
 
+    # ĐỢT 43 A — COMBO Ở NHÀ VỚI THÚ: home43a (phòng khách): mẹ ngồi bệt ôm mèo vào lòng, bé ngủ trưa trên sofa cùng con chó; play43a: mẹ nhảy cùng
+    # bé gái rồi đập tay, bé chơi ném bóng với con corgi (chó chạy nhặt bóng cùng lúc), dọn đồ chơi. Mỗi cảnh phải qua acting_check, composition không
+    # còn tên combo; chữ: "tắm cho thú", "về nhà", "dọn đồ chơi"… ra đúng bước (bước "with" thành "together" của con vật / bé).
+    combo43a = {
+        'home43a': ([dict(name='me', id='mother', x=200, z=-560, faces='meo'), dict(name='be', id='boy', x=-520, z=-848, faces='cho'),
+                     dict(name='cho', species='dog', x=-200, z=-720, faces='be'), dict(name='meo', species='cat', x=480, z=-560, faces='me')],
+                    [{'who': 'me', 'say': 'Mèo ơi, lại đây với mẹ nào.', 'do': [['floorCuddle', '@meo']]}, {'who': 'be', 'say': 'Con ngủ trưa với Lu nhé.', 'do': [['napWithPet', '@cho']]}],
+                    ('"sitOnFloor"', '["carry", meo', "['lieDown', 'sofa', {", '[cho, ["sleep", 3')),
+        'play43a': ([dict(name='me', id='mother', x=-100, z=-560, faces='em'), dict(name='em', id='girl', x=40, z=-560, faces='me'), dict(name='cho', species='corgi', x=160, z=-560)],
+                    [{'who': 'me', 'say': 'Nhảy cùng mẹ nào!', 'do': [['danceWithKid', '@em']]}, {'who': 'em', 'do': [['playFetch', '@cho']]}, {'who': 'em', 'do': ['standUp']},
+                     {'who': 'em', 'do': ['tidyToys'], 'view': {'on': ['em'], 'size': 'full'}}],
+                    ('[em, ["dance", "happy", 2', '["highFive", em', '[cho, ["fetch", 260', '"pickUp"', '["hideItem", "both"'))}
+    for name43a, (cast43a, turns43a, needles43a) in combo43a.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{name43a}.json')
+        try:
+            json.dump({'id': name43a, 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': cast43a, 'script': turns43a}, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name43a))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name43a}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, name43a, 'index.html'), encoding='utf-8').read()
+        for needle in needles43a:
+            if needle not in html: problems.append(f'{name43a}: {needle} is not in the composition')
+        for combo_name in ('floorCuddle', 'napWithPet', 'danceWithKid', 'playFetch', 'tidyToys'):
+            if combo_name in html: problems.append(f'{name43a}: combo name {combo_name} was left in the composition instead of its steps')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name43a)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name43a}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+    text = os.path.join(work, 'combo43a.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nmẹ (mother) · bé (girl) · chó (corgi)\n\nmẹ → chó: tắm cho bé cưng\nmẹ → chó: về nhà\nbé → chó: chơi ném bóng\n'
+                                            'mẹ → bé: quẩy cùng bé\nbé: [dọn đồ chơi]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py combos 43 A: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'combo43a.scene.json'), encoding='utf-8'))
+        steps = [[(t['who'], t['do'][0]) for t in (e['together'] if 'together' in e else [e])] for e in made['script'] if isinstance(e, dict) and (e.get('do') or e.get('together'))]
+        want = [[('me', ['bathPet', '@cho'])], [('me', ['towelDry', '@cho'])], [('me', 'thumbsUp')], [('me', 'wave')], [('me', 'kneel'), ('cho', ['greet', 1.4])],
+                [('me', ['stroke', '@cho']), ('cho', 'wagTail')], [('be', ['throwBall', 'right']), ('cho', ['fetch', 260])], [('be', ['stroke', '@cho'])], [('be', 'thumbsUp')],
+                [('me', ['face', 'front']), ('be', ['face', 'front'])], [('me', ['dance', 'happy', 2]), ('be', ['dance', 'happy', 2])], [('me', ['idle', 0.6])], [('me', ['highFive', '@be'])],
+                [('be', 'pickUp')], [('be', ['hideItem', 'both'])], [('be', 'nod')]]
+        if steps != want: problems.append(f'script.py combos 43 A: steps {steps}, want {want}')
+        if not any(c.get('name') == 'cho' and c.get('inTub') for c in made['characters']): problems.append('script.py combos 43 A: "tắm cho bé cưng" did not put the dog in a tub ("inTub")')
+
     # ĐỢT 41 — COMBO CHO ĐỢT 38–40: chăm sóc tổng hợp + chuẩn bị khám; tiêm có y tá giữ; thanh toán tại quầy; tiễn khách + ăn mừng cùng bé
     # + chó / mèo / thỏ. Mỗi cảnh phải qua acting_check, composition không còn tên combo; chữ: "chuẩn bị khám", "chó vui"… ra đúng bước.
     bag41 = {'name': 'bac_si', 'id': 'vet', 'x': -150, 'z': -560, 'faces': 'be'}
@@ -1605,16 +1647,9 @@ with tempfile.TemporaryDirectory() as work:
         want = [['washHands', 2], 'putOnGloves', ['clipNails', '@cho'], ['eyeDrops', '@cho'], ['cleanEars', '@cho'], 'thumbsUp', ['playBow', 1.2], 'wagTail', ['carryToy', 120]]
         if steps != want: problems.append(f'script.py combos 41: steps {steps}, want {want}')
 
-    # ĐỢT 43 — COMBO CHO ĐỢT 42: tắm trọn gói (tắm, lau khô, đánh răng), chơi ném bóng (chó chạy nhặt cùng lúc), đón thú về (thú chồm lên
-    # chào cùng lúc, vuốt, cười khi nó vẫy đuôi), ăn mừng lớn (nhảy, múa, reo). Mỗi cảnh qua acting_check, composition không còn tên combo;
-    # chữ: "quẩy mừng", "chơi ném bóng", "đón thú về" ra đúng bước (cả bước "with" của con thú).
-    combo43 = {
-        'bath43': ({'preset': 'exam'}, [dict(name='bac_si', id='vet', x=40, z=-560, faces='cho'), dict(name='cho', species='corgi', on='table', x=200, z=-560, faces='bac_si', inTub=True)],
-                   [{'who': 'bac_si', 'do': [['bathTime', '@cho']]}], ('"bathPet"', '"towelDry"', '"brushTeeth"', '"thumbsUp"')),
-        'fetch43': ({'preset': 'park'}, [dict(name='be', id='boy', x=-200, z=-560), dict(name='cho', species='shiba', x=-60, z=-560)],
-                    [{'who': 'be', 'do': [['playFetch', '@cho']]}], ('"throwBall", "right"', '"fetch", 260', '"stroke"', '"giveTreat"')),
-        'home43': ({'preset': 'living-room'}, [dict(name='me', id='owner_woman', x=-80, z=-560, faces='cho'), dict(name='cho', species='corgi', x=80, z=-560, faces='me')],
-                   [{'who': 'me', 'do': [['welcomeHome', '@cho']]}], ('"greet", 1.4', '"stroke"', '"laugh"', '"wagTail"')),
+    # ĐỢT 43 C — COMBO CHO ĐỢT 42: ăn mừng lớn (nhảy, múa, reo); các combo dưới. (bathTime, playFetch, welcomeHome, sleepyPet: của 0.83.0.) Mỗi cảnh qua acting_check, composition không còn tên combo;
+    # chữ: "quẩy mừng", "nhặt đồ đưa", "nghỉ trưa với thú", "hốt hoảng chạy tới", "thú sợ hãi" ra đúng bước (cả bước "with" của con thú).
+    combo43c = {
         'party43': ({'preset': 'living-room'}, [dict(name='be', id='girl', x=0, z=-560)],
                     [{'who': 'be', 'do': ['partyTime']}], ('"jump", 2', '"dance", "happy", 2', '"cheer"')),
         # nhóm 2: BÉ ngồi bệt vuốt mèo rồi nằm ngủ cùng nó (con vật dừng xa hơn người ngồi ghế — FLOOR_GAP_43: trước đó bàn tay bé dựng đứng
@@ -1627,12 +1662,10 @@ with tempfile.TemporaryDirectory() as work:
         'tidy43': ({'preset': 'living-room'}, [dict(name='be', id='girl', x=-60, z=-560, faces='me'), dict(name='cho', species='corgi', x=140, z=-560),
                                                dict(name='me', id='mother', x=-300, z=-560, faces='be', holds='toy', holdsHidden=True)],
                    [{'who': 'be', 'do': [['tidyUp', '@cho', '@me']]}], ('"pickUp"', '"handOver"', '["take", be]')),
-        # nhóm 3 (của thú): chó và mèo ngáp rồi ngủ; mèo đen run sợ rồi chạy nấp sau ông (đứng sâu hơn ông 120 — gần hơn thì nó chạy xuyên chân ông).
-        'sleepy43': ({'preset': 'living-room'}, [dict(name='cho', species='corgi', x=-150, z=-560), dict(name='meo', species='calico', x=200, z=-560)],
-                     [{'who': 'cho', 'do': ['sleepyPet']}, {'who': 'meo', 'do': ['sleepyPet']}], ('"yawn"', '"sleep", 3')),
+        # của thú: mèo đen run sợ rồi chạy nấp sau ông (đứng sâu hơn ông 120 — gần hơn thì nó chạy xuyên chân ông).
         'scared43': ({'preset': 'living-room'}, [dict(name='ong', id='grandpa', x=0, z=-560), dict(name='meo', species='black_cat', x=-300, z=-680, faces='ong')],
                      [{'who': 'meo', 'do': [['scaredPet', '@ong']]}], ('"tremble", 1.5', '"hide", set.target(meo, ong'))}
-    for name, (stage_set, cast, turns, needles) in combo43.items():
+    for name, (stage_set, cast, turns, needles) in combo43c.items():
         scene43 = {'id': name, 'camera': 'auto', 'set': stage_set, 'characters': cast, 'script': turns}
         path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
         try:
@@ -1644,44 +1677,47 @@ with tempfile.TemporaryDirectory() as work:
         html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
         for needle in needles:
             if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
-        for combo_name in ('bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'sleepyPet', 'scaredPet'):
+        for combo_name in ('partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp', 'scaredPet'):
             if combo_name in html: problems.append(f'{name}: combo name {combo_name} was left in the composition instead of its steps')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
         if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
-    text = os.path.join(work, 'combo43.txt')
-    open(text, 'w', encoding='utf-8').write('bối cảnh: công viên\nbé (boy) · chó (shiba)\n\nbé: [quẩy mừng]\nbé → chó: chơi ném bóng\nbé → chó: đón thú về\n')
+    text = os.path.join(work, 'combo43c.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: công viên\nbé (boy) · chó (shiba)\n\nbé: [quẩy mừng]\n')
     done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py combos 43: ' + (done.stderr or done.stdout).strip()[-300:])
+    if done.returncode != 0: problems.append('script.py combos 43c: ' + (done.stderr or done.stdout).strip()[-300:])
     else:
-        made = json.load(open(os.path.join(work, 'combo43.scene.json'), encoding='utf-8'))
+        made = json.load(open(os.path.join(work, 'combo43c.scene.json'), encoding='utf-8'))
         steps = [[(t['who'], t['do'][0]) for t in (e['together'] if 'together' in e else [e])] for e in made['script'] if isinstance(e, dict) and (e.get('do') or e.get('together'))]
-        want = [[('be', ['jump', 2])], [('be', ['dance', 'happy', 2])], [('be', 'cheer')],
-                [('be', ['throwBall', 'right']), ('cho', ['fetch', 260])], [('be', ['stroke', '@cho'])], [('be', ['giveTreat', '@cho'])],
-                [('be', 'wave'), ('cho', ['greet', 1.4])], [('be', ['stroke', '@cho'])], [('be', 'laugh'), ('cho', 'wagTail')]]
-        if steps != want: problems.append(f'script.py combos 43: steps {steps}, want {want}')
+        want = [[('be', ['jump', 2])], [('be', ['dance', 'happy', 2])], [('be', 'cheer')]]
+        if steps != want: problems.append(f'script.py combos 43c: steps {steps}, want {want}')
     # nhóm 2 bằng chữ: các bước đúng, và mẹ (người nhận quả bóng) có quả bóng cất sẵn — không thì không đón lấy.
-    text = os.path.join(work, 'combo43b.txt')
+    text = os.path.join(work, 'combo43c2.txt')
     open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nbé (girl) · chó (corgi) · mẹ (mother) · mèo (cat)\n\n'
                                             'bé → chó → mẹ: nhặt đồ đưa\nmẹ → mèo: nghỉ trưa với thú\nmẹ → chó: hốt hoảng chạy tới\n'
-                                            'chó: [thú buồn ngủ]\nmèo → mẹ: thú sợ hãi\n')
+                                            'mèo → mẹ: thú sợ hãi\n')
     done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py combos 43b: ' + (done.stderr or done.stdout).strip()[-300:])
+    if done.returncode != 0: problems.append('script.py combos 43c-2: ' + (done.stderr or done.stdout).strip()[-300:])
     else:
-        made = json.load(open(os.path.join(work, 'combo43b.scene.json'), encoding='utf-8'))
+        made = json.load(open(os.path.join(work, 'combo43c2.scene.json'), encoding='utf-8'))
         steps = [[(t['who'], t['do'][0]) for t in (e['together'] if 'together' in e else [e])] for e in made['script'] if isinstance(e, dict) and (e.get('do') or e.get('together'))]
         want = [[('be', ['pickUp', '@cho'])], [('be', ['handOver', '@me'])], [('me', 'sitOnFloor')], [('me', ['stroke', '@meo'])],
                 [('me', ['lieDown', 'floor', {'sleep': True}]), ('meo', ['sleep', 3])],
                 [('me', 'startle')], [('me', ['run', '@cho'])], [('me', ['stroke', '@cho'])], [('me', 'relief')],
-                [('cho', 'yawn')], [('cho', ['sleep', 3])], [('meo', ['tremble', 1.5])], [('meo', ['hide', '@me'])]]
-        if steps != want: problems.append(f'script.py combos 43b: steps {steps}, want {want}')
+                [('meo', ['tremble', 1.5])], [('meo', ['hide', '@me'])]]
+        if steps != want: problems.append(f'script.py combos 43c-2: steps {steps}, want {want}')
         mom = next((c for c in made['characters'] if c['name'] == 'me'), {})
-        if mom.get('holds') != 'toy' or not mom.get('holdsHidden'): problems.append(f'script.py combos 43b: the one given the ball has no ball put away to take it with ({mom})')
+        if mom.get('holds') != 'toy' or not mom.get('holdsHidden'): problems.append(f'script.py combos 43c-2: the one given the ball has no ball put away to take it with ({mom})')
     # Từ kịch bản của combo không được trùng từ của một động tác lẻ (ví dụ "nhảy mừng" đã là `jump`): trùng thì một bên bị nuốt.
     if HERE not in sys.path: sys.path.insert(0, HERE)
     import script as script_mod
     single = set(script_mod.ACTIONS) | set(script_mod.TARGETED) | set(script_mod.PERSON_42D)
     for word, combo_name in script_mod.COMBO_WORDS.items():
         if word in single: problems.append(f'combo {combo_name}: script word "{word}" is already an action word in tools/script.py')
+    seen_words = {}
+    for combo_name, combo in script_mod.COMBOS.items():
+        for word in combo.get('vi', []):
+            if word in seen_words: problems.append(f'combo {combo_name}: script word "{word}" is also combo {seen_words[word]}\'s')
+            seen_words.setdefault(word, combo_name)
 
     # ĐỢT 42 A — LỒNG TIẾNG trong kịch bản chữ + NGƯỜI DẪN KHÔNG HIỆN HÌNH: kịch bản dùng cả hai dạng cú pháp ("(lồng tiếng) →" và "cùng lúc (quay …)") dựng được;
     # composition có góc máy của nhóm `together` vào con thú (không bao giờ vào người dẫn), người dẫn không có chỗ đứng / thân trên màn hình; acting_check đạt.
@@ -1714,6 +1750,53 @@ with tempfile.TemporaryDirectory() as work:
             if html.count('[loi_dan, [\'explain\'') < 4: problems.append('voiceover42a: the narrator lines are not all in the conversation')
             done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'voiceover42a')], capture_output=True, text=True)
             if done.returncode != 0 or 'loi_dan' in done.stdout: problems.append('voiceover42a: acting_check ' + ('measures the narrator: ' if 'loi_dan' in done.stdout else 'fails: ') + (done.stdout.strip() or done.stderr.strip())[-500:])
+
+    # ĐỢT 43 B — COMBO PHÒNG KHÁM, NHÀ THUỐC, THÚ: tiếp nhận thú mới + chăm sóc răng + tái khám sau mổ (clinic43b); an ủi chủ + chó tăng động
+    # + ngáp rồi ngủ (home43b); phát thuốc (pharm43b — túi đang cầm, bìa đơn thuốc cất ở tay trái). Mỗi cảnh qua acting_check, composition
+    # không còn tên combo; chữ: các từ mới ra đúng bước, túi + bìa hồ sơ và chậu tắm tự có.
+    combo_43b = {
+        'clinic43b': ({'preset': 'exam'}, [dict(name='bac_si', id='vet', x=40, z=-560, faces='cho', holds='clipboard', holdsHidden=True), dict(name='cho', species='dog', on='table', x=200, z=-560, faces='bac_si'),
+                                           dict(name='chu', id='granny', x=-420, z=-560, faces='bac_si')],
+                      [{'who': 'bac_si', 'do': [['newPatientCheckIn', '@cho', '@chu']]}, {'who': 'bac_si', 'do': [['dentalCare', '@cho']]}, {'who': 'bac_si', 'do': [['postSurgeryCheck', '@cho']]}],
+                      ('[chu, "wave"]', '"scanChip"', '"brushTeeth"', '[cho, ["openMouth", 2.2]', '"unwell"', '"takeTemp"', "['readChart'")),
+        'home43b': ({'preset': 'living-room'}, [dict(name='bac_si', id='vet', x=-150, z=-560, faces='me'), dict(name='me', id='granny', x=100, z=-560, faces='bac_si'),
+                                                dict(name='cho', species='corgi', x=380, z=-560), dict(name='meo', species='cat', x=-480, z=-560)],
+                    [{'who': 'bac_si', 'do': [['comfortOwner', '@me']]}, {'who': 'meo', 'do': ['sleepyPet']}, {'who': 'cho', 'do': ['zoomies']}],
+                    ('"wipeTears"', '"patShoulder"', '"hug"', '"chaseTail"', '"pant"', '"yawn"', '"sleep"')),
+        'pharm43b': ({'preset': 'pharmacy'}, [dict(name='duoc_si', id='pharmacist', x=-150, z=-380, faces='khach', holds={'R': 'bag', 'L': 'clipboard'}, holdsHidden=['L']),
+                                              dict(name='khach', id='granny', x=60, z=-380, faces='duoc_si')],
+                     [{'who': 'duoc_si', 'do': [['dispenseMedicine', '@khach']]}], ("['readChart'", '"countFingers"', '"handOverBag"', '"takeBag"'))}
+    for name, (stage_set, cast, turns, needles) in combo_43b.items():
+        scene_43b = {'id': name, 'camera': 'auto', 'set': stage_set, 'characters': cast, 'script': turns}
+        path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
+        try:
+            json.dump(scene_43b, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        html = open(os.path.join(work, name, 'index.html'), encoding='utf-8').read()
+        for needle in needles:
+            if needle not in html: problems.append(f'{name}: {needle} is not in the composition')
+        for combo_name in ('dispenseMedicine', 'newPatientCheckIn', 'dentalCare', 'comfortOwner', 'fullSpa', 'postSurgeryCheck', 'zoomies', 'sleepyPet'):
+            if combo_name in html: problems.append(f'{name}: combo name {combo_name} was left in the composition instead of its steps')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+    text = os.path.join(work, 'combo43b.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn) · bà (granny)\n\nbác sĩ → chó: spa trọn gói\nbác sĩ → chó → bà: tiếp nhận thú mới\n'
+                                            'bác sĩ → bà: phát thuốc\nbác sĩ → bà: an ủi chủ\nbác sĩ → chó: chăm sóc răng\nbác sĩ → chó: tái khám sau mổ\nchó: [chó tăng động]\nchó: [ngáp rồi ngủ]\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py combos 43b: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = json.load(open(os.path.join(work, 'combo43b.scene.json'), encoding='utf-8'))
+        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+        want = [['bathPet', '@cho'], ['towelDry', '@cho'], ['brushTeeth', '@cho'], ['cleanEars', '@cho'], 'thumbsUp', 'bow', ['scanChip', '@cho'], 'readChart', 'readChart', ['countFingers', 3],
+                ['handOverBag', '@ba'], 'wave', ['patShoulder', '@ba'], ['hug', '@ba'], ['brushTeeth', '@cho'], 'thumbsUp', ['takeTemp', '@cho'], 'readChart', ['chaseTail', 3], ['jump', 2], ['pant', 1.4],
+                'yawn', 'stretch', ['sleep', 3]]
+        if steps != want: problems.append(f'script.py combos 43b: steps {steps}, want {want}')
+        cast = {c['name']: c for c in made['characters']}
+        if cast.get('bac_si', {}).get('holds') != {'R': 'bag', 'L': 'clipboard'} or cast['bac_si'].get('holdsHidden') != ['L']: problems.append(f'script.py combos 43b: the vet should hold a shown bag and a put-away clipboard, got {cast.get("bac_si")}')
+        if not cast.get('cho', {}).get('inTub'): problems.append('script.py combos 43b: the dog of "spa trọn gói" does not stand in a tub')
 
     # ĐỢT 37 — COMBO (runtime/combos.js): mỗi bước của combo thành một lượt riêng; lời của lượt nói trước combo; bước có "with" chạy
     # `together` với con vật; trả thú cho chủ sau khi cân (mỗi lần bế một `omSlot` — trước đây lần bế sau ghi đè lần cân).

@@ -225,6 +225,13 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `dischargePet` | `(pet, owner)` | `carry`, `handOverPet(owner)`, `countFingers(3)`, `wave` | trả thú, xuất viện |
 | `groomingSession` | `(pet)` | `clipNails`, `eyeDrops`, `cleanEars`, `thumbsUp` | chăm sóc tổng hợp, spa thú cưng |
 | `prepForExam` | — | `washHands(2)`, `putOnGloves` (the gloves stay on) | chuẩn bị khám, rửa tay đeo găng |
+| `bathTime` | `(pet)` | `bathPet`, `towelDry`, `thumbsUp` — the pet stands in a tub (`"inTub": true`, added by `tools/script.py`); stand the tub raised (a table): in a tub on the floor the person's head cannot bend far enough to look at the pet, and acting_check fails the gaze | tắm cho thú, tắm cho bé cưng |
+| `floorCuddle` | `(pet)` | `sitOnFloor`, `stroke` (the pet comes over), `carry` onto the lap — stays sitting with the pet | ngồi bệt ôm thú, ôm thú vào lòng |
+| `napWithPet` | `(pet)` | `lieDown('sofa', { sleep: true })` with the pet's `sleep(3)` at the same time — stand the person at the sofa and the pet on the floor beside it | ngủ trưa cùng thú, nằm nghỉ cùng thú |
+| `welcomeHome` (dog) | `(pet)` | `wave`, `kneel` (the dog's `greet` at the same time), `stroke` (the dog's `wagTail` at the same time) — the dog close in front, facing the person | về nhà, chào thú khi về nhà |
+| `playFetch` (dog) | `(pet)` | `throwBall('right')` (the dog's `fetch(260)` at the same time — the dog faces right, as pets do by default), `stroke`, `thumbsUp` — keep the dog within about 120 units for the stroke | chơi ném bóng, chơi đón bóng |
+| `danceWithKid` | `(kid)` | both `face('front')`, both `dance('happy', 2)` at the same time, `idle(0.6)`, `highFive(kid)` | nhảy cùng bé, quẩy cùng bé |
+| `tidyToys` | — | `pickUp` (a toy in front), `hideItem('both')`, `nod` — the automatic shot of `pickUp` is a medium one that can leave the toy out; give that turn `"view": { "on": [...], "size": "full" }` | dọn đồ chơi, cất đồ chơi |
 | `assistedVaccination` | `(pet, nurse)` | `washHands`, `putOnGloves`, `inject` (the nurse's `restrain` at the same time), `takeOffGloves`, `giveTreat` | tiêm có người giữ |
 | `checkoutCounter` | `(customer)` | the cashier waits while the customer's `payByQR` runs, `giveChange(customer)`, `stampCard` (stamps, not handed over — a customer holding a phone has no free hand for a third item), `wave` | thanh toán tại quầy |
 | `farewellOwner` | `(owner)` | `handOverBag(owner)`, `patShoulder(owner)`, `wave` | tiễn khách, dặn dò ra về |
@@ -232,14 +239,18 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `happyDog` (dog) | — | `playBow`, `wagTail`, `carryToy(120)` | chó vui |
 | `cozyCat` (cat) | — | `groomFace`, `loaf`, `slowBlink` | mèo thư giãn |
 | `happyBunny` (rabbit) | — | `binky`, `periscope`, `noseTwitch` | thỏ vui |
-| `bathTime` | `(pet)` | `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp` — the pet needs `"inTub": true` | tắm trọn gói, spa tắm |
-| `playFetch` | `(pet)` | `throwBall('right')` (the dog's `fetch(260)` at the same time), `stroke`, `giveTreat` — stand the dog beside the person, facing right | chơi ném bóng, ném bóng cho chó |
-| `welcomeHome` | `(pet)` | `wave` (the pet's `greet(1.4)` at the same time), `stroke`, `laugh` (the pet's `wagTail` at the same time) | đón thú về, về nhà với thú |
+| `dispenseMedicine` | `(customer)` | `readChart` (the prescription), `countFingers(3)` (the doses), `handOverBag(customer)`, `wave`. Needs a shown bag and a put-away clipboard: `"holds": { "R": "bag", "L": "clipboard" }, "holdsHidden": ["L"]` (`tools/script.py` gives them). In the `pharmacy` preset stand both in front of the counter, about 210 units apart | phát thuốc, giao thuốc, bán thuốc |
+| `newPatientCheckIn` | `(pet, owner)` | `wave` (the owner's `wave` at the same time; `owner` may be left out), `bow`, `scanChip(pet)`, `readChart` | tiếp nhận thú mới, đăng ký khám |
+| `dentalCare` | `(pet)` | `examine` teeth (the pet's `openMouth` at the same time), `brushTeeth`, `thumbsUp` | chăm sóc răng, vệ sinh răng |
+| `comfortOwner` | `(owner)` | `express('sad', 1.6)` (the owner's `wipeTears` at the same time), `patShoulder(owner)`, `hug(owner)` | an ủi chủ, động viên chủ nuôi |
+| `fullSpa` | `(pet)` | `bathPet` (the pet `"inTub": true` — `tools/script.py` sets it), `towelDry`, `brushTeeth`, `cleanEars`, `thumbsUp`. No `clipNails`: in the tub the lifted paw stays behind the rim | spa trọn gói, tắm sấy trọn gói |
+| `postSurgeryCheck` | `(pet)` | `listen` (the pet's `unwell` at the same time — drowsy; a `"wears": "cone"` pet is fine), `takeTemp`, `readChart` | tái khám sau mổ, kiểm tra sau mổ |
+| `zoomies` (dog) | — | `chaseTail(3)`, `jump(2)`, `pant(1.4)` | chó tăng động, chạy lung tung, chó quậy |
+| `sleepyPet` (dog, cat) | — | `yawn`, `stretch`, `sleep(3)` | ngáp rồi ngủ, lăn ra ngủ, díp mắt |
 | `partyTime` | — | `jump(2)`, `dance('happy', 2)`, `cheer` | ăn mừng lớn, quẩy mừng, mở tiệc |
 | `lazyAfternoon` | `(pet)` | `sitOnFloor`, `stroke` (the pet comes over), `lieDown('floor', { sleep: true })` (the pet's `sleep(3)` at the same time) — they stay lying until `standUp` | nghỉ trưa với thú, chiều lười biếng |
 | `rushToPet` | `(pet)` | `startle`, `run` up to the pet, `stroke`, `relief` | hốt hoảng chạy tới, chạy tới xem thú |
-| `tidyUp` | `(pet, person)` | `pickUp` (the toy by the pet), `handOver(person)` — the person takes it only with the same item put away (`"holds": "toy", "holdsHidden": true`; `tools/script.py` gives it) | nhặt đồ đưa, dọn đồ chơi |
-| `sleepyPet` (dog, cat) | — | `yawn`, `sleep(3)` — it stays lying | thú buồn ngủ, ngáp rồi ngủ |
+| `tidyUp` | `(pet, person)` | `pickUp` (the toy by the pet), `handOver(person)` — the person takes it only with the same item put away (`"holds": "toy", "holdsHidden": true`; `tools/script.py` gives it) | nhặt đồ đưa, nhặt đồ chơi đưa |
 | `scaredPet` (dog, cat) | `(person)` | `tremble(1.5)`, `hide(person)` — it stays there. In a 3D set stand it ~120 further back (z) than the person | thú sợ hãi, sợ nấp sau |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`

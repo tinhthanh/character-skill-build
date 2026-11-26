@@ -171,6 +171,13 @@
     { "label": "combo vaccinationVisit (pet on a scale)", "steps": [["vaccinationVisit", "@pet", "@scale"]], "pet": "cat", "scale": "4.2 kg", "items": { "R": "syringe" }, "itemsHidden": true },
     { "label": "combo groomingSession (pet)", "steps": [["groomingSession", "@pet"]], "pet": "dog" },
     { "label": "combo prepForExam", "steps": ["prepForExam"] },
+    { "label": "combo bathTime (pet in a tub)", "steps": [["bathTime", "@pet"]], "pet": "dog", "tub": true },
+    { "label": "combo floorCuddle (pet)", "steps": [["floorCuddle", "@pet"]], "pet": "cat", "petOnFloor": true },
+    { "label": "combo napWithPet (pet)", "steps": [["napWithPet", "@pet"]], "pet": "dog", "petOnFloor": true },
+    { "label": "combo welcomeHome (pet)", "steps": [["welcomeHome", "@pet"]], "pet": "dog", "petOnFloor": true },
+    { "label": "combo playFetch (pet)", "steps": [["playFetch", "@pet"]], "pet": "dog", "petOnFloor": true },
+    { "label": "combo danceWithKid (child)", "steps": [["danceWithKid", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["face", "front"], ["dance", "happy", 2], ["idle", 0.6], ["highFive", "@self"]], "personGap": 78 },
+    { "label": "combo tidyToys", "steps": ["tidyToys"] },
     { "label": "combo celebrateWithKid (child)", "steps": [["celebrateWithKid", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["highFive", "@self"]], "personGap": 78 },
     { "label": "combo farewellOwner (person)", "steps": [["farewellOwner", "@person"]], "items": { "R": "bag" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["takeBag", "@self"]], "personGap": 94 },
     { "label": "highFive (person)", "steps": [["highFive", "@person"]], "person": "nurse", "personSteps": [["highFive", "@self"]], "personGap": 103 },
@@ -180,7 +187,13 @@
     { "label": "patShoulder (person)", "steps": [["patShoulder", "@person"]], "person": "granny", "personSteps": [["lookAt", "@self", { "hold": 2.4 }]], "personGap": 75 },
     { "label": "whisper (person)", "steps": [["whisper", "@person"]], "person": "nurse", "personSteps": [["hearWhisper", "@self"]], "personGap": 80 },
     { "label": "whisper (child)", "steps": [["whisper", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["hearWhisper", "@self"]], "personGap": 70 },
-    { "label": "handOverBag (person)", "steps": [["handOverBag", "@person"]], "items": { "R": "bag" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["takeBag", "@self"]], "personGap": 94 }
+    { "label": "handOverBag (person)", "steps": [["handOverBag", "@person"]], "items": { "R": "bag" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["takeBag", "@self"]], "personGap": 94 },
+    { "label": "combo dispenseMedicine (person)", "steps": [["dispenseMedicine", "@person"]], "items": { "R": "bag", "L": "clipboard" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["idle", 10.9], ["takeBag", "@self"]], "personGap": 94 },
+    { "label": "combo newPatientCheckIn (pet)", "steps": [["newPatientCheckIn", "@pet"]], "pet": "dog", "items": { "R": "clipboard" }, "itemsHidden": true },
+    { "label": "combo dentalCare (pet)", "steps": [["dentalCare", "@pet"]], "pet": "dog" },
+    { "label": "combo comfortOwner (person)", "steps": [["comfortOwner", "@person"]], "person": "granny", "personSteps": [["idle", 2.3], ["lookAt", "@self", { "hold": 2.6 }], ["hug", "@self"]], "personGap": 75 },
+    { "label": "combo fullSpa (pet in a tub)", "steps": [["fullSpa", "@pet"]], "pet": "dog", "tub": true },
+    { "label": "combo postSurgeryCheck (pet)", "steps": [["postSurgeryCheck", "@pet"]], "pet": "cat", "wear": ["cone"], "items": { "R": "clipboard" }, "itemsHidden": true }
   ],
   "pets": [
     { "label": "idle", "steps": [["idle", 1.6]] },

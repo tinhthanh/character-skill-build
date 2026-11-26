@@ -2,50 +2,88 @@
 
 ## Unreleased
 
-Added: combos for wave 42 (wave 43, groups 1–3). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
-are measured by `tools/acting_check.py`.
+Added: five more combos (wave 43, group C). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and are
+measured by `tools/acting_check.py`. That makes 36 combos. (The branch also had its own `bathTime`, `playFetch`, `welcomeHome` and
+`sleepyPet`; 0.83.0's, with the same names, are kept.)
 
-- `bathTime(pet)`: `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp`. The pet needs `"inTub": true`. Scripts: "tắm trọn gói", "spa tắm".
-- `playFetch(pet)`: `throwBall('right')` while the dog does `fetch(260)`, then `stroke`, `giveTreat`. Stand the dog beside the
-  person, facing right. Scripts: "chơi ném bóng", "ném bóng cho chó".
-- `welcomeHome(pet)`: `wave` while the pet does `greet`, `stroke`, then `laugh` while it does `wagTail`. Scripts: "đón thú về",
-  "về nhà với thú".
 - `partyTime`: `jump(2)`, `dance('happy', 2)`, `cheer`. Scripts: "ăn mừng lớn", "quẩy mừng", "mở tiệc".
-- `lazyAfternoon(pet)` (group 2): `sitOnFloor`, `stroke`, then `lieDown('floor', { sleep: true })` while the pet does `sleep(3)`.
-  They stay lying until `standUp`. Scripts: "nghỉ trưa với thú", "chiều lười biếng".
-- `rushToPet(pet)` (group 2): `startle`, `run` up to the pet, `stroke`, `relief`. Scripts: "hốt hoảng chạy tới", "chạy tới xem thú".
-- `tidyUp(pet, person)` (group 2): `pickUp` (the toy by the pet), `handOver(person)`. Scripts: "nhặt đồ đưa", "dọn đồ chơi".
+- `lazyAfternoon(pet)`: `sitOnFloor`, `stroke`, then `lieDown('floor', { sleep: true })` while the pet does `sleep(3)`. They stay
+  lying until `standUp`. Scripts: "nghỉ trưa với thú", "chiều lười biếng".
+- `rushToPet(pet)`: `startle`, `run` up to the pet, `stroke`, `relief`. Scripts: "hốt hoảng chạy tới", "chạy tới xem thú".
+- `tidyUp(pet, person)`: `pickUp` (the toy by the pet), `handOver(person)`. Scripts: "nhặt đồ đưa", "nhặt đồ chơi đưa".
+- `scaredPet(person)` (dogs and cats): `tremble(1.5)`, then `hide(person)`. In a 3D set stand the pet ~120 further back (z) than the
+  person: at 80 the cat ran through the grandpa's legs. Scripts: "thú sợ hãi", "sợ nấp sau".
+- **`run(rig)`**: runs up beside another character or pet, measured on screen when the step is built, as scene files'
+  `["run", "@dog"]` does. `rushToPet` needs it in `sequence()`. Before, `run` took only a number and threw.
 - **Handing an item over in scripts**: `tools/script.py` now gives whoever is handed an item (`handOver`) the same item put away,
   so they take it. Before, "bé → chó → mẹ: nhặt đồ đưa" left the ball floating in the air, because `take` needs one.
-- `sleepyPet` (group 3, dogs and cats): `yawn`, then `sleep(3)`; it stays lying. Scripts: "thú buồn ngủ", "ngáp rồi ngủ".
-- `scaredPet(person)` (group 3, dogs and cats): `tremble(1.5)`, then `hide(person)`. In a 3D set stand the pet ~120 further back
-  (z) than the person: at 80 the cat ran through the grandpa's legs. Scripts: "thú sợ hãi", "sợ nấp sau".
-- **`run(rig)`**: runs up beside another character or pet, measured on screen when the step is built, as scene files' `["run", "@dog"]`
-  does. `rushToPet` needs it in `sequence()`. Before, `run` took only a number and threw.
-- That makes 25 combos.
-- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`, `lazy43`, `rush43`, `tidy43`, `sleepy43`, `scared43`. `tools/check_scene.py` now also refuses a combo word that is already
-  a single action's word in `tools/script.py`.
+- **CI scenes**: `party43`, `lazy43`, `rush43`, `tidy43`, `scared43`. `tools/check_scene.py` now also refuses a combo word that is
+  already a single action's word in `tools/script.py`, or another combo's.
 
 Fixed
-- **Stroking a pet while sitting on the floor** (đợt 42 E). A pet coming over to someone sitting on the floor stopped as close as
-  to someone on a chair (0.22 × their height). With the low shoulder of a floor sitter, the pet's head was right by the shoulder:
-  the elbow folded too far and the hand stood upright beside the pet's ear. A child's hand did not touch the cat on 7 of 13
-  moments, or a dog on any. An adult's hand lifted off for a moment in a script-built scene. The pet now stops at 0.27 × the
-  height. Tried from 0.22 to 0.30 on a boy and a mother with a cat and a dog: 0.26–0.28 pass all four. A girl with a calico, a
-  granny with a shiba, a mother with a dog and a grandpa with an orange cat pass too. The CI scene `lazy43` uses a boy.
+- **A child stroking a pet while sitting on the floor** (đợt 42 E). A pet coming over to someone sitting on the floor stopped
+  as close as to someone on a chair (0.22 × their height). A child is drawn smaller in the same frame, and the pet's head ended
+  up right by the child's low shoulder: the elbow folded too far and the hand stood upright beside the pet's ear. A boy's hand
+  did not touch the cat on 7 of 13 moments, or a dog on any. For a child (`kit.bodies.child`: `boy`, `girl`) the pet now stops
+  at 0.27 × the height. Tried from 0.22 to 0.30: 0.27–0.28 pass a boy with a cat and with a dog. A girl with a calico passes
+  too. Adults keep 0.22: at 0.27 the cat stood so far from the mother in `home43a` (0.83.0) that the medium shot was almost as
+  wide as the full shot. The CI scene `lazy43` uses a boy.
 
 Known
-- `bathTime` and `welcomeHome` don't end on `giveTreat`: with the pet facing the person, the hand at the mouth hides too much
-  of its head (acting_check: 37–57 % of the head in view, it needs 60 %).
-- `playFetch` always throws to the right; the dog runs the way it faces.
-- A corgi's `greet` (rearing up) reads only weakly, because its legs are short.
 - `scaredPet` with a dog: it hides only partly behind the person (`hide` stops short of the middle so the head can peek out).
   acting_check sees 91–95 % of a shiba (it needs at most 90 %). A plain `["hide", "@person"]` passes only just. This comes from
   `hide`, not from the combo; the CI scene uses a cat.
 - `rushToPet`: when the dog faces the person, the stroking hand hides too much of its head (acting_check: 57 % of the head in
   view, it needs 60 %). The CI scene leaves the dog's facing alone.
-- Between `stroke` and `giveTreat`, `playFetch` stands up, steps closer and kneels again. This comes from how `tools/scene.py`
-  places a person for each step, not from the combo.
+
+## 0.83.0
+
+Added: 15 combos (wave 43, two Opus agents in parallel), built only from existing actions, most of them from wave 42's.
+Each one works as a step in `sequence()`, in scene files and in Vietnamese scripts. It is in the action catalog and the
+Combos table of `references/actions.md`, and is measured by `tools/acting_check.py`. That makes 31 combos.
+
+- **At home** (43 A):
+  - `bathTime(pet)`: bathe, towel-dry, thumbs up.
+  - `floorCuddle(pet)`: sit on the floor, stroke the pet, carry it onto the lap.
+  - `napWithPet(pet)`: lie asleep on the sofa, with the pet's `sleep` beside.
+  - `welcomeHome(pet)`, dogs: wave, kneel while the dog greets, stroke while it wags.
+  - `playFetch(pet)`, dogs: throw the ball while the dog fetches, stroke, thumbs up.
+  - `danceWithKid(kid)`: dance together, then a high five.
+  - `tidyToys()`: pick a toy up, put it away, nod.
+  - Scripts: "tắm cho thú", "ngồi bệt ôm thú", "ngủ trưa cùng thú", "chào thú khi về nhà", "chơi ném bóng", "nhảy cùng bé",
+    "dọn đồ chơi".
+- **Clinic, pharmacy and pets** (43 B):
+  - `dispenseMedicine(customer)`: read the prescription, count the doses, hand over the bag, wave.
+  - `newPatientCheckIn(pet, owner)`: waves, bow, scan the chip, read the chart.
+  - `dentalCare(pet)`: look at the teeth while the pet opens its mouth, brush them, thumbs up.
+  - `comfortOwner(owner)`: a sad face while the owner wipes tears, a pat on the shoulder, a hug.
+  - `fullSpa(pet)`: bathe, towel-dry, brush the teeth, clean the ears, thumbs up.
+  - `postSurgeryCheck(pet)`: listen, take the temperature, read the chart, while the pet looks unwell.
+  - For pets, `zoomies` (dog: chase its tail, jump, pant) and `sleepyPet` (yawn, stretch, sleep).
+  - Scripts: "phát thuốc", "tiếp nhận thú mới", "chăm sóc răng", "an ủi chủ", "spa trọn gói" / "tắm sấy trọn gói",
+    "tái khám sau mổ", "chó tăng động", "ngáp rồi ngủ".
+- **CI scenes**: `home43a`, `play43a`, `clinic43b`, `home43b`, `pharm43b`, plus a script-word check for each branch.
+
+Fixed
+- `handOverBag` accepts a person holding a visible bag whose other hand's item is put away (`"holdsHidden": ["L"]`).
+  In scripts, a bag plus a clipboard now gives a visible bag in the right hand and a put-away clipboard in the left,
+  instead of both put away.
+
+Known
+- **`bathTime` on the floor**: it passes only with the tub on a table. On the living-room floor the person's head cannot
+  bend far enough toward the pet (acting_check 60–64 %, limit 50 %).
+- **`playFetch`**: it throws to the right, so the dog must face right. The stroke needs the dog within about 120 units.
+- **Staging the scripts don't do**:
+  - `napWithPet` needs the person standing at the sofa.
+  - `tidyToys` needs a full-shot `view`, or the toy is cropped out.
+  - In the pharmacy preset, `script.py` places the customer behind the counter, so the handover is hidden.
+- **Measured problems in older actions**:
+  - With `owner_woman`, `owner_man` and `mother`, `patShoulder` misses the shoulder by about 7 % of their height, and `hug`
+    fails for `owner_woman`.
+  - Between the pharmacist and `owner_woman`, `handOverBag` jumps 3.0 % between frames at the usual spacing.
+- **Not done**:
+  - `zoomies` and `sleepyPet` are not in the action catalog.
+  - Not reviewed by Gemini on rendered films.
 
 ## 0.82.0
 

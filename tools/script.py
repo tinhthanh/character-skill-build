@@ -446,6 +446,12 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             if item and who and not who.get('holds') and not who.get('species'):
                 who['holds'] = item if isinstance(item, str) else {'L': item}
                 if item in ('syringe', 'clipboard', 'cash', 'stampcard', 'phone'): who['holdsHidden'] = True      # cất sẵn: chỉ lấy ra lúc tiêm / đọc bệnh án / thối tiền / đóng dấu / chụp ảnh (đợt 39 A: cash, stampcard; đợt 39 C: phone)
+            elif item and who and not who.get('species') and isinstance(who.get('holds'), str) and who['holds'] != item and 'bag' in (who['holds'], item) and isinstance(item, str):
+                # ĐỢT 43 B — túi thuốc + một món cất sẵn (phát thuốc: đọc đơn rồi đưa túi): túi ĐANG CẦM ở tay phải (`handOverBag` cần
+                # túi hiện), món kia (bìa hồ sơ…) cất ở tay trái.
+                other = item if who['holds'] == 'bag' else who['holds']
+                who['holds'] = {'R': 'bag', 'L': other}
+                who['holdsHidden'] = ['L']
             elif item and who and isinstance(who.get('holds'), str) and who['holds'] != item and not who.get('species') and who.get('holdsHidden'):
                 # Món thứ hai (đợt 37: "tiêm phòng" rồi "khám tổng quát" — ống tiêm VÀ bìa hồ sơ): tay kia. Ống tiêm ở tay phải
                 # (tay mặc định, như khi chỉ có nó).
