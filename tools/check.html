@@ -1812,7 +1812,23 @@ try {
       const home = L.combo(vet, 'welcomeHome', dog);
       if (home.length !== 3 || !home[0].together || home[0].together[1][1][0] !== 'greet' || !home[2].together || home[2].together[1][1] !== 'wagTail')
         hong('combo.welcomeHome', `combo() turns are wrong: ${JSON.stringify(home.map((turn) => (turn.together ? 'together' : turn[1])))}`);
-      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
+      const rush = L.sequence(vet, [['rushToPet', dog]], { breathe: false });
+      if (names(rush) !== 'startle,run,stroke,relief') hong('combo.rushToPet', `sequence steps are ${names(rush)}`);
+      rush.kill();
+      // `run(rig)` (đợt 43): chạy tới đứng cạnh con chó — gần nó hơn lúc đầu, không chạy qua nó.
+      // Con chó ở xa (600 px) — con chó ở trên đã đứng sát người, quãng chạy ~0.
+      {
+        const farHost = document.createElement('div'); farHost.style.cssText = 'position:absolute;left:600px;top:108px;width:100px;height:82px'; stage.appendChild(farHost);
+        const far = L.createPet(farHost, { species: 'dog' }).rig;
+        const x0 = vet.centerX(), goal = far.centerX(), dash = vet.run(far); dash.progress(1); vet.apDung();
+        const x1 = vet.centerX();
+        if (!(Math.abs(goal - x1) < Math.abs(goal - x0) / 2) || Math.sign(goal - x1) !== Math.sign(goal - x0)) hong('run(rig)', `from ${x0.toFixed(0)} to ${x1.toFixed(0)} px, the dog at ${goal.toFixed(0)} px`);
+        dash.progress(0); dash.kill(); vet.apDung();
+      }
+      const lazy = L.combo(vet, 'lazyAfternoon', dog);
+      if (lazy.length !== 3 || !lazy[2].together || lazy[2].together[0][1][0] !== 'lieDown' || lazy[2].together[1][1][0] !== 'sleep')
+        hong('combo.lazyAfternoon', `combo() turns are wrong: ${JSON.stringify(lazy.map((turn) => (turn.together ? 'together' : turn[1])))}`);
+      for (const name of ['bathTime', 'playFetch', 'welcomeHome', 'partyTime', 'lazyAfternoon', 'rushToPet', 'tidyUp']) if (!L.list().combos[name]) hong('combo', `list().combos does not list ${name}`);
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.

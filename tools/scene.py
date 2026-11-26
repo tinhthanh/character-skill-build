@@ -368,6 +368,10 @@ RUN_TO_42D = {}               # id(bước ["run", "@tên"]) → tên người /
 # ĐỢT 42 E — SÁT SÀN: nhặt đồ dưới sàn (`pickUp`), ngồi bệt (`sitOnFloor`), nằm trên sàn / sofa (`lieDown`). acting_check đo mông chạm sàn, thân nằm
 # ngang trên mặt sàn / mặt sofa, bàn tay tới món đồ lúc nắm, món đồ trong tay sau đó (`floor42e`).
 FLOOR_42E = ('sitOnFloor', 'lieDown', 'pickUp')
+# ĐỢT 43: con vật tới người NGỒI BỆT dừng cách xa hơn người ngồi ghế (0,22 × chiều cao host): vai người ngồi bệt thấp, đầu con vật sát vai
+# thì khuỷu gập quá mức, bàn tay dựng đứng cạnh tai nó (bé ngồi bệt vuốt mèo / chó: tay không chạm suốt lúc vuốt). Dò 0,22–0,30 trên
+# bé / mẹ × mèo / chó: 0,26–0,28 đều đạt cả bốn.
+FLOOR_GAP_43 = 0.27
 PICK_GAP_42E = 0.34          # nhặt đồ chơi cạnh con vật: giữa người cách giữa con vật chừng ấy × chiều cao người (món đồ vào tầm tay lúc ngồi xổm)
 FLOOR_TIMES_42E = {'sitOnFloor': (1.2, 1.5), 'lieDown': (1.9, 2.0), 'pickUp': (1.0, 2.6)}      # (đã vào thế, xong bước) giây từ đầu bước — runtime/rig-svg.js
 
@@ -2610,7 +2614,7 @@ def main():
                 # sát đầu gối (0,22). Đợt 29–30 nó dừng xa hơn (0,3) mà vẫn sau hai ống chân, cùng lớp với người: bà trên sofa phải
                 # cúi 40° qua đầu gối, con mèo khuất 34 % sau ống chân và bàn tay; tay ông ghế đá khuất hẳn sau mặt con chó.
                 if who.get('seated') and target['_pet'] and stage_set is not None and not target.get('on'):
-                    wanted = 0.22 * who['_host_height']
+                    wanted = (FLOOR_GAP_43 if who.get('_floor42e') else 0.22) * who['_host_height']
                     # BÊN NÀO (đợt 31): bên con vật đi tới — không vòng qua trước hai ống chân người ngồi. Phía ĐẦU GỐI: nó vẽ TRÊN người
                     # (`over`, không khuất sau ống chân), tay đặt lên đỉnh đầu ('crown'). Phía HÔNG (không có chân che): người vẽ trước
                     # như thường, tay đặt lên đỉnh đầu ('top', 15 % xuống) — nhắm giữa mặt thì bàn tay che mất mặt nó (đo: đầu mèo lộ 57 %),

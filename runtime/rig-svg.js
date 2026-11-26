@@ -4829,6 +4829,7 @@ export class RigSVG {
   // một phần, bàn chân vẫn trên đất), TIẾP ĐẤT (gối gập đỡ lực), và CHÂN TRỤ KHÔNG TRƯỢT (chạy: hông đi đúng bằng phần bàn chân trụ
   // lùi về sau; nhảy / múa: không dời `x`, chân trụ đứng yên). Đọc được ở ~1 khung / giây: dáng nghiêng người chạy, hai tay giơ cao lúc bay.
 
+  static RUN_GAP_42D = 0.42;          // đợt 43: `run(rig)` dừng cách nó chừng ấy × nửa chiều cao khung (như RUN_GAP_42D của tools/scene.py)
   static RUN_STEP_42D = 0.3;          // giây một bước chạy (`speed` 1); `walk` 0,46, `hurry` 0,3 nhưng không có pha bay
   static RUN_CONTACT_42D = 0.3;       // phần CHU KỲ (2 bước = 1) một chân trên đất: 60 % mỗi bước — 40 % còn lại cả hai chân trên không
   static RUN_LIFT_42D = 0.15;         // pha bay: hông nhấc thêm chừng ấy × chiều dài chân nhìn thấy (người lớn ~22 đơn vị, trẻ con ~14)
@@ -4988,7 +4989,17 @@ export class RigSVG {
    * Vị trí xuất phát đọc từ `s.x` lúc dựng (như `walk`); `x` ở lại chỗ chạy tới.
    */
   run(quang = 0, { speed = 1, steps = 6 } = {}) {
-    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] run(distance): distance is a number of frame units (0 = on the spot, negative = to the left) — got ${JSON.stringify(quang)}`);
+    // ĐỢT 43: `run(rig)` — chạy tới ĐỨNG CẠNH một nhân vật / con vật (rig hay mỏ neo `{ centerX, live }` của conversation), đo trên
+    // màn hình lúc dựng, cách như tools/scene.py đổi `["run", "@cho"]` ra quãng: dừng cách nó nửa bề ngang thân nó + RUN_GAP_42D × nửa
+    // chiều cao khung người chạy. Combo `rushToPet` trong `sequence()` cần nó (scene.py đã tự đổi ra số).
+    if (quang && typeof quang === 'object' && typeof quang.centerX === 'function') {
+      const live = quang.live || quang, frame = this.svg.getBoundingClientRect(), unit = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+      const box = live.svg && live.svg.getBoundingClientRect ? live.svg.getBoundingClientRect() : null;
+      const dx = (quang.centerX() - this.centerX()) / unit, side = dx >= 0 ? 1 : -1;
+      const half = box ? (live instanceof RigSVG ? 0.1 : 0.12) * box.height / unit : 0;       // nửa bề ngang thân nó, chừng
+      quang = Math.round(dx - side * (half + RigSVG.RUN_GAP_42D * 0.5 * frame.height / unit));
+    }
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] run(distance): distance is a number of frame units (0 = on the spot, negative = to the left), or a character / pet to run up to — got ${JSON.stringify(quang)}`);
     if (!(typeof speed === 'number' && speed >= 0.5 && speed <= 2)) throw new Error(`[character] run(distance, { speed }): speed is a number from 0.5 to 2 — got ${JSON.stringify(speed)}`);
     if (!(Number.isInteger(steps) && steps >= 2 && steps <= 30)) throw new Error(`[character] run(0, { steps }): steps is a whole number from 2 to 30 — got ${JSON.stringify(steps)}`);
     if (this.s.ride > 0.5) throw new Error('[character] run: the character is riding a scooter — getOff() first');

@@ -3606,6 +3606,7 @@ class RigSVG {
     }
     return t;
   }
+  static RUN_GAP_42D = 0.42;          // đợt 43: `run(rig)` dừng cách nó chừng ấy × nửa chiều cao khung (như RUN_GAP_42D của tools/scene.py)
   static RUN_STEP_42D = 0.3;          // giây một bước chạy (`speed` 1); `walk` 0,46, `hurry` 0,3 nhưng không có pha bay
   static RUN_CONTACT_42D = 0.3;       // phần CHU KỲ (2 bước = 1) một chân trên đất: 60 % mỗi bước — 40 % còn lại cả hai chân trên không
   static RUN_LIFT_42D = 0.15;         // pha bay: hông nhấc thêm chừng ấy × chiều dài chân nhìn thấy (người lớn ~22 đơn vị, trẻ con ~14)
@@ -3720,7 +3721,14 @@ class RigSVG {
     return at + buoc * h;
   }
   run(quang = 0, { speed = 1, steps = 6 } = {}) {
-    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] run(distance): distance is a number of frame units (0 = on the spot, negative = to the left) — got ${JSON.stringify(quang)}`);
+    if (quang && typeof quang === 'object' && typeof quang.centerX === 'function') {
+      const live = quang.live || quang, frame = this.svg.getBoundingClientRect(), unit = Math.min(frame.width / KHUNG.w, frame.height / KHUNG.h) || 1;
+      const box = live.svg && live.svg.getBoundingClientRect ? live.svg.getBoundingClientRect() : null;
+      const dx = (quang.centerX() - this.centerX()) / unit, side = dx >= 0 ? 1 : -1;
+      const half = box ? (live instanceof RigSVG ? 0.1 : 0.12) * box.height / unit : 0;       // nửa bề ngang thân nó, chừng
+      quang = Math.round(dx - side * (half + RigSVG.RUN_GAP_42D * 0.5 * frame.height / unit));
+    }
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] run(distance): distance is a number of frame units (0 = on the spot, negative = to the left), or a character / pet to run up to — got ${JSON.stringify(quang)}`);
     if (!(typeof speed === 'number' && speed >= 0.5 && speed <= 2)) throw new Error(`[character] run(distance, { speed }): speed is a number from 0.5 to 2 — got ${JSON.stringify(speed)}`);
     if (!(Number.isInteger(steps) && steps >= 2 && steps <= 30)) throw new Error(`[character] run(0, { steps }): steps is a whole number from 2 to 30 — got ${JSON.stringify(steps)}`);
     if (this.s.ride > 0.5) throw new Error('[character] run: the character is riding a scooter — getOff() first');
@@ -11911,6 +11919,36 @@ const COMBOS = {
     "about": "celebrate big: jump for joy twice, a short dance, then a cheer",
     "steps": [["jump", 2], ["dance", "happy", 2], "cheer"],
     "vi": ["ăn mừng lớn", "quẩy mừng", "mở tiệc", "tiệc mừng"]
+  },
+  "lazyAfternoon": {
+    "params": ["pet"],
+    "about": "a lazy afternoon on the floor: sit down cross-legged, stroke the pet (it comes over), then lie down and doze off while the pet sleeps — they stay lying; \"standUp\" gets up",
+    "steps": [
+      "sitOnFloor",
+      ["stroke", "$pet"],
+      { "step": ["lieDown", "floor", { "sleep": true }], "with": { "$pet": [["sleep", 3]] } }
+    ],
+    "vi": ["nghỉ trưa với thú", "nằm nghỉ với thú", "chiều lười biếng"]
+  },
+  "rushToPet": {
+    "params": ["pet"],
+    "about": "a scare: startle, run to the pet, stroke it, then a relieved breath",
+    "steps": [
+      "startle",
+      ["run", "$pet"],
+      ["stroke", "$pet"],
+      "relief"
+    ],
+    "vi": ["hốt hoảng chạy tới", "chạy tới xem thú", "lo lắng chạy tới"]
+  },
+  "tidyUp": {
+    "params": ["pet", "person"],
+    "about": "tidy up: pick up the toy by the pet, then hand it to someone",
+    "steps": [
+      ["pickUp", "$pet"],
+      ["handOver", "$person"]
+    ],
+    "vi": ["nhặt đồ đưa", "dọn đồ chơi", "nhặt đồ chơi đưa"]
   }
 };
 const isPlaceholder = (value) => typeof value === 'string' && /^\$[A-Za-z_]\w*$/.test(value);

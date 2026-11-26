@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Added: combos for wave 42 (wave 43, group 1). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
+Added: combos for wave 42 (wave 43, groups 1–2). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and
 are measured by `tools/acting_check.py`.
 
 - `bathTime(pet)`: `bathPet`, `towelDry`, `brushTeeth`, `thumbsUp`. The pet needs `"inTub": true`. Scripts: "tắm trọn gói", "spa tắm".
@@ -11,15 +11,33 @@ are measured by `tools/acting_check.py`.
 - `welcomeHome(pet)`: `wave` while the pet does `greet`, `stroke`, then `laugh` while it does `wagTail`. Scripts: "đón thú về",
   "về nhà với thú".
 - `partyTime`: `jump(2)`, `dance('happy', 2)`, `cheer`. Scripts: "ăn mừng lớn", "quẩy mừng", "mở tiệc".
-- That makes 20 combos.
-- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`. `tools/check_scene.py` now also refuses a combo word that is already
+- `lazyAfternoon(pet)` (group 2): `sitOnFloor`, `stroke`, then `lieDown('floor', { sleep: true })` while the pet does `sleep(3)`.
+  They stay lying until `standUp`. Scripts: "nghỉ trưa với thú", "chiều lười biếng".
+- `rushToPet(pet)` (group 2): `startle`, `run` up to the pet, `stroke`, `relief`. Scripts: "hốt hoảng chạy tới", "chạy tới xem thú".
+- `tidyUp(pet, person)` (group 2): `pickUp` (the toy by the pet), `handOver(person)`. Scripts: "nhặt đồ đưa", "dọn đồ chơi".
+- **Handing an item over in scripts**: `tools/script.py` now gives whoever is handed an item (`handOver`) the same item put away,
+  so they take it. Before, "bé → chó → mẹ: nhặt đồ đưa" left the ball floating in the air, because `take` needs one.
+- **`run(rig)`**: runs up beside another character or pet, measured on screen when the step is built, as scene files' `["run", "@dog"]`
+  does. `rushToPet` needs it in `sequence()`. Before, `run` took only a number and threw.
+- That makes 23 combos.
+- **CI scenes**: `bath43`, `fetch43`, `home43`, `party43`, `lazy43`, `rush43`, `tidy43`. `tools/check_scene.py` now also refuses a combo word that is already
   a single action's word in `tools/script.py`.
+
+Fixed
+- **Stroking a pet while sitting on the floor** (đợt 42 E). A pet coming over to someone sitting on the floor stopped as close as
+  to someone on a chair (0.22 × their height). With the low shoulder of a floor sitter, the pet's head was right by the shoulder:
+  the elbow folded too far and the hand stood upright beside the pet's ear. A child's hand did not touch the cat on 7 of 13
+  moments, or a dog on any. An adult's hand lifted off for a moment in a script-built scene. The pet now stops at 0.27 × the
+  height. Tried from 0.22 to 0.30 on a boy and a mother with a cat and a dog: 0.26–0.28 pass all four. A girl with a calico, a
+  granny with a shiba, a mother with a dog and a grandpa with an orange cat pass too. The CI scene `lazy43` uses a boy.
 
 Known
 - `bathTime` and `welcomeHome` don't end on `giveTreat`: with the pet facing the person, the hand at the mouth hides too much
   of its head (acting_check: 37–57 % of the head in view, it needs 60 %).
 - `playFetch` always throws to the right; the dog runs the way it faces.
 - A corgi's `greet` (rearing up) reads only weakly, because its legs are short.
+- `rushToPet`: when the dog faces the person, the stroking hand hides too much of its head (acting_check: 57 % of the head in
+  view, it needs 60 %). The CI scene leaves the dog's facing alone.
 - Between `stroke` and `giveTreat`, `playFetch` stands up, steps closer and kneels again. This comes from how `tools/scene.py`
   places a person for each step, not from the combo.
 
