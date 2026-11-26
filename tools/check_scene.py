@@ -886,6 +886,42 @@ with tempfile.TemporaryDirectory() as work:
         if os.path.exists(path): os.remove(path)
     if done.returncode == 0 or 'not wearing the cone' not in (done.stderr + done.stdout): problems.append('bare40: pawAtCone without a cone should fail with "not wearing the cone": ' + (done.stderr + done.stdout).strip()[-200:])
 
+    # ĐỢT 42 C (khung hình): con vật ≥ 35 % khung lúc làm động tác trong view cận / trung không khai `fill` (kể cả view "together" có lời dẫn của
+    # người đứng đó), đồ đạc / người không bị mép khung cắt dở (cả khung dọc 1080×1920), người đứng sau quầy lễ tân thấy được nửa người.
+    shots42c = (
+        {'id': 'mom42c', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'characters': [{'name': 'me', 'id': 'granny', 'x': -150, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500}],
+         'script': [{'who': 'me', 'say': 'Xin chào cả nhà.', 'dur': 2}, {'together': [{'who': 'me', 'say': 'Nhìn thỏ kìa.', 'dur': 2.5}, {'who': 'tho', 'do': [['binky']]}], 'view': {'on': ['tho', 'me'], 'size': 'medium'}}, {'who': 'cho', 'do': [['bark']]}]},
+        {'id': 'liv42c', 'camera': 'auto', 'set': {'preset': 'living-room'},
+         'characters': [{'name': 'be', 'id': 'boy', 'x': -150, 'z': -500}, {'name': 'cho', 'species': 'dog', 'x': -300, 'z': -500, 'faces': 'be'}, {'name': 'meo', 'species': 'cat', 'x': -70, 'z': -500}, {'name': 'tho', 'species': 'rabbit', 'x': 30, 'z': -600}],
+         'script': [{'who': 'be', 'say': 'Cả nhà chơi nhé.', 'dur': 1.8}, {'who': 'cho', 'do': [['playBow']], 'view': {'on': ['cho'], 'size': 'close'}}, {'who': 'meo', 'do': [['loaf', 3]], 'view': {'on': ['meo'], 'size': 'close'}},
+                    {'who': 'tho', 'do': [['eatCarrot', 3]], 'view': {'on': ['tho'], 'size': 'medium'}}, {'together': [{'who': 'be', 'say': 'Nhìn cún chơi kìa.', 'dur': 2}, {'who': 'cho', 'do': ['playBow']}], 'view': {'on': ['cho'], 'size': 'close'}},
+                    {'together': [{'who': 'be', 'say': 'Còn thỏ nữa.', 'dur': 2}, {'who': 'tho', 'do': [['eatCarrot', 3]]}], 'view': {'on': ['tho', 'be'], 'size': 'medium'}}, {'who': 'cho', 'do': [['bark']]}]},
+        {'id': 'vert42c', 'camera': 'auto', 'width': 1080, 'height': 1920, 'set': {'preset': 'exam'},
+         'characters': [{'name': 'bac_si', 'id': 'vet', 'x': -140, 'z': -560, 'faces': 'be_gai'}, {'name': 'be_gai', 'id': 'girl', 'x': 440, 'z': -560, 'faces': 'bac_si'}, {'name': 'cho', 'species': 'cat', 'on': 'table', 'x': 200, 'z': -560}],
+         'script': [{'who': 'bac_si', 'say': 'Chào em.', 'dur': 2, 'view': {'on': ['bac_si'], 'size': 'close'}}, {'who': 'be_gai', 'say': 'Em chào bác sĩ.', 'dur': 2, 'view': {'on': ['be_gai'], 'size': 'close'}},
+                    {'who': 'bac_si', 'say': 'Em khỏe không?', 'dur': 2, 'view': {'on': ['bac_si', 'be_gai'], 'size': 'medium'}}, {'who': 'be_gai', 'say': 'Dạ khỏe ạ.', 'dur': 2, 'view': {'on': ['be_gai'], 'size': 'medium'}},
+                    {'together': [{'who': 'bac_si', 'say': 'Bé mèo đáng yêu quá.', 'dur': 2}, {'who': 'cho', 'do': [['groomFace']]}], 'view': {'on': ['cho', 'bac_si'], 'size': 'close'}}]},
+        {'id': 'rec42c', 'camera': 'auto', 'set': {'preset': 'reception'},
+         'characters': [{'name': 'bac_si', 'id': 'clerk', 'x': -300, 'z': -620, 'faces': 'be'}, {'name': 'be', 'id': 'boy', 'x': 250, 'z': -380, 'faces': 'bac_si'}],
+         'script': [{'who': 'bac_si', 'say': 'Chào em.', 'dur': 2}, {'who': 'be', 'say': 'Dạ chào ạ.', 'dur': 2}, {'who': 'bac_si', 'say': 'Em mang bé đi khám à?', 'dur': 2, 'view': {'on': ['bac_si'], 'size': 'medium'}}]})
+    for scene42c, needles42c in zip(shots42c, (('tho binky — big enough in the frame', 'furniture inside the frame'), ('cho playBow — big enough in the frame', 'meo loaf — big enough in the frame', 'tho eatCarrot — big enough in the frame', 'furniture inside the frame'),
+                                              ('cho groomFace — big enough in the frame', 'furniture inside the frame', 'people inside the frame'), ('furniture inside the frame', 'people inside the frame'))):
+        path = os.path.join(os.path.dirname(stage), '_check_' + scene42c['id'] + '.json')
+        try:
+            json.dump(scene42c, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, scene42c['id']))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f"{scene42c['id']}: the scene does not build: " + done.stderr.strip()[:300]); continue
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, scene42c['id'])], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f"{scene42c['id']}: " + (done.stdout.strip() or done.stderr.strip())[-700:])
+        else:
+            for needle in needles42c:
+                if needle not in done.stdout: problems.append(f"{scene42c['id']}: acting_check did not measure {needle!r}")
+    # Quầy lễ tân: máy tính không còn đứng chắn ngực người ngồi quầy ở chỗ gợi ý (x -300).
+    reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scene.py'), encoding='utf-8').read())] if item), None)
+    if not reception42c or abs(int(reception42c.group(1)) + 300) < 80: problems.append('reception preset: the laptop must not stand in front of the receptionist spot (x -300)')
+
     # Đợt 35: PHÒNG KHÁM — bác sĩ cân con chó (đặt lên cái cân "can" rồi bế về), đo nhiệt độ (con chó quay đuôi lại), cho uống thuốc
     # (con chó há miệng rồi nhai). acting_check: con chó đứng trên bệ cân lúc đọc số, tay tới nó lúc bế, lúc đo nhiệt, lúc đưa thuốc.
     care = {'id': 'care35', 'camera': 'auto', 'set': {'preset': 'exam', 'cutouts': [{'kind': 'scale', 'name': 'can', 'x': -120, 'z': -560, 'reading': '9.6 kg'}]},
