@@ -1532,10 +1532,11 @@ with tempfile.TemporaryDirectory() as work:
         if '__OUTRO' in html or 'set.cut("' in html: problems.append('outro42: a camera cut is given the outro placeholder instead of the start view')
         if 'frameAt(T0 + talk.turns[2].start, [cho], "close"' not in html: problems.append('outro42: the "view" on the "together" entry does not point the camera at the dog during the voice-over')
 
+    # (Đợt 44 A: `floor42e` mở bằng bé nằm sofa và con chó nằm ngủ cạnh sofa — trong góc toàn của hai đứa — trước đây chó chỉ nằm xuống ở ~23 s.)
     # ĐỢT 42 E — SÁT SÀN: mẹ ngồi bệt, mèo tới, vuốt rồi bế mèo lên lòng; bé nằm ngủ trên sofa, chó nằm cạnh (`floor42e`); bé nhặt quả bóng cạnh
     # con corgi, đưa cho mẹ, nằm xuống sàn, mẹ ngồi bệt (`pick42e`). Mỗi cảnh phải qua acting_check (mông trên sàn, thân nằm ngang trên sàn / mặt
     # sofa, tay tới quả bóng lúc nắm, quả bóng trong tay); script.py: "ngồi bệt", "nằm sofa", "bé → chó: nhặt" ra đúng bước.
-    scenes42e = {'floor42e': {"id": "floor42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 200, "z": -560, "faces": "meo"}, {"name": "be", "id": "boy", "x": -520, "z": -848, "faces": "me"}, {"name": "cho", "species": "dog", "x": -160, "z": -720, "faces": "be"}, {"name": "meo", "species": "cat", "x": 480, "z": -560, "faces": "me"}], "script": [{"who": "me", "say": "Mèo ơi, lại đây với mẹ nào.", "do": ["sitOnFloor"]}, {"who": "me", "do": [["stroke", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Lên đây mẹ bế nào.", "do": [["carry", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "be", "say": "Mẹ ơi, con buồn ngủ quá.", "do": [["lieDown", "sofa", {"sleep": True}]]}, {"who": "cho", "do": [["walk", 4, -40], "lieDown"]}, {"who": "me", "say": "Ngủ ngon nhé con.", "view": {"on": ["me", "be", "cho"], "size": "full"}}, {"who": "be", "do": ["standUp"]}]},
+    scenes42e = {'floor42e': {"id": "floor42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 200, "z": -560, "faces": "meo"}, {"name": "be", "id": "boy", "x": -520, "z": -848, "faces": "me"}, {"name": "cho", "species": "dog", "x": -160, "z": -720, "faces": "be"}, {"name": "meo", "species": "cat", "x": 480, "z": -560, "faces": "me"}], "script": [{"who": "be", "say": "Mẹ ơi, con buồn ngủ quá.", "do": [["lieDown", "sofa", {"sleep": True}]]}, {"who": "cho", "do": [["walk", 4, -40], "lieDown", ["sleep", 2]], "view": {"on": ["be", "cho"], "size": "full"}}, {"who": "me", "say": "Mèo ơi, lại đây với mẹ nào.", "do": ["sitOnFloor"]}, {"who": "me", "do": [["stroke", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Lên đây mẹ bế nào.", "do": [["carry", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Ngủ ngon nhé con.", "view": {"on": ["me", "be", "cho"], "size": "full"}}, {"who": "be", "do": ["standUp"]}]},
                  'pick42e': {"id": "pick42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 260, "z": -560, "faces": "be", "holds": "toy", "holdsHidden": True}, {"name": "be", "id": "boy", "x": -160, "z": -560, "faces": "me"}, {"name": "cho", "species": "corgi", "x": 20, "z": -700, "faces": "be"}], "script": [{"who": "me", "say": "Con nhặt quả bóng cho mẹ nhé."}, {"who": "be", "do": [["pickUp", "@cho"]], "view": {"on": ["be", "cho"], "size": "full"}}, {"who": "be", "do": [["handOver", "@me"]]}, {"who": "be", "say": "Con nằm nghỉ một chút.", "do": [["walk", 4, -200], "lieDown"]}, {"who": "me", "do": ["sitOnFloor", "nod"]}, {"who": "be", "do": ["standUp", "wave"]}]}}
     for name, scene42e in scenes42e.items():
         path = os.path.join(os.path.dirname(stage), f'_check_{name}.json')
@@ -1560,6 +1561,71 @@ with tempfile.TemporaryDirectory() as work:
         steps = [t['do'] for t in made['script'] if isinstance(t, dict) and t.get('do')]
         want = [['sitOnFloor'], [['pickUp', '@cho']], [['lieDown', 'sofa']], ['standUp', 'sitOnFloor']]
         if steps != want: problems.append(f'script.py floor 42 E: steps {steps}, want {want}')
+
+    # ĐỢT 44 A — SỬA LỖI ĐÃ BIẾT (0.82 / 0.83): pair44a / mom44a — vỗ vai, ôm với owner_woman, owner_man, mother (trước: tay cách vai ~7 %, vai
+    # người kia tính ở hướng nhìn thẳng; ôm owner_woman: tóc dài làm khung đầu dài xuống ngực); bag44a — dược sĩ đưa túi cho owner_woman cách 270
+    # (trước: túi nhảy 3,0–3,1 % một khung — tay tính với độ dài tay chưa co theo `coThan`); bath44a — tắm trong chậu DƯỚI SÀN (trước: hướng
+    # nhìn 60–64 %); fetch44a — chó quay TRÁI, bóng bay sang trái. Chữ: nhà thuốc (dược sĩ sau quầy, khách trước quầy), "nằm sofa" / "ngủ trưa
+    # cùng thú" (đứng sẵn ở sofa). Mục thú `zoomies`, `sleepyPet` trong action-catalog.json.
+    scenes44a = {
+        'pair44a': ({'preset': 'reception'}, [dict(name='vet', id='vet', x=-140, z=-380, faces='o'), dict(name='o', id='owner_woman', x=140, z=-380, faces='vet')],
+                    [{'who': 'vet', 'do': [['patShoulder', '@o']]}, {'who': 'o', 'do': [['patShoulder', '@vet']]}, {'who': 'o', 'do': [['hug', '@vet']]}],
+                    ('vet patShoulder o — hand on the shoulder', 'o patShoulder vet — hand on the shoulder', 'o hug vet — arms round each other')),
+        'mom44a': ({'preset': 'reception'}, [dict(name='bo', id='owner_man', x=-140, z=-380, faces='me'), dict(name='me', id='mother', x=140, z=-380, faces='bo')],
+                   [{'who': 'bo', 'do': [['patShoulder', '@me']]}, {'who': 'me', 'do': [['patShoulder', '@bo']]}, {'who': 'me', 'do': [['hug', '@bo']]}],
+                   ('bo patShoulder me — hand on the shoulder', 'me patShoulder bo — hand on the shoulder', 'me hug bo — arms round each other')),
+        'bag44a': ({'preset': 'reception'}, [dict(name='ph', id='pharmacist', x=-150, z=-380, holds='bag', faces='o'), dict(name='o', id='owner_woman', x=120, z=-380, faces='ph')],
+                   [{'who': 'ph', 'do': [['handOverBag', '@o']]}], ('ph handOverBag o — the bag passes hand to hand',)),
+        'bath44a': ({'preset': 'living-room'}, [dict(name='me', id='mother', x=40, z=-560, faces='cho'), dict(name='cho', species='corgi', x=220, z=-560, faces='me', inTub=True)],
+                    [{'who': 'me', 'say': 'Tắm cho Mochi nào!', 'do': [['bathTime', '@cho']]}], ('me bathPet — head turned to cho', 'me towelDry — head turned to cho')),
+        'fetch44a': ({'preset': 'living-room'}, [dict(name='me', id='mother', x=-420, z=-560), dict(name='em', id='girl', x=160, z=-560, faces='cho'), dict(name='cho', species='corgi', x=40, z=-560, faces='me')],
+                     [{'who': 'em', 'say': 'Lu ơi, bắt bóng nè!', 'do': [['playFetch', '@cho']]}], ('em throwBall',))}
+    for name44a, (set44a, cast44a, turns44a, measures44a) in scenes44a.items():
+        path = os.path.join(os.path.dirname(stage), f'_check_{name44a}.json')
+        try:
+            json.dump({'id': name44a, 'camera': 'auto', 'set': set44a, 'characters': cast44a, 'script': turns44a}, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+            done = build(path, os.path.join(work, name44a))
+        finally:
+            if os.path.exists(path): os.remove(path)
+        if done.returncode != 0: problems.append(f'{name44a}: the scene does not build: ' + done.stderr.strip()[:300]); continue
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name44a)], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'{name44a}: ' + (done.stdout.strip() or done.stderr.strip())[-900:])
+        for needle in measures44a:
+            if needle not in done.stdout: problems.append(f'{name44a}: acting_check did not measure "{needle}"')
+    if os.path.isdir(os.path.join(work, 'fetch44a')):
+        html = open(os.path.join(work, 'fetch44a', 'index.html'), encoding='utf-8').read()
+        if '[em, ["throwBall", cho]]' not in html: problems.append('fetch44a: playFetch did not throw toward the dog (["throwBall", cho])')
+        # Quả bóng rơi BÊN TRÁI người ném (con chó quay trái): chỗ cuối cùng còn thấy quả bóng, so với giữa khung của bé.
+        landed = page_eval(os.path.join(work, 'fetch44a'), "(() => { const tl = Object.values(window.__timelines)[0], host = document.querySelector('[data-name=\"em\"]'), ball = host && host.querySelector('[id$=\"-ball\"]'); if (!ball) return null; const svg = host.querySelector('svg'); let last = null; for (let t = 0; t < tl.duration(); t += 0.1) { tl.seek(t, false); window.__set.update(); const r = ball.getBoundingClientRect(); if (r.width > 0 && getComputedStyle(ball).display !== 'none' && +(ball.getAttribute('opacity') ?? 1) > 0) { const s = svg.getBoundingClientRect(); last = r.left + r.width / 2 - (s.left + s.width / 2); } } return last; })()")
+        if not isinstance(landed, (int, float)) or landed >= 0: problems.append(f'fetch44a: the ball should land to the left of the girl (the dog faces left) — got {landed!r} px from her centre')
+    # Chữ — NHÀ THUỐC: dược sĩ sau quầy (z sau mép sau −550), khách trước quầy (z trước mép trước −420); cảnh dựng được và qua acting_check.
+    text = os.path.join(work, 'pharm44a.txt')
+    open(text, 'w', encoding='utf-8').write('bối cảnh: nhà thuốc\ndược sĩ (pharmacist) · chị (owner_woman)\n\nchị: Chào chị, tôi lấy thuốc.\ndược sĩ → chị: phát thuốc\nchị: Cảm ơn chị!\n')
+    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text], capture_output=True, text=True)
+    if done.returncode != 0: problems.append('script.py pharmacy 44 A: ' + (done.stderr or done.stdout).strip()[-300:])
+    else:
+        made = {c['name']: c for c in json.load(open(os.path.join(work, 'pharm44a.scene.json'), encoding='utf-8'))['characters']}
+        if not made.get('duoc_si', {}).get('z', 0) < -550 or not made.get('chi', {}).get('z', -999) > -420:
+            problems.append(f'script.py pharmacy 44 A: the pharmacist should stand behind the counter (z < -550) and the customer in front (z > -420) — got {made}')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, 'pharm44a')], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('pharm44a (script): ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+        elif 'duoc_si handOverBag chi — the bag passes hand to hand' not in done.stdout: problems.append('pharm44a (script): acting_check did not measure the bag hand-over')
+    # Chữ — NẰM SOFA: "bé: [nằm sofa]" và "ngủ trưa cùng thú" — bé đứng sẵn ở mép trước sofa, con chó trên sàn cạnh sofa, người khác sang phải; cảnh dựng được.
+    for key, body in (('sofa44a', 'mẹ (mother) · bé (boy)\n\nbé: [nằm sofa]\nmẹ: Ngủ ngon nhé.\nbé: [đứng dậy]\n'), ('nap44a', 'mẹ (mother) · bé (boy) · chó (dog)\n\nmẹ: Con ngủ trưa đi.\nbé → chó: ngủ trưa cùng thú\n')):
+        text = os.path.join(work, f'{key}.txt')
+        open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\n' + body)
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text], capture_output=True, text=True)
+        if done.returncode != 0: problems.append(f'script.py {key}: ' + (done.stderr or done.stdout).strip()[-300:]); continue
+        made = {c['name']: c for c in json.load(open(os.path.join(work, f'{key}.scene.json'), encoding='utf-8'))['characters']}
+        be, me = made.get('be', {}), made.get('me', {})
+        if not (-560 <= be.get('x', 0) <= -40 and abs(be.get('z', 0) + 848) <= 1) or me.get('x', -999) < 0: problems.append(f'script.py {key}: the boy is not staged at the sofa / the mother stands in front of it — {made}')
+        if key == 'nap44a' and not (-560 <= made.get('cho', {}).get('x', 999) <= 0 and made.get('cho', {}).get('z', 0) > -860): problems.append(f'script.py {key}: the dog is not on the floor beside the sofa — {made}')
+        if key == 'sofa44a':
+            done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, key)], capture_output=True, text=True)
+            if done.returncode != 0: problems.append(f'{key} (script): ' + (done.stdout.strip() or done.stderr.strip())[-600:])
+    catalog44a = {row['label'] for row in json.load(open(os.path.join(HERE, 'action-catalog.json'), encoding='utf-8'))['pets']}
+    for label in ('combo zoomies', 'combo sleepyPet', 'cat: combo sleepyPet'):
+        if label not in catalog44a: problems.append(f'action-catalog.json: pet row "{label}" is missing')
 
     # ĐỢT 43 A — COMBO Ở NHÀ VỚI THÚ: home43a (phòng khách): mẹ ngồi bệt ôm mèo vào lòng, bé ngủ trưa trên sofa cùng con chó; play43a: mẹ nhảy cùng
     # bé gái rồi đập tay, bé chơi ném bóng với con corgi (chó chạy nhặt bóng cùng lúc), dọn đồ chơi. Mỗi cảnh phải qua acting_check, composition không
@@ -1597,7 +1663,7 @@ with tempfile.TemporaryDirectory() as work:
         made = json.load(open(os.path.join(work, 'combo43a.scene.json'), encoding='utf-8'))
         steps = [[(t['who'], t['do'][0]) for t in (e['together'] if 'together' in e else [e])] for e in made['script'] if isinstance(e, dict) and (e.get('do') or e.get('together'))]
         want = [[('me', ['bathPet', '@cho'])], [('me', ['towelDry', '@cho'])], [('me', 'thumbsUp')], [('me', 'wave')], [('me', 'kneel'), ('cho', ['greet', 1.4])],
-                [('me', ['stroke', '@cho']), ('cho', 'wagTail')], [('be', ['throwBall', 'right']), ('cho', ['fetch', 260])], [('be', ['stroke', '@cho'])], [('be', 'thumbsUp')],
+                [('me', ['stroke', '@cho']), ('cho', 'wagTail')], [('be', ['throwBall', '@cho']), ('cho', ['fetch', 260])], [('be', ['stroke', '@cho'])], [('be', 'thumbsUp')],
                 [('me', ['face', 'front']), ('be', ['face', 'front'])], [('me', ['dance', 'happy', 2]), ('be', ['dance', 'happy', 2])], [('me', ['idle', 0.6])], [('me', ['highFive', '@be'])],
                 [('be', 'pickUp')], [('be', ['hideItem', 'both'])], [('be', 'nod')]]
         if steps != want: problems.append(f'script.py combos 43 A: steps {steps}, want {want}')

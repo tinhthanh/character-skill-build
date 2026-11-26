@@ -122,7 +122,7 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                sofa: stand or sit the person at it — the seat height is the sofa box's); ["pickUp", "@dog"] (the toy by the dog —
                the person steps up to it and gets a put-away toy; then ["handOver", "@mom"]); ["handOverPet", "@vet"] (the vet's ["takePet", "@owner"]
                is added at the same time; a carried pet passes from one person's arms to the other's); ["throwBall", "right"]
-               together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
+               (or "left", or "@dog": the way the dog faces) together with a dog's ["fetch", 260]; a pet's "rub" (against the legs of the person beside it).
                "ride" … "getOff": a person astride a scooter, side-on, hands on the bars. In a 3D set the easy way is
                "rides": "<scooter cutout name>" on the character — seated on it from the first frame, "getOff" in
                one of its turns steps it down beside the scooter (examples/scene-ride/scene.json).
@@ -408,7 +408,7 @@ def floor_step_42e(step, where, who, stage_set, fail):
     if not args or args[0] != 'sofa' or stage_set is None: return None
     x, z = float(who['x']), float(who.get('z', -300))
     box = next((b for b in stage_set.get('boxes', []) if b.get('name') == who.get('on')), None) or next((b for b in stage_set.get('boxes', [])
-               if abs(x - float(b['x'])) <= float(b['width']) / 2 and -float(b['depth']) - 20 <= z - float(b['z']) <= 40), None)
+               if float(b['x']) <= x <= float(b['x']) + float(b['width']) and -float(b['depth']) - 20 <= z - float(b['z']) <= 40), None)      # đợt 44 A: x của hộp là MÉP TRÁI (set.box)
     if box is None: fail(f'{where}: ["lieDown", "sofa"] — "{who["name"]}" is not at a sofa: give them "on": "<sofa box>" and "seated": true, or stand them at its front (x within its width, z ≈ its z + 12)')
     options = dict(args[1]) if len(args) > 1 else {}
     options.setdefault('lift', round(float(box.get('height', 0)) * PERSON[1] / who['_host_height'], 1))
