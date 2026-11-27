@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+Added: five more combos (wave 43, group C). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and are
+measured by `tools/acting_check.py`. That makes 36 combos. (The branch also had its own `bathTime`, `playFetch`, `welcomeHome` and
+`sleepyPet`; 0.83.0's, with the same names, are kept.)
+
+- `partyTime`: `jump(2)`, `dance('happy', 2)`, `cheer`. Scripts: "ăn mừng lớn", "quẩy mừng", "mở tiệc".
+- `lazyAfternoon(pet)`: `sitOnFloor`, `stroke`, then `lieDown('floor', { sleep: true })` while the pet does `sleep(3)`. They stay
+  lying until `standUp`. Scripts: "nghỉ trưa với thú", "chiều lười biếng".
+- `rushToPet(pet)`: `startle`, `run` up to the pet, `stroke`, `relief`. Scripts: "hốt hoảng chạy tới", "chạy tới xem thú".
+- `tidyUp(pet, person)`: `pickUp` (the toy by the pet), `handOver(person)`. Scripts: "nhặt đồ đưa", "nhặt đồ chơi đưa".
+- `scaredPet(person)` (dogs and cats): `tremble(1.5)`, then `hide(person)`. In a 3D set stand the pet ~120 further back (z) than the
+  person: at 80 the cat ran through the grandpa's legs. Scripts: "thú sợ hãi", "sợ nấp sau".
+- **`run(rig)`**: runs up beside another character or pet, measured on screen when the step is built, as scene files'
+  `["run", "@dog"]` does. `rushToPet` needs it in `sequence()`. Before, `run` took only a number and threw.
+- **Handing an item over in scripts**: `tools/script.py` now gives whoever is handed an item (`handOver`) the same item put away,
+  so they take it. Before, "bé → chó → mẹ: nhặt đồ đưa" left the ball floating in the air, because `take` needs one.
+- **CI scenes**: `party43`, `lazy43`, `rush43`, `tidy43`, `scared43`. `tools/check_scene.py` now also refuses a combo word that is
+  already a single action's word in `tools/script.py`, or another combo's.
+
+Fixed
+- **A child stroking a pet while sitting on the floor** (đợt 42 E). A pet coming over to someone sitting on the floor stopped
+  as close as to someone on a chair (0.22 × their height). A child is drawn smaller in the same frame, and the pet's head ended
+  up right by the child's low shoulder: the elbow folded too far and the hand stood upright beside the pet's ear. A boy's hand
+  did not touch the cat on 7 of 13 moments, or a dog on any. For a child (`kit.bodies.child`: `boy`, `girl`) the pet now stops
+  at 0.27 × the height. Tried from 0.22 to 0.30: 0.27–0.28 pass a boy with a cat and with a dog. A girl with a calico passes
+  too. Adults keep 0.22: at 0.27 the cat stood so far from the mother in `home43a` (0.83.0) that the medium shot was almost as
+  wide as the full shot. The CI scene `lazy43` uses a boy.
+
+Known
+- `scaredPet` with a dog: it hides only partly behind the person (`hide` stops short of the middle so the head can peek out).
+  acting_check sees 91–95 % of a shiba (it needs at most 90 %). A plain `["hide", "@person"]` passes only just. This comes from
+  `hide`, not from the combo; the CI scene uses a cat.
+- `rushToPet`: when the dog faces the person, the stroking hand hides too much of its head (acting_check: 57 % of the head in
+  view, it needs 60 %). The CI scene leaves the dog's facing alone.
+
 ## 0.83.0
 
 Added: 15 combos (wave 43, two Opus agents in parallel), built only from existing actions, most of them from wave 42's.

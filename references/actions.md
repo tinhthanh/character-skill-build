@@ -134,7 +134,7 @@ the demo steps from `tools/action-catalog.json`.
 | `walkForward` | `(steps = 8)` | approach from far away (grows) | 3.5 |
 | `walkAway` | `(steps = 8)` | walk into the distance and fade — **ends hidden** | 3.3 |
 | `hurry` | `(steps = 6, distance = 0)` | like `walk` but quicker steps (0.3 s each instead of 0.46), mouth open, brows up — in a rush, an emergency | 2.3 on the spot |
-| `run` | `(distance = 0, { speed = 1, steps = 6 })` | a real **run**, not a fast walk: turns side-on, leans forward, knees high, heels kicked up, elbows bent and arms pumping against the legs, a bounce each step and a **flight phase** (both feet off the floor, the shadow left on the floor) — then stops and turns back to its facing. `distance` in frame units (negative = to the left; the number of steps is chosen so that a planted foot never slides), 0 = on the spot for `steps` steps. `speed` 0.5–2 (1 = 0.3 s a step). Seated / kneeling: stands up first. A hand holding an item keeps it (no arm pump). Scene files: `["run", "@dog"]` runs up beside that character. `RigSVG.RUN_STEP_42D`, `RUN_CONTACT_42D` | 2.3 on the spot; about 1.3 s for 300 units |
+| `run` | `(distance = 0, { speed = 1, steps = 6 })` | a real **run**, not a fast walk: turns side-on, leans forward, knees high, heels kicked up, elbows bent and arms pumping against the legs, a bounce each step and a **flight phase** (both feet off the floor, the shadow left on the floor) — then stops and turns back to its facing. `distance` in frame units (negative = to the left; the number of steps is chosen so that a planted foot never slides), 0 = on the spot for `steps` steps. `speed` 0.5–2 (1 = 0.3 s a step). Seated / kneeling: stands up first. A hand holding an item keeps it (no arm pump). Scene files: `["run", "@dog"]` runs up beside that character; in `sequence()` / `conversation()` pass the rig itself, `run(dog)` (wave 43, measured on screen when the step is built). `RigSVG.RUN_STEP_42D`, `RUN_CONTACT_42D` | 2.3 on the spot; about 1.3 s for 300 units |
 | `jump` | `(times = 1, { height = 1 })` | **jump for joy**, facing the viewer: crouch with the arms swung down (anticipation), push off, both feet clearly off the floor with the arms up in a V and the knees tucked (the shadow stays on the floor and shrinks), land with bent knees, settle. `times` 1–6 (the landing is the next crouch), `height` 0.3–2 (1 ≈ 0.36 × the leg length: ~50 units for an adult, ~32 for a child). Unlike `cheer`'s small hops. Seated: rises into the crouch. A hand holding an item keeps it down | 1.5; +0.75 a jump |
 | `dance` | `(style = 'happy', bars = 2, { bpm = 120 })` | a short cheerful **dance** on the beat, facing the viewer: a knee bounce on every beat; odd bars step-touch (a knee lifted left / right, the body leaning, both arms swinging to one side), even bars hip sway with both hands up; the last two beats a spin and a pose (one hand pointing up, the other on the hip, a wink). Feet stay planted. `bars` 1–8 of 4 beats; `style` `'happy'` or `'gentle'` (smaller, for older people). Beat n falls at `RigSVG.DANCE_LEAD_42D` (0.25 s) + n × 60 / `bpm` s from the start of the step — match a music track with `{ bpm }` (60–180, default `RigSVG.DANCE_BPM_42D`). Seated: arms and head only. A hand holding an item keeps it | 4.95 at 120 bpm, 2 bars |
 | `walk` | `(steps = 4, distance = 0)` | turn sideways and walk; `distance` 0 = on the spot, positive = move right, negative = move left, in frame units. With a distance, `steps` is ignored: the number of steps follows from the distance | 2.4 on the spot; about 1.9 s per 100 units, 2.9 s for 370 |
@@ -247,6 +247,11 @@ Vietnamese script line (`tools/script.py`). `VGCharacter.list().combos` lists th
 | `postSurgeryCheck` | `(pet)` | `listen` (the pet's `unwell` at the same time — drowsy; a `"wears": "cone"` pet is fine), `takeTemp`, `readChart` | tái khám sau mổ, kiểm tra sau mổ |
 | `zoomies` (dog) | — | `chaseTail(3)`, `jump(2)`, `pant(1.4)` | chó tăng động, chạy lung tung, chó quậy |
 | `sleepyPet` (dog, cat) | — | `yawn`, `stretch`, `sleep(3)` | ngáp rồi ngủ, lăn ra ngủ, díp mắt |
+| `partyTime` | — | `jump(2)`, `dance('happy', 2)`, `cheer` | ăn mừng lớn, quẩy mừng, mở tiệc |
+| `lazyAfternoon` | `(pet)` | `sitOnFloor`, `stroke` (the pet comes over), `lieDown('floor', { sleep: true })` (the pet's `sleep(3)` at the same time) — they stay lying until `standUp` | nghỉ trưa với thú, chiều lười biếng |
+| `rushToPet` | `(pet)` | `startle`, `run` up to the pet, `stroke`, `relief` | hốt hoảng chạy tới, chạy tới xem thú |
+| `tidyUp` | `(pet, person)` | `pickUp` (the toy by the pet), `handOver(person)` — the person takes it only with the same item put away (`"holds": "toy", "holdsHidden": true`; `tools/script.py` gives it) | nhặt đồ đưa, nhặt đồ chơi đưa |
+| `scaredPet` (dog, cat) | `(person)` | `tremble(1.5)`, `hide(person)` — it stays there. In a 3D set stand it ~120 further back (z) than the person | thú sợ hãi, sợ nấp sau |
 
 What each step needs still applies: `fullCheckup` reads a held clipboard, `vaccinationVisit`
 injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `checkoutCounter` needs a cashier holding cash and a stamp card and a customer with a phone, and the pet must be
@@ -262,7 +267,12 @@ within reach. `tools/script.py` gives the items and the scale by itself.
   spoken first, as its own turn. The other keys go on the first step, and `exit` goes on the last.
   A combo inside `together` is refused.
 - To add a combo, add an entry between the `BEGIN` / `END COMBOS` lines (plain JSON). The
-  runtime, `tools/scene.py` and `tools/script.py` all read that one table.
+  runtime, `tools/scene.py` and `tools/script.py` all read that one table. Its Vietnamese words
+  must not already be a single action's word in `tools/script.py` (`tools/check_scene.py` refuses
+  a clash, e.g. "nhảy mừng" is `jump`).
+- In a scene file the person kneels and stands up by themselves for `stroke` / `giveTreat` on a pet
+  on the floor, so don't put `kneel` / `standUp` steps in a combo. End on a step that leaves the
+  pet's head in view: `giveTreat` hides part of it behind the hand when the pet faces the person.
 
 ## Pets — `VGCharacter.createPet(host, { species, config, wear }).rig`
 
