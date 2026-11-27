@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.87.0
+
+Faster: the full `sh tools/check.sh` went from 8 min 11 s to **6 min 6 s** (366 s; wave 47, two Opus agents in
+parallel). It now runs the same checks with more of them at once.
+
+- **One case per scene** (47 A): the slow cases that built several scenes in a loop are split into one case per scene,
+  and one per script-word check, named `group:part`. That is 105 cases instead of 63.
+  - `--only combo41` still runs the whole group, and `--changed` picks parts on their own.
+  - The scheduler starts the longest cases first, using the last recorded times.
+  - A new `calm` tag starts a case only once the main queue is empty. `seek46` uses it.
+- **Check page in shards** (47 B): `tools/check.html` runs in 3 parallel shards (`?shard=i/n`, `?characters=a,b`;
+  `CHECK_PAGE_SHARDS` overrides the count), at the same time as the scene step. It is 172 s wall instead of about 3.5 min
+  after the scene step.
+  - `tools/check_report.py` merges the shards and fails if a check ran in no shard or in two.
+  - New flags `--page` / `--no-page`. The page is skipped with `--only` / `--failed` / `--list`. With `--changed` it runs
+    only when `runtime/`, `configs/`, `vendor/` or the page's own files changed.
+- **Behaviour change**: a failing step no longer stops the others. Every step runs, and the script exits 1 if any failed.
+
+Measured on a quiet machine:
+
+| Step | Time |
+|---|---|
+| Cues | about 1 s |
+| Scene step (105 cases, 10 at a time) | 365 s wall, 3281 s of case time |
+| Check page (alongside the scene step) | 172 s |
+| `tools/lint-examples.sh --check` | 148 s |
+
+Known
+- **CPU-bound now**: case time ÷ 10 workers ≈ wall time, with the page shards sharing the same cores, so more splitting
+  or more workers will not help much. The scene step alone was 267 s in 0.86.0. Running the page alongside costs it
+  about 100 s and saves the page's whole 3.5 min. The next gains need less work per case. The slowest is
+  `example_scene:peek` (160 s), which loads up to 40 full-composition iframes in one page.
+- **`seek46` under load**: it can fail on pixel differences when about ten other Chrome cases run at the same time
+  (already true in 0.86.0). It passed 3 of 3 runs alone. The `calm` tag works around it. Making its capture wait until
+  Chrome has finished drawing would fix it.
+- **Leaked Chrome processes**: headless Chromes started by `tools/chrome_run.py` can be left running when their run is
+  killed. Twelve were found after waves 45–47 and stopped.
+- **The unsharded page** (`CHECK_PAGE_SHARDS=1`) can exceed `chrome_run`'s 300 s reply timeout under heavy load.
+
 ## 0.86.0
 
 Fixed: a frame depends only on its time (wave 46). Before, what a frame showed could depend on the seeks made before it,
