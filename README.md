@@ -40,7 +40,14 @@ And what a scene can do with them:
 
 - **`SKILL.md`** — instructions an AI agent follows to create a character from a brief,
   verify it, and place it in a composition.
-- **`runtime/`** — the library (ES modules) with an English API.
+- **`runtime/`** — the library (ES modules) with an English API. The two rigs keep only their core in
+  `rig-svg.js` (people) and `rig-thu.js` (pets): building the SVG, drawing (`apDung`), colours, shape, rest pose and
+  the action lists. The actions live in one file per group — `runtime/person/` (`basic`, `gestures`, `counter`,
+  `presenter`, `motion`, `care`, `treatment`, `look-carry`, `pairs`, `floor`, `stance`, `speech`) and `runtime/pet/`
+  (`poses`, `play`, `basic`, `species`, `tricks`, `mood`) — each one `export default (Rig) => mix(Rig, class { … })`,
+  installed onto the rig class; module-level constants and helpers are in `person/shared.js` / `pet/shared.js`.
+  A new action goes in the group file it belongs to (or a new group file added to the install list at the end of the
+  rig file); `mix` refuses a name that is already defined.
 - **`dist/character.slim.js`** — the same library as one plain-script file for HyperFrames,
   with the tuned configs baked in.
 - **`studio/`** — a visual editor: presets, sliders, colour palettes, undo, per-character save.
@@ -84,7 +91,7 @@ python3 tools/check_scene.py --list  # every case with its tags and `uses`
 `--changed` picks a case when its own code changed, when a word of the changed hunks (an action,
 preset, character id, or a tool: `script`, `acting_check`, `page_eval`, `camera`…) is in its `uses`,
 or when it is tagged `smoke`. It is a fast loop, not a proof: a change to a shared engine
-(`runtime/set3d.js` camera, `runtime/rig-svg.js` skeleton, `tools/scene.py`) can break scenes that
+(`runtime/set3d.js` camera, `runtime/rig-svg.js` skeleton or `runtime/person/shared.js`, `tools/scene.py`) can break scenes that
 never name the changed words. **Run the full `sh tools/check.sh` (no arguments) before merging or
 releasing.**
 

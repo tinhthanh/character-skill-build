@@ -985,7 +985,7 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (rig.s.huong !== actor.wrote) { rig.s.huong = actor.wrote; rig.render(); }
       });
       // ĐỢT 46 — RIG VẼ LẠI THEO BỐ CỤC CỦA CHÍNH KHUNG NÀY. Một số phần của hình vẽ rig đo màn hình lúc vẽ (con vật đang bế: chỗ host
-      // của nó và cánh tay người bế — `#placeCarried`; dây dắt, dây kéo, túi trao tay, điểm gặp lúc trao con vật). Rig chỉ tự vẽ lại khi
+      // của nó và cánh tay người bế — `_placeCarried`; dây dắt, dây kéo, túi trao tay, điểm gặp lúc trao con vật). Rig chỉ tự vẽ lại khi
       // trạng thái của nó đổi (microtask sau khi tua) — TRƯỚC khi vòng trên đặt host theo máy quay của khung này; tua tới một lúc mà
       // trạng thái rig không đổi (tween đã xong) thì nó giữ hình vẽ theo bố cục của lần tua trước (máy quay khác): con chó trong tay
       // ông lệch một khúc tuỳ khung trước đó. Vẽ lại mọi rig ở đây, sau khi mọi host đã vào chỗ (rẻ: ~0,3 ms một rig).
