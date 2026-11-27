@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+Catalog and docs catch up with the runtime.
+
+- **`tools/action-catalog.json`**: ten new demo rows, so `tools/actions.sh` and `tools/reel.py` now show them.
+  - People: `shine (pet)` and the combos `dischargePet` (the owner takes the pet), `assistedVaccination` (the nurse holds
+    the cat), `checkoutCounter`, `partyTime`, `lazyAfternoon`, `rushToPet` and `tidyUp` (the mother takes the toy).
+  - Pets: `enter → exit` and the combo `scaredPet` (it hides behind grandpa).
+  - Every combo in `runtime/combos.js` and every action in the rigs' action lists now has a row.
+- **`tools/reel.py`**:
+  - Pet rows with a person now place that person beside the pet, as `tools/actions.sh` does. Before, `hide` and `lick`
+    ran with no one there, and the new `scaredPet` row stopped every pet reel.
+  - A row the character cannot do is left out and printed as `skipped`, instead of stopping the reel. The barista's
+    built-in cup leaves no free hand for `stampCard`, `pourDrink` and `givePill`, so the barista reel failed before.
+  - New check `reel48` (`tools/ci/w48.py`) builds the reels of `vet`, `barista`, `dog` and `rabbit`.
+- **Docs**: the pet tables in `SKILL.md`, `references/slots.md` and `references/hyperframes.md` listed 5 species. They
+  now list all 12: `corgi`, `poodle`, `husky`, `black_dog`, `white_cat`, `calico` and `rabbit` were missing.
+
 ## 0.87.0
 
 Faster: the full `sh tools/check.sh` went from 8 min 11 s to **6 min 6 s** (366 s; wave 47, two Opus agents in

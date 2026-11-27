@@ -121,6 +121,7 @@
     { "label": "wearing mask + gloves + cap: inject (pet)", "steps": [["inject", "@pet"]], "pet": "cat", "items": { "R": "syringe" }, "wearPerson": ["mask", "gloves", "cap"] },
     { "label": "wearing mask: explain", "steps": [["explain", "Đeo khẩu trang khi chăm sóc thú ốm nhé.", 2.4]], "wearPerson": ["mask"] },
     { "label": "inject (pet)", "steps": [["inject", "@pet"]], "pet": "cat", "items": { "R": "syringe" } },
+    { "label": "shine (pet)", "steps": [["shine", "@pet", 2]], "pet": "cat" },
     { "label": "sitDown → carry → explain (pet on the lap)", "steps": ["sitDown", ["carry", "@pet"], ["explain", "Bé ngoan lắm, chờ chút nhé.", 2]], "pet": "cat", "petOnFloor": true },
     { "label": "carry → putDown (pet)", "steps": [["carry", "@pet"], "nod", "putDown"], "pet": "cat" },
     { "label": "examine ears (pet)", "steps": [["examine", "@pet", "ears"]], "pet": "dog" },
@@ -193,7 +194,14 @@
     { "label": "combo dentalCare (pet)", "steps": [["dentalCare", "@pet"]], "pet": "dog" },
     { "label": "combo comfortOwner (person)", "steps": [["comfortOwner", "@person"]], "person": "granny", "personSteps": [["idle", 2.3], ["lookAt", "@self", { "hold": 2.6 }], ["hug", "@self"]], "personGap": 75 },
     { "label": "combo fullSpa (pet in a tub)", "steps": [["fullSpa", "@pet"]], "pet": "dog", "tub": true },
-    { "label": "combo postSurgeryCheck (pet)", "steps": [["postSurgeryCheck", "@pet"]], "pet": "cat", "wear": ["cone"], "items": { "R": "clipboard" }, "itemsHidden": true }
+    { "label": "combo postSurgeryCheck (pet)", "steps": [["postSurgeryCheck", "@pet"]], "pet": "cat", "wear": ["cone"], "items": { "R": "clipboard" }, "itemsHidden": true },
+    { "label": "combo dischargePet (pet → person)", "steps": [["dischargePet", "@pet", "@person"]], "pet": "dog", "person": "owner_woman", "personSteps": [["idle", 1.65], ["takePet", "@self"]], "personGap": 120 },
+    { "label": "combo assistedVaccination (pet + nurse)", "steps": [["assistedVaccination", "@pet", "@person"]], "pet": "cat", "items": { "R": "syringe" }, "itemsHidden": true, "person": "nurse", "personGap": 105 },
+    { "label": "combo checkoutCounter (person)", "steps": [["checkoutCounter", "@person"]], "items": { "R": "cash", "L": "stampcard" }, "itemsHidden": true, "person": "granny", "personItems": { "R": "phone" }, "personGap": 100 },
+    { "label": "combo partyTime", "steps": ["partyTime"] },
+    { "label": "combo lazyAfternoon (pet)", "steps": [["lazyAfternoon", "@pet"]], "pet": "cat", "petOnFloor": true },
+    { "label": "combo rushToPet (pet)", "steps": [["rushToPet", "@pet"]], "pet": "dog", "petOnFloor": true },
+    { "label": "combo tidyUp (pet's toy → person)", "steps": [["tidyUp", "@pet", "@person"]], "pet": "dog", "petOnFloor": true, "person": "mother", "personItems": { "R": "toy" }, "personItemsHidden": true, "personSteps": [["idle", 2.5], ["take", "@self"]], "personGap": 110 }
   ],
   "pets": [
     { "label": "idle", "steps": [["idle", 1.6]] },
@@ -230,6 +238,7 @@
     { "label": "greet", "steps": ["greet"] },
     { "label": "play", "steps": ["play"] },
     { "label": "goIn → comeOut", "steps": [["goIn", 90], ["idle", 0.8], ["comeOut", 90]] },
+    { "label": "enter → exit", "steps": [["enter", "left", 300], ["idle", 0.6], ["exit", "right", 300]] },
     { "label": "fetch", "steps": [["fetch", 160, { "delay": 0.3 }]] },
     { "label": "wearing cone + bandage: limp", "steps": [["limp", 4]], "wear": ["cone", "bandage"] },
     { "label": "shiverAtVet", "steps": [["shiverAtVet", 2]] },
@@ -284,6 +293,7 @@
     { "label": "rabbit: eatCarrot", "steps": [["eatCarrot", 6]], "species": "rabbit" },
     { "label": "combo zoomies", "steps": ["zoomies"], "species": "dog" },
     { "label": "combo sleepyPet", "steps": ["sleepyPet"], "species": "dog" },
-    { "label": "cat: combo sleepyPet", "steps": ["sleepyPet"], "species": "cat" }
+    { "label": "cat: combo sleepyPet", "steps": ["sleepyPet"], "species": "cat" },
+    { "label": "combo scaredPet (person)", "steps": [["scaredPet", "@person"]], "person": "grandpa", "personAt": 150 }
   ]
 }
