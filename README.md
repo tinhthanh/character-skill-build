@@ -86,7 +86,27 @@ preset, character id, or a tool: `script`, `acting_check`, `page_eval`, `camera`
 or when it is tagged `smoke`. It is a fast loop, not a proof: a change to a shared engine
 (`runtime/set3d.js` camera, `runtime/rig-svg.js` skeleton, `tools/scene.py`) can break scenes that
 never name the changed words. **Run the full `sh tools/check.sh` (no arguments) before merging or
-releasing.** `tools/check.html` always runs whole, after the scene cases (≈ 4 min).
+releasing.**
+
+`tools/check.html` runs at the same time as the scene cases (both only need the fresh `dist/`), split
+into shards — one headless Chrome each, `CHECK_PAGE_SHARDS=n` (default 3, `1` = one unsharded run).
+Its result is printed after the scene step's. With no arguments it always runs; with `--changed` only
+when the change touches `runtime/`, `configs/`, `tools/check.html` or the files that run it; with
+`--only` / `--failed` / `--list` it is skipped. `--page` / `--no-page` force it on or off.
+
+```bash
+sh tools/check.sh --only w44 --page              # some scene cases and the whole check page
+sh tools/check.sh --changed --no-page            # scene cases only
+# one shard, or one character's action sweep, by hand (python3 tools/serve.py 8300 first):
+#   http://127.0.0.1:8300/tools/check.html?shard=2/3
+#   http://127.0.0.1:8300/tools/check.html?characters=vet,dog
+```
+
+Each block of the page is a unit of work opened with `if (chay('name'))`; the sweep of one character
+is one unit (`person:vet`, `pet:dog`). Shard `i/n` runs every n-th unit. Every shard meets all units in
+the same order, and `tools/check_report.py shard1.html shard2.html …` merges the shards and fails if a
+unit ran in no shard or in two (`--times` also prints the slowest units). A new block of checks needs
+its own `if (chay('…'))` (names must be unique); a block without one runs in every shard.
 
 `tools/acting_check.py` (used by most scene cases) opens one headless Chrome per scene and reloads
 the page for each pass (probe, pets in view, stroke tracks, 2× re-measure, people behind counters), so
