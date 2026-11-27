@@ -234,15 +234,22 @@ with its config applied (`--no-config` for the bare definition). Groups for peop
 
 ## Pets
 
-Dogs and cats use a separate rig; they are configured, not defined through drawing keys.
+Dogs, cats and the rabbit use a separate rig; they are configured, not defined through drawing keys.
 
 | Species | Notes |
 |---|---|
 | `dog` | golden puppy, floppy ears |
 | `shiba` | pointed ears, curled tail |
+| `corgi` | short legs, long body, pointed ears, stubby tail |
+| `poodle` | light apricot, slim, tightly curled tail |
+| `husky` | grey and white, pointed ears, blue eyes |
+| `black_dog` | plain black |
 | `cat` | grey tabby |
 | `orange_cat` | orange tabby |
 | `black_cat` | plain black, yellow eyes |
+| `white_cat` | white, blue eyes |
+| `calico` | white with orange and black patches |
+| `rabbit` | grey and white, long ears, hops |
 
 Config: `{ shape: { … }, colors: { … } }`.
 

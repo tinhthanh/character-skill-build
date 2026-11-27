@@ -33,7 +33,8 @@ python3 tools/scene.py scene.json          # → <id>/index.html next to the sce
 ```
 
 - `characters` — `id` is a registered person, `species` a pet: any id from the Pets table in
-  `actions.md` (`dog`, `cat`, `shiba`, `orange_cat`, `black_cat`, or one you registered). `name`
+  `actions.md` (`dog`, `shiba`, `corgi`, `poodle`, `husky`, `black_dog`, `cat`, `orange_cat`, `black_cat`,
+  `white_cat`, `calico`, `rabbit`, or one you registered). `name`
   is the handle the rest of the file uses (`who`, `faces`, `shot` all take a `name`, not an `id`).
   The bundled examples use `vet`, `boy`, `girl`, `receptionist`, a dog and a cat; `tools/gallery.sh`
   shows every character. `x` is where the character
