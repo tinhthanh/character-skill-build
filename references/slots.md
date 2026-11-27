@@ -252,4 +252,4 @@ Config: `{ shape: { … }, colors: { … } }`.
 - `colors` — `fur` · `furLight` (muzzle, chest, paws) · `furDark` (far legs and ears, derived
   from `fur`) · `stripes` (cats) · `iris` · `nose` · `collar` · `tag` · `earInner`.
 
-A new breed is an entry added to the species table in `runtime/rig-thu.js`.
+A new breed is an entry added to the species table (`LOAI`) in `runtime/pet/shared.js`.
