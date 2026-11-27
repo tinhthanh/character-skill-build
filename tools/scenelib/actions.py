@@ -65,7 +65,8 @@ CHART_ACTIONS = ('readChart', 'showXray')                # đo riêng: bìa hồ
 GESTURES = ('wave', 'thumbsUp', 'point', 'present', 'cheer', 'callOut', 'thumbsDown', 'stopSign', 'fingerWag', 'beckon', 'fingerHeart', 'vSign',
             'introduce', 'shrug', 'throwBall',
             'holdSign', 'showSize', 'takeSelfie', 'yawnStretch')            # đợt 39 C
-GESTURES += ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')          # đợt 39 B
+EVERYDAY_GESTURES = ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')          # đợt 39 B (acting_check đo riêng từng cái)
+GESTURES += EVERYDAY_GESTURES
 GESTURES += ('jump', 'dance')          # đợt 42 D — hai tay giơ cao lúc nhảy / múa: bàn tay trong khung
 # ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA (cả thân): nhịp của chúng là góc TOÀN (cả người, bàn chân trong khung; máy đo thêm ở đỉnh cú nhảy
 # — đầu không chạm mép trên); chạy là nhịp có người đi (`move`). `["run", "@tên"]` chạy tới đứng cạnh người / con vật ấy (cách
@@ -108,7 +109,8 @@ SHOW_SIZE_GAP = {'small': 44, 'medium': 130, 'big': 250}      # runtime/rig-svg.
 # ĐỘNG TÁC THÚ đợt 35: moments.json đo con vật trong khung, chân trên sàn (lăn ngửa: lưng trên sàn, chân chổng trời), nấp: đầu ló ra,
 # thân khuất một phần; liếm: mõm tới tay / mặt người.
 PET_ACTS = ('rollOver', 'chaseTail', 'knead', 'lick', 'hide', 'eatCarrot', 'bark')
-PET_ACTS += ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')           # đợt 40 C — thú ở phòng khám
+CLINIC_PET_ACTS = ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')           # đợt 40 C — thú ở phòng khám
+PET_ACTS += CLINIC_PET_ACTS
 PET_ACT_ASK = {'rollOver': 'Is the animal lying on its back, belly up, with its paws in the air?',
                'chaseTail': 'Is the dog spinning round after its tail (or, at the end, dizzy)?',
                'knead': 'Is the cat pressing its front paws up and down (kneading), eyes half shut?',
@@ -116,14 +118,17 @@ PET_ACT_ASK = {'rollOver': 'Is the animal lying on its back, belly up, with its 
                'hide': 'Is the animal hiding behind someone, only its head peeking out, scared?',
                'eatCarrot': 'Is the rabbit holding a carrot to its mouth with its front paws, nibbling it?',
                'bark': 'Is the dog barking — mouth wide open, head tossed up, bark lines in front of its mouth?'}
-PET_ACTS += ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')     # đợt 40 A — sáu động tác của chó
+DOG_ACTS = ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')     # đợt 40 A — sáu động tác của chó
+PET_ACTS += DOG_ACTS
 PET_ACT_ASK.update({'playBow': 'Is the dog in a play bow — front legs stretched out, chest on the floor, rump up, tail wagging, mouth open?',
                     'howl': 'Is the dog sitting and howling — head thrown back, muzzle up, mouth in an O, eyes shut, wavy sound lines rising?',
                     'dig': 'Is the dog digging — nose down, front paws scraping the floor in turns, dirt flying back between its hind legs?',
                     'carryToy': 'Is the dog trotting with a toy (a rope or a bone) in its mouth, head high and proud — or dropping it on the floor?',
                     'leanOnLeg': 'Is the dog leaning its side against the person\'s leg, looking up at them with half-closed eyes?',
                     'tugOfWar': 'Is the dog in a tug of war — gripping a rope in its mouth, braced, pulling back and shaking its head, the rope taut to the person\'s hand?'})
-PET_ACTS += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
+# Đợt 40 B — mèo và thỏ (cùng bảng: góc cận gần hơn PET_CLOSE_FILLS, acting_check `check_cat_rabbit_act`).
+CAT_RABBIT_ACTS = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
+PET_ACTS += CAT_RABBIT_ACTS
 PET_ACT_ASK.update({'groomFace': 'Is the cat sitting and wiping a licked front paw over its ear and face?',      # đợt 40 B
                     'loaf': 'Is the cat lying like a loaf of bread — paws tucked under, a compact round shape, eyes half closed?',
                     'slowBlink': 'Does the cat look at the viewer and close its eyes slowly (eyes shut for a moment)?',
@@ -161,13 +166,12 @@ DESK_ASK = {'payByQR': 'Is {who} holding a phone up to the QR code on the stand,
 # khung, lưỡi và chân trước chỉ vài điểm ảnh. `alone`: được lẹm người khác; `fill`: phần chiều cao khung con vật chiếm.
 PET_CLOSE = ('rollOver', 'chaseTail', 'knead', 'eatCarrot', 'lick', 'bark')
 PET_CLOSE_FILL = 0.62
-PET_CLOSE += ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')      # đợt 40 A — góc cận con vật (dựa chân / kéo co: chân và tay người, đầu dây vẫn lọt vào khung)
+PET_CLOSE += DOG_ACTS      # đợt 40 A — góc cận con vật (dựa chân / kéo co: chân và tay người, đầu dây vẫn lọt vào khung)
 TUG_STAND = 0.29             # đợt 40 A: mõm con chó cách giữa người bấy nhiêu × chiều cao người lúc kéo co (runtime/rig-thu.js TUG_ROPE: along + reach)
 TUG_SNOUT = 84               # … đầu dây ở mõm cách giữa khung con chó chừng ấy đơn vị khung của nó (thế giật ngược)
-PET_CLOSE += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
-CAT_RABBIT_ACTS = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
+PET_CLOSE += CAT_RABBIT_ACTS      # đợt 40 B
 PET_CLOSE_FILLS = {'noseTwitch': 0.95, 'slowBlink': 0.9, 'groomFace': 0.8, 'loaf': 0.95, 'flop': 0.7, 'batToy': 0.95, 'archBack': 0.9, 'binky': 0.9}      # đợt 40 B: cận hơn cho mặt (mũi, mắt) — phần chiều cao khung
-PET_CLOSE += ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')                 # đợt 40 C
+PET_CLOSE += CLINIC_PET_ACTS                 # đợt 40 C
 LICK_BEAT = 1.0          # đợt 40 C: giây mỗi cái liếm — runtime/rig-thu.js `LICK_BEAT` (bàn tay / má chìa ra đủ lâu)
 
 

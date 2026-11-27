@@ -82,7 +82,7 @@ grass.*
 
 ## Checking the light
 
-`tools/scene.py` writes `moments.json` next to a 3D scene: the moments that matter for the light, each with
+`tools/scene.py` writes `moments.json` next to a 3D scene (`light_moments`, tools/scenelib/lighting.py): the moments that matter for the light, each with
 questions whose right answer is "yes". `python3 tools/light_audit.py <scene dirs…> -o audit/` captures them as
 sheets and writes `audit/prompt.txt`; answer the questions (or hand the sheets and the prompt to a reviewer), then
 `python3 tools/light_audit.py --score answers.json -o audit/`. A question about something not in the frame may be

@@ -45,6 +45,10 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
 import argparse, json, os, re, socket, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+if HERE not in sys.path: sys.path.insert(0, HERE)
+# Các nhóm động tác dùng chung với tools/scene.py (một bảng: tools/scenelib/actions.py).
+from scenelib.actions import CARE_ACTIONS, CAT_RABBIT_ACTS, CLINIC_PET_ACTS, DESK_PAY, DOG_ACTS, EVERYDAY_GESTURES  # noqa: E402
+from scenelib.notes import MEDIUM_WIDE  # noqa: E402 — góc trung ≥ 85 % bề rộng góc toàn: cắt sang gần như cùng khung (đợt 31)
 KEEP = None            # --keep: giữ ảnh chụp của phép đo con vật thấy được
 REACH = 0.06            # tay cách đích ≤ 6 % chiều cao người
 FEET = 0.03             # chân lệch sàn ≤ 3 % chiều cao người
@@ -625,7 +629,6 @@ def check_props(folder, moments, cuts):
     return results
 
 
-MEDIUM_WIDE = 0.85     # góc trung ≥ 85 % bề rộng góc toàn của cùng chủ thể: cắt sang gần như cùng khung (đợt 31)
 
 
 def check_shots(folder, log):
@@ -693,7 +696,6 @@ def check_gesture(folder, c, frames):
 
 # ĐỢT 39 B — sáu cử chỉ thường ngày: cái làm nên chữ "đọc được" của từng cử chỉ, đo từ `g39` (`rig.gesture39Probe()` qua `set.careProbe()`).
 # Mọi khoảng cách tính theo chiều cao KHUÔN MẶT trên khung (bé đầu to, người ngồi, góc cận / toàn đều cùng thước).
-EVERYDAY_GESTURES = ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')
 SHUSH_LIPS = 0.38        # suỵt: đầu ngón trỏ cách tâm miệng ≤ 38 % chiều cao mặt
 FACEPALM_PALM = 0.75        # ôm trán: đầu ngón / bàn tay cách giữa hai mắt ≤ 75 % chiều cao mặt, và đầu đã gục (headPitch ≥ 0,3)
 SALUTE_BROW = 0.55        # chào: đầu ngón tay cách chân mày bên ấy ≤ 55 % chiều cao mặt (bàn tay ở trán, không ở má / tai)
@@ -791,7 +793,6 @@ THROUGH = 0.03         # nấp: chạy ngang qua chân người mà đường s�
                        # (đợt 35, lượt hai: con shiba xa hơn cô bé 30 đơn vị — 1,6 %, Gemini thấy đi xuyên; xa hơn 100 — 5,3 %)
 
 
-CAT_RABBIT_ACTS = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
 # ĐỢT 40 B — mèo & thỏ: các phép đo riêng (xem check_dog_act). Người chấm xem thưa (~1 khung / giây): dáng chính phải GIỮ ≥ 1 s.
 CLOSE_ACTS += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
 AIRBORNE_ACTS = ('binky', 'sitInBox')       # đợt 40 B: động tác có cú nhảy — bàn chân rời sàn là đúng
@@ -877,7 +878,6 @@ def check_cat_rabbit_act(folder, c, track, what):      # đợt 40 B (tên riên
         return ok_('the nose twitches fast', flips >= TWITCH_N and amp >= 0.15, f'the nose swells and shrinks {flips} times (least {TWITCH_N}), by {amp * 100:.0f} % of its width (least 15 %) over {len(w)} frames')
     return []
 # ĐỢT 40 C — thú ở phòng khám: tư thế đạt được và GIỮ ≥ 1 s (người chấm xem ~1 khung / giây), đủ lớn trong khung, đo bằng khung hình vẽ.
-CLINIC_PET_ACTS = ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')
 SHIVER_CROUCH = 0.4        # sợ run: bốn chân gập — khoảng đáy lưng → đáy bàn chân ngắn đi ≥ 40 % so với lúc đứng …
 PET_POSE_HOLD = 1.0          # … và giữ tư thế ≥ 1 s liền
 SHIVER_SHAKES = 10          # sợ run: thân đổi chiều lắc ≥ 10 lần
@@ -1226,7 +1226,6 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
 
 # ĐỢT 40 A — sáu động tác của chó (số đo từ `set.careProbe()` → `p40` của con vật và của người kéo, cùng `actingProbe` — hình thể).
 DOG_TARGETS = set()              # người là đích của một động tác chó đợt 40 A trong cảnh (góc cận con vật cắt họ ở mép)
-DOG_ACTS = ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')
 BOW_CHEST, BOW_RUMP = 20, 6      # chổng mông: vai hạ ≥ 20 đơn vị, hông nhổm ≥ 6 đơn vị so với lúc đứng
 HOLD_POSE = 1.0                  # … và giữ dáng ≥ 1 s (người chấm xem thưa ~1 khung / giây)
 HOWL_HEAD = 25                   # tru: đầu ngửa ≥ 25°
@@ -2557,7 +2556,7 @@ def check_desk(folder, c, shots, scales):
         out.append({'scene': folder, 'what': f'{who} {name} — {what} ({len(rows)} moments)', 'ok': not bad and ok_all,
                     'note': f'{worst[3]} at {worst[0]:g} s' + (f' ({len(bad)} of {len(rows)} moments fail)' if bad else '') + extra})
     times = lambda label: [t for t in c['times'] if phases.get(str(t)) == label]
-    if name in ('payByQR', 'payByCard'):
+    if name in DESK_PAY:
         qr = name == 'payByQR'; limit = DESK_QR if qr else DESK_READER
         rows = []
         for t in times('near'):
@@ -2828,7 +2827,7 @@ def check_one_scene(folder):
         if c['kind'] == 'desk39':          # đợt 39 A
             results.extend(check_desk(folder, c, shots, scales))
             continue
-        if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
+        if c['kind'] in CARE_ACTIONS and c.get('track'): results.extend(check_care(folder, c, shots))
         if c['kind'] == 'prep':
             results.extend(check_prep(folder, c, shots))
             continue

@@ -207,7 +207,9 @@ clips for every voice file.
    action, six moments through it, run through `sequence()` exactly as the scene will), and
    `python3 tools/reel.py <id> [--turned] [--render | --clips]` builds a reel in which the
    character performs every action with its name on screen (and, with `--clips`, one mp4 per
-   action). Both read `tools/action-catalog.json`; add an entry there for a new action.
+   action). Both read `tools/action-catalog.json`; add an entry there for a new action. What the scene
+   builder knows about an action (reach target, pair part, timings, gaps, moments.json questions) is in ONE
+   file, `tools/scenelib/actions.py`; `tools/scene.py` is the CLI over the phases in `tools/scenelib/`.
 2. **Build it.** `python3 tools/scene.py scene.json` → `<id>/index.html` next to the scene
    file, with the bundle, cues and audio beside it. Read its notes (lines starting `!`).
 3. **Preview and look.** `sh tools/peek.sh <id>/index.html` prints every step's timing and
