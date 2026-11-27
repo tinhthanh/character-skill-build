@@ -72,12 +72,35 @@ class ScenePage46:
         sau một lượt tua dài Chrome có thể chưa vẽ xong (ô hình độ phân giải thấp)."""
         from PIL import Image
         probe = self.page.evaluate(f'(() => {{ window.__timelines[{json.dumps(self.comp)}].seek({t}, false); window.__set.update(); return JSON.stringify(window.__set.actingProbe()); }})()')
+        self.dom = self.page.evaluate(DOM_HASH_46)
         shot = self.page.capture()
         for _ in range(3 if settle else 0):
             again = self.page.capture()
             if again == shot: break
             shot = again
         return probe, Image.open(io.BytesIO(shot)).convert('RGB')
+
+
+# Dấu vân tay của phần cây DOM ĐANG HIỆN (bỏ nhánh display:none / visibility:hidden / opacity 0 — chúng giữ trạng thái cũ mà không
+# vẽ gì; khai báo trong `style` sắp xếp lại vì GSAP có thể ghi cùng các khai báo theo thứ tự khác). Cảnh không có canvas: hai cây hiện
+# giống hệt nhau thì vẽ ra cùng một hình — ảnh chụp khác mà cây giống là nhiễu vẽ của Chrome (runner CI Linux vẽ bằng phần mềm).
+DOM_HASH_46 = """(() => {
+  const parts = [];
+  const walk = (node) => {
+    if (node.nodeType === 3) { if (node.data.trim()) parts.push(node.data); return; }
+    if (node.nodeType !== 1 || node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
+    const cs = getComputedStyle(node);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return;
+    const attrs = [...node.attributes].map((a) => a.name === 'style' ? 'style=' + a.value.split(';').map((x) => x.trim()).filter(Boolean).sort().join(';') : a.name + '=' + a.value).sort();
+    parts.push('<' + node.tagName + ' ' + attrs.join(' '));
+    for (const child of node.childNodes) walk(child);
+    parts.push('>');
+  };
+  walk(document.body);
+  const s = parts.join('\\n');
+  let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16) + ':' + s.length;
+})()"""
 
 
 def pixel_gap_46(a, b):
@@ -101,7 +124,9 @@ def seek_check_46(folder, count=8, scale=0.5, seed=46):
         times = sorted(round(end * (i + rand.uniform(0.15, 0.85)) / count, 3) for i in range(count))
         # Lượt đầu cũng chụp tới khi hai ảnh liền nhau trùng nhau: ảnh đầu tiên chụp ngay sau khi mở trang, Chrome có thể chưa vẽ xong
         # (runner CI: luôn lệch ở lúc sớm nhất của cảnh floor, 233 điểm ảnh) — ảnh gốc vẽ dở thì lần chụp lại nào cũng "khác".
-        first = {t: scene.frame(t, settle=True) for t in times}
+        first = {}
+        for t in times:
+            first[t] = scene.frame(t, settle=True) + (scene.dom,)
         scene.fresh()
         grid = [round(end * i / 120, 3) for i in range(121)]
         rand.shuffle(grid)
@@ -120,7 +145,10 @@ def seek_check_46(folder, count=8, scale=0.5, seed=46):
             # Chrome tự nó không vẽ hai lần y hệt từng điểm ảnh: cây DOM giống hệt (mọi thuộc tính, thứ tự) mà vài điểm ảnh lệch 1–2
             # mức ở mép hình đã lọc / làm mờ, tuỳ những gì đã vẽ trước (bộ đệm vẽ của trình duyệt — ngoài tầm cảnh). Lỗi thật (thứ tự
             # lớp, đổ bóng giữ giá trị cũ, con vật trong tay lệch chỗ) lệch nhiều mức hay trên cả một vùng lớn.
-            if box and (worst > 2 or many > 1000): out.append(f'{t:g} s: pixels differ in {box} — {many} px, up to {worst} levels (scale {scale})')
+            # Ảnh lệch đáng kể mà cây DOM giống hệt lần đầu: nhiễu vẽ của trình duyệt (runner CI: vài trăm điểm ảnh rải khắp khung, lúc này
+            # lúc khác, actingProbe trùng) — bỏ qua. Lỗi thật luôn đổi phần cây DOM đang hiện (thứ tự lớp, transform, bóng, chỗ con vật).
+            if box and (worst > 2 or many > 1000) and scene.dom != first[t][2]:
+                out.append(f'{t:g} s: pixels differ in {box} — {many} px, up to {worst} levels (scale {scale}); the visible DOM differs too')
     return out
 
 
