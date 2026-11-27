@@ -82,18 +82,18 @@ def check_depths(folder):
                      + (f' — slides in view, standing still, for {d["slid"]} frame{"" if d["slid"] == 1 else "s"}' if d['slid'] else '')} for d in (DEPTHS or [])]
 
 
-PAGE_45 = {}            # đợt 45: Chrome đang mở cảnh đang soát — {'folder', 'server', 'page', 'used'}; mọi lượt đo (probe, pixel) dùng chung
+PAGE_45 = {}            # đợt 45: Chrome đang mở cảnh đang soát — {'folder', 'server', 'page'}; mọi lượt đo (probe, pixel) dùng chung một trang (đợt 46)
 
 
 def page45(folder, scale=1):
-    """ĐỢT 45 — MỘT CHROME CHO CẢ LƯỢT SOÁT: trả về trang của cảnh `folder` VỪA MỞ (chưa tua lần nào) ở tỉ lệ điểm ảnh `scale`. Lần đầu khởi
-    động Chrome (tools/chrome_run.py `Page45`); các lượt sau (`probe`, `pet_pixels`, `person_pixels_44b`) chỉ mở lại trang trong Chrome ấy.
-    Mỗi lượt vẫn bắt đầu từ trang mới mở như trước: số đo phụ thuộc thứ tự tua trước đó (thử: dùng tiếp trang sau `probe` thì bàn tay bác sĩ
-    trên con mèo đổi từ 100 % thành 86 % thấy được). `close_page45()` đóng Chrome (check_scene, khi xong cảnh)."""
+    """ĐỢT 45 — MỘT CHROME CHO CẢ LƯỢT SOÁT: trả về trang của cảnh `folder` ở tỉ lệ điểm ảnh `scale`. Lần đầu khởi động Chrome
+    (tools/chrome_run.py `Page45`) và mở cảnh; các lượt sau (`probe`, `pet_pixels`, `person_pixels_44b`) dùng lại ĐÚNG trang ấy.
+    ĐỢT 46: không mở lại trang trước mỗi lượt nữa — khung hình giờ chỉ phụ thuộc thời điểm, không phụ thuộc những lần tua trước nó
+    (đợt 45 phải mở lại: trang đã tua qua `probe` xếp đuôi con mèo đè lên tay bác sĩ — tools/ci/w46.py giữ điều ấy). Đổi tỉ lệ điểm ảnh
+    thì chỉ đổi cỡ vẽ, không mở lại. `close_page45()` đóng Chrome (check_scene, khi xong cảnh)."""
     if PAGE_45.get('folder') == folder:
         page = PAGE_45['page']
-        if PAGE_45['used'] or page.scale != scale: page.load(scale)
-        PAGE_45['used'] = True
+        if page.scale != scale: page.set_scale(scale)
         return page
     close_page45()
     sys.path.insert(0, HERE)
@@ -114,7 +114,7 @@ def page45(folder, scale=1):
     except BaseException:
         server.terminate()
         raise
-    PAGE_45.update(folder=folder, server=server, page=page, used=True)
+    PAGE_45.update(folder=folder, server=server, page=page)
     return page
 
 
@@ -237,7 +237,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
     'head', 'hand'}}: tỉ lệ điểm ảnh của hình con vật (c khác b) mà ảnh thường cũng thấy (a khác b) — trong khung hình vẽ đầu
     + thân (`parts` của actingProbe) để bóng dưới sàn không lẫn vào; `hand`: trong khung hình vẽ của bàn tay gần con vật nhất,
     tỉ lệ điểm ảnh của bàn tay (d khác e) mà ảnh thường vẫn thấy như ở d (a giống d: không bị gì che).
-    Đợt 45: chụp trong Chrome chung của cảnh (`page45`, trang mở lại cho lượt này), chỉ VÙNG được đo (khung đầu + thân con vật, khung bàn
+    Đợt 45: chụp trong Chrome chung của cảnh (`page45`; đợt 46: cùng trang với các lượt khác, không mở lại), chỉ VÙNG được đo (khung đầu + thân con vật, khung bàn
     tay nới thêm dải tìm khe 80 px), không ghi ra đĩa, so điểm ảnh bằng Pillow (C); d, e chỉ chụp khi có bàn tay để đo. Ảnh một vùng có thể
     lệch 1–2 mức màu so với cùng chỗ trên ảnh cả khung (Chrome vẽ theo ô khác) — mọi số đo trên 69 cảnh CI vẫn như trước."""
     try:
@@ -392,7 +392,7 @@ def person_pixels_44b(folder, jobs):
     """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC BAO NHIÊU, đo bằng pixel (như `pet_pixels`). `jobs`: [(lúc, tên, khung đầu, khung ngực)]. Ở mỗi lúc
     chụp ba ảnh: a — như thường; b — ẩn host người ấy; c — host người ấy lên lớp trên cùng. Trong mỗi khung: phần điểm ảnh của hình người ấy
     (c khác b) mà ảnh thường cũng thấy (a khác b) — mặt quầy, máy tính, màn hình trước họ che thì không thấy. Trả về {(lúc, tên): (đầu, ngực)}.
-    Đợt 45: trong Chrome chung của cảnh (trang mở lại cho lượt này), chỉ chụp vùng hai khung, so bằng Pillow (C)."""
+    Đợt 45: trong Chrome chung của cảnh (đợt 46: cùng trang, không mở lại), chỉ chụp vùng hai khung, so bằng Pillow (C)."""
     try:
         from PIL import ImageChops
     except ImportError:

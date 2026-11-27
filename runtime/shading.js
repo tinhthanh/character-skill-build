@@ -101,42 +101,51 @@ export function attachShade(svg, root) {
      * tối hẳn. amount = 0 tắt lớp.
      */
     set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)},${root.getAttribute('transform')}`;
-      if (key === last) return;
-      last = key;
-      if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
-      cover.style.display = '';
+      // ĐỢT 46: khoá so sánh là chính CÁC GIÁ TRỊ SẼ GHI (đã làm tròn), không phải đầu vào làm tròn — khoá cũ `amount.toFixed(3)` mà
+      // ghi `(amount × 0,95).toFixed(3)`: hai khung cùng khoá có thể cần hai giá trị khác nhau (0,351 / 0,352), khung sau giữ giá trị
+      // của khung trước — hình phụ thuộc khung nào được vẽ trước nó.
+      if (amount <= 0.003 && glow <= 0.003) { if (last !== 'off') { last = 'off'; cover.style.display = 'none'; } return; }
       const b = frame();
       // Chủ yếu theo CHIỀU NGANG: ánh sáng từ một bên đọc rõ nhất trên hình chibi đứng thẳng; chuyển sắc trải theo bề NGANG
       // của hình (trải theo đường chéo cả khung thì giữa thân gần như không đổi — đo ở cảnh thử đợt 17).
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2, sx = (dx < 0 ? -1 : 1) * Math.max(Math.abs(dx), Math.abs(dy) * 0.6), sy = dy * 0.35, length = Math.hypot(sx, sy) || 1, ux = sx / length, uy = sy / length;
       const half = b.width * 0.5;
-      grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
-      grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
-      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.6, glow).toFixed(3));
-      // Màu phía khuất: màu bóng của giờ trong ngày (đêm: xanh lạnh) — đen thuần thì thành xám đục (Gemini, đợt 17).
-      stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
-      // Nửa khuất tối rõ NGAY sau giữa thân (0,95 × độ tối): một ranh giới sáng / tối đọc được ở cỡ nhỏ — 0,75 thì người chấm
-      // (hai mô hình, đợt 25) đều thấy nhân vật "sáng đều hai bên".
-      stops[2].setAttribute('stop-opacity', Math.min(0.75, amount * 0.95).toFixed(3));
-      stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
-      // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
       const lift = fill && fillAmount > 0.003;
-      stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
-      stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
+      const out = [(cx - ux * half).toFixed(1), (cy - uy * half).toFixed(1), (cx + ux * half).toFixed(1), (cy + uy * half).toFixed(1),
+        `rgb(${rgb})`, Math.min(0.6, glow).toFixed(3), `rgb(${dark})`,
+        // Nửa khuất tối rõ NGAY sau giữa thân (0,95 × độ tối): một ranh giới sáng / tối đọc được ở cỡ nhỏ — 0,75 thì người chấm
+        // (hai mô hình, đợt 25) đều thấy nhân vật "sáng đều hai bên".
+        Math.min(0.75, amount * 0.95).toFixed(3), Math.min(0.7, amount).toFixed(3),
+        // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
+        lift ? `rgb(${fill})` : `rgb(${dark})`, (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3)];
+      const key = out.join(',');
+      if (key === last) return;
+      last = key;
+      cover.style.display = '';
+      grad.setAttribute('x1', out[0]); grad.setAttribute('y1', out[1]);
+      grad.setAttribute('x2', out[2]); grad.setAttribute('y2', out[3]);
+      stops[0].setAttribute('stop-color', out[4]); stops[0].setAttribute('stop-opacity', out[5]);
+      // Màu phía khuất: màu bóng của giờ trong ngày (đêm: xanh lạnh) — đen thuần thì thành xám đục (Gemini, đợt 17).
+      stops[2].setAttribute('stop-color', out[6]); stops[3].setAttribute('stop-color', out[6]);
+      stops[2].setAttribute('stop-opacity', out[7]);
+      stops[3].setAttribute('stop-opacity', out[8]);
+      stops[4].setAttribute('stop-color', out[9]);
+      stops[4].setAttribute('stop-opacity', out[10]);
     },
     /** ÁNH SÁNG PHẢN XẠ từ sàn: màu `rgb` ("214,168,110"), độ mạnh `amount` 0…1 (0 tắt) — dày ở chân, tan hết ở ngang ngực. */
     bounce(rgb = '255,255,255', amount = 0) {
-      const key = `${rgb},${amount.toFixed(3)},${root.getAttribute('transform')}`;
+      if (amount <= 0.004) { if (lastBounce !== 'off') { lastBounce = 'off'; up.style.display = 'none'; } return; }
+      const b = frame();
+      // Đợt 46: khoá là các giá trị sẽ ghi (như `set`).
+      const out = [(b.y + b.height).toFixed(1), (b.y + b.height * 0.35).toFixed(1), `rgb(${rgb})`, Math.min(0.5, amount).toFixed(3), Math.min(0.5, amount * 0.35).toFixed(3)];
+      const key = out.join(',');
       if (key === lastBounce) return;
       lastBounce = key;
-      if (amount <= 0.004) { up.style.display = 'none'; return; }
       up.style.display = '';
-      const b = frame();
-      rise.setAttribute('y1', (b.y + b.height).toFixed(1)); rise.setAttribute('y2', (b.y + b.height * 0.35).toFixed(1));
-      for (const stop of riseStops) stop.setAttribute('stop-color', `rgb(${rgb})`);
-      riseStops[0].setAttribute('stop-opacity', Math.min(0.5, amount).toFixed(3));
-      riseStops[1].setAttribute('stop-opacity', Math.min(0.5, amount * 0.35).toFixed(3));
+      rise.setAttribute('y1', out[0]); rise.setAttribute('y2', out[1]);
+      for (const stop of riseStops) stop.setAttribute('stop-color', out[2]);
+      riseStops[0].setAttribute('stop-opacity', out[3]);
+      riseStops[1].setAttribute('stop-opacity', out[4]);
     },
   };
 }

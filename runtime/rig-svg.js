@@ -2104,6 +2104,10 @@ export class RigSVG {
     // Cẳng tay (đan tay) hay bàn tay (bưng đồ) ở lớp trước đi theo đúng cánh tay của nó — bàn tay thì cộng thêm phép
     // biến đổi của cẳng tay.
     if (front) e.xaCang.setAttribute('transform', e['bat' + front].getAttribute('transform') + (front === carryFront ? ' ' + e['cang' + front].getAttribute('transform') : ''));
+    // Đợt 46: nhóm trống thì về trạng thái cố định — nhóm trống có bộ lọc viền vẫn được Chrome vẽ (một lớp lọc theo phép biến đổi của
+    // nó), mang phép biến đổi của lần nó có tay gần nhất thì điểm ảnh quanh đó lệch 1–2 mức tuỳ những khung đã vẽ trước.
+    else if (e.xaCang.hasAttribute('transform')) e.xaCang.removeAttribute('transform');
+    if (!front && e.xaCang.style.filter) e.xaCang.style.filter = '';
     this.#placeCarried();
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:
     // bắp + cẳng ≈ ±90°). Cánh tay lệch khỏi dáng ấy bao nhiêu — nghỉ ở dáng gập hờ, hay quay nghiêng người khiến
@@ -7322,6 +7326,7 @@ export class RigSVG {
     if (s.om < 0.5) {
       pet.carrier = null;                                          // đợt 40 C
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
+      if (e.om.hasAttribute('transform')) e.om.removeAttribute('transform');      // đợt 46: ngăn trống về trạng thái cố định (như `xaCang`)
       return;
     }
     if (!inside) { e.om.appendChild(pet.svg); }
