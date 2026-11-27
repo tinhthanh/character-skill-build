@@ -11,6 +11,24 @@
 const ra = { ok: true, loi: [], nhanVat: {}, banDung: {} };
 const hong = (cho, chu) => { ra.ok = false; ra.loi.push(`${cho}: ${chu}`); };
 window.addEventListener('error', (e) => hong('page', e.message));
+// CHIA PHẦN (đợt 47 B): `?shard=i/n` chỉ chạy phần thứ i trong n phần; `?characters=a,b` chỉ chạy phần quét động tác của các
+// nhân vật / thú ấy. Mỗi phần việc (một khối kiểm tra, hoặc phần quét một nhân vật) mở bằng `if (chay('tên')) …`: MỌI lượt
+// chạy đều gặp đủ các tên theo cùng thứ tự (ghi vào ra.tatCa), mỗi tên thuộc đúng MỘT phần (ra.phan) — tools/check_report.py
+// gộp các phần và đối chiếu: không tên nào bị bỏ, không tên nào chạy hai lần. ra.thoiGian: mỗi phần việc mất bao nhiêu ms.
+const thamSo = new URLSearchParams(location.search);
+const [phanSo, soPhan] = (thamSo.get('shard') || '1/1').split('/').map(Number);
+const chiNhanVat = thamSo.get('characters') ? thamSo.get('characters').split(',') : null;
+Object.assign(ra, { shard: `${phanSo}/${soPhan}`, tatCa: [], phan: [], thoiGian: {} });
+let viecDangChay = null, batDau = 0;
+const ghiGio = () => { const now = performance.now(); if (viecDangChay) ra.thoiGian[viecDangChay] = Math.round(now - batDau); viecDangChay = null; return now; };
+const chay = (ten) => {
+  const now = ghiGio();
+  const thuTu = ra.tatCa.push(ten) - 1;
+  const cuaToi = chiNhanVat ? chiNhanVat.includes(ten.replace(/^(person|pet):/, '')) && /^(person|pet):/.test(ten) : thuTu % soPhan === phanSo - 1;
+  viecDangChay = cuaToi ? ten : null; batDau = now;
+  if (cuaToi) ra.phan.push(ten);
+  return cuaToi;
+};
 try {
   const L = await import('../runtime/index.js');
   const { RigSVG, RigThu } = L;
@@ -48,7 +66,7 @@ try {
   // nhảy xa. Chạy ĐẦU TIÊN, trên trang còn sạch: lỗi này (tween ghi nhớ sai giá trị đầu do cơ
   // chế lazy của GSAP — nhân vật bước vào xong giật về điểm xuất phát) chỉ lộ ra khi tween
   // được vẽ lần đầu bằng một cú nhảy, đúng tình huống của bộ dựng video.
-  for (const [ten, tao, buoc] of [['vet', (h) => new RigSVG(h, 'vet'), ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']],
+  if (chay('khong-dich-chuyen-tuc')) for (const [ten, tao, buoc] of [['vet', (h) => new RigSVG(h, 'vet'), ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']],
                                   ['dog', (h) => new RigThu(h, 'dog'), ['enter', 'wagTail', ['walk', 4, 80], 'sit']]]) {
     const rig = tao(document.getElementById('san')), t = L.sequence(rig, buoc);
     let truoc = null;
@@ -60,7 +78,7 @@ try {
     if (rig.tl().vars.defaults.lazy !== false) hong(ten, 'rig timelines must have defaults.lazy = false');
   }
 
-  for (const k of Object.keys(RigSVG.NHAN_VAT)) {
+  for (const k of Object.keys(RigSVG.NHAN_VAT)) if (chay('person:' + k)) {
     const rig = new RigSVG(document.getElementById('san'), k);
     for (const id of ['tocTruoc', 'matL', 'matR', 'nguoiL', 'nguoiR', 'banL', 'banR'])
       if (!rig.svg.querySelector(`#${rig.id}-${id}`)) hong(k, `missing required element id "\${p}-${REQUIRED[id]}" (see references/slots.md)`);
@@ -69,16 +87,16 @@ try {
     try { rig.doiMau({ ao: '#8a5ad6', toc: '#6b4b2f' }); L.applyConfig(rig, { proportions: { headSize: 1.2 }, faceShape: { halfWidth: 44 } }); if (xau(rig.svg)) hong(k, 'broken SVG attributes after setColors / applyConfig'); }
     catch (e) { hong(k, 'setColors / applyConfig threw: ' + e.message); }
   }
-  for (const k of Object.keys(RigThu.LOAI)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC.filter((name) => !RigThu.WITH_WEAR.includes(name)), ['exit', 'flop']); }       // đợt 40 B: `flop` (thỏ) là thế giữ tới `standUp`; đợt 40 C: `pawAtCone` cần đang đeo loa — có bài kiểm riêng
+  for (const k of Object.keys(RigThu.LOAI)) if (chay('pet:' + k)) { const pet = new RigThu(document.getElementById('san2'), k); quet(pet, k, pet.DONG_TAC.filter((name) => !RigThu.WITH_WEAR.includes(name)), ['exit', 'flop']); }       // đợt 40 B: `flop` (thỏ) là thế giữ tới `standUp`; đợt 40 C: `pawAtCone` cần đang đeo loa — có bài kiểm riêng
 
   // Tính tất định: gieo cùng hạt phải ra cùng timeline.
-  { const rig = new RigSVG(document.getElementById('san'), 'vet');
+  if (chay('tinh-tat-dinh-gieo')) { const rig = new RigSVG(document.getElementById('san'), 'vet');
     const dau = (t) => JSON.stringify(t.getChildren(true, true, false).map((c) => [c.startTime().toFixed(3), c.duration().toFixed(3)]));
     L.seed(3); const a = dau(rig.explain('một hai ba bốn', 2)); L.seed(3); const b = dau(rig.explain('một hai ba bốn', 2)); L.seed(null);
     if (a !== b) hong('seed', 'the same seed produced two different timelines'); }
 
   // sequence(): khung 0 phải đúng trạng thái đầu của bước đầu; tua tới đâu cũng ra đúng một trạng thái.
-  { const rig = new RigSVG(document.getElementById('san'), 'surgeon');
+  if (chay('sequence-khung-0-phai')) { const rig = new RigSVG(document.getElementById('san'), 'surgeon');
     const t = L.sequence(rig, ['enter', 'wave', ['walk', 4, 100], 0.3, 'nod']);
     t.seek(0); rig.apDung(); const x0 = rig.s.x;
     if (x0 > -268) hong('sequence', `frame 0: x = ${x0.toFixed(1)}, expected −270 or further out (enter)`);
@@ -95,7 +113,7 @@ try {
     ra.kichBan = { dai: +t.duration().toFixed(2) }; }
 
   // ── Các lớp CHẶN LỖI IM LẶNG phải còn hoạt động ──
-  { const expectThrow = (label, fn) => { try { fn(); hong('guards', `${label}: should have thrown`); } catch (e) { /* đúng */ } };
+  if (chay('cac-lop-chan-loi')) { const expectThrow = (label, fn) => { try { fn(); hong('guards', `${label}: should have thrown`); } catch (e) { /* đúng */ } };
     const host = document.getElementById('san');
     const problems = L.validateConfig({ proportionz: { headSize: 2 }, faceShape: { halfWidth: 'wide', crownHeight: 50 }, colors: { top: 'green' }, restPose: { upperArmL: 'x' } });
     if (problems.length !== 4) hong('guards', `validateConfig should report 4 problems, reported ${problems.length}: ${problems.join(' | ')}`);
@@ -121,7 +139,7 @@ try {
   }
 
   // ── Mọi tệp trong configs/ phải hợp lệ (studio ghi ra, nhưng người cũng sửa tay) ──
-  try {
+  if (chay('moi-tep-trong-configs')) try {
     const listing = await (await fetch('../configs/', { cache: 'no-store' })).text();
     const files = [...listing.matchAll(/href="([^"?]+\.json)"/g)].map((m) => decodeURIComponent(m[1]));
     ra.configs = files.length;
@@ -140,10 +158,12 @@ try {
   // ── MỌI động tác, đặt GIỮA một chuỗi: tua tới cùng một thời điểm từ phía trước và từ phía
   //    sau phải ra đúng một trạng thái. (Trước khi sequence() lấy mẫu sẵn, enter / walkForward /
   //    walkAway ở giữa chuỗi lệch cả vị trí lẫn độ mờ; phép thử cũ chỉ thử enter ở ĐẦU chuỗi.)
+  // Đợt 47 B: mỗi (rig, động tác) là một phần việc riêng — cả khối mất ~30 s, chia nhỏ để các phần cân nhau.
   { const sweep = (rig, label) => {
       const keys = Object.keys(rig.NGHI), read = () => JSON.stringify(keys.map((k) => (typeof rig.s[k] === 'number' ? +rig.s[k].toFixed(3) : rig.s[k])));
       for (const name of rig.actions) {
         if (name === 'idle' || (rig.constructor.EXCHANGE || []).includes(name) || (rig.constructor.WITH_ITEM || []).includes(name) || (rig.constructor.WITH_WEAR || []).includes(name)) continue;       // `handOver` / `take` cần một món đồ — có bài kiểm riêng
+        if (!chay(`seek-both-ways:${label}.${name}`)) continue;
         L.seed(3); rig.reset();
         const step = name === 'point' ? [name, { x: 60, y: 80 }] : (name === 'speak' || name === 'explain') ? [name, 'xin chào bạn nhé một hai ba', 2.4] : name;
         const t = L.sequence(rig, ['idle', step, 'idle']), D = t.duration();
@@ -160,7 +180,7 @@ try {
   }
 
   // ── Tư thế nghỉ tuỳ chỉnh (nghiêng đầu, nắm tay) phải được mọi động tác tôn trọng ──
-  { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
+  if (chay('tu-the-nghi-tuy')) { L.registerCharacter({ id: 'check_tmp_3', base: 'vet', define: (base) => ({ ...base, restPose: { ...base.restPose, headTilt: 4, handR: 'fist', smile: 0.2 } }) });
     const rig = L.createCharacter(document.getElementById('san'), { id: 'check_tmp_3' }).rig;
     for (const name of rig.actions) {
       if (['walkAway', 'exit'].includes(name) || L.RigSVG.EXCHANGE.includes(name) || L.RigSVG.WITH_ITEM.includes(name)) continue;      // cần một món đồ / một người khác — có bài kiểm riêng
@@ -222,7 +242,7 @@ try {
   }
 
   // ── LƯỢC ĐỒ CÔNG KHAI: tên tiếng Anh phải tới được đúng chỗ trong rig ──
-  { const host = document.getElementById('san');
+  if (chay('luoc-do-cong-khai')) { const host = document.getElementById('san');
     L.registerCharacter({ id: 'check_tmp_2', base: 'surgeon', define: (base, kit) => ({
       ...base, name: 'kiểm', hat: () => '', headSize: 1.11, longSleeves: true,
       colors: { ...base.colors, hair: '#888888', top: '#123456' },
@@ -272,7 +292,7 @@ try {
   }
 
   // ── Tư thế nghỉ LỆCH hai tay (một tay cầm đồ) phải sống sót qua bộ số của studio ──
-  {
+  if (chay('tu-the-nghi-lech')) {
     const host = document.getElementById('san');
     const plain = L.createCharacter(host, { id: 'barista', config: null }).rig;
     const gap = plain.state.upperArmL - plain.state.upperArmR, bend = plain.state.forearmL - plain.state.forearmR;
@@ -287,24 +307,26 @@ try {
   // ── Tay đang cầm đồ: không xoè ra dưới đồ vật; động tác một tay tự dùng tay rảnh ──
   {
     const host = document.getElementById('san');
-    const holder = L.createCharacter(host, { id: 'barista', config: null }).rig;           // cốc ở tay phải
-    const shown = (side) => [...holder.svg.querySelectorAll(`[id$="-tay${side}"] > [data-tay]`)].filter((el) => el.getAttribute('opacity') === '1').map((el) => el.dataset.tay).join();
-    const rest = { L: holder.state.upperArmL, R: holder.state.upperArmR };
-    for (const name of ['wave', 'thumbsUp']) {
-      const t = holder[name](); t.progress(0.45); holder.render();
-      if (Math.abs(holder.state.upperArmR - rest.R) > 1 || Math.abs(holder.state.upperArmL - rest.L) < 5) hong(name, 'uses the hand that holds an item although the other hand is free');
-      t.kill(); holder.reset();
+    if (chay('held-item-free-hand')) {
+      const holder = L.createCharacter(host, { id: 'barista', config: null }).rig;           // cốc ở tay phải
+      const shown = (side) => [...holder.svg.querySelectorAll(`[id$="-tay${side}"] > [data-tay]`)].filter((el) => el.getAttribute('opacity') === '1').map((el) => el.dataset.tay).join();
+      const rest = { L: holder.state.upperArmL, R: holder.state.upperArmR };
+      for (const name of ['wave', 'thumbsUp']) {
+        const t = holder[name](); t.progress(0.45); holder.render();
+        if (Math.abs(holder.state.upperArmR - rest.R) > 1 || Math.abs(holder.state.upperArmL - rest.L) < 5) hong(name, 'uses the hand that holds an item although the other hand is free');
+        t.kill(); holder.reset();
+      }
+      for (const name of ['present', 'shrug', 'explain']) {
+        const t = holder[name](); t.progress(0.45); holder.render();
+        if (shown('R') !== 'nam') hong(name, `the hand holding an item opens (shape ${shown('R')})`);
+        t.kill(); holder.reset();
+      }
+      const stowed = holder.hideItem('R'); stowed.progress(1); const wave = holder.wave(); wave.progress(0.45); holder.render();
+      if (Math.abs(holder.state.upperArmR - rest.R) < 5) hong('wave', 'does not go back to the right hand once the item is put away');
+      wave.kill(); stowed.kill(); holder.svg.remove();
     }
-    for (const name of ['present', 'shrug', 'explain']) {
-      const t = holder[name](); t.progress(0.45); holder.render();
-      if (shown('R') !== 'nam') hong(name, `the hand holding an item opens (shape ${shown('R')})`);
-      t.kill(); holder.reset();
-    }
-    const stowed = holder.hideItem('R'); stowed.progress(1); const wave = holder.wave(); wave.progress(0.45); holder.render();
-    if (Math.abs(holder.state.upperArmR - rest.R) < 5) hong('wave', 'does not go back to the right hand once the item is put away');
-    wave.kill(); stowed.kill(); holder.svg.remove();
     // Bắt đầu cảnh ĐÃ NGỒI SẴN, đã quay sẵn: đặt trạng thái trước khi dựng sequence, và nó giữ suốt.
-    {
+    if (chay('bat-dau-canh-da')) {
       const seated = L.createCharacter(host, { id: 'granny' }).rig;
       seated.state.seat = 1; seated.state.facing = -0.55;
       const line = L.sequence(seated, [['speak', 'xin chao', 1], ['nod']]);
@@ -315,7 +337,7 @@ try {
       line.kill(); seated.svg.remove();
     }
     // Hai tay đều cầm đồ: vẫy / tán thành bằng ĐẦU, hai tay đứng yên, thời lượng không đổi.
-    {
+    if (chay('hai-tay-deu-cam')) {
       L.registerCharacter({ id: 'check_tmp_full', base: 'clerk', define: (base, kit) => ({ ...base, heldItemR: (p, c) => kit.parts.phone(c), restPose: { ...base.restPose, handR: 'fist' } }) });
       const full = L.createCharacter(host, { id: 'check_tmp_full' }).rig, free = L.createCharacter(host, { id: 'clerk' }).rig;
       for (const name of ['wave', 'thumbsUp']) {
@@ -331,7 +353,7 @@ try {
     }
     // CỬ CHỈ KHI NÓI: tay đi từ tư thế nghỉ của chính nhân vật — không giật trong một khung hình ở đầu câu, không
     // quất nhanh quá 20° mỗi khung; tay đang cầm đồ đứng yên; tay kia có diễn.
-    {
+    if (chay('cu-chi-khi-noi')) {
       // Ba cụm lời cách nhau hai quãng ngắt; trong mỗi cụm khẩu hình đổi mỗi 0,3 s và cứ ba âm thì một âm mở to (D) — trọng âm.
       const gestureCues = { metadata: { duration: 9 }, mouthCues: [] };
       for (const [from, to] of [[0, 2.7], [3.1, 5.8], [6.2, 9]]) {
@@ -365,7 +387,7 @@ try {
     }
     // Câu nói ngắn vẫn phải THẤY cử chỉ, với mọi hạt giống: nhân vật nghỉ ở dáng đan tay từng bốc trúng dáng "tay lên
     // ngực" (lệch 15°) và đứng im cả câu.
-    for (let seedNo = 1; seedNo <= 8; seedNo++) {
+    if (chay('cau-noi-ngan-van')) for (let seedNo = 1; seedNo <= 8; seedNo++) {
       L.seed(seedNo); const actor = L.createCharacter(host, { id: 'vet' }).rig, rest = actor.state.forearmR;
       const line = L.sequence(actor, [['explain', 'Xin chào các bạn, hôm nay mình khám định kỳ cho bé nhé.', 4]]); let moved = 0;
       for (let time = 0; time <= line.duration(); time += 1 / 30) { line.time(time); moved = Math.max(moved, Math.abs(actor.state.forearmR - rest)); }
@@ -373,7 +395,7 @@ try {
       line.kill(); actor.svg.remove();
     }
     // Đang quay mặt sang trái thì vẫy và diễn bằng tay TRÁI (tay ở phía người đối diện); quay phải thì tay phải.
-    for (const [facing, near, far] of [['left', 'L', 'R'], ['right', 'R', 'L']]) for (const step of ['wave', ['explain', 'mot hai ba bon nam sau bay tam', 4]]) {
+    if (chay('dang-quay-mat-sang')) for (const [facing, near, far] of [['left', 'L', 'R'], ['right', 'R', 'L']]) for (const step of ['wave', ['explain', 'mot hai ba bon nam sau bay tam', 4]]) {
       L.seed(5); const actor = L.createCharacter(host, { id: 'boy' }).rig, rest = { L: actor.state.forearmL, R: actor.state.forearmR };
       const line = L.sequence(actor, [['face', facing], step]), begin = line.data.steps[1].start, moved = { L: 0, R: 0 };
       for (let time = begin; time <= line.duration(); time += 1 / 30) { line.time(time); for (const side of ['L', 'R']) moved[side] = Math.max(moved[side], Math.abs(actor.state['forearm' + side] - rest[side])); }
@@ -381,7 +403,7 @@ try {
       line.kill(); actor.svg.remove();
     }
     // Cất đồ rồi thì tay buông lỏng (không nắm vào không khí); lấy ra lại thì về dáng giữ đồ. Đi thì tay cầm đồ gần như không vung.
-    {
+    if (chay('cat-do-roi-thi')) {
       const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', hold = actor.NGHI['cang' + side];
       const line = L.sequence(actor, [['hideItem', side], ['idle', 0.5], ['showItem', side], ['walk', 4, 120]]), steps = line.data.steps;
       line.time(steps[1].start + 0.3);
@@ -394,7 +416,7 @@ try {
       line.kill(); actor.svg.remove();
     }
     // Vừa `exit` xong mà `enter` lại: phải THẤY nhân vật suốt quãng đi vào (từng đi vào trong vô hình rồi hiện phụt ra ở giữa).
-    for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'cat' }).rig]) {
+    if (chay('vua-exit-xong-ma')) for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'cat' }).rig]) {
       const actor = make(), line = L.sequence(actor, ['exit', 'enter']), back = line.data.steps[1];
       line.time(back.start + back.duration * 0.4);
       if (actor.s.mo < 0.99) hong('enter', `${actor.id || 'pet'}: still invisible (opacity ${actor.s.mo.toFixed(2)}) 40% into walking back in`);
@@ -402,7 +424,7 @@ try {
       line.kill(); actor.svg.remove();
     }
     // Ba kiểu bước tại chỗ phải KHÁC nhau khi nhìn thẳng: march đánh cẳng tay cao, stroll đung đưa nhẹ và chậm hơn, stepInPlace không đánh tay.
-    {
+    if (chay('ba-kieu-buoc-tai')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig, swing = {}, length = {};
       for (const name of ['march', 'stroll', 'stepInPlace']) {
         const t = actor[name](), rest = actor.NGHI.cangL; let most = 0;
@@ -414,7 +436,7 @@ try {
       actor.svg.remove();
     }
     // Biểu cảm có THÂN NGƯỜI: ngạc nhiên bung tay, suy nghĩ đưa tay lên, vui thì nhún (đang ngồi thì không); tay cầm đồ đứng yên.
-    {
+    if (chay('bieu-cam-co-than')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig, holder = L.createCharacter(host, { id: 'barista' }).rig;
       const most = (rig, name, key, rest) => { const t = rig.express(name); let far = 0; for (let time = 0; time <= t.duration(); time += 1 / 30) { t.time(time); far = Math.max(far, Math.abs(rig.s[key] - rest)); } t.progress(1); const back = Math.abs(rig.s[key] - rest); t.kill(); rig.reset(); return [far, back]; };
       for (const [name, key, least] of [['surprised', 'cangL', 25], ['thinking', 'cangR', 60], ['happy', 'y', 5], ['tired', 'tho', 0.8]]) {
@@ -429,14 +451,14 @@ try {
       actor.svg.remove(); holder.svg.remove();
     }
     // Mèo nghỉ ở dáng NGỒI: chạy vào khung thì phải đứng (từng trượt vào trong dáng ngồi).
-    {
+    if (chay('meo-nghi-o-dang')) {
       const pet = L.createPet(host, { species: 'cat' }).rig, line = L.sequence(pet, ['exit', 'enter']), back = line.data.steps[1];
       line.time(back.start + back.duration * 0.4);
       if (pet.s.ngoi > 0.05) hong('pet enter', `the cat runs in sitting (seat ${pet.s.ngoi.toFixed(2)})`);
       line.kill(); pet.svg.remove();
     }
     // Câu nói 4 giây: nửa SAU câu tay vẫn phải diễn (cử chỉ cuối từng bị bỏ vì không đủ chỗ cho pha về nền).
-    {
+    if (chay('cau-noi-4-giay')) {
       let quiet = 0;
       for (let seedNo = 1; seedNo <= 8; seedNo++) {
         L.seed(seedNo); const actor = L.createCharacter(host, { id: 'vet' }).rig, rest = actor.state.forearmR;
@@ -450,7 +472,7 @@ try {
       if (quiet) hong('explain gestures', `${quiet} of 8 seeds: no gesture in the second half of a four-second line`);
     }
     // Đồ cầm LUÔN ĐỨNG THẲNG trên màn hình: lúc nghỉ, lúc đi ngang cả hai chiều, lúc quay mặt.
-    {
+    if (chay('do-cam-luon-dung')) {
       const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', upright = -90;       // −90° là nắp cốc hướng LÊN, cho cả hai tay
       const tilt = () => { actor.render(); const m = actor.el['item' + side].getScreenCTM(); let off = Math.atan2(m.b, m.a) * 180 / Math.PI - upright; off = ((off + 540) % 360) - 180; return Math.abs(off); };
       const poses = [['at rest', null, 0], ['walking right', ['walk', 4, 120], 0.5], ['walking left', ['walk', 4, -120], 0.5], ['facing left', ['face', 'left'], 1], ['waving', ['wave'], 0.5]];
@@ -462,7 +484,7 @@ try {
       actor.svg.remove();
     }
     // Quay 3/4: tay XA nằm sau cả hai chân (từng ló bàn tay ra giữa hai đùi); nhìn thẳng thì về lại lớp trên thân.
-    {
+    if (chay('quay-3-4-tay')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig, legs = actor.el.chanG;       // cậu bé nghỉ ở dáng BUÔNG tay (dáng đan tay thì cẳng tay xa vắt ra trước bụng, xem '3/4 stance')
       for (const [turn, far] of [[0.55, 'batR'], [-0.55, 'batL']]) {
         actor.s.huong = turn; actor.render();
@@ -473,7 +495,7 @@ try {
       actor.svg.remove();
     }
     // Thú lật hướng: giữa chừng không bị ép dẹt thành một vạch.
-    {
+    if (chay('thu-lat-huong-giua')) {
       const pet = L.createPet(host, { species: 'cat' }).rig, t = pet.face('left'); let thinnest = 9;
       const wide = pet.el.goc.getBoundingClientRect().width;
       for (let p = 0; p <= 1; p += 0.01) { t.progress(p); pet.render(); thinnest = Math.min(thinnest, pet.el.goc.getBoundingClientRect().width / wide); }
@@ -482,7 +504,7 @@ try {
       t.kill(); pet.svg.remove();
     }
     // Vui: cú nhún phải đủ cao để thấy ở cỡ toàn thân; `express` ngắn không được giật lúc khép.
-    {
+    if (chay('vui-cu-nhun-phai')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig;
       for (const hold of [0.2, 0.6, 1.2]) {
         const t = actor.express('happy', hold); let top = 0, before = null, jump = 0;
@@ -494,7 +516,7 @@ try {
       actor.svg.remove();
     }
     // Gật và lắc đầu đủ lớn để thấy ở cỡ toàn thân; đuôi chó vẫy đủ rộng.
-    {
+    if (chay('gat-va-lac-dau')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig, far = (t, key) => { let most = 0; for (let p = 0; p <= 1; p += 0.01) { t.progress(p); most = Math.max(most, Math.abs(actor.s[key])); } t.kill(); actor.reset(); return most; };
       const dip = far(actor.nod(), 'dauY'), swing = far(actor.shake(), 'dauX');
       if (dip < 12) hong('nod', `the head dips only ${dip.toFixed(0)} units`);
@@ -506,7 +528,7 @@ try {
     }
     // Đi ngang, tay cầm đồ là tay XA: cánh tay nằm SAU thân (không vắt ngang qua ngực), còn món đồ ló ra khỏi mép
     // trước của thân nên vẫn thấy trọn.
-    {
+    if (chay('di-ngang-tay-cam')) {
       const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', toward = side === 'R' ? 120 : -120, dir = Math.sign(toward);
       const arm = actor.el['bat' + side];
       const t = actor.walk(4, toward); t.progress(0.5); actor.render();
@@ -517,7 +539,7 @@ try {
       t.kill(); actor.svg.remove();
     }
     // CỬ CHỈ Ở DÁNG 3/4 (kênh `aim`): nhân vật giữ nguyên hướng đang quay, cánh tay diễn theo góc màn hình.
-    {
+    if (chay('cu-chi-o-dang')) {
       const mid = (rig, t, at) => { t.pause(); t.time(at); rig.render(); };
       const vet = L.createCharacter(host, { id: 'vet' }).rig; vet.face('left').progress(1);
       let t = vet.point({ x: 30, y: 190 }); mid(vet, t, 0.7);
@@ -1045,7 +1067,7 @@ try {
       t.kill(); busy.svg.remove();
     }
     // Nhịp thở nền của `sequence()`: trong lúc giữ dáng ngực vẫn phồng xẹp; chuỗi kết thúc đúng trạng thái nghỉ; `breathe: false` thì tắt.
-    for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'dog' }).rig]) {
+    if (chay('nhip-tho-nen-cua')) for (const make of [() => L.createCharacter(host, { id: 'vet' }).rig, () => L.createPet(host, { species: 'dog' }).rig]) {
       const actor = make(), steps = [['idle', 0.2], 3, ['idle', 0.2]];
       const range = (line) => { let low = 9, high = -9; for (let time = 0.8; time <= 3; time += 0.05) { line.time(time); low = Math.min(low, actor.s.tho); high = Math.max(high, actor.s.tho); } return high - low; };
       const alive = L.sequence(actor, steps), moved = range(alive);
@@ -1057,7 +1079,7 @@ try {
       still.kill(); actor.svg.remove();
     }
     // Nói với nét mặt buồn / giận: khoé miệng TRỄ XUỐNG suốt câu, kể cả lúc miệng mở to (từng ngang ra — đọc thành cười).
-    for (const mood of ['worried', 'angry', 'sad']) {
+    if (chay('noi-voi-net-mat')) for (const mood of ['worried', 'angry', 'sad']) {
       L.seed(3); const actor = L.createCharacter(host, { id: 'vet' }).rig;
       const line = L.sequence(actor, [['explain', 'Xin chào các bạn, hôm nay mình khám định kỳ cho bé nhé.', 4, { mood }]]); let highest = -9;
       for (let time = 0.5; time <= 3.9; time += 1 / 60) { line.time(time); highest = Math.max(highest, actor.s.cuoi); }
@@ -1065,14 +1087,14 @@ try {
       line.kill(); actor.svg.remove();
     }
     // Cười: vai và đầu rung đủ lớn để thấy.
-    {
+    if (chay('cuoi-vai-va-dau')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig, t = actor.express('laughing', 1.2); let low = 99, high = -99;
       for (let time = 0.4; time <= 1.4; time += 1 / 60) { t.time(time); low = Math.min(low, actor.s.vai); high = Math.max(high, actor.s.vai); }
       if (high - low < 5) hong('express', `laughing: the shoulders shake only ${(high - low).toFixed(1)} units`);
       t.kill(); actor.svg.remove();
     }
     // Đi ngang: cái cốc vẫn ở ngang bụng như lúc đứng (từng tụt xuống ngang hông ngay khi quay người).
-    {
+    if (chay('di-ngang-cai-coc')) {
       const actor = L.createCharacter(host, { id: 'barista' }).rig, side = actor.holds.R ? 'R' : 'L', item = actor.el['item' + side];
       const height = () => { actor.render(); const box = item.getBoundingClientRect(), frame = actor.svg.getBoundingClientRect(); return (box.top + box.height / 2 - frame.top) / frame.height * 470; };
       const rest = height();
@@ -1080,7 +1102,7 @@ try {
       actor.svg.remove();
     }
     // CẢNH RỘNG: `exit` đi ra HẲN ngoài khung hình, `enter` bắt đầu từ ngoài khung hình — không mờ đi / hiện ra giữa sân khấu.
-    {
+    if (chay('canh-rong-exit-di')) {
       const stage = document.createElement('div'); stage.setAttribute('data-composition-id', 'check-stage');
       stage.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:400px;overflow:hidden';
       const spot = document.createElement('div'); spot.style.cssText = 'position:absolute;left:330px;top:0;width:400px;height:400px';
@@ -1107,7 +1129,7 @@ try {
       stage.remove();
     }
     // `present`: cẳng tay nâng lên, lòng bàn tay ngửa (không dang chếch xuống); tay cầm đồ đứng yên.
-    {
+    if (chay('present-cang-tay-nang')) {
       const actor = L.createCharacter(host, { id: 'boy' }).rig; let t = actor.present(); t.time(0.85);
       if (actor.s.cangL < 50 || actor.s.cangR < 50) hong('present', `the forearms are not raised (${actor.s.cangL.toFixed(0)}°, ${actor.s.cangR.toFixed(0)}°)`);
       t.progress(1); if (Math.abs(actor.s.cangR - actor.NGHI.cangR) > 1e-6) hong('present', 'does not return to rest');
@@ -1119,7 +1141,7 @@ try {
       t.kill(); holder.svg.remove();
     }
     // Thú ở cảnh RỘNG chạy vào trong khoảng ba giây (từng mất hơn năm); quãng ngắn vẫn giữ nhịp cũ. Sủa: miệng mở dần chứ không bật; gừ: tai ép hẳn ra sau.
-    {
+    if (chay('thu-o-canh-rong')) {
       const stage = document.createElement('div'); stage.setAttribute('data-composition-id', 'check-wide');
       stage.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:400px;overflow:hidden';
       const spot = document.createElement('div'); spot.style.cssText = 'position:absolute;left:560px;top:150px;width:300px;height:248px';
@@ -1137,7 +1159,7 @@ try {
       t.kill(); cat.svg.remove();
     }
     // `hand` chọn tay chủ đạo của cử chỉ khi nói (người dẫn diễn về phía bảng nội dung).
-    for (const [hand, lead, other] of [['L', 'L', 'R'], ['R', 'R', 'L']]) for (const step of [(o) => ['explain', 'mot hai ba bon nam sau bay tam', 4, o], (o) => ['speakCues', { metadata: { duration: 4 }, mouthCues: Array.from({ length: 13 }, (_, n) => ({ start: n * 0.3, end: n * 0.3 + 0.3, value: n % 3 ? 'B' : 'D' })) }, null, o]]) {
+    if (chay('hand-chon-tay-chu')) for (const [hand, lead, other] of [['L', 'L', 'R'], ['R', 'R', 'L']]) for (const step of [(o) => ['explain', 'mot hai ba bon nam sau bay tam', 4, o], (o) => ['speakCues', { metadata: { duration: 4 }, mouthCues: Array.from({ length: 13 }, (_, n) => ({ start: n * 0.3, end: n * 0.3 + 0.3, value: n % 3 ? 'B' : 'D' })) }, null, o]]) {
       // Cộng dồn qua BA seed: một lần rút thăm có thể ra toàn dáng hai tay, mà tay phụ nghỉ ở góc xa dáng đích hơn nên
       // "lệch khỏi nghỉ" của nó lớn hơn — so một seed là phép thử ăn may theo dãy ngẫu nhiên.
       const moved = { L: 0, R: 0 }, total = { L: 0, R: 0 }; let label = '';
@@ -1151,7 +1173,7 @@ try {
     }
     // MÁY QUAY và người bước ra: nói xong rồi `exit` thì máy quay về toàn cảnh lúc bắt đầu đi — kể cả khi trước lượt ấy
     // máy quay đang ở toàn cảnh (từng ghì cận vào chỗ trống). Và con vật đứng cạnh không bị mép dưới khung cắt ngang.
-    {
+    if (chay('may-quay-va-nguoi')) {
       const stage2 = document.createElement('div'); stage2.setAttribute('data-composition-id', 'check-camera');
       stage2.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
       const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage2.appendChild(d); return d; };
@@ -1175,7 +1197,7 @@ try {
     }
     // Con vật đứng cạnh người nói, đầu nó bị mép DƯỚI của cận ngực cắt ngang: máy quay siết lại thành cận mặt (con vật
     // nằm hẳn dưới khung, người nói vẫn to) thay vì nới ra ôm cả hai.
-    {
+    if (chay('con-vat-dung-canh')) {
       const stage3 = document.createElement('div'); stage3.setAttribute('data-composition-id', 'check-tight');
       stage3.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
       const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage3.appendChild(d); return d; };
@@ -1194,7 +1216,7 @@ try {
       careful.kill(); L.shot(scene3, null, 'wide').progress(1); stage3.remove();
     }
     // PHỤ ĐỀ tránh đầu nhân vật: hộp chữ đè lên đầu con chó thì dời theo chiều dọc tới chỗ trống; `avoid: false` thì để yên.
-    {
+    if (chay('phu-de-tranh-dau')) {
       const stage4 = document.createElement('div'); stage4.setAttribute('data-composition-id', 'check-captions');
       stage4.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
       const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage4.appendChild(d); return d; };
@@ -1226,7 +1248,7 @@ try {
     }
     // PHỤ ĐỀ lúc máy quay ĐANG PHÓNG VÀO (khung dọc, hộp chữ giữa khung): suốt thời gian hộp chữ hiện rõ, nó không được
     // đè lên đầu người nói — dời đi, hoặc hiện muộn hơn một chút khi không còn chỗ.
-    {
+    if (chay('phu-de-luc-may')) {
       const stage5 = document.createElement('div'); stage5.setAttribute('data-composition-id', 'check-captions-move');
       stage5.style.cssText = 'position:absolute;left:0;top:0;width:540px;height:960px;overflow:hidden';
       const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage5.appendChild(d); return d; };
@@ -1256,7 +1278,7 @@ try {
     }
     // Lượt KHÔNG LỜI mở đầu bằng `enter`, ngay sau câu nói của người khác: bắt đầu sớm (tối đa 1,2 s) khi người kia còn
     // đang nói nốt; lượt không lời KHÁC (chó sủa) thì vẫn chờ dứt lời; lượt sau đó không bị kéo sớm theo.
-    {
+    if (chay('luot-khong-loi-mo')) {
       const person = L.createCharacter(host, { id: 'vet' }).rig, pet = L.createPet(san2, { species: 'dog' }).rig;
       const spoken = (talk, n) => { const step = talk.turns[n].steps.find((item) => item.speech !== undefined); return [step.start, step.start + step.speech]; };
       const arriving = L.conversation([[person, ['explain', 'mot hai ba bon nam sau', 3]], [pet, 'enter', 'wagTail'], [person, ['explain', 'bay tam', 1.5]]]);
@@ -1271,7 +1293,7 @@ try {
     }
     // ── TƯƠNG TÁC ──
     // Cho một nhân vật bất kỳ cầm đồ (`items`), kể cả ở trạng thái đang cất (`itemsHidden`).
-    {
+    if (chay('tuong-tac')) {
       const giver = L.createCharacter(host, { id: 'barista' }).rig, side = giver.holds.R ? 'R' : 'L';
       const taker = L.createCharacter(host, { id: 'granny', items: { L: 'cup' }, itemsHidden: true }).rig;
       if (!taker.holds.L || taker.s.itemL !== 0 || taker.NGHI.itemL !== 0) hong('items', 'a character created with a hidden item should have it put away');
@@ -1315,7 +1337,7 @@ try {
     }
     // ĐIỆN THOẠI VÀ MÁY TÍNH: gọi điện (áp máy lên má, mặt lưng ra ngoài), thế áp máy giữ qua câu nói, khoe màn hình
     // (phóng to), bấm điện thoại, gõ phím; điện thoại / máy tính có ảnh trên màn hình.
-    {
+    if (chay('dien-thoai-va-may')) {
       const caller = L.createCharacter(host, { id: 'vet', items: { R: { kind: 'phone', image: 'data:image/png;base64,iVBORw0KGgo=' } } }).rig;
       if (!caller.el.itemR.querySelector('image[href^="data:image/png"]')) hong('phone', 'items: { R: { kind: "phone", image } } does not draw the picture on the screen');
       const head = () => caller.el.dau.getBoundingClientRect(), wrist = () => caller.el.coTayR.getBoundingClientRect();
@@ -1401,7 +1423,7 @@ try {
     }
     // KHÁM BỆNH VÀ BẾ THÚ: thú nằm / ngủ / mệt; nghe tim phổi (ống nghe áp vào thân); tiêm (pít-tông, kim không rời tay);
     // bế lên (SVG con vật vào ngăn giữa thân và tay, trước bụng) và đặt xuống (về host, đúng chỗ cũ).
-    {
+    if (chay('kham-benh-va-be')) {
       const ring = document.createElement('div'); ring.style.cssText = 'position:absolute;left:0;top:0;width:600px;height:300px'; document.body.appendChild(ring);
       const place = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; ring.appendChild(d); return d; };
       // Thú: nằm giữ qua động tác khác; ngủ xong vẫn nằm, mắt mở; mệt thì tai cụp; đứng dậy về dáng đứng.
@@ -1474,7 +1496,7 @@ try {
     }
     // CỬ CHỈ, GIAO TIẾP VÀ BIỂU CẢM (đợt 3): đếm ngón, vỗ tay, chắp tay, xem đồng hồ, ôm đầu, cúi chào, bắt tay; khóc,
     // ngượng, buồn ngủ.
-    {
+    if (chay('cu-chi-giao-tiep')) {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:600px;height:300px'; document.body.appendChild(stage);
       const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
       const one = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
@@ -1597,7 +1619,7 @@ try {
     }
     // ĐỢT 39 A — QUẦY THU NGÂN & QUẦY CÀ PHÊ: quét QR / quẹt thẻ tới đúng mã / máy rồi "ting", thối tiền (từng tờ sang tay, xấp tiền sang người nhận),
     // đóng dấu (dấu đỏ ở lại), rót nước (dòng nước, mức nước dâng, cốc còn trong tay), lau quầy; mỗi cái qua sequence(), kết thúc ở dáng nghỉ; lỗi rõ.
-    {
+    if (chay('dot-39-a-quay')) {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:900px;width:900px;height:300px'; document.body.appendChild(stage);
       const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
       const mk = (left, id, items, hidden) => L.createCharacter(spot(`left:${left}px;top:0;width:200px;height:235px`), { id, items, itemsHidden: hidden }).rig;
@@ -1685,6 +1707,7 @@ try {
     // tools/actions.sh và tools/reel.py dùng). Một động tác đứng SAU một bước khác trong chuỗi (như trong cảnh thật) phải
     // đi qua đúng các trạng thái như khi gọi một mình: lệnh `set` ở mốc 0 của bước bị bỏ qua, tween ghi nhớ sai giá trị
     // đầu… đều làm hai đường lệch nhau. So từng khóa trạng thái ở từng khung 1/60 s.
+    // Đợt 47 B: mỗi mục của danh mục là một phần việc (cả khối mất ~50 s); phần dựng chung (đọc danh mục, sân khấu) chạy ở mọi phần.
     {
       const catalog = await (await fetch('action-catalog.json', { cache: 'no-store' })).json();
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
@@ -1712,6 +1735,8 @@ try {
         const kind = id in RigThu.LOAI ? RigThu.LOAI[id].loai : null;
         // Combo (đợt 37) không có hàm trên rig để gọi thẳng — chỉ chạy qua sequence(); tools/check_scene.py thử nó trong cảnh.
         for (const entry of list.filter((item) => item.steps.length === 1 && !L.COMBOS[Array.isArray(item.steps[0]) ? item.steps[0][0] : item.steps[0]] && (!item.species || item.species === kind))) {
+          compared++;        // đếm mọi mục của danh mục, ở mọi phần (một mục hỏng thì cả trang dừng ở 'check', như trước)
+          if (!chay(`seq-vs-direct:${id}.${entry.label}`)) continue;
           await new Promise((resolve) => setTimeout(resolve, 0));        // nhường lượt: trang vẫn trả lời chrome_run giữa chừng (CI chậm)
           stage.replaceChildren(); L.seed(5);
           const direct = build(id, entry, 0), keys = Object.keys(direct.rig.NGHI);
@@ -1734,16 +1759,16 @@ try {
               if (gap > 0.5 && (!worst || gap > worst.gap)) worst = { key, gap, time: n / 60, a, b };
             });
           });
-          chain.kill(); compared++;
+          chain.kill();
           if (worst) hong(`${id}.${entry.label}`, `inside a sequence the action differs from a direct call — ${publicKey(worst.key)} is ${typeof worst.b === 'number' ? worst.b.toFixed(2) : worst.b} instead of ${typeof worst.a === 'number' ? worst.a.toFixed(2) : worst.a} at ${worst.time.toFixed(2)} s`);
         }
       }
-      if (compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
+      if (chay('action-catalog-count') && compared < 40) hong('action-catalog', `only ${compared} single-step actions compared — is tools/action-catalog.json readable?`);
       stage.remove();
     }
     // ĐỢT 38 B — GIỮ CON VẬT, RỬA TAY, ĐEO / THÁO GĂNG: găng là trạng thái của timeline (tua tới đâu cũng đúng, giữ qua bước sau trong
     // sequence()), hiện ở đúng bàn tay; tháo găng khi không đeo bị từ chối; hai tay người giữ trên con vật; bọt chỉ lúc xoa.
-    {
+    if (chay('dot-38-b-giu')) {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:300px;width:900px;height:300px'; document.body.appendChild(stage);
       const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
       const vet = L.createCharacter(spot('left:0;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
@@ -1784,7 +1809,7 @@ try {
     }
     // ĐỢT 37 — COMBO: `sequence()` bung combo thành các bước của nó (không còn tên combo trong `steps`); `combo()` trả lượt
     // `conversation()`, bước "with" thành `together` với con vật; thiếu con vật thì báo lỗi rõ.
-    {
+    if (chay('dot-37-combo-sequence')) {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
       const host = document.createElement('div'); host.style.cssText = 'position:absolute;left:0;top:0;width:200px;height:235px'; stage.appendChild(host);
       const petHost = document.createElement('div'); petHost.style.cssText = 'position:absolute;left:110px;top:108px;width:100px;height:82px'; stage.appendChild(petHost);
@@ -1826,7 +1851,7 @@ try {
       stage.remove();
     }
     // ĐỢT 4 — triệu chứng của thú, khám bằng đèn soi, bánh thưởng, dây dắt.
-    {
+    if (chay('dot-4-trieu-chung')) {
       const stage = document.createElement('div'); stage.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:300px'; document.body.appendChild(stage);
       const spot = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage.appendChild(d); return d; };
       for (const species of ['dog', 'cat']) {
@@ -2430,7 +2455,7 @@ try {
       stage.remove();
     }
     // VUỐT VE: tay ở phía con vật vươn tới nó; tay ấy đang cầm đồ thì dùng tay kia.
-    {
+    if (chay('vuot-ve-tay-o')) {
       const stage6 = document.createElement('div'); stage6.style.cssText = 'position:absolute;left:0;top:0;width:900px;height:400px';
       const mk = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;' + css; stage6.appendChild(d); return d; };
       const mid = mk('left:280px;top:0;width:340px;height:400px'), right = mk('left:560px;top:250px;width:180px;height:149px'), left = mk('left:160px;top:250px;width:180px;height:149px');
@@ -2453,7 +2478,7 @@ try {
       t.kill(); stage6.remove();
     }
     // GHI CHÉP: tay kia đưa tới món đồ đang cầm và viết; tay cầm đồ đứng yên; không cầm gì thì viết lên tay trái.
-    {
+    if (chay('ghi-chep-tay-kia')) {
       const clerk = L.createCharacter(host, { id: 'boy', items: { L: 'clipboard' } }).rig, t = clerk.write(1.2); let pen = 0, pad = 0, flips = 0, way = 0, before = null;
       for (let time = 0; time <= t.duration(); time += 1 / 60) { t.time(time); pen = Math.max(pen, Math.abs(clerk.s.cangR - clerk.NGHI.cangR)); pad = Math.max(pad, Math.abs(clerk.s.cangL - clerk.NGHI.cangL));
         if (before !== null) { const d = Math.sign(Math.round((clerk.s.cangR - before) * 30)); if (d && d !== way) { if (way) flips++; way = d; } } before = clerk.s.cangR; }
@@ -2464,7 +2489,7 @@ try {
       t.kill(); clerk.svg.remove();
     }
     // Nhân vật có món đồ ĐANG CẤT bước vào bằng `enter` thì món đồ vẫn cất (từng tự hiện ra, nên không `take()` được).
-    {
+    if (chay('nhan-vat-co-mon')) {
       const late = L.createCharacter(host, { id: 'granny', items: { L: 'cup' }, itemsHidden: true }).rig, line = L.sequence(late, [['enter', 'right'], ['take', 'left']]);
       line.time(line.data.steps[1].start - 0.01); if (late.s.itemL > 0.01) hong('enter', 'a put-away item appears when the character walks in');
       line.time(line.duration()); if (late.s.itemL !== 1) hong('take', 'the item is not received after walking in');
@@ -2474,7 +2499,7 @@ try {
     // tay ở lớp có mặt nạ — vẽ cả cánh tay trước thân thì ống tay áo chạy dọc qua ngực, che bảng tên. Bàn tay ở lớp
     // trước vẫn phải nằm ĐÚNG đầu cẳng tay. Quay hẳn sang ngang thì cả tay ra sau.
     // Và vuốt ve con vật ở phía tay đang cầm đồ: tay kia vắt sang phía ấy.
-    {
+    if (chay('dung-dang-3-4')) {
       const actor = L.createCharacter(host, { id: 'vet', items: { R: 'clipboard' } }).rig, arm = actor.el.batR;
       actor.s.huong = 0.55; actor.render();
       if (actor.el.coTayR.parentNode !== actor.el.xaCang) hong('held item', 'three-quarter stance: the hand with the item is not in the layer in front of the body');
@@ -2493,7 +2518,7 @@ try {
     }
     // MÁY QUAY: người vừa nói xong rồi `walk` sang chỗ khác ở lượt sau → về toàn cảnh (không ghì cận vào chỗ cũ).
     // Và tóc của người đứng cạnh: một mảng tóc ló vào mép cận cảnh cũng tính là bị cắt.
-    {
+    if (chay('may-quay-nguoi-vua')) {
       const stage7 = document.createElement('div'); stage7.setAttribute('data-composition-id', 'check-walk-cam');
       stage7.style.cssText = 'position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden';
       const mk = (id, css) => { const d = document.createElement('div'); d.id = id; d.style.cssText = 'position:absolute;' + css; stage7.appendChild(d); return d; };
@@ -2521,7 +2546,7 @@ try {
       stage7.remove();
     }
     // Thú chạy ra khỏi khung thì quay đầu về phía chạy — không đi giật lùi sau `face('left')` — và chạy được cả hai phía.
-    for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
+    if (chay('thu-chay-ra-khoi')) for (const [to, dir] of [[undefined, 1], ['left', -1]]) {
       const pet = L.createPet(host, { species: 'dog' }).rig;
       const line = L.sequence(pet, [['walk', 4, 60], ['face', 'left'], to ? ['exit', to] : 'exit']), last = line.data.steps[2];
       line.time(last.start + 0.01); const from = pet.s.x;
@@ -2532,7 +2557,7 @@ try {
       line.kill(); pet.svg.remove();
     }
     // Vẫy tay: không quất (dưới 20° mỗi khung, kể cả từ dáng đan tay), biên độ nhỏ dần, dài đúng 2,25 s.
-    for (const id of ['vet', 'boy']) {
+    if (chay('vay-tay-khong-quat')) for (const id of ['vet', 'boy']) {
       const waver = L.createCharacter(host, { id }).rig, t = waver.wave(); let before = null, biggest = 0; const peaks = [];
       for (let time = 0; time <= t.duration(); time += 1 / 60) { t.time(time); const now = [waver.state.upperArmR, waver.state.forearmR]; if (before) biggest = Math.max(biggest, Math.abs(now[0] - before[0]), Math.abs(now[1] - before[1])); before = now; }
       if (biggest > 20) hong('wave', `${id}: a joint moves ${biggest.toFixed(0)}° in one frame`);
@@ -2542,7 +2567,7 @@ try {
       t.kill(); waver.svg.remove();
     }
     // Reo mừng: nhún lên rồi về đúng mặt đất; đang ngồi thì không nhún; tay cầm đồ thì đứng yên.
-    {
+    if (chay('reo-mung-nhun-len')) {
       const happy = L.createCharacter(host, { id: 'barista' }).rig, rest = happy.NGHI.batR;
       const t = happy.cheer(); let top = 0, armR = 0, armL = 0;
       for (let p = 0; p <= 1; p += 0.02) { t.progress(p); top = Math.min(top, happy.state.y); armR = Math.max(armR, Math.abs(happy.state.upperArmR - rest)); armL = Math.max(armL, happy.state.upperArmL); }
@@ -2556,7 +2581,7 @@ try {
       seated.kill(); happy.svg.remove();
     }
     // `torsoWidth`: thân rộng ra, đầu vẫn tròn.
-    {
+    if (chay('torsowidth-than-rong-ra')) {
       L.registerCharacter({ id: 'check_tmp_wide', base: 'nurse', define: (base) => ({ ...base, torsoWidth: 1.3 }) });
       const wide = L.createCharacter(host, { id: 'check_tmp_wide' }).rig, plain = L.createCharacter(host, { id: 'nurse' }).rig;
       const size = (rig, el) => { const box = rig.el[el].getBoundingClientRect(), unit = rig.svg.getBoundingClientRect().height / 470; return { w: box.width / unit, h: box.height / unit }; };
@@ -2566,7 +2591,7 @@ try {
       if (L.kit.bodies.stocky.torsoWidth < 1.2) hong('kit.bodies.stocky', 'has no wide torso');
     }
     // Tay / chân XA tối đi khi quay nhưng không được mất nét viền.
-    {
+    if (chay('tay-chan-xa-toi')) {
       const turned = L.createCharacter(host, { id: 'receptionist' }).rig; turned.state.facing = 0.55; turned.render();
       const leg = turned.el.chanR, wanted = leg.getAttribute('filter');
       if (wanted && !leg.style.filter.includes('url(')) hong('outline', `the far leg loses its outline filter when turned (style.filter: ${leg.style.filter})`);
@@ -2576,17 +2601,19 @@ try {
       turned.svg.remove();
     }
     // face(target) phải tính cả quãng nhân vật đã đi: A đi sang bên phải của B rồi quay về phía B = quay TRÁI.
-    const hostA = document.createElement('div'), hostB = document.createElement('div');
-    hostA.style.cssText = 'position:fixed;left:0;top:0;height:300px'; hostB.style.cssText = 'position:fixed;left:150px;top:0;height:300px'; document.body.append(hostA, hostB);
-    const a = L.createCharacter(hostA, { id: 'vet' }).rig, b = L.createCharacter(hostB, { id: 'nurse' }).rig;
-    const moved = L.sequence(a, [['walk', 4, 320], ['face', b]]); moved.time(moved.duration());
-    if (!(a.state.facing < 0)) hong('face', `after walking past the other character, face(rig) turns the wrong way (facing ${a.state.facing})`);
-    if (!moved.data.steps[1].target || moved.data.rig !== a) hong('sequence', 'data.rig / the face target are not recorded for tools/peek.sh');
-    moved.kill(); hostA.remove(); hostB.remove();
+    if (chay('face-after-walk')) {
+      const hostA = document.createElement('div'), hostB = document.createElement('div');
+      hostA.style.cssText = 'position:fixed;left:0;top:0;height:300px'; hostB.style.cssText = 'position:fixed;left:150px;top:0;height:300px'; document.body.append(hostA, hostB);
+      const a = L.createCharacter(hostA, { id: 'vet' }).rig, b = L.createCharacter(hostB, { id: 'nurse' }).rig;
+      const moved = L.sequence(a, [['walk', 4, 320], ['face', b]]); moved.time(moved.duration());
+      if (!(a.state.facing < 0)) hong('face', `after walking past the other character, face(rig) turns the wrong way (facing ${a.state.facing})`);
+      if (!moved.data.steps[1].target || moved.data.rig !== a) hong('sequence', 'data.rig / the face target are not recorded for tools/peek.sh');
+      moved.kill(); hostA.remove(); hostB.remove();
+    }
   }
 
   // ── Thú: thế ngồi và hướng quay giữ nguyên qua các động tác ──
-  {
+  if (chay('thu-the-ngoi-va')) {
     const host = document.getElementById('san');
     const dog = L.createPet(host, { species: 'dog' }).rig;
     const held = L.sequence(dog, ['sitDown', 'bark', ['face', 'left'], 'tiltHead', ['walk', 2], 'standUp', ['face', 'right'], 'wagTail']);
@@ -2607,7 +2634,7 @@ try {
   }
 
   // ── Đạo cụ cảnh và nhóm bộ số `posture` ──
-  {
+  if (chay('dao-cu-canh-va')) {
     const host = document.getElementById('san');
     const sitter = L.createCharacter(host, { id: 'granny' }).rig;
     for (const kind of L.list().props) {
@@ -2639,7 +2666,7 @@ try {
   }
 
   // ── Bộ dựng sẵn: mọi kiểu tóc, mọi bộ trang phục, mọi dáng người đều dựng được trên mọi nhân vật gốc ──
-  {
+  if (chay('bo-dung-san-moi')) {
     const host = document.getElementById('san');
     let serial = 0;
     const tryOn = (label, base, extra) => {
@@ -2670,7 +2697,7 @@ try {
   }
 
   // ── Nhép miệng theo cue và máy quay ──
-  {
+  if (chay('nhep-mieng-theo-cue')) {
     const stage = document.createElement('div'); stage.dataset.compositionId = 'check-stage';
     stage.style.cssText = 'position:fixed;left:-4000px;top:0;width:1920px;height:1080px;overflow:hidden';
     stage.innerHTML = '<div id="ck-wall" style="position:absolute;inset:0"></div><div id="ck-host" style="position:absolute;left:300px;bottom:96px;height:760px"></div><div id="ck-caption" style="position:absolute;left:0;bottom:0;width:100px;height:40px"></div>';
@@ -2717,7 +2744,7 @@ try {
   }
 
   // ── Hội thoại tự căn giờ, và máy quay ngắm nhiều nhân vật (kể cả thú) ──
-  {
+  if (chay('hoi-thoai-tu-can')) {
     const stage = document.createElement('div'); stage.dataset.compositionId = 'check-talk';
     stage.style.cssText = 'position:fixed;left:-4000px;top:0;width:1920px;height:1080px;overflow:hidden';
     stage.innerHTML = '<div id="tk-wall" style="position:absolute;inset:0"></div><div id="tk-a" style="position:absolute;left:200px;bottom:96px;height:760px"></div><div id="tk-b" style="position:absolute;left:1100px;bottom:96px;height:700px"></div><div id="tk-dog" style="position:absolute;left:800px;bottom:96px;height:330px"></div>';
@@ -2893,7 +2920,7 @@ try {
   }
 
   // ── Công cụ SOÁT BẰNG MẮT cũng phải chạy: bảng tư thế đủ ô, gallery đủ nhân vật ──
-  {
+  if (chay('cong-cu-soat-bang')) {
     const load = (url) => new Promise((resolve) => {
       const frame = document.createElement('iframe'); frame.style.cssText = 'position:fixed;left:-3000px;width:1280px;height:1500px'; frame.src = url; document.body.appendChild(frame);
       const started = Date.now();
@@ -2917,7 +2944,7 @@ try {
   }
 
   // ── Bản SLIM phải chạy ra cùng kết quả với bản đầy đủ ──
-  try {
+  if (chay('ban-slim-phai-chay')) try {
     const slimSource = await (await fetch('../dist/character.slim.js', { cache: 'no-store' })).text();
     const Slim = new Function(slimSource + '\nreturn VGCharacter;')();
     if (listOf(Slim) !== listAtStart) hong('dist', 'character.slim.js is out of date — run: python3 tools/build.py');
@@ -2929,17 +2956,20 @@ try {
   } catch (e) { hong('dist', 'the slim bundle does not run: ' + e.message); }
 
   // Bản dựng IIFE phải tươi: cùng danh sách nhân vật với mã nguồn.
-  const G = window[L.GLOBAL_NAME];
-  if (!G) hong('dist', 'dist/character.iife.js failed to load — run: python3 tools/build.py');
-  else {
-    const a = listOf(G), b = listAtStart;
-    ra.banDung.khop = a === b;
-    if (a !== b) hong('dist', 'dist/character.iife.js is out of date — run: python3 tools/build.py');
-    const h = document.createElement('div'); document.body.appendChild(h);
-    try { const { rig } = G.createCharacter(h, { id: 'vet', config: { colors: { top: '#2f9e8f' } } }); if (rig.mau.ao !== '#2f9e8f') hong('dist', 'createCharacter ignored the config'); }
-    catch (e) { hong('dist', 'createCharacter threw: ' + e.message); }
-    h.remove();
+  if (chay('dist-iife-fresh')) {
+    const G = window[L.GLOBAL_NAME];
+    if (!G) hong('dist', 'dist/character.iife.js failed to load — run: python3 tools/build.py');
+    else {
+      const a = listOf(G), b = listAtStart;
+      ra.banDung.khop = a === b;
+      if (a !== b) hong('dist', 'dist/character.iife.js is out of date — run: python3 tools/build.py');
+      const h = document.createElement('div'); document.body.appendChild(h);
+      try { const { rig } = G.createCharacter(h, { id: 'vet', config: { colors: { top: '#2f9e8f' } } }); if (rig.mau.ao !== '#2f9e8f') hong('dist', 'createCharacter ignored the config'); }
+      catch (e) { hong('dist', 'createCharacter threw: ' + e.message); }
+      h.remove();
+    }
   }
+  ghiGio();
 } catch (e) { hong('check', e.stack || String(e)); }
 document.getElementById('kq').textContent = JSON.stringify(ra);
 document.title = ra.ok ? 'PASS' : 'FAIL';
