@@ -1,6 +1,58 @@
 # Changelog
 
-## Unreleased
+## 0.84.0
+
+Fixed: the known problems of 0.82.0 and 0.83.0 (wave 44, two Opus agents in parallel), and a faster test harness. Also
+released: wave 43 group C (merged from PR #5), under "Wave 43 C" at the end of this entry.
+
+- **Two people** (44 A):
+  - `patShoulder` reached for the other person's shoulder as if they faced the camera. It now aims at the shoulder as
+    turned toward the patter, so the hand lands within 1.1–2.8 % instead of 7 %, for every built-in person.
+  - `hug` passes for `owner_woman`: acting_check's "above the head" limit uses the bottom of the face, not a head box
+    stretched by long hair.
+  - `handOverBag` uses the real arm length for scaled bodies, and the received bag starts where the giver's was. The jump
+    between frames went from 3.0 % to 0.8 %.
+- **Staging in scripts** (44 A):
+  - In the `pharmacy` preset staff stand behind the counter and customers in front.
+  - Whoever lies on the sofa starts at its front, with a sleeping pet beside it.
+- **Other actions** (44 A):
+  - Bathing in a floor tub: the person's face turns down into the tub, so the gaze check passes.
+  - `throwBall` / `playFetch` throw the way the dog faces.
+  - `zoomies` and `sleepyPet` are in the action catalog.
+  - `floor42e` shows the dog lying by the sofa early in the scene.
+- **Camera** (44 B):
+  - Automatic pet shots and inserts get the wave 42 C pet size (≥ 35 % of the frame). A new framing is kept only if it
+    cuts no more furniture or people.
+  - Close shots move sideways or pull back rather than show a person as a headless torso.
+  - The automatic shot for `pickUp` keeps the item and the person in frame.
+  - Mid-glide frames that would cut furniture become a straight cut.
+  - The first automatic pet close-up waits 1.6 s after the opening shot.
+  - The `takeTemp` / `givePill` close-up in a crowded exam room pushes the neighbour out.
+  - New measure: a clerk behind a counter must show their face and chest. The `pharmacy` preset's monitor moved to
+    x −230 and is now 360 high, so it no longer hides the pharmacist from any angle (found when merging A and B).
+- **Test harness**:
+  - `tools/check_scene.py` (one 2063-line block run on one core) is split into 62 cases under `tools/ci/`, one module
+    per wave, run in parallel. The scene step went from 42 min to 9 min, and the whole `check.sh` takes about 13 min.
+  - `sh tools/check.sh --changed` runs only the cases a change touches (about 3 min), and says why each was picked.
+    `--only <case>` and `--failed` rerun just those; `--list` lists the cases.
+  - The full run is still required before merge or release, because the camera and the skeleton are shared by every
+    scene.
+  - Headless Chrome no longer hangs when the Mac's display turns off, and start-up is retried.
+  - New waves add `tools/ci/wNN.py` instead of editing a shared file.
+- **CI scenes**: `pair44a`, `mom44a`, `bag44a`, `bath44a`, `fetch44a`, `pharm44a`, `sofa44a`, `nap44a`, `auto44b`,
+  `torso44b`, `desk44b`, `rec44b`, `pick44b`, `edge44b`, `open44b`, `pharm44b`, `exam44b`.
+
+Known
+- **Pets still under 35 %** in two crowded layouts: a lying cat next to a standing dog reaches 32 %, and two pets far
+  apart in the pharmacy stay at 17 %.
+- **Headless torso still possible** when a person's head is right above the pet (showing it would shrink the pet to
+  about 25 %), and in automatic `alone` pet close-ups. The `--torso44b` measure is opt-in for that reason.
+- **Scripts that still fail a camera check**: "ngủ trưa cùng thú" scripts (the pet is cut or the medium shot equals the
+  full shot), and a child patting the vet (the vet is about 78 % in frame).
+- **Hidden hand-over**: a child customer in the pharmacy takes the bag below the counter top.
+- **Slowest check**: a single `acting_check` screenshot sweep (about 5 min) now sets the floor for the full run.
+
+### Wave 43 C (PR #5)
 
 Added: five more combos (wave 43, group C). They work in `sequence()`, `combo()`, scene files and Vietnamese scripts, and are
 measured by `tools/acting_check.py`. That makes 36 combos. (The branch also had its own `bathTime`, `playFetch`, `welcomeHome` and
@@ -20,7 +72,7 @@ measured by `tools/acting_check.py`. That makes 36 combos. (The branch also had 
 - **CI scenes**: `party43`, `lazy43`, `rush43`, `tidy43`, `scared43`. `tools/check_scene.py` now also refuses a combo word that is
   already a single action's word in `tools/script.py`, or another combo's.
 
-Fixed
+Fixed (wave 43 C)
 - **A child stroking a pet while sitting on the floor** (đợt 42 E). A pet coming over to someone sitting on the floor stopped
   as close as to someone on a chair (0.22 × their height). A child is drawn smaller in the same frame, and the pet's head ended
   up right by the child's low shoulder: the elbow folded too far and the hand stood upright beside the pet's ear. A boy's hand
@@ -29,7 +81,7 @@ Fixed
   too. Adults keep 0.22: at 0.27 the cat stood so far from the mother in `home43a` (0.83.0) that the medium shot was almost as
   wide as the full shot. The CI scene `lazy43` uses a boy.
 
-Known
+Known (wave 43 C)
 - `scaredPet` with a dog: it hides only partly behind the person (`hide` stops short of the middle so the head can peek out).
   acting_check sees 91–95 % of a shiba (it needs at most 90 %). A plain `["hide", "@person"]` passes only just. This comes from
   `hide`, not from the combo; the CI scene uses a cat.
