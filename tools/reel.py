@@ -93,10 +93,23 @@ def main():
     const slots = [];
     let at = 0.2, count = 0;
     const list = (isPet ? catalog.pets : catalog.people).filter((entry) => !entry.species || entry.species === kind);
+    // A row the character cannot do (a barista's built-in cup leaves no free hand for `stampCard`) is left out of the
+    // reel and reported, instead of stopping the whole reel.
+    const skipped = [];
     for (const entry of list) {{
+      const before = stage.children.length;
+      try {{
       const parts = [];
       let rig, pet = null, scale = null, person = null;
-      if (isPet) {{
+      if (isPet && entry.person) {{
+        // A pet beside a person (`hide`, `lick`, combo `scaredPet`): both at their real size (pet host = 0.43 × person host),
+        // on one floor, the person drawn in front at `personAt` — as in tools/actions.html (a 230 px cell, person 225 px tall).
+        const k = personH / 225, x0 = {WIDTH} / 2 - 130 * k, floor = personY + personH * 458 / 470, petH = personH * 0.43;
+        const host = add('pet', `left:${{x0 + 20 * k}}px;top:${{floor - petH * 292 / 330}}px;width:${{petH * 400 / 330}}px;height:${{petH}}px`);
+        rig = VGCharacter.createPet(host, {{ species: id, wear: entry.wear || [] }}).rig; parts.push(host);
+        const personHost = add('host', `left:${{x0 + (entry.personAt || 150) * k - personW / 2}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
+        person = VGCharacter.createCharacter(personHost, {{ id: entry.person }}).rig; parts.push(personHost);
+      }} else if (isPet) {{
         const h = personH * 0.6, w = h * 300 / 248;
         const host = add('pet', `left:${{{WIDTH} / 2 - w / 2}}px;top:${{{HEIGHT} * 0.86 - h}}px;width:${{w}}px;height:${{h}}px`);
         rig = VGCharacter.createPet(host, {{ species: id, wear: entry.wear || [] }}).rig; parts.push(host);
@@ -150,11 +163,16 @@ def main():
       tl.add(line.paused(false), start + {LEAD});
       slots.push([start, end, entry.label]);
       at = end;
+      }} catch (error) {{
+        while (stage.children.length > before) stage.lastElementChild.remove();
+        count = slots.length;
+        skipped.push(`${{entry.label}}: ${{error.message || error}}`);
+      }}
     }}
     window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(name)}] = tl;
     // Read by tools/reel.py (the total length and where each action is, to cut clips).
-    window.__sceneTimings = {{ duration: Math.max(tl.duration(), at), turns: slots, speech: [] }};
+    window.__sceneTimings = {{ duration: Math.max(tl.duration(), at), turns: slots, speech: [], skipped }};
   </script>
 </div>
 </body>
@@ -169,6 +187,8 @@ def main():
     if not slots: fail(f'no catalog entry fits "{args.id}"')
     print(target)
     print(f'  {len(slots)} actions, {total:g} s')
+    for reason in timings.get('skipped') or []:
+        print(f'  skipped (this character cannot do it) — {reason}')
 
     if not (args.render or args.clips): return
     env = dict(os.environ, HYPERFRAMES_NO_TELEMETRY='1', DO_NOT_TRACK='1')
