@@ -79,8 +79,8 @@ def pets40b(work, problems):
     if done.returncode == 0: problems.append('pets40b: a dog washing its face (a cat action) was not refused')
 
 
-@case('dogs40a')
-def dogs40a(work, problems):
+@case('dogs40a', parts=('pets40a', 'pets40a_park'))
+def dogs40a(work, problems, part):
     stage = STAGE
     TAG = scratch('dogs40a')
     # ĐỢT 40 A — sáu động tác của chó: chổng mông rủ chơi, tru, đào đất, tha đồ chơi (dây thừng / xương, tới người), dựa chân người, kéo co (người `pullToy` cùng lúc,
@@ -92,6 +92,7 @@ def dogs40a(work, problems):
                'pets40a_park': {'id': 'pets40a-park', 'camera': 'auto', 'set': {'preset': 'park'}, 'characters': [{'name': 'vet', 'id': 'vet', 'x': 0, 'z': -500}, {'name': 'husky', 'species': 'husky', 'x': -300, 'z': -500, 'faces': 'vet'}],
                         'script': [{'who': 'husky', 'do': [['playBow', 1.2]]}, {'who': 'husky', 'do': [['leanOnLeg', '@vet', 2]]}, {'who': 'husky', 'do': [['tugOfWar', '@vet', 2.4]]}, {'who': 'husky', 'do': [['howl', 1.6]]}]}}
     for key, scene in pets40.items():
+        if key != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_{key}.json')
         try:
             json.dump(scene, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
