@@ -122,8 +122,8 @@ def seek_check_46(folder, count=8, scale=0.5, seed=46):
     return out
 
 
-@case('seek46', uses=('acting_check', 'camera', 'carry', 'handOverPet', 'lieDown', 'stroke', 'listen', 'handshake'))
-def seek46(work, problems):
+@case('seek46', parts=('acting', 'handover', 'floor'), tags=('calm',), uses=('acting_check', 'camera', 'carry', 'handOverPet', 'lieDown', 'stroke', 'listen', 'handshake'))
+def seek46(work, problems, part):
     # ĐỢT 46: một khung hình là hàm của THỜI ĐIỂM — bộ dựng có thể tua không theo thứ tự, nhảy lùi, chia khung cho nhiều tiến trình.
     # Trước đợt 46: thứ tự lớp (`set.update`) xếp bằng `Array.prototype.sort` với hàm so sánh không bắc cầu — trang đã tua qua cảnh
     # (V8 chạy nóng) xếp khác trang vừa mở; lớp đổ bóng trên thân (shading.js) giữ giá trị của khung vẽ trước khi khoá làm tròn trùng.
@@ -142,4 +142,4 @@ def seek46(work, problems):
         return [f'seek46 {name}: a frame depends on the seeks before it — {line}' for line in found]
     # Ba cảnh song song (mỗi cảnh một Chrome): chờ Chrome vẽ là phần lâu nhất.
     with concurrent.futures.ThreadPoolExecutor(len(SCENES_46)) as pool:
-        for found in pool.map(lambda item: one(*item), SCENES_46.items()): problems.extend(found)
+        for found in pool.map(lambda item: one(*item), [item for item in SCENES_46.items() if item[0] == part]): problems.extend(found)

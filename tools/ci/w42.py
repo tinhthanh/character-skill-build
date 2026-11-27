@@ -2,8 +2,8 @@
 from .common import *  # noqa: F401,F403
 
 
-@case('framing42c')
-def framing42c(work, problems):
+@case('framing42c', parts=('mom42c', 'liv42c', 'vert42c', 'rec42c', 'laptop'))
+def framing42c(work, problems, part):
     stage = STAGE
     TAG = scratch('framing42c')
     # ĐỢT 42 C (khung hình): con vật ≥ 35 % khung lúc làm động tác trong view cận / trung không khai `fill` (kể cả view "together" có lời dẫn của
@@ -26,6 +26,7 @@ def framing42c(work, problems):
          'script': [{'who': 'bac_si', 'say': 'Chào em.', 'dur': 2}, {'who': 'be', 'say': 'Dạ chào ạ.', 'dur': 2}, {'who': 'bac_si', 'say': 'Em mang bé đi khám à?', 'dur': 2, 'view': {'on': ['bac_si'], 'size': 'medium'}}]})
     for scene42c, needles42c in zip(shots42c, (('tho binky — big enough in the frame', 'furniture inside the frame'), ('cho playBow — big enough in the frame', 'meo loaf — big enough in the frame', 'tho eatCarrot — big enough in the frame', 'furniture inside the frame'),
                                               ('cho groomFace — big enough in the frame', 'furniture inside the frame', 'people inside the frame'), ('furniture inside the frame', 'people inside the frame'))):
+        if scene42c['id'] != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_' + scene42c['id'] + '.json')
         try:
             json.dump(scene42c, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -38,13 +39,14 @@ def framing42c(work, problems):
         else:
             for needle in needles42c:
                 if needle not in done.stdout: problems.append(f"{scene42c['id']}: acting_check did not measure {needle!r}")
-    # Quầy lễ tân: máy tính không còn đứng chắn ngực người ngồi quầy ở chỗ gợi ý (x -300).
-    reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scene.py'), encoding='utf-8').read())] if item), None)
-    if not reception42c or abs(int(reception42c.group(1)) + 300) < 80: problems.append('reception preset: the laptop must not stand in front of the receptionist spot (x -300)')
+    if part == 'laptop':
+        # Quầy lễ tân: máy tính không còn đứng chắn ngực người ngồi quầy ở chỗ gợi ý (x -300).
+        reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scene.py'), encoding='utf-8').read())] if item), None)
+        if not reception42c or abs(int(reception42c.group(1)) + 300) < 80: problems.append('reception preset: the laptop must not stand in front of the receptionist spot (x -300)')
 
 
-@case('bath42f')
-def bath42f(work, problems):
+@case('bath42f', parts=('bath42f', 'cat42f', 'words', 'bad42f'))
+def bath42f(work, problems, part):
     stage = STAGE
     TAG = scratch('bath42f')
     # ĐỢT 42 F: tắm (chó corgi trong chậu tắm trên bàn khám: xối nước, xoa bọt hai tay, xả, lùi ra — con vật rũ nước), lau khô bằng khăn, đánh răng;
@@ -64,6 +66,7 @@ def bath42f(work, problems):
                                            'bac_si brushTeeth cho — the toothbrush at the mouth, the mouth open', 'bac_si brushTeeth cho — then it licks its lips, hands off')),
                                 (cat42f, ('y_ta bathPet meo — the water spray lands on its back', 'y_ta bathPet meo — it stands inside the tub', 'y_ta towelDry meo — both hands rub on the towel'))):
         sid42f = spec42f['id']
+        if sid42f != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_{sid42f}.json')
         try:
             json.dump(spec42f, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -79,27 +82,29 @@ def bath42f(work, problems):
         else:
             for needle in needles42f:
                 if needle not in done.stdout: problems.append(f'{sid42f}: acting_check did not measure "{needle}":\n' + done.stdout[-400:])
-    # Kịch bản chữ (đợt 42 F): "tắm" (con vật tự đứng trong chậu tắm), "lau khô lông", "đánh răng"; đối số sai bị từ chối.
-    text = os.path.join(work, 'bath42f.txt')
-    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn)\n\nbác sĩ → chó: tắm\nbác sĩ → chó: lau khô lông\nbác sĩ → chó: đánh răng\n')
-    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py bath42f: ' + (done.stderr or done.stdout).strip()[-300:])
-    else:
-        made = json.load(open(os.path.join(work, 'bath42f.scene.json'), encoding='utf-8'))
-        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
-        if steps != [['bathPet', '@cho'], ['towelDry', '@cho'], ['brushTeeth', '@cho']]: problems.append(f'script.py bath42f: steps {steps}')
-        if not any(c.get('inTub') for c in made['characters'] if c.get('name') == 'cho'): problems.append('script.py bath42f: the bathed dog does not stand in a tub ("inTub")')
-    for label42f, step42f, needle42f, extra42f in (('bath hold too long', ['bathPet', '@cho', {'hold': 30}], 'hold must be', {}), ('teeth with extra words', ['brushTeeth', '@cho', 'fast'], '"brushTeeth" takes', {}),
-                                                   ('a person in a tub', ['towelDry', '@cho'], '"inTub" is for a pet', {'person_tub': True})):
-        bad42f = json.loads(json.dumps(bath42f)); bad42f['script'] = [{'who': 'bac_si', 'do': [step42f]}]
-        if extra42f.get('person_tub'): bad42f['characters'][0]['inTub'] = True
-        path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_bad42f.json')
-        try:
-            json.dump(bad42f, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
-            done = build(path, os.path.join(work, 'bad42f'))
-        finally:
-            if os.path.exists(path): os.remove(path)
-        if done.returncode == 0 or needle42f not in done.stderr: problems.append(f'bad42f ({label42f}): should be refused with "{needle42f}" — got: ' + (done.stderr.strip()[-200:] or 'no error'))
+    if part == 'words':
+        # Kịch bản chữ (đợt 42 F): "tắm" (con vật tự đứng trong chậu tắm), "lau khô lông", "đánh răng"; đối số sai bị từ chối.
+        text = os.path.join(work, 'bath42f.txt')
+        open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn)\n\nbác sĩ → chó: tắm\nbác sĩ → chó: lau khô lông\nbác sĩ → chó: đánh răng\n')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('script.py bath42f: ' + (done.stderr or done.stdout).strip()[-300:])
+        else:
+            made = json.load(open(os.path.join(work, 'bath42f.scene.json'), encoding='utf-8'))
+            steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+            if steps != [['bathPet', '@cho'], ['towelDry', '@cho'], ['brushTeeth', '@cho']]: problems.append(f'script.py bath42f: steps {steps}')
+            if not any(c.get('inTub') for c in made['characters'] if c.get('name') == 'cho'): problems.append('script.py bath42f: the bathed dog does not stand in a tub ("inTub")')
+    if part == 'bad42f':
+        for label42f, step42f, needle42f, extra42f in (('bath hold too long', ['bathPet', '@cho', {'hold': 30}], 'hold must be', {}), ('teeth with extra words', ['brushTeeth', '@cho', 'fast'], '"brushTeeth" takes', {}),
+                                                       ('a person in a tub', ['towelDry', '@cho'], '"inTub" is for a pet', {'person_tub': True})):
+            bad42f = json.loads(json.dumps(bath42f)); bad42f['script'] = [{'who': 'bac_si', 'do': [step42f]}]
+            if extra42f.get('person_tub'): bad42f['characters'][0]['inTub'] = True
+            path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_bad42f.json')
+            try:
+                json.dump(bad42f, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+                done = build(path, os.path.join(work, 'bad42f'))
+            finally:
+                if os.path.exists(path): os.remove(path)
+            if done.returncode == 0 or needle42f not in done.stderr: problems.append(f'bad42f ({label42f}): should be refused with "{needle42f}" — got: ' + (done.stderr.strip()[-200:] or 'no error'))
 
 
 @case('motion42d')
@@ -199,8 +204,8 @@ def motion42d(work, problems):
     # (Đợt 44 A: `floor42e` mở bằng bé nằm sofa và con chó nằm ngủ cạnh sofa — trong góc toàn của hai đứa — trước đây chó chỉ nằm xuống ở ~23 s.)
 
 
-@case('floor42e')
-def floor42e(work, problems):
+@case('floor42e', parts=('floor42e', 'pick42e', 'words'))
+def floor42e(work, problems, part):
     stage = STAGE
     TAG = scratch('floor42e')
     # ĐỢT 42 E — SÁT SÀN: mẹ ngồi bệt, mèo tới, vuốt rồi bế mèo lên lòng; bé nằm ngủ trên sofa, chó nằm cạnh (`floor42e`); bé nhặt quả bóng cạnh
@@ -209,6 +214,7 @@ def floor42e(work, problems):
     scenes42e = {'floor42e': {"id": "floor42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 200, "z": -560, "faces": "meo"}, {"name": "be", "id": "boy", "x": -520, "z": -848, "faces": "me"}, {"name": "cho", "species": "dog", "x": -160, "z": -720, "faces": "be"}, {"name": "meo", "species": "cat", "x": 480, "z": -560, "faces": "me"}], "script": [{"who": "be", "say": "Mẹ ơi, con buồn ngủ quá.", "do": [["lieDown", "sofa", {"sleep": True}]]}, {"who": "cho", "do": [["walk", 4, -40], "lieDown", ["sleep", 2]], "view": {"on": ["be", "cho"], "size": "full"}}, {"who": "me", "say": "Mèo ơi, lại đây với mẹ nào.", "do": ["sitOnFloor"]}, {"who": "me", "do": [["stroke", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Lên đây mẹ bế nào.", "do": [["carry", "@meo"]], "view": {"on": ["me", "meo"], "size": "full"}}, {"who": "me", "say": "Ngủ ngon nhé con.", "view": {"on": ["me", "be", "cho"], "size": "full"}}, {"who": "be", "do": ["standUp"]}]},
                  'pick42e': {"id": "pick42e", "camera": "auto", "set": {"preset": "living-room"}, "characters": [{"name": "me", "id": "receptionist", "x": 260, "z": -560, "faces": "be", "holds": "toy", "holdsHidden": True}, {"name": "be", "id": "boy", "x": -160, "z": -560, "faces": "me"}, {"name": "cho", "species": "corgi", "x": 20, "z": -700, "faces": "be"}], "script": [{"who": "me", "say": "Con nhặt quả bóng cho mẹ nhé."}, {"who": "be", "do": [["pickUp", "@cho"]], "view": {"on": ["be", "cho"], "size": "full"}}, {"who": "be", "do": [["handOver", "@me"]]}, {"who": "be", "say": "Con nằm nghỉ một chút.", "do": [["walk", 4, -200], "lieDown"]}, {"who": "me", "do": ["sitOnFloor", "nod"]}, {"who": "be", "do": ["standUp", "wave"]}]}}
     for name, scene42e in scenes42e.items():
+        if name != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_{name}.json')
         try:
             json.dump(scene42e, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -222,15 +228,16 @@ def floor42e(work, problems):
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
         if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
         elif 'floor42e' not in done.stdout and 'sitOnFloor' not in done.stdout: problems.append(f'{name}: acting_check measured nothing on the floor')
-    text = os.path.join(work, 'floor42e.txt')
-    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nmẹ (receptionist) · bé (boy) · chó (dog)\n\nmẹ: [ngồi bệt]\nbé → chó: nhặt\nbé: [nằm sofa]\nbé: [đứng dậy, ngồi xếp bằng]\n')
-    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py floor 42 E: ' + (done.stderr or done.stdout).strip()[-300:])
-    else:
-        made = json.load(open(os.path.join(work, 'floor42e.scene.json'), encoding='utf-8'))
-        steps = [t['do'] for t in made['script'] if isinstance(t, dict) and t.get('do')]
-        want = [['sitOnFloor'], [['pickUp', '@cho']], [['lieDown', 'sofa']], ['standUp', 'sitOnFloor']]
-        if steps != want: problems.append(f'script.py floor 42 E: steps {steps}, want {want}')
+    if part == 'words':
+        text = os.path.join(work, 'floor42e.txt')
+        open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khách\nmẹ (receptionist) · bé (boy) · chó (dog)\n\nmẹ: [ngồi bệt]\nbé → chó: nhặt\nbé: [nằm sofa]\nbé: [đứng dậy, ngồi xếp bằng]\n')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('script.py floor 42 E: ' + (done.stderr or done.stdout).strip()[-300:])
+        else:
+            made = json.load(open(os.path.join(work, 'floor42e.scene.json'), encoding='utf-8'))
+            steps = [t['do'] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+            want = [['sitOnFloor'], [['pickUp', '@cho']], [['lieDown', 'sofa']], ['standUp', 'sitOnFloor']]
+            if steps != want: problems.append(f'script.py floor 42 E: steps {steps}, want {want}')
 
 
 @case('voiceover42a')

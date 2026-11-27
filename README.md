@@ -76,7 +76,7 @@ The scene self-test is split into independent cases under `tools/ci/` (one modul
 
 ```bash
 sh tools/check.sh --changed          # cases the change vs main touches (+ a smoke set); prints why each was picked
-sh tools/check.sh --only pharm44a,w43  # cases by name, glob or module
+sh tools/check.sh --only pharm44a,w43  # cases by name, glob, module or group of a split case (combo41)
 sh tools/check.sh --failed           # only what failed last time (.cache/ci-failed.txt)
 python3 tools/check_scene.py --list  # every case with its tags and `uses`
 ```
@@ -105,10 +105,31 @@ def clinic45a(work, problems):           # `work` is a fresh temp dir for this c
     if done.returncode != 0: problems.append('clinic45a: the scene does not build: ' + done.stderr.strip()[:300])
 ```
 
+**One case per scene.** A case that builds several independent scenes (each with its own
+`acting_check`, a Chrome run of 20–60 s) is split into parts, so no single case holds up the run:
+
+```python
+@case('combo41', parts=('groom41', 'vacc41', 'words'))
+def combo41(work, problems, part):       # each part runs as its own case: combo41:groom41, combo41:words…
+    scenes = {'groom41': (...), 'vacc41': (...)}
+    for name, spec in scenes.items():
+        if name != part: continue        # build + needles + acting_check of this scene only
+        ...
+    if part == 'words':                  # the script-word check
+        ...
+```
+
+`--only combo41` still runs all its parts, `--only 'combo41:*'` / `--only combo41:groom41` some of them.
+A part's own code (the dict entry keyed by its name, a `({'id': name, …}, …)` tuple or its
+`if part == …:` block) gives its `uses` and its lines for `--changed`; the rest of the function is shared.
+
 `uses` is derived from the case's string literals and from what it built on its last passing run; pass
 `uses=(...)` only for words its source cannot show. Scene files written next to an example (so relative
 assets resolve) must carry `scratch(name)` in their file name so parallel cases do not collide.
-Cases run longest-first (times of the last run in `.cache/ci-times.json`); with `-j` > 1 every
+Cases run longest-first (times of the last run in `.cache/ci-times.json`; a part not yet timed gets
+its group's old time ÷ its number of parts, else a guess from the Chrome runs in its source). Cases
+tagged `calm` (pixel-exact screenshot comparisons: `seek46`, which misses paints when ten Chromes
+draw at once) start only after the main queue is empty and at most two other cases still run. With `-j` > 1 every
 `tools/chrome_run.py` wait is tripled (`CHROME_RUN_TIMEOUT_SCALE`) because many Chromes share the CPU.
 
 ## A character in a dozen lines

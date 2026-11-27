@@ -5,11 +5,12 @@ in its own temp dir, in parallel.
 
   python3 tools/check_scene.py                  every case (what check.sh and the release run)
   python3 tools/check_scene.py --changed [BASE] only the cases a change vs BASE (default: main) touches, plus a smoke set
-  python3 tools/check_scene.py --only a,b,w44*  cases by name (globs allowed; a module name such as w44 selects its cases)
+  python3 tools/check_scene.py --only a,b,w44*  cases by name (globs allowed; a module name such as w44, or a split case's
+                                                group such as combo41, selects all its cases)
   python3 tools/check_scene.py --failed         the cases that failed on the last run
   python3 tools/check_scene.py --list           list the cases with their tags and uses
 """
-import argparse, concurrent.futures, fnmatch, json, os, re, subprocess, sys, tempfile, threading, time, traceback
+import argparse, fnmatch, json, os, re, subprocess, sys, tempfile, threading, time, traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -21,6 +22,7 @@ FAILED = os.path.join(CACHE, 'ci-failed.txt')
 USES = os.path.join(CACHE, 'ci-uses.json')
 TIMES = os.path.join(CACHE, 'ci-times.json')
 SMOKE_TAG = 'smoke'
+CALM_TAG, CALM_BESIDE = 'calm', 2      # trường hợp nhạy với máy bận: chạy cuối, cạnh nhiều nhất 2 trường hợp khác
 
 
 def git(*args):
@@ -63,7 +65,7 @@ def changed_selection(cases, base):
         rel = os.path.relpath(c.file, ROOT)
         if common_changed: why.append('tools/ci/common.py or the registry changed')
         for a, b in edited.get(rel, ()):
-            if a <= c.lines[1] and b >= c.lines[0]: why.append(f'its code in {rel} changed'); break
+            if c.touched_by(a, b): why.append(f'its code in {rel} changed'); break
         hits = sorted(c.uses & words)
         if hits: why.append('uses ' + ', '.join(hits[:8]) + (' …' if len(hits) > 8 else ''))
         if SMOKE_TAG in c.tags: why.append('smoke set')
@@ -79,14 +81,15 @@ def load_json(path):
 def estimate(c, times):
     """Seconds a case is expected to take: its last measured time, else a guess from what it runs (Chrome passes dominate)."""
     if c.name in times: return times[c.name]
+    if c.group in times: return times[c.group] / c.parts            # phần mới tách của một trường hợp đã đo
     s = c.source
-    return 150 * s.count('acting_check.py') + 40 * s.count('page_eval(') + 30 * s.count('peek.sh') + 3 * (s.count('build(') + s.count('script.py'))
+    return (150 * s.count('acting_check.py') + 40 * s.count('page_eval(') + 30 * s.count('peek.sh') + 3 * (s.count('build(') + s.count('script.py'))) / c.parts
 
 
 def main():
     parser = argparse.ArgumentParser(description='Scene self-test: build example scenes, check generated compositions and refusals.')
     parser.add_argument('-j', '--jobs', type=int, default=max(1, (os.cpu_count() or 3) - 2), help='parallel cases (default: CPU count − 2)')
-    parser.add_argument('--only', help='comma-separated case names, globs or module names (e.g. pharm44a,w43,set3d_*)')
+    parser.add_argument('--only', help='comma-separated case names, globs, module names or groups of split cases (e.g. pharm44a,w43,set3d_*,combo41)')
     parser.add_argument('--changed', nargs='?', const='main', metavar='BASE', help='cases touched by the changes vs BASE (default main) + the smoke set')
     parser.add_argument('--failed', action='store_true', help='rerun the cases that failed last time (.cache/ci-failed.txt)')
     parser.add_argument('--list', action='store_true', help='list the cases (name, module, tags, uses) and exit')
@@ -98,7 +101,7 @@ def main():
     selected, reasons = cases, {}
     if args.only:
         pats = [p.strip() for p in args.only.split(',') if p.strip()]
-        selected = [c for c in cases if any(fnmatch.fnmatchcase(c.name, p) or c.module == p for p in pats)]
+        selected = [c for c in cases if any(fnmatch.fnmatchcase(c.name, p) or c.module == p or fnmatch.fnmatchcase(c.group, p) for p in pats)]
         if not selected: sys.exit(f'check_scene: --only {args.only}: no such case (see --list)')
     if args.failed:
         names = open(FAILED, encoding='utf-8').read().split() if os.path.isfile(FAILED) else []
@@ -111,7 +114,7 @@ def main():
         for c in selected: print(f'  · {c.name:22} ← ' + '; '.join(reasons[c.name]))
     if args.list:
         for c in selected:
-            print(f'{c.name:22} {c.module:7} tags={",".join(c.tags) or "-"}  uses={" ".join(sorted(c.uses))}')
+            print(f'{c.name:22} {c.module:7} ' + (f'group={c.group}  ' if c.part else '') + f'tags={",".join(c.tags) or "-"}  uses={" ".join(sorted(c.uses))}')
         print(f'{len(selected)} cases')
         return 0
 
@@ -136,7 +139,7 @@ def main():
 
     def run(c):
         problems, t0 = [], time.time()
-        with tempfile.TemporaryDirectory(prefix=f'ci-{c.name}-') as work:
+        with tempfile.TemporaryDirectory(prefix=f'ci-{c.name.replace(":", "-")}-') as work:
             try: c.fn(work, problems)
             except Exception:                                     # một trường hợp vỡ không kéo đổ các trường hợp khác
                 problems.append(f'{c.name}: the check itself crashed:\n' + traceback.format_exc()[-1500:])
@@ -148,11 +151,26 @@ def main():
             print(f'  {mark} {c.name:22} {took:6.1f} s   [{len(results)}/{len(selected)}]', flush=True)
 
     # Trường hợp lâu nhất chạy trước (lần đo trước, hay ước lượng) — thời gian tổng không bị một ca dài bắt đầu muộn kéo dài.
-    queue = sorted(selected, key=lambda c: -estimate(c, times))
+    # Trường hợp gắn thẻ `calm` (so ảnh chụp từng điểm ảnh — seek46) chỉ bắt đầu khi hàng đợi chính đã hết và còn ít trường hợp
+    # đang chạy (≤ CALM_BESIDE): giữa mười Chrome cùng vẽ, ảnh chụp ngay sau một lượt tua có thể chưa vẽ xong.
+    queue = sorted(selected, key=lambda c: (CALM_TAG in c.tags, -estimate(c, times)))
     if args.jobs > 1: os.environ.setdefault('CHROME_RUN_TIMEOUT_SCALE', '3')      # nhiều Chrome cùng lúc → trang chậm hơn
     print(f'scene: {len(selected)} cases, {args.jobs} at a time', flush=True)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for future in [pool.submit(run, c) for c in queue]: future.result()
+    jobs, running, turn = max(1, args.jobs), [0], threading.Condition()
+
+    def worker(c):
+        try: run(c)
+        finally:
+            with turn: running[0] -= 1; turn.notify_all()
+    threads, calm = [], False
+    for c in queue:
+        with turn:
+            if CALM_TAG in c.tags and not calm:                  # trường hợp `calm` đầu tiên: đợi máy bớt bận; các phần sau chạy cùng nó
+                calm = True; turn.wait_for(lambda: running[0] <= min(CALM_BESIDE, jobs - 1))
+            turn.wait_for(lambda: running[0] < jobs)
+            running[0] += 1
+        threads.append(threading.Thread(target=worker, args=(c,))); threads[-1].start()
+    for t in threads: t.join()
     wall = time.time() - started
 
     problems = [(name, p) for c in selected for name in (c.name,) for p in results[c.name][0]]

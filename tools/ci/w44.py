@@ -2,8 +2,8 @@
 from .common import *  # noqa: F401,F403
 
 
-@case('framing44b')
-def framing44b(work, problems):
+@case('framing44b', parts=('auto44b', 'torso44b', 'desk44b', 'rec44b', 'pick44b', 'edge44b', 'open44b', 'pharm44b', 'exam44b'))
+def framing44b(work, problems, part):
     stage = STAGE
     TAG = scratch('framing44b')
     # ĐỢT 44 B (khung hình): (1) góc CHỈ CÓ CON VẬT của đạo diễn tự động (nhóm toàn thú, không "view") — con vật ≥ 35 % khung (trước: 15–24 %);
@@ -46,6 +46,7 @@ def framing44b(work, problems):
           'script': [{'who': 'le_tan', 'say': 'Mời bác sĩ.', 'dur': 1.5}, {'who': 'bac_si', 'do': [['takeTemp', '@cho', 1.5, {'reading': '38.5°C'}]]}, {'who': 'bac_si', 'do': [['givePill', '@cho']]}]},
          ('bac_si turns to the thermometer held by the face', 'bac_si givePill cho — big enough on screen', 'people inside the frame'), (), False))
     for scene44b, needles44b, banned44b, torso44b in shots44b:
+        if scene44b['id'] != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_' + scene44b['id'] + '.json')
         try:
             json.dump(scene44b, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -62,8 +63,8 @@ def framing44b(work, problems):
                 if needle in done.stdout: problems.append(f"{scene44b['id']}: acting_check still reports {needle!r}:\n" + '\n'.join(line for line in done.stdout.splitlines() if needle in line)[:500])
 
 
-@case('acting44a')
-def acting44a(work, problems):
+@case('acting44a', parts=('pair44a', 'mom44a', 'bag44a', 'bath44a', 'fetch44a'))
+def acting44a(work, problems, part):
     stage = STAGE
     TAG = scratch('acting44a')
     # ĐỢT 44 A — SỬA LỖI ĐÃ BIẾT (0.82 / 0.83): pair44a / mom44a — vỗ vai, ôm với owner_woman, owner_man, mother (trước: tay cách vai ~7 %, vai
@@ -85,6 +86,7 @@ def acting44a(work, problems):
         'fetch44a': ({'preset': 'living-room'}, [dict(name='me', id='mother', x=-420, z=-560), dict(name='em', id='girl', x=160, z=-560, faces='cho'), dict(name='cho', species='corgi', x=40, z=-560, faces='me')],
                      [{'who': 'em', 'say': 'Lu ơi, bắt bóng nè!', 'do': [['playFetch', '@cho']]}], ('em throwBall',))}
     for name44a, (set44a, cast44a, turns44a, measures44a) in scenes44a.items():
+        if name44a != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_{name44a}.json')
         try:
             json.dump({'id': name44a, 'camera': 'auto', 'set': set44a, 'characters': cast44a, 'script': turns44a}, open(path, 'w', encoding='utf-8'), ensure_ascii=False)

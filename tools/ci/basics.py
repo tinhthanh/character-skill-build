@@ -2,8 +2,8 @@
 from .common import *  # noqa: F401,F403
 
 
-@case('example_scene', tags=('smoke',))
-def example_scene(work, problems):
+@case('example_scene', parts=('main', 'peek'), tags=('smoke',))
+def example_scene(work, problems, part):
     TAG = scratch('example_scene')
     example = os.path.join(ROOT, 'examples', 'scene', 'scene.json')
     out = os.path.join(work, 'built')
@@ -11,84 +11,87 @@ def example_scene(work, problems):
     if done.returncode != 0:
         problems.append('the example scene does not build: ' + (done.stderr.strip() or done.stdout.strip()))
     else:
-        html = open(os.path.join(out, 'index.html'), encoding='utf-8').read()
-        for name in ('character.slim.js', 'voice.wav', 'voice.cues.js'):
-            if not os.path.isfile(os.path.join(out, name)): problems.append(f'{name} was not written next to index.html')
-        if '__TOTAL__' in html or '__START_' in html: problems.append('index.html still contains unfilled placeholders')
-        audio = re.findall(r'<audio[^>]*data-start="([\d.]+)" data-duration="([\d.]+)"', html)
-        import wave
-        with wave.open(os.path.join(ROOT, 'examples', 'voiceover', 'voice.wav')) as clip: length = clip.getnframes() / clip.getframerate()
-        # Ba câu có tiếng: một tệp dùng chung với ví dụ voiceover, hai tệp trong examples/scene/voice/ (đã tạo sẵn
-        # bằng voice-tts và commit — dựng lại KHÔNG cần voice-tts).
-        if len(audio) != 3 or float(audio[0][0]) < 2 or abs(float(audio[0][1]) - length) > 0.05 or not all(float(a[0]) < float(b[0]) for a, b in zip(audio, audio[1:])): problems.append(f'the audio clips are not timed (found {audio})')
-        total = re.search(r'data-composition-id="clinic-visit" data-start="0" data-duration="([\d.]+)"', html)
-        if not total or float(total.group(1)) < 12: problems.append('the composition duration was not filled in')
-        if 'VGCharacter.conversation(' not in html or 'VGCharacter.captions(' not in html or 'camera:' not in html: problems.append('the composition lacks the conversation, captions or camera')
-        # Hai người cùng `enter` thì vào CÙNG LÚC; đạo cụ "front" nằm sau nhân vật trong HTML (tức vẽ đè lên họ).
-        staged = json.load(open(example, encoding='utf-8'))
-        staged['id'] = 'staged'
-        staged['characters'][1].update({'enter': 'right', 'seated': False})
-        staged['props'][0]['front'] = True
-        staged['script'][-1]['together'][0]['shot'] = ['vet', 'boy', 'bella']
-        # mood trên một lượt, nền là ảnh, và một người NGỒI sau quầy cao (phải có lời nhắc kèm số gợi ý).
-        staged['script'][2]['mood'] = 'surprised'
-        staged['characters'].append({'name': 'clerk', 'id': 'clerk', 'x': 250, 'seated': True})
-        import struct, zlib
-        def chunk(kind, data): return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
-        png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 2, 2, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b'\x00\x20\x40\x50\x20\x40\x50' * 2)) + chunk(b'IEND', b'')
-        picture = os.path.join(os.path.dirname(example), '_check_room.png')
-        open(picture, 'wb').write(png)
-        staged['background'] = {'image': '_check_room.png'}
-        # Người bước vào GIỮA cảnh rồi nói, và bước ra; một câu nhắc tên con vật.
-        staged['characters'].append({'name': 'late', 'id': 'nurse', 'x': 1700, 'faces': 'vet'})
-        staged['script'].insert(3, {'who': 'late', 'enter': 'right', 'say': 'Xin lỗi, tôi đến muộn.', 'dur': 1.6, 'exit': 'right'})
-        staged['music'] = '../voiceover/voice.wav'
-        # Nhân vật được cho cầm một món đồ đang cất (để nhận từ người khác).
-        staged['characters'][0].update({'holds': {'L': 'clipboard'}, 'holdsHidden': True})
-        # Một cái bàn đặt đúng chỗ con chó đứng: phải có lời nhắc là cái bàn sẽ che nó.
-        staged['props'].append({'kind': 'table', 'x': next(who['x'] for who in staged['characters'] if who.get('species'))})
-        staged_path = os.path.join(os.path.dirname(example), f'_check_{TAG}_staged.json')
-        try:
-            json.dump(staged, open(staged_path, 'w', encoding='utf-8'))
-            built = build(staged_path, os.path.join(work, 'staged'))
-        finally:
-            os.remove(staged_path); os.remove(picture)
-        if built.returncode != 0:
-            problems.append('a scene with two entrances, a front prop and a shot inside together does not build: ' + built.stderr.strip()[:200])
-        else:
-            page = open(os.path.join(work, 'staged', 'index.html'), encoding='utf-8').read()
-            if not re.search(r"together: \[\[vet, \['enter', \"left\", \d+\][^\n]*\[boy, \['enter', \"right\", \d+\]", page): problems.append('two entering characters do not enter together')
-            if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
-            if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
-            if 'late.state.opacity = 0' not in page: problems.append('a character that enters mid-scene is not hidden at the start')
-            if not re.search(r"\[late, \['enter', \"right\", \d+\], \['face', vet\], \['explain'[^\n]*\['exit', \"right\", \d+\]\]", page): problems.append('a turn with enter / say / exit is not written in that order')
-            if 'bella.state.facing = -1' not in page or "[bella, ['face'" in page: problems.append('a character present from the start is not turned toward its target up front')
-            if 'data-role="music"' not in page or 'data-volume="0.15"' not in page: problems.append('"music" does not add a quiet music clip')
-            if not re.search(r'\{ turn: \[vet, \[.speakCues.[^\n]*shot: \[vet, bella\] \}', page): problems.append('a line that names a pet does not frame the pet with the speaker')
-            if '{ mood: "surprised" }]' not in page or "['express', \"surprised\"" in page: problems.append('"mood" on a spoken turn is not passed to the line itself')
-            if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
-            if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
-            if '"clerk" sits behind the counter' not in built.stdout or '"tabletop"' not in built.stdout: problems.append('no note about a seated character hidden behind a tall front counter')
-            if 'items: {"L": "clipboard"}, itemsHidden: true' not in page: problems.append('"holds" / "holdsHidden" are not passed to createCharacter')
-            if '"bella" stands at x' not in built.stdout or 'inside the table' not in built.stdout: problems.append('no note about a pet standing inside a table')
-            # Sửa tay làm lệch giờ → --retime đưa <audio> và tổng thời lượng về đúng.
-            index = os.path.join(work, 'staged', 'index.html')
-            before = re.search(r'src="voice.wav" data-start="([\d.]+)"', page).group(1)
-            open(index, 'w', encoding='utf-8').write(page.replace('[bella, "wagTail"]', '[bella, "wagTail", "wagTail"]'))
-            fixed = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), '--retime', index], capture_output=True, text=True)
-            after = re.search(r'src="voice.wav" data-start="([\d.]+)"', open(index, encoding='utf-8').read()).group(1)
-            if fixed.returncode != 0 or float(after) < float(before) + 1: problems.append(f'--retime did not move the audio clip after a hand edit ({before} → {after}): {fixed.stderr.strip()[:160]}')
-        # Dải cận miệng của câu có tiếng: peek.sh --mouth in dòng khẩu hình và ghi ảnh.
-        peek = subprocess.run(['sh', os.path.join(HERE, 'peek.sh'), os.path.join(out, 'index.html'), '--mouth=1'], capture_output=True, text=True)
-        strip = os.path.join(out, 'peek-mouth1.png')        # không chỉ định tên: ảnh nằm cạnh composition, tên riêng cho dải cận miệng
-        if peek.returncode != 0 or 'mouth strip: line 1' not in peek.stdout or 'cue shapes per frame' not in peek.stdout or not os.path.isfile(strip):
-            problems.append('peek.sh --mouth does not produce a mouth strip: ' + (peek.stderr.strip() or peek.stdout.strip())[-200:])
-        beyond = subprocess.run(['sh', os.path.join(HERE, 'peek.sh'), os.path.join(out, 'index.html'), '--mouth=9'], capture_output=True, text=True)
-        if beyond.returncode == 0 or 'spoken line' not in beyond.stderr: problems.append('peek.sh --mouth=9 on a scene with fewer lines does not explain itself')
-        cues = open(os.path.join(out, 'voice.cues.js'), encoding='utf-8').read()
-        if 'khám định kỳ cho bé Bella' not in cues: problems.append('the spoken words were not stored in the cues (captions would be empty)')
+        if part == 'main':                                 # dải cận miệng (peek.sh, Chrome) là một trường hợp riêng (đợt 47)
+            html = open(os.path.join(out, 'index.html'), encoding='utf-8').read()
+            for name in ('character.slim.js', 'voice.wav', 'voice.cues.js'):
+                if not os.path.isfile(os.path.join(out, name)): problems.append(f'{name} was not written next to index.html')
+            if '__TOTAL__' in html or '__START_' in html: problems.append('index.html still contains unfilled placeholders')
+            audio = re.findall(r'<audio[^>]*data-start="([\d.]+)" data-duration="([\d.]+)"', html)
+            import wave
+            with wave.open(os.path.join(ROOT, 'examples', 'voiceover', 'voice.wav')) as clip: length = clip.getnframes() / clip.getframerate()
+            # Ba câu có tiếng: một tệp dùng chung với ví dụ voiceover, hai tệp trong examples/scene/voice/ (đã tạo sẵn
+            # bằng voice-tts và commit — dựng lại KHÔNG cần voice-tts).
+            if len(audio) != 3 or float(audio[0][0]) < 2 or abs(float(audio[0][1]) - length) > 0.05 or not all(float(a[0]) < float(b[0]) for a, b in zip(audio, audio[1:])): problems.append(f'the audio clips are not timed (found {audio})')
+            total = re.search(r'data-composition-id="clinic-visit" data-start="0" data-duration="([\d.]+)"', html)
+            if not total or float(total.group(1)) < 12: problems.append('the composition duration was not filled in')
+            if 'VGCharacter.conversation(' not in html or 'VGCharacter.captions(' not in html or 'camera:' not in html: problems.append('the composition lacks the conversation, captions or camera')
+            # Hai người cùng `enter` thì vào CÙNG LÚC; đạo cụ "front" nằm sau nhân vật trong HTML (tức vẽ đè lên họ).
+            staged = json.load(open(example, encoding='utf-8'))
+            staged['id'] = 'staged'
+            staged['characters'][1].update({'enter': 'right', 'seated': False})
+            staged['props'][0]['front'] = True
+            staged['script'][-1]['together'][0]['shot'] = ['vet', 'boy', 'bella']
+            # mood trên một lượt, nền là ảnh, và một người NGỒI sau quầy cao (phải có lời nhắc kèm số gợi ý).
+            staged['script'][2]['mood'] = 'surprised'
+            staged['characters'].append({'name': 'clerk', 'id': 'clerk', 'x': 250, 'seated': True})
+            import struct, zlib
+            def chunk(kind, data): return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+            png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 2, 2, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b'\x00\x20\x40\x50\x20\x40\x50' * 2)) + chunk(b'IEND', b'')
+            picture = os.path.join(os.path.dirname(example), '_check_room.png')
+            open(picture, 'wb').write(png)
+            staged['background'] = {'image': '_check_room.png'}
+            # Người bước vào GIỮA cảnh rồi nói, và bước ra; một câu nhắc tên con vật.
+            staged['characters'].append({'name': 'late', 'id': 'nurse', 'x': 1700, 'faces': 'vet'})
+            staged['script'].insert(3, {'who': 'late', 'enter': 'right', 'say': 'Xin lỗi, tôi đến muộn.', 'dur': 1.6, 'exit': 'right'})
+            staged['music'] = '../voiceover/voice.wav'
+            # Nhân vật được cho cầm một món đồ đang cất (để nhận từ người khác).
+            staged['characters'][0].update({'holds': {'L': 'clipboard'}, 'holdsHidden': True})
+            # Một cái bàn đặt đúng chỗ con chó đứng: phải có lời nhắc là cái bàn sẽ che nó.
+            staged['props'].append({'kind': 'table', 'x': next(who['x'] for who in staged['characters'] if who.get('species'))})
+            staged_path = os.path.join(os.path.dirname(example), f'_check_{TAG}_staged.json')
+            try:
+                json.dump(staged, open(staged_path, 'w', encoding='utf-8'))
+                built = build(staged_path, os.path.join(work, 'staged'))
+            finally:
+                os.remove(staged_path); os.remove(picture)
+            if built.returncode != 0:
+                problems.append('a scene with two entrances, a front prop and a shot inside together does not build: ' + built.stderr.strip()[:200])
+            else:
+                page = open(os.path.join(work, 'staged', 'index.html'), encoding='utf-8').read()
+                if not re.search(r"together: \[\[vet, \['enter', \"left\", \d+\][^\n]*\[boy, \['enter', \"right\", \d+\]", page): problems.append('two entering characters do not enter together')
+                if page.index('id="prop-1-counter"') < page.index('id="vet" class="clip"'): problems.append('a "front" prop is not placed after the characters')
+                if 'shot: [vet, boy, bella]' not in page: problems.append('a shot on a turn inside together is not written')
+                if 'late.state.opacity = 0' not in page: problems.append('a character that enters mid-scene is not hidden at the start')
+                if not re.search(r"\[late, \['enter', \"right\", \d+\], \['face', vet\], \['explain'[^\n]*\['exit', \"right\", \d+\]\]", page): problems.append('a turn with enter / say / exit is not written in that order')
+                if 'bella.state.facing = -1' not in page or "[bella, ['face'" in page: problems.append('a character present from the start is not turned toward its target up front')
+                if 'data-role="music"' not in page or 'data-volume="0.15"' not in page: problems.append('"music" does not add a quiet music clip')
+                if not re.search(r'\{ turn: \[vet, \[.speakCues.[^\n]*shot: \[vet, bella\] \}', page): problems.append('a line that names a pet does not frame the pet with the speaker')
+                if '{ mood: "surprised" }]' not in page or "['express', \"surprised\"" in page: problems.append('"mood" on a spoken turn is not passed to the line itself')
+                if 'url("_check_room.png")' not in page or not os.path.isfile(os.path.join(work, 'staged', '_check_room.png')): problems.append('background.image is not used or not copied')
+                if 'id="floor"' in page: problems.append('the floor strip is drawn over a background image although no floor colour was given')
+                if '"clerk" sits behind the counter' not in built.stdout or '"tabletop"' not in built.stdout: problems.append('no note about a seated character hidden behind a tall front counter')
+                if 'items: {"L": "clipboard"}, itemsHidden: true' not in page: problems.append('"holds" / "holdsHidden" are not passed to createCharacter')
+                if '"bella" stands at x' not in built.stdout or 'inside the table' not in built.stdout: problems.append('no note about a pet standing inside a table')
+                # Sửa tay làm lệch giờ → --retime đưa <audio> và tổng thời lượng về đúng.
+                index = os.path.join(work, 'staged', 'index.html')
+                before = re.search(r'src="voice.wav" data-start="([\d.]+)"', page).group(1)
+                open(index, 'w', encoding='utf-8').write(page.replace('[bella, "wagTail"]', '[bella, "wagTail", "wagTail"]'))
+                fixed = subprocess.run([sys.executable, os.path.join(HERE, 'scene.py'), '--retime', index], capture_output=True, text=True)
+                after = re.search(r'src="voice.wav" data-start="([\d.]+)"', open(index, encoding='utf-8').read()).group(1)
+                if fixed.returncode != 0 or float(after) < float(before) + 1: problems.append(f'--retime did not move the audio clip after a hand edit ({before} → {after}): {fixed.stderr.strip()[:160]}')
+        if part == 'peek':
+            # Dải cận miệng của câu có tiếng: peek.sh --mouth in dòng khẩu hình và ghi ảnh.
+            peek = subprocess.run(['sh', os.path.join(HERE, 'peek.sh'), os.path.join(out, 'index.html'), '--mouth=1'], capture_output=True, text=True)
+            strip = os.path.join(out, 'peek-mouth1.png')        # không chỉ định tên: ảnh nằm cạnh composition, tên riêng cho dải cận miệng
+            if peek.returncode != 0 or 'mouth strip: line 1' not in peek.stdout or 'cue shapes per frame' not in peek.stdout or not os.path.isfile(strip):
+                problems.append('peek.sh --mouth does not produce a mouth strip: ' + (peek.stderr.strip() or peek.stdout.strip())[-200:])
+            beyond = subprocess.run(['sh', os.path.join(HERE, 'peek.sh'), os.path.join(out, 'index.html'), '--mouth=9'], capture_output=True, text=True)
+            if beyond.returncode == 0 or 'spoken line' not in beyond.stderr: problems.append('peek.sh --mouth=9 on a scene with fewer lines does not explain itself')
+        if part == 'main':
+            cues = open(os.path.join(out, 'voice.cues.js'), encoding='utf-8').read()
+            if 'khám định kỳ cho bé Bella' not in cues: problems.append('the spoken words were not stored in the cues (captions would be empty)')
     # Chạy lại lên bản CHƯA sửa thì ghi đè bình thường; lên bản ĐÃ sửa tay thì dừng, trừ khi --force.
-    if not problems:
+    if part == 'main' and not problems:
         again = build(example, out)
         if again.returncode != 0: problems.append('running the tool again over its own untouched output fails: ' + again.stderr.strip()[:200])
         target = os.path.join(out, 'index.html')

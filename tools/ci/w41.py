@@ -2,8 +2,8 @@
 from .common import *  # noqa: F401,F403
 
 
-@case('combo41')
-def combo41(work, problems):
+@case('combo41', parts=('groom41', 'vacc41', 'desk41', 'far41', 'home41', 'words'))
+def combo41(work, problems, part):
     stage = STAGE
     TAG = scratch('combo41')
     # ĐỢT 41 — COMBO CHO ĐỢT 38–40: chăm sóc tổng hợp + chuẩn bị khám; tiêm có y tá giữ; thanh toán tại quầy; tiễn khách + ăn mừng cùng bé
@@ -25,6 +25,7 @@ def combo41(work, problems):
                    [{'who': 'bac_si', 'do': [['celebrateWithKid', '@be']]}, {'who': 'cho', 'do': ['happyDog']},
                     {'who': 'meo', 'do': ['cozyCat']}, {'who': 'tho', 'do': ['happyBunny']}], ('"highFive"', '"playBow"', '"groomFace"', '"binky"'))}
     for name, (stage_set, cast, turns, needles) in combo41.items():
+        if name != part: continue                          # mỗi cảnh là một trường hợp riêng (đợt 47)
         scene41 = {'id': name, 'camera': 'auto', 'set': stage_set, 'characters': cast, 'script': turns}
         path = os.path.join(os.path.dirname(stage), f'_check_{TAG}_{name}.json')
         try:
@@ -40,12 +41,13 @@ def combo41(work, problems):
             if combo_name in html: problems.append(f'{name}: combo name {combo_name} was left in the composition instead of its steps')
         done = subprocess.run([sys.executable, os.path.join(HERE, 'acting_check.py'), os.path.join(work, name)], capture_output=True, text=True)
         if done.returncode != 0: problems.append(f'{name}: ' + (done.stdout.strip() or done.stderr.strip())[-600:])
-    text = os.path.join(work, 'combo41.txt')
-    open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn) · y tá (nurse)\n\nbác sĩ: [chuẩn bị khám]\nbác sĩ → chó: chăm sóc tổng hợp\nchó: [chó vui]\n')
-    done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
-    if done.returncode != 0: problems.append('script.py combos 41: ' + (done.stderr or done.stdout).strip()[-300:])
-    else:
-        made = json.load(open(os.path.join(work, 'combo41.scene.json'), encoding='utf-8'))
-        steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
-        want = [['washHands', 2], 'putOnGloves', ['clipNails', '@cho'], ['eyeDrops', '@cho'], ['cleanEars', '@cho'], 'thumbsUp', ['playBow', 1.2], 'wagTail', ['carryToy', 120]]
-        if steps != want: problems.append(f'script.py combos 41: steps {steps}, want {want}')
+    if part == 'words':
+        text = os.path.join(work, 'combo41.txt')
+        open(text, 'w', encoding='utf-8').write('bối cảnh: phòng khám\nbác sĩ (vet) · chó (corgi, trên bàn) · y tá (nurse)\n\nbác sĩ: [chuẩn bị khám]\nbác sĩ → chó: chăm sóc tổng hợp\nchó: [chó vui]\n')
+        done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), text, '--no-build'], capture_output=True, text=True)
+        if done.returncode != 0: problems.append('script.py combos 41: ' + (done.stderr or done.stdout).strip()[-300:])
+        else:
+            made = json.load(open(os.path.join(work, 'combo41.scene.json'), encoding='utf-8'))
+            steps = [t['do'][0] for t in made['script'] if isinstance(t, dict) and t.get('do')]
+            want = [['washHands', 2], 'putOnGloves', ['clipNails', '@cho'], ['eyeDrops', '@cho'], ['cleanEars', '@cho'], 'thumbsUp', ['playBow', 1.2], 'wagTail', ['carryToy', 120]]
+            if steps != want: problems.append(f'script.py combos 41: steps {steps}, want {want}')
