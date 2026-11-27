@@ -137,13 +137,35 @@ def main():
     lock, results = threading.Lock(), {}
     started = time.time()
 
-    def run(c):
-        problems, t0 = [], time.time()
+    def wait_for_page():
+        """check.sh chạy trang check.html song song (mỗi phần một Chrome) và đặt CHECK_PAGE_DONE=<thư mục>:<số phần>: trường hợp `calm`
+        đợi mọi phần xong (tệp shard<i>.end) — ba Chrome của trang đang chạy thì ảnh chụp của seek46 lệch (runner CI 4 nhân)."""
+        spec = os.environ.get('CHECK_PAGE_DONE')
+        if not spec: return
+        folder, count = spec.rsplit(':', 1)
+        ends = [os.path.join(folder, f'shard{i}.end') for i in range(1, int(count) + 1)]
+        t0, said = time.time(), False
+        while not all(os.path.isfile(e) for e in ends) and time.time() - t0 < 1800:
+            if not said: print('scene: the `calm` cases wait for the check page to finish', flush=True); said = True
+            time.sleep(1)
+
+    def attempt(c):
+        problems = []
         with tempfile.TemporaryDirectory(prefix=f'ci-{c.name.replace(":", "-")}-') as work:
             try: c.fn(work, problems)
             except Exception:                                     # một trường hợp vỡ không kéo đổ các trường hợp khác
                 problems.append(f'{c.name}: the check itself crashed:\n' + traceback.format_exc()[-1500:])
             found = ci.scan_uses(work)
+        return problems, found
+
+    def run(c):
+        t0 = time.time()
+        problems, found = attempt(c)
+        # Trường hợp `calm` (so ảnh chụp từng điểm ảnh) hỏng thì chạy lại MỘT lần: trên máy bận (runner CI 4 nhân) ảnh chụp ngay sau
+        # một lượt tua đôi khi chưa vẽ xong. Lỗi thật (khung hình phụ thuộc các lần tua trước) lặp lại đúng như thế nên vẫn hỏng.
+        if problems and CALM_TAG in c.tags:
+            print(f'  ↻ {c.name:22} failed once ({problems[0][:120]}) — running it again', flush=True)
+            problems, found = attempt(c)
         took = time.time() - t0
         with lock:
             results[c.name] = (problems, took, found)
@@ -167,6 +189,7 @@ def main():
         with turn:
             if CALM_TAG in c.tags and not calm:                  # trường hợp `calm` đầu tiên: đợi máy bớt bận; các phần sau chạy cùng nó
                 calm = True; turn.wait_for(lambda: running[0] <= min(CALM_BESIDE, jobs - 1))
+                wait_for_page()
             turn.wait_for(lambda: running[0] < jobs)
             running[0] += 1
         threads.append(threading.Thread(target=worker, args=(c,))); threads[-1].start()
