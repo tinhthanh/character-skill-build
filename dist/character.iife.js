@@ -3392,7 +3392,7 @@ __m['runtime/person/motion.js'] = (function () {
 const { KHUNG, DAI, HIPS_POSE, clamp, RAD, mem, pha, mix } = __m['runtime/person/shared.js'];
 
 const __default = (RigSVG) => mix(RigSVG, class {
-  static RUN_GAP_42D = 0.42;          // đợt 43: `run(rig)` dừng cách nó chừng ấy × nửa chiều cao khung (như RUN_GAP_42D của tools/scene.py)
+  static RUN_GAP_42D = 0.42;          // đợt 43: `run(rig)` dừng cách nó chừng ấy × nửa chiều cao khung (như RUN_GAP của tools/scenelib)
   static RUN_STEP_42D = 0.3;          // giây một bước chạy (`speed` 1); `walk` 0,46, `hurry` 0,3 nhưng không có pha bay
   static RUN_CONTACT_42D = 0.3;       // phần CHU KỲ (2 bước = 1) một chân trên đất: 60 % mỗi bước — 40 % còn lại cả hai chân trên không
   static RUN_LIFT_42D = 0.15;         // pha bay: hông nhấc thêm chừng ấy × chiều dài chân nhìn thấy (người lớn ~22 đơn vị, trẻ con ~14)
