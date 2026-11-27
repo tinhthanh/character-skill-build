@@ -1,4 +1,4 @@
-/* VGCharacter v0.85.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.86.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -137,35 +137,40 @@ function attachShade(svg, root) {
   return {
     cover,
     set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)},${root.getAttribute('transform')}`;
-      if (key === last) return;
-      last = key;
-      if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
-      cover.style.display = '';
+      if (amount <= 0.003 && glow <= 0.003) { if (last !== 'off') { last = 'off'; cover.style.display = 'none'; } return; }
       const b = frame();
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2, sx = (dx < 0 ? -1 : 1) * Math.max(Math.abs(dx), Math.abs(dy) * 0.6), sy = dy * 0.35, length = Math.hypot(sx, sy) || 1, ux = sx / length, uy = sy / length;
       const half = b.width * 0.5;
-      grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
-      grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
-      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.6, glow).toFixed(3));
-      stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
-      stops[2].setAttribute('stop-opacity', Math.min(0.75, amount * 0.95).toFixed(3));
-      stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
       const lift = fill && fillAmount > 0.003;
-      stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
-      stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
+      const out = [(cx - ux * half).toFixed(1), (cy - uy * half).toFixed(1), (cx + ux * half).toFixed(1), (cy + uy * half).toFixed(1),
+        `rgb(${rgb})`, Math.min(0.6, glow).toFixed(3), `rgb(${dark})`,
+        Math.min(0.75, amount * 0.95).toFixed(3), Math.min(0.7, amount).toFixed(3),
+        lift ? `rgb(${fill})` : `rgb(${dark})`, (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3)];
+      const key = out.join(',');
+      if (key === last) return;
+      last = key;
+      cover.style.display = '';
+      grad.setAttribute('x1', out[0]); grad.setAttribute('y1', out[1]);
+      grad.setAttribute('x2', out[2]); grad.setAttribute('y2', out[3]);
+      stops[0].setAttribute('stop-color', out[4]); stops[0].setAttribute('stop-opacity', out[5]);
+      stops[2].setAttribute('stop-color', out[6]); stops[3].setAttribute('stop-color', out[6]);
+      stops[2].setAttribute('stop-opacity', out[7]);
+      stops[3].setAttribute('stop-opacity', out[8]);
+      stops[4].setAttribute('stop-color', out[9]);
+      stops[4].setAttribute('stop-opacity', out[10]);
     },
     bounce(rgb = '255,255,255', amount = 0) {
-      const key = `${rgb},${amount.toFixed(3)},${root.getAttribute('transform')}`;
+      if (amount <= 0.004) { if (lastBounce !== 'off') { lastBounce = 'off'; up.style.display = 'none'; } return; }
+      const b = frame();
+      const out = [(b.y + b.height).toFixed(1), (b.y + b.height * 0.35).toFixed(1), `rgb(${rgb})`, Math.min(0.5, amount).toFixed(3), Math.min(0.5, amount * 0.35).toFixed(3)];
+      const key = out.join(',');
       if (key === lastBounce) return;
       lastBounce = key;
-      if (amount <= 0.004) { up.style.display = 'none'; return; }
       up.style.display = '';
-      const b = frame();
-      rise.setAttribute('y1', (b.y + b.height).toFixed(1)); rise.setAttribute('y2', (b.y + b.height * 0.35).toFixed(1));
-      for (const stop of riseStops) stop.setAttribute('stop-color', `rgb(${rgb})`);
-      riseStops[0].setAttribute('stop-opacity', Math.min(0.5, amount).toFixed(3));
-      riseStops[1].setAttribute('stop-opacity', Math.min(0.5, amount * 0.35).toFixed(3));
+      rise.setAttribute('y1', out[0]); rise.setAttribute('y2', out[1]);
+      for (const stop of riseStops) stop.setAttribute('stop-color', out[2]);
+      riseStops[0].setAttribute('stop-opacity', out[3]);
+      riseStops[1].setAttribute('stop-opacity', out[4]);
     },
   };
 }
@@ -1736,6 +1741,8 @@ class RigSVG {
     e.cangL.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangL})`);
     e.cangR.setAttribute('transform', `translate(0 ${DAI.canhTay * daiCanhTay}) rotate(${rotation.cangR})`);
     if (front) e.xaCang.setAttribute('transform', e['bat' + front].getAttribute('transform') + (front === carryFront ? ' ' + e['cang' + front].getAttribute('transform') : ''));
+    else if (e.xaCang.hasAttribute('transform')) e.xaCang.removeAttribute('transform');
+    if (!front && e.xaCang.style.filter) e.xaCang.style.filter = '';
     this.#placeCarried();
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
     for (const side of ['L', 'R']) if (e['tool' + side]) e['tool' + side].style.display = s['tool' + side] >= 0.5 ? '' : 'none';
@@ -5419,6 +5426,7 @@ class RigSVG {
     if (s.om < 0.5) {
       pet.carrier = null;                                          // đợt 40 C
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
+      if (e.om.hasAttribute('transform')) e.om.removeAttribute('transform');      // đợt 46: ngăn trống về trạng thái cố định (như `xaCang`)
       return;
     }
     if (!inside) { e.om.appendChild(pet.svg); }
@@ -10384,6 +10392,45 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   let ghostCount = 0;                                    // bàn tay vuốt chép lên trên con vật (đợt 32)
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
   let trial = null;                                  // máy THỬ (đợt 32): `direct` đo đồ đạc ở mép một góc chưa đặt — đè lên máy của timeline
+  const insertSort46 = (list, compare) => {
+    for (let start = 1; start < list.length; start++) {
+      const pivot = list[start];
+      let left = 0, right = start;
+      while (left < right) { const mid = (left + right) >> 1; if (compare(pivot, list[mid]) < 0) right = mid; else left = mid + 1; }
+      for (let p = start; p > left; p--) list[p] = list[p - 1];
+      list[left] = pivot;
+    }
+    return list;
+  };
+  const settleLayers46 = () => {
+    const rank = new Map(), pad = (n) => String(n).padStart(3, '0');
+    actors.forEach((actor, i) => {
+      const k = `a${pad(i)}`;
+      if (actor.shadow) rank.set(actor.shadow, `${k}.0`);
+      (actor.casts || []).forEach((el, n) => rank.set(el, `${k}.1.${pad(n)}`));
+      (actor.climbs || []).forEach((el, n) => { if (el) rank.set(el, `${k}.2.${pad(n)}`); });
+      if (actor.wallShade) rank.set(actor.wallShade, `${k}.3`);
+    });
+    props.forEach((prop, j) => {
+      const k = `p${pad(j)}`;
+      rank.set(prop.group, `${k}.0`);
+      (prop.casts || []).forEach((el, n) => rank.set(el, `${k}.1.${pad(n)}`));
+      (prop.climbs || []).forEach((el, n) => { if (el) rank.set(el, `${k}.2.${pad(n)}`); });
+    });
+    if (lighting) (lighting.pools || []).forEach((el, n) => rank.set(el, `t.${pad(n)}`));
+    for (const [el, key] of rank) {
+      if (key[0] === 'p' && key.endsWith('.0')) continue;                                         // nhóm đồ vật: không phải bóng
+      const hide = +(el.style.opacity || 1) === 0;
+      if ((el.style.display === 'none') !== hide) el.style.display = hide ? 'none' : '';
+    }
+    for (const element of layers) {
+      const kids = [...element.children], keyed = kids.filter((el) => rank.has(el));
+      if (!keyed.length) continue;
+      const want = keyed.sort((x, y) => (rank.get(x) < rank.get(y) ? -1 : 1)), from = kids.length - want.length;
+      if (want.every((el, n) => kids[from + n] === el)) continue;
+      for (const el of want) element.appendChild(el);
+    }
+  };
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
   const layer = (index) => {
     while (layers.length <= index) {
@@ -10757,20 +10804,20 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const opacity = (lighting.cloud * sunFade()).toFixed(3);
         for (const el of lighting.sunFaces) if (el.style.opacity !== opacity) el.style.opacity = opacity;
         {
-          const mood = lighting.mood, a = clamp((mood.dark - 0.06) * 1.45, 0, 0.84), key = `${mood.shade}|${a.toFixed(3)}|${(mood.sunAlpha || 0).toFixed(2)}`;
-          if (key !== lighting.skyKey) {
-            lighting.skyKey = key;
-            const sun = mood.sun && mood.sunColor ? clamp(mood.sunAlpha / 0.62, 0, 1) * (mood.warm > 0.1 ? 0.45 : 0) : 0;
-            lighting.sky.style.background = a < 0.01 ? 'none' : `linear-gradient(rgba(${mood.shade},${Math.min(0.92, a * 1.1).toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) 55%, ${sun > 0.01 ? `rgba(${mood.sunColor},${sun.toFixed(3)})` : `rgba(${mood.shade},${(a * 0.7).toFixed(3)})`})`;
-          }
+          const mood = lighting.mood, a = clamp((mood.dark - 0.06) * 1.45, 0, 0.84);
+          const sun = mood.sun && mood.sunColor ? clamp(mood.sunAlpha / 0.62, 0, 1) * (mood.warm > 0.1 ? 0.45 : 0) : 0;
+          const key = a < 0.01 ? 'none' : `linear-gradient(rgba(${mood.shade},${Math.min(0.92, a * 1.1).toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) 55%, ${sun > 0.01 ? `rgba(${mood.sunColor},${sun.toFixed(3)})` : `rgba(${mood.shade},${(a * 0.7).toFixed(3)})`})`;
+          if (key !== lighting.skyKey) { lighting.skyKey = key; lighting.sky.style.background = key; }
         }
         if (lighting.lens) {
-          const mood = lighting.mood, g = mood.grade, lens = lighting.lens, key = `${g.map((v) => v.toFixed(2))}|${mood.vignette.toFixed(3)}`;
+          const mood = lighting.mood, g = mood.grade, lens = lighting.lens;
+          const grade = `rgba(${g.slice(0, 3).map(Math.round).join(',')},${g[3].toFixed(3)})`, vignette = `radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,${mood.vignette.toFixed(3)}) 100%)`;
+          const grain = (mood.grain * 4.4).toFixed(3), key = `${grade}|${vignette}|${grain}`;          // hạt phim nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
           if (key !== lens.last) {
             lens.last = key;
-            lens.grade.style.background = `rgba(${g.slice(0, 3).map(Math.round).join(',')},${g[3].toFixed(3)})`;
-            lens.vignette.style.background = `radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,${mood.vignette.toFixed(3)}) 100%)`;
-            if (lens.grain) lens.grain.style.opacity = (mood.grain * 4.4).toFixed(3);                     // nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
+            lens.grade.style.background = grade;
+            lens.vignette.style.background = vignette;
+            if (lens.grain) lens.grain.style.opacity = grain;
           }
           const frame = Math.floor(time * 24);
           if (lens.grain) lens.grain.style.backgroundPosition = `${(frame * 73) % 220}px ${(frame * 131) % 220}px`;
@@ -10780,7 +10827,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lamp.baseRgb = lamp.baseRgb || lamp.rgb;
           const shot = Math.floor((time + lamp.x * 0.001) / 2.3), tones = [lamp.baseRgb, '255,196,160', '168,214,255', '214,255,220'];
           lamp.rgb = tones[(shot * 7 + 3) % tones.length];
-          lamp.pulse = 0.78 + 0.12 * Math.sin(time * 9.1) * Math.sin(time * 3.7 + 1) + 0.1 * Math.sin(time * 23);
+          lamp.pulse = Math.round((0.78 + 0.12 * Math.sin(time * 9.1) * Math.sin(time * 3.7 + 1) + 0.1 * Math.sin(time * 23)) * 100) / 100;      // bước 0,01 (đợt 46: khoá `litKey`)
         }
       }
       const pull = camera.lens - camera.distance, [cx, cy] = centre();
@@ -10797,7 +10844,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       const isPerson = (actor) => !!(actor.rig && typeof actor.rig.seatY === 'function');
       const together = (a, b) => Math.abs(a.spot.z - b.spot.z) < 30 && Math.abs(a.where - b.where) < 220;
-      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => {
+      const shown = insertSort46(actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })), (a, b) => {
         if (isPerson(a.actor) !== isPerson(b.actor) && together(a.actor, b.actor)) return isPerson(a.actor) ? 1 : -1;
         return a.at.depth - b.at.depth;
       });
@@ -10822,6 +10869,33 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
         element.style.transform = `scale(${camera.zoom}) translateZ(${pull}px) ${moves}`;
       }
+      const placeMark46 = (actor) => {
+        const rig = actor.rig, markEl = rig && rig.markEl, away = actor.host.style.display === 'none';
+        if (markEl) {
+          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
+          if (lit) {
+            if (!actor.markLayer) {
+              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              actor.markLayer.setAttribute('data-mark-layer', '');
+              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
+              view.appendChild(actor.markLayer);
+            }
+            markEl.style.visibility = '';
+            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
+            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
+            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
+            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
+            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
+            layer.style.opacity = markEl.getAttribute('opacity');
+            layer.style.display = '';
+            layer.innerHTML = markEl.innerHTML;
+            markEl.style.visibility = 'hidden';
+          } else {
+            markEl.style.visibility = '';
+            if (actor.markLayer) actor.markLayer.style.display = 'none';
+          }
+        }
+      };
       shown.forEach(({ actor, at }, rank) => {
         const { host, rig } = actor;
         if (!actor.width) { actor.width = host.offsetWidth; actor.height = host.offsetHeight; }        // host đang ẩn thì chưa đo được: đo lại ở khung sau
@@ -10911,31 +10985,6 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (actor.lamp) { if (host.style.opacity !== actor.lamp.level.toFixed(3)) host.style.opacity = actor.lamp.level.toFixed(3); }
         else if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
         host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
-        const markEl = rig && rig.markEl;
-        if (markEl) {
-          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
-          if (lit) {
-            if (!actor.markLayer) {
-              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-              actor.markLayer.setAttribute('data-mark-layer', '');
-              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
-              view.appendChild(actor.markLayer);
-            }
-            markEl.style.visibility = '';
-            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
-            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
-            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
-            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
-            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
-            layer.style.opacity = markEl.getAttribute('opacity');
-            layer.style.display = '';
-            layer.innerHTML = markEl.innerHTML;
-            markEl.style.visibility = 'hidden';
-          } else {
-            markEl.style.visibility = '';
-            if (actor.markLayer) actor.markLayer.style.display = 'none';
-          }
-        }
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
           if (actor.shadow.parentNode !== layers[rank]) layers[rank].appendChild(actor.shadow);
@@ -10956,6 +11005,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         actor.base = own; actor.wrote = clamp(own - camera.yaw / 90, -1, 1);
         if (rig.s.huong !== actor.wrote) { rig.s.huong = actor.wrote; rig.render(); }
       });
+      for (const actor of actors) if (actor.rig && actor.rig.el && typeof actor.rig.apDung === 'function') actor.rig.apDung();
+      for (const { actor } of shown) placeMark46(actor);
       for (const prop of props) {
         const depth = set.project(...prop.centre).depth;
         const near = (actor) => prop.span && actor.where > prop.span[0] - 200 && actor.where < prop.span[1] + 200;
@@ -10975,6 +11026,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         soften(item, item.element, item.filter, px);
       }
       if (lighting) { boxShadows(); beamOverlays(); }
+      settleLayers46();
       if (lighting && lighting.dust.length) {
         const time = driven ? driven.time() : 0;
         for (const mote of lighting.dust) {
@@ -10984,8 +11036,8 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         }
       }
       if (lighting) {
-        const key = lighting.lamps.map((lamp) => (lamp.kind === 'screen' ? `${(lamp.level * (lamp.pulse ?? 1)).toFixed(2)}${lamp.rgb}` : lamp.level.toFixed(3))).join(',')
-          + (lighting.shift ? `|${lighting.shift.state.t.toFixed(3)}` : '');
+        const key = lighting.lamps.map((lamp) => (lamp.kind === 'screen' ? `${lamp.level * (lamp.pulse ?? 1)}${lamp.rgb}` : `${lamp.level}`)).join(',')
+          + (lighting.shift ? `|${lighting.shift.state.t}` : '');
         if (key !== litKey) {
           litKey = key;
           surfaces.forEach(lightSurface);
@@ -12723,7 +12775,7 @@ const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUP
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
-const VERSION = '0.85.0';
+const VERSION = '0.86.0';
 const GLOBAL_NAME = 'VGCharacter';
 RigSVG.COLOR_ALIASES = COLOR_KEYS;
 RigThu.COLOR_ALIASES = COLOR_KEYS;

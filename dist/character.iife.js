@@ -1,4 +1,4 @@
-/* VGCharacter v0.85.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
+/* VGCharacter v0.86.0 — bản dựng một tệp của character-skill-build. SINH TỰ ĐỘNG bằng tools/build.py — đừng sửa tay. */
 var VGCharacter = (function () {
 'use strict';
 const __m = {};
@@ -195,42 +195,51 @@ function attachShade(svg, root) {
      * tối hẳn. amount = 0 tắt lớp.
      */
     set(dx, dy, amount, rgb = '255,255,255', glow = 0, dark = '0,0,0', fill = null, fillAmount = 0) {
-      const key = `${dx.toFixed(2)},${dy.toFixed(2)},${amount.toFixed(3)},${rgb},${glow.toFixed(3)},${dark},${fill},${fillAmount.toFixed(3)},${root.getAttribute('transform')}`;
-      if (key === last) return;
-      last = key;
-      if (amount <= 0.003 && glow <= 0.003) { cover.style.display = 'none'; return; }
-      cover.style.display = '';
+      // ĐỢT 46: khoá so sánh là chính CÁC GIÁ TRỊ SẼ GHI (đã làm tròn), không phải đầu vào làm tròn — khoá cũ `amount.toFixed(3)` mà
+      // ghi `(amount × 0,95).toFixed(3)`: hai khung cùng khoá có thể cần hai giá trị khác nhau (0,351 / 0,352), khung sau giữ giá trị
+      // của khung trước — hình phụ thuộc khung nào được vẽ trước nó.
+      if (amount <= 0.003 && glow <= 0.003) { if (last !== 'off') { last = 'off'; cover.style.display = 'none'; } return; }
       const b = frame();
       // Chủ yếu theo CHIỀU NGANG: ánh sáng từ một bên đọc rõ nhất trên hình chibi đứng thẳng; chuyển sắc trải theo bề NGANG
       // của hình (trải theo đường chéo cả khung thì giữa thân gần như không đổi — đo ở cảnh thử đợt 17).
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2, sx = (dx < 0 ? -1 : 1) * Math.max(Math.abs(dx), Math.abs(dy) * 0.6), sy = dy * 0.35, length = Math.hypot(sx, sy) || 1, ux = sx / length, uy = sy / length;
       const half = b.width * 0.5;
-      grad.setAttribute('x1', (cx - ux * half).toFixed(1)); grad.setAttribute('y1', (cy - uy * half).toFixed(1));
-      grad.setAttribute('x2', (cx + ux * half).toFixed(1)); grad.setAttribute('y2', (cy + uy * half).toFixed(1));
-      stops[0].setAttribute('stop-color', `rgb(${rgb})`); stops[0].setAttribute('stop-opacity', Math.min(0.6, glow).toFixed(3));
-      // Màu phía khuất: màu bóng của giờ trong ngày (đêm: xanh lạnh) — đen thuần thì thành xám đục (Gemini, đợt 17).
-      stops[2].setAttribute('stop-color', `rgb(${dark})`); stops[3].setAttribute('stop-color', `rgb(${dark})`);
-      // Nửa khuất tối rõ NGAY sau giữa thân (0,95 × độ tối): một ranh giới sáng / tối đọc được ở cỡ nhỏ — 0,75 thì người chấm
-      // (hai mô hình, đợt 25) đều thấy nhân vật "sáng đều hai bên".
-      stops[2].setAttribute('stop-opacity', Math.min(0.75, amount * 0.95).toFixed(3));
-      stops[3].setAttribute('stop-opacity', Math.min(0.7, amount).toFixed(3));
-      // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
       const lift = fill && fillAmount > 0.003;
-      stops[4].setAttribute('stop-color', lift ? `rgb(${fill})` : `rgb(${dark})`);
-      stops[4].setAttribute('stop-opacity', (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3));
+      const out = [(cx - ux * half).toFixed(1), (cy - uy * half).toFixed(1), (cx + ux * half).toFixed(1), (cy + uy * half).toFixed(1),
+        `rgb(${rgb})`, Math.min(0.6, glow).toFixed(3), `rgb(${dark})`,
+        // Nửa khuất tối rõ NGAY sau giữa thân (0,95 × độ tối): một ranh giới sáng / tối đọc được ở cỡ nhỏ — 0,75 thì người chấm
+        // (hai mô hình, đợt 25) đều thấy nhân vật "sáng đều hai bên".
+        Math.min(0.75, amount * 0.95).toFixed(3), Math.min(0.7, amount).toFixed(3),
+        // Mép ngoài cùng phía khuất: màu ánh sáng phụ (nếu có), không thì vẫn tối.
+        lift ? `rgb(${fill})` : `rgb(${dark})`, (lift ? Math.min(0.5, fillAmount) : Math.min(0.7, amount)).toFixed(3)];
+      const key = out.join(',');
+      if (key === last) return;
+      last = key;
+      cover.style.display = '';
+      grad.setAttribute('x1', out[0]); grad.setAttribute('y1', out[1]);
+      grad.setAttribute('x2', out[2]); grad.setAttribute('y2', out[3]);
+      stops[0].setAttribute('stop-color', out[4]); stops[0].setAttribute('stop-opacity', out[5]);
+      // Màu phía khuất: màu bóng của giờ trong ngày (đêm: xanh lạnh) — đen thuần thì thành xám đục (Gemini, đợt 17).
+      stops[2].setAttribute('stop-color', out[6]); stops[3].setAttribute('stop-color', out[6]);
+      stops[2].setAttribute('stop-opacity', out[7]);
+      stops[3].setAttribute('stop-opacity', out[8]);
+      stops[4].setAttribute('stop-color', out[9]);
+      stops[4].setAttribute('stop-opacity', out[10]);
     },
     /** ÁNH SÁNG PHẢN XẠ từ sàn: màu `rgb` ("214,168,110"), độ mạnh `amount` 0…1 (0 tắt) — dày ở chân, tan hết ở ngang ngực. */
     bounce(rgb = '255,255,255', amount = 0) {
-      const key = `${rgb},${amount.toFixed(3)},${root.getAttribute('transform')}`;
+      if (amount <= 0.004) { if (lastBounce !== 'off') { lastBounce = 'off'; up.style.display = 'none'; } return; }
+      const b = frame();
+      // Đợt 46: khoá là các giá trị sẽ ghi (như `set`).
+      const out = [(b.y + b.height).toFixed(1), (b.y + b.height * 0.35).toFixed(1), `rgb(${rgb})`, Math.min(0.5, amount).toFixed(3), Math.min(0.5, amount * 0.35).toFixed(3)];
+      const key = out.join(',');
       if (key === lastBounce) return;
       lastBounce = key;
-      if (amount <= 0.004) { up.style.display = 'none'; return; }
       up.style.display = '';
-      const b = frame();
-      rise.setAttribute('y1', (b.y + b.height).toFixed(1)); rise.setAttribute('y2', (b.y + b.height * 0.35).toFixed(1));
-      for (const stop of riseStops) stop.setAttribute('stop-color', `rgb(${rgb})`);
-      riseStops[0].setAttribute('stop-opacity', Math.min(0.5, amount).toFixed(3));
-      riseStops[1].setAttribute('stop-opacity', Math.min(0.5, amount * 0.35).toFixed(3));
+      rise.setAttribute('y1', out[0]); rise.setAttribute('y2', out[1]);
+      for (const stop of riseStops) stop.setAttribute('stop-color', out[2]);
+      riseStops[0].setAttribute('stop-opacity', out[3]);
+      riseStops[1].setAttribute('stop-opacity', out[4]);
     },
   };
 }
@@ -2641,6 +2650,10 @@ class RigSVG {
     // Cẳng tay (đan tay) hay bàn tay (bưng đồ) ở lớp trước đi theo đúng cánh tay của nó — bàn tay thì cộng thêm phép
     // biến đổi của cẳng tay.
     if (front) e.xaCang.setAttribute('transform', e['bat' + front].getAttribute('transform') + (front === carryFront ? ' ' + e['cang' + front].getAttribute('transform') : ''));
+    // Đợt 46: nhóm trống thì về trạng thái cố định — nhóm trống có bộ lọc viền vẫn được Chrome vẽ (một lớp lọc theo phép biến đổi của
+    // nó), mang phép biến đổi của lần nó có tay gần nhất thì điểm ảnh quanh đó lệch 1–2 mức tuỳ những khung đã vẽ trước.
+    else if (e.xaCang.hasAttribute('transform')) e.xaCang.removeAttribute('transform');
+    if (!front && e.xaCang.style.filter) e.xaCang.style.filter = '';
     this.#placeCarried();
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:
     // bắp + cẳng ≈ ±90°). Cánh tay lệch khỏi dáng ấy bao nhiêu — nghỉ ở dáng gập hờ, hay quay nghiêng người khiến
@@ -7859,6 +7872,7 @@ class RigSVG {
     if (s.om < 0.5) {
       pet.carrier = null;                                          // đợt 40 C
       if (inside) { c.host.appendChild(pet.svg); for (const [name, value] of c.attrs) value === null ? pet.svg.removeAttribute(name) : pet.svg.setAttribute(name, value); pet.apDung(); }
+      if (e.om.hasAttribute('transform')) e.om.removeAttribute('transform');      // đợt 46: ngăn trống về trạng thái cố định (như `xaCang`)
       return;
     }
     if (!inside) { e.om.appendChild(pet.svg); }
@@ -14816,6 +14830,55 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
   let frame = null, room = null;                     // room: bề ngang sàn [xMin, xMax] — ra ngoài là ra khỏi phòng
   let trial = null;                                  // máy THỬ (đợt 32): `direct` đo đồ đạc ở mép một góc chưa đặt — đè lên máy của timeline
 
+  // ĐỢT 46: xếp chèn nhị phân, ổn định, tự viết — kết quả là hàm của (mảng, hàm so sánh) kể cả khi hàm so sánh không bắc cầu
+  // (`Array.prototype.sort` thì không: tuỳ trạng thái JIT của V8). Mảng nhỏ (số nhân vật), sắp xếp tại chỗ, trả về chính mảng.
+  const insertSort46 = (list, compare) => {
+    for (let start = 1; start < list.length; start++) {
+      const pivot = list[start];
+      let left = 0, right = start;
+      while (left < right) { const mid = (left + right) >> 1; if (compare(pivot, list[mid]) < 0) right = mid; else left = mid + 1; }
+      for (let p = start; p > left; p--) list[p] = list[p - 1];
+      list[left] = pivot;
+    }
+    return list;
+  };
+  // ĐỢT 46 — THỨ TỰ TRONG MỘT LỚP CHỈ THEO THỜI ĐIỂM. Bóng của nhân vật, bóng dài theo đèn, bóng leo tường, nhóm đồ vật… vào lớp của
+  // chúng bằng `appendChild` lúc ĐỔI lớp (hay lúc được tạo, khi lần đầu cần tới): thứ tự của chúng trong lớp là thứ tự những lần đổi
+  // ấy — tuỳ những khung đã vẽ trước. Các bóng chồng lên nhau trên cùng mặt sàn hoà màu theo thứ tự ấy (lệch 1–2 mức màu mỗi lần
+  // làm tròn 8 bit). Cuối mỗi `update`: trong mỗi lớp, các phần tử ấy nằm sau mọi phần tử cố định, theo một thứ tự cố định (nhân vật
+  // theo thứ tự đặt, rồi đồ vật, rồi quầng đèn pin) — chỉ dời khi lệch.
+  const settleLayers46 = () => {
+    const rank = new Map(), pad = (n) => String(n).padStart(3, '0');
+    actors.forEach((actor, i) => {
+      const k = `a${pad(i)}`;
+      if (actor.shadow) rank.set(actor.shadow, `${k}.0`);
+      (actor.casts || []).forEach((el, n) => rank.set(el, `${k}.1.${pad(n)}`));
+      (actor.climbs || []).forEach((el, n) => { if (el) rank.set(el, `${k}.2.${pad(n)}`); });
+      if (actor.wallShade) rank.set(actor.wallShade, `${k}.3`);
+    });
+    props.forEach((prop, j) => {
+      const k = `p${pad(j)}`;
+      rank.set(prop.group, `${k}.0`);
+      (prop.casts || []).forEach((el, n) => rank.set(el, `${k}.1.${pad(n)}`));
+      (prop.climbs || []).forEach((el, n) => { if (el) rank.set(el, `${k}.2.${pad(n)}`); });
+    });
+    if (lighting) (lighting.pools || []).forEach((el, n) => rank.set(el, `t.${pad(n)}`));
+    // Bóng đang tắt (độ đục 0 — bóng dài không còn đèn đổ, bóng leo tường thừa…) thì `display: none`: trong lớp `preserve-3d`, một mặt
+    // phẳng trong suốt vẫn vào phép xếp / cắt mặt phẳng 3D của Chrome — nó cắt mép người, bàn bên cạnh thành đường răng cưa khác
+    // nhau tuỳ hình học cũ nó còn giữ từ khung trước (lệch tới 50 mức màu dọc mép cậu bé, cảnh thử đợt 46).
+    for (const [el, key] of rank) {
+      if (key[0] === 'p' && key.endsWith('.0')) continue;                                         // nhóm đồ vật: không phải bóng
+      const hide = +(el.style.opacity || 1) === 0;
+      if ((el.style.display === 'none') !== hide) el.style.display = hide ? 'none' : '';
+    }
+    for (const element of layers) {
+      const kids = [...element.children], keyed = kids.filter((el) => rank.has(el));
+      if (!keyed.length) continue;
+      const want = keyed.sort((x, y) => (rank.get(x) < rank.get(y) ? -1 : 1)), from = kids.length - want.length;
+      if (want.every((el, n) => kids[from + n] === el)) continue;
+      for (const el of want) element.appendChild(el);
+    }
+  };
   const centre = () => origin || [view.clientWidth / 2, view.clientHeight * 0.57];
   const layer = (index) => {
     while (layers.length <= index) {
@@ -15377,20 +15440,23 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         for (const el of lighting.sunFaces) if (el.style.opacity !== opacity) el.style.opacity = opacity;
         {
           // Trời theo giờ: chiều — trên thẫm tím, sát chân trời ánh cam; đêm — xanh đen; ngày — để nguyên.
-          const mood = lighting.mood, a = clamp((mood.dark - 0.06) * 1.45, 0, 0.84), key = `${mood.shade}|${a.toFixed(3)}|${(mood.sunAlpha || 0).toFixed(2)}`;
-          if (key !== lighting.skyKey) {
-            lighting.skyKey = key;
-            const sun = mood.sun && mood.sunColor ? clamp(mood.sunAlpha / 0.62, 0, 1) * (mood.warm > 0.1 ? 0.45 : 0) : 0;
-            lighting.sky.style.background = a < 0.01 ? 'none' : `linear-gradient(rgba(${mood.shade},${Math.min(0.92, a * 1.1).toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) 55%, ${sun > 0.01 ? `rgba(${mood.sunColor},${sun.toFixed(3)})` : `rgba(${mood.shade},${(a * 0.7).toFixed(3)})`})`;
-          }
+          // Đợt 46: khoá là chính chuỗi sẽ ghi — khoá cũ làm tròn đầu vào (a, sunAlpha) mà chuỗi ghi lại tính từ giá trị chưa làm tròn:
+          // hai khung cùng khoá cần hai chuỗi khác nhau thì khung sau mang màu trời của khung vẽ trước nó.
+          const mood = lighting.mood, a = clamp((mood.dark - 0.06) * 1.45, 0, 0.84);
+          const sun = mood.sun && mood.sunColor ? clamp(mood.sunAlpha / 0.62, 0, 1) * (mood.warm > 0.1 ? 0.45 : 0) : 0;
+          const key = a < 0.01 ? 'none' : `linear-gradient(rgba(${mood.shade},${Math.min(0.92, a * 1.1).toFixed(3)}), rgba(${mood.shade},${(a * 0.8).toFixed(3)}) 55%, ${sun > 0.01 ? `rgba(${mood.sunColor},${sun.toFixed(3)})` : `rgba(${mood.shade},${(a * 0.7).toFixed(3)})`})`;
+          if (key !== lighting.skyKey) { lighting.skyKey = key; lighting.sky.style.background = key; }
         }
         if (lighting.lens) {
-          const mood = lighting.mood, g = mood.grade, lens = lighting.lens, key = `${g.map((v) => v.toFixed(2))}|${mood.vignette.toFixed(3)}`;
+          // Đợt 46: khoá là các chuỗi sẽ ghi (khoá cũ `g.toFixed(2)` mà ghi `Math.round(g)`, `g[3].toFixed(3)`).
+          const mood = lighting.mood, g = mood.grade, lens = lighting.lens;
+          const grade = `rgba(${g.slice(0, 3).map(Math.round).join(',')},${g[3].toFixed(3)})`, vignette = `radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,${mood.vignette.toFixed(3)}) 100%)`;
+          const grain = (mood.grain * 4.4).toFixed(3), key = `${grade}|${vignette}|${grain}`;          // hạt phim nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
           if (key !== lens.last) {
             lens.last = key;
-            lens.grade.style.background = `rgba(${g.slice(0, 3).map(Math.round).join(',')},${g[3].toFixed(3)})`;
-            lens.vignette.style.background = `radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,${mood.vignette.toFixed(3)}) 100%)`;
-            if (lens.grain) lens.grain.style.opacity = (mood.grain * 4.4).toFixed(3);                     // nhẹ hơn thì nén video xoá mất (Gemini đợt 20)
+            lens.grade.style.background = grade;
+            lens.vignette.style.background = vignette;
+            if (lens.grain) lens.grain.style.opacity = grain;
           }
           // Hạt phim: đổi chỗ mỗi khung hình (24 lần / giây), theo thời gian timeline.
           const frame = Math.floor(time * 24);
@@ -15401,7 +15467,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
           lamp.baseRgb = lamp.baseRgb || lamp.rgb;
           const shot = Math.floor((time + lamp.x * 0.001) / 2.3), tones = [lamp.baseRgb, '255,196,160', '168,214,255', '214,255,220'];
           lamp.rgb = tones[(shot * 7 + 3) % tones.length];
-          lamp.pulse = 0.78 + 0.12 * Math.sin(time * 9.1) * Math.sin(time * 3.7 + 1) + 0.1 * Math.sin(time * 23);
+          lamp.pulse = Math.round((0.78 + 0.12 * Math.sin(time * 9.1) * Math.sin(time * 3.7 + 1) + 0.1 * Math.sin(time * 23)) * 100) / 100;      // bước 0,01 (đợt 46: khoá `litKey`)
         }
       }
       const pull = camera.lens - camera.distance, [cx, cy] = centre();
@@ -15428,7 +15494,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       // đúng một khung giữa lúc lia — con vật bật từ sau ra trước tay người (Gemini / người dùng: "giây 19 vẫn giật").
       const isPerson = (actor) => !!(actor.rig && typeof actor.rig.seatY === 'function');
       const together = (a, b) => Math.abs(a.spot.z - b.spot.z) < 30 && Math.abs(a.where - b.where) < 220;
-      const shown = actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })).sort((a, b) => {
+      // ĐỢT 46 — THỨ TỰ LỚP CHỈ THEO THỜI ĐIỂM: hàm so sánh này KHÔNG bắc cầu (luật cặp người–con vật lẫn với độ sâu; người,
+      // con vật cùng z có độ sâu BẰNG HỆT nhau khi máy nhìn thẳng). Với hàm so sánh như thế, `Array.prototype.sort` cho kết quả
+      // tuỳ cách V8 chạy nó — và V8 đổi đường chạy sau khi hàm `update` đã chạy nóng vài chục lần (đo: cùng đầu vào, trang vừa
+      // mở xếp mèo / bác sĩ / bé, trang đã tua qua cảnh xếp bác sĩ / chó / bé / mèo — đuôi mèo vẽ đè lên tay bác sĩ). Khung
+      // hình phụ thuộc số lần tua trước nó. Xếp bằng phép chèn nhị phân của riêng mình: cùng đầu vào (thứ tự `actors` cố định,
+      // vị trí theo thời điểm) luôn cùng kết quả — đúng kết quả của trang vừa mở (V8 chạy lạnh cũng là chèn nhị phân).
+      const shown = insertSort46(actors.map((actor) => ({ actor, at: set.project(actor.where, actor.spot.y, actor.spot.z) })), (a, b) => {
         if (isPerson(a.actor) !== isPerson(b.actor) && together(a.actor, b.actor)) return isPerson(a.actor) ? 1 : -1;
         return a.at.depth - b.at.depth;
       });
@@ -15460,6 +15532,37 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         element.style.left = cx + 'px'; element.style.top = cy + 'px';
         element.style.transform = `scale(${camera.zoom}) translateZ(${pull}px) ${moves}`;
       }
+      // Dấu cảm xúc của một nhân vật (gọi sau khi rig đã vẽ lại theo bố cục của khung — đợt 46).
+      const placeMark46 = (actor) => {
+        // DẤU CẢM XÚC LUÔN Ở TRÊN CÙNG (! ? tim zzz — marks.js): dấu vẽ trong SVG của chính nhân vật, nên người đứng trước
+        // con vật (bác sĩ cạnh chó trên bàn) che mất dấu của nó (Gemini soát cảnh thử đợt 13). Khi có dấu: chép nó ra một
+        // lớp phủ riêng trên mọi lớp của bối cảnh, đúng chỗ dấu gốc trên màn hình, và ẩn dấu gốc.
+        const rig = actor.rig, markEl = rig && rig.markEl, away = actor.host.style.display === 'none';
+        if (markEl) {
+          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
+          if (lit) {
+            if (!actor.markLayer) {
+              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              actor.markLayer.setAttribute('data-mark-layer', '');
+              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
+              view.appendChild(actor.markLayer);
+            }
+            markEl.style.visibility = '';
+            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
+            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
+            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
+            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
+            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
+            layer.style.opacity = markEl.getAttribute('opacity');
+            layer.style.display = '';
+            layer.innerHTML = markEl.innerHTML;
+            markEl.style.visibility = 'hidden';
+          } else {
+            markEl.style.visibility = '';
+            if (actor.markLayer) actor.markLayer.style.display = 'none';
+          }
+        }
+      };
       shown.forEach(({ actor, at }, rank) => {
         const { host, rig } = actor;
         if (!actor.width) { actor.width = host.offsetWidth; actor.height = host.offsetHeight; }        // host đang ẩn thì chưa đo được: đo lại ở khung sau
@@ -15595,34 +15698,6 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (actor.lamp) { if (host.style.opacity !== actor.lamp.level.toFixed(3)) host.style.opacity = actor.lamp.level.toFixed(3); }
         else if (+(host.style.opacity || 1) !== +present.toFixed(3)) host.style.opacity = present < 1 ? present.toFixed(3) : '';
         host.style.transform = `translate(${(at.x - (actor.width / 2 + actor.step * actor.unit) * at.scale).toFixed(2)}px, ${(at.y - actor.height * (actor.ground || 1) * at.scale).toFixed(2)}px) scale(${at.scale.toFixed(5)})`;
-        // DẤU CẢM XÚC LUÔN Ở TRÊN CÙNG (! ? tim zzz — marks.js): dấu vẽ trong SVG của chính nhân vật, nên người đứng trước
-        // con vật (bác sĩ cạnh chó trên bàn) che mất dấu của nó (Gemini soát cảnh thử đợt 13). Khi có dấu: chép nó ra một
-        // lớp phủ riêng trên mọi lớp của bối cảnh, đúng chỗ dấu gốc trên màn hình, và ẩn dấu gốc.
-        const markEl = rig && rig.markEl;
-        if (markEl) {
-          const lit = !away && markEl.dataset.kind && +(markEl.getAttribute('opacity') || 0) > 0.01;
-          if (lit) {
-            if (!actor.markLayer) {
-              actor.markLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-              actor.markLayer.setAttribute('data-mark-layer', '');
-              actor.markLayer.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:9999';
-              view.appendChild(actor.markLayer);
-            }
-            markEl.style.visibility = '';
-            const box = view.getBoundingClientRect(), r = markEl.getBoundingClientRect(), local = markEl.getBBox();
-            const sx = view.clientWidth / (box.width || 1), sy = view.clientHeight / (box.height || 1), layer = actor.markLayer;
-            layer.setAttribute('viewBox', `${local.x} ${local.y} ${Math.max(1, local.width)} ${Math.max(1, local.height)}`);
-            layer.setAttribute('width', (r.width * sx).toFixed(2)); layer.setAttribute('height', (r.height * sy).toFixed(2));
-            layer.style.transform = `translate(${((r.left - box.left) * sx).toFixed(2)}px, ${((r.top - box.top) * sy).toFixed(2)}px)`;
-            layer.style.opacity = markEl.getAttribute('opacity');
-            layer.style.display = '';
-            layer.innerHTML = markEl.innerHTML;
-            markEl.style.visibility = 'hidden';
-          } else {
-            markEl.style.visibility = '';
-            if (actor.markLayer) actor.markLayer.style.display = 'none';
-          }
-        }
         // Bóng trên sàn: nằm ở lớp ngay SAU nhân vật — trên nền và trên những nhân vật ở xa hơn, dưới mọi đồ vật đứng trước.
         if (rig && rig.el && rig.el.bong && rig.el.bong.style.display !== 'none') rig.el.bong.style.display = 'none';      // dựng lại rig (đổi màu, cầm đồ) thì phần tử mới: ẩn lại
         if (actor.shadow) {
@@ -15651,6 +15726,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         actor.base = own; actor.wrote = clamp(own - camera.yaw / 90, -1, 1);
         if (rig.s.huong !== actor.wrote) { rig.s.huong = actor.wrote; rig.render(); }
       });
+      // ĐỢT 46 — RIG VẼ LẠI THEO BỐ CỤC CỦA CHÍNH KHUNG NÀY. Một số phần của hình vẽ rig đo màn hình lúc vẽ (con vật đang bế: chỗ host
+      // của nó và cánh tay người bế — `#placeCarried`; dây dắt, dây kéo, túi trao tay, điểm gặp lúc trao con vật). Rig chỉ tự vẽ lại khi
+      // trạng thái của nó đổi (microtask sau khi tua) — TRƯỚC khi vòng trên đặt host theo máy quay của khung này; tua tới một lúc mà
+      // trạng thái rig không đổi (tween đã xong) thì nó giữ hình vẽ theo bố cục của lần tua trước (máy quay khác): con chó trong tay
+      // ông lệch một khúc tuỳ khung trước đó. Vẽ lại mọi rig ở đây, sau khi mọi host đã vào chỗ (rẻ: ~0,3 ms một rig).
+      for (const actor of actors) if (actor.rig && actor.rig.el && typeof actor.rig.apDung === 'function') actor.rig.apDung();
+      for (const { actor } of shown) placeMark46(actor);
       // Mỗi đồ vật vào lớp nằm ngay TRƯỚC những nhân vật ở SAU nó. Nhân vật đứng sát hộp theo chiều ngang thì "sau" tính
       // theo VỊ TRÍ TRONG PHÒNG: đứng sau mặt trước của hộp (z nhỏ hơn) là ở sau hộp, ở mọi góc máy. So khoảng cách tới
       // máy của TÂM hộp với của nhân vật thì người đứng ngang giữa bề sâu cái bàn (bác sĩ cạnh bàn khám) có cùng độ sâu
@@ -15684,6 +15766,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         soften(item, item.element, item.filter, px);
       }
       if (lighting) { boxShadows(); beamOverlays(); }
+      settleLayers46();
       // Bụi trong luồng nắng: trôi xuống chậm, lắc ngang nhẹ, lấp lánh — theo thời gian của timeline.
       if (lighting && lighting.dust.length) {
         const time = driven ? driven.time() : 0;
@@ -15695,9 +15778,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
       }
       // Các mặt của bối cảnh chỉ tính lại ánh sáng khi mức sáng của một đèn đổi (bật / tắt dần).
       if (lighting) {
-        // Màn hình TV: mức nhấp nháy (làm tròn) và màu cũng vào khoá — vệt sáng TV trên tường, sàn nhấp nháy theo.
-        const key = lighting.lamps.map((lamp) => (lamp.kind === 'screen' ? `${(lamp.level * (lamp.pulse ?? 1)).toFixed(2)}${lamp.rgb}` : lamp.level.toFixed(3))).join(',')
-          + (lighting.shift ? `|${lighting.shift.state.t.toFixed(3)}` : '');
+        // Màn hình TV: mức nhấp nháy và màu cũng vào khoá — vệt sáng TV trên tường, sàn nhấp nháy theo.
+        // Đợt 46: khoá bằng GIÁ TRỊ ĐÚNG mà `lightSurface` dùng (không làm tròn): khoá làm tròn thì hai khung cùng khoá mà mức đèn
+        // khác nhau chút ít — khung sau mang ánh sáng tường / sàn của khung vẽ trước nó. Nhịp nháy TV đã lượng tử sẵn (bước 0,01, ở trên)
+        // nên tường không phải tính lại mỗi khung.
+        const key = lighting.lamps.map((lamp) => (lamp.kind === 'screen' ? `${lamp.level * (lamp.pulse ?? 1)}${lamp.rgb}` : `${lamp.level}`)).join(',')
+          + (lighting.shift ? `|${lighting.shift.state.t}` : '');
         if (key !== litKey) {
           litKey = key;
           surfaces.forEach(lightSurface);
@@ -17955,7 +18041,7 @@ const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
 const CUSTOM_CHARACTERS = __m['characters/index.js'].default;
 
-const VERSION = '0.85.0';
+const VERSION = '0.86.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 const GLOBAL_NAME = 'VGCharacter';
 

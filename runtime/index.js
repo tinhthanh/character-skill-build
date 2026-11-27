@@ -27,7 +27,7 @@ import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
 import { COMBOS, isCombo, expandCombo, combo } from './combos.js';
 import CUSTOM_CHARACTERS from '../characters/index.js';
 
-export const VERSION = '0.85.0';
+export const VERSION = '0.86.0';
 /** Tên biến toàn cục của bản dựng IIFE. */
 export const GLOBAL_NAME = 'VGCharacter';
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.86.0
+
+Fixed: a frame depends only on its time (wave 46). Before, what a frame showed could depend on the seeks made before it,
+so a video rendered by HyperFrames could differ from a fresh preview. HyperFrames renders after many earlier seeks, and
+with `--workers` each worker starts mid-scene, so layers could flip at a block boundary. There were five separate leaks:
+
+- **Layer order** (`runtime/set3d.js` `update`): actors were ordered by a sort whose comparator is not transitive (people
+  in front of a nearby pet, mixed with depth, and equal depths). V8's result depends on how hot the code is: after a few
+  dozen seeks the cat's tail was drawn over the vet's arm in the `acting` scene. Now a fixed insertion sort gives the
+  same order as a fresh page.
+- **Shading caches** (`runtime/shading.js`, and the sky, lens and wall/floor lighting in set3d): keyed on rounded
+  inputs, but the values written came from unrounded ones, so a key hit kept the previous frame's value. Keys are now
+  the exact values written. TV flicker is rounded to steps of 0.01.
+- **A carried pet** (`runtime/rig-svg.js` `#placeCarried`, and other rig code that reads screen positions): rigs redrew
+  before set3d placed the hosts, so a pet in someone's arms used the previous frame's camera. Every rig now redraws at
+  the end of `set.update`, and the emotion marks are placed after that.
+- **Order inside a layer**: shadows and prop groups were moved only when their layer changed, and unused shadows stayed
+  at opacity 0 in the 3D layers, splitting planes. They now sit in a fixed order, and unused ones get `display: none`.
+- **Empty arm groups**: `xaCang` and `om` kept their last transform and filter. They are reset when empty.
+
+- **New CI case `seek46`**: on three scenes (`acting`, a pet carried and handed over across a cut, a pet lying by a
+  person on the sofa), the same 8 times captured in order on a fresh page must match the same times captured backwards
+  after 121 shuffled seeks. Probes and pixels are compared. The case fails on 0.85.0's runtime.
+- **acting_check** no longer reloads the page between passes. Its output is still identical on all 69 CI scenes.
+- `sh tools/check.sh`: the scene step takes 267 s wall (63 cases).
+
+Known
+- **Chrome's own differences**: with an identical DOM, Chrome still sometimes differs by 1–2 colour levels on a few
+  pixels at the edges of filtered or blurred areas, depending on what it drew before. `seek46` therefore allows up to
+  2 levels on up to 1000 pixels.
+- **Outline measured once**: `shading.js` measures each character's outline the first time it can. A character hidden
+  for the whole load would be measured at whichever frame comes first.
+
 ## 0.85.0
 
 Faster: `tools/acting_check.py` (wave 45). The scene step of `sh tools/check.sh` went from about 9 min to 4.5 min (271 s
