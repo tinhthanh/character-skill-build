@@ -243,6 +243,10 @@ def main():
             call('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': args.scale, 'mobile': False})
             call('Page.navigate', {'url': args.url})
             title, deadline, crashed = '', time.time() + args.timeout, False
+            # Trang kiểm tra có những đoạn đồng bộ dài, trong lúc ấy Chrome không trả lời lệnh nào: trên runner CI bận một lần hỏi
+            # `document.title` từng chờ quá hạn 300 s của socket và bỏ cả phần, dù trang còn trong --timeout. Khi chờ trang xong,
+            # hạn của socket là phần còn lại của --timeout (ít nhất hạn mặc định).
+            tools.sock.settimeout(max(tools.sock.gettimeout() or 0, args.timeout + 30))
             while time.time() < deadline:
                 if args.wait_js:
                     if evaluate(f'!!({args.wait_js})'): title = 'ready'; break

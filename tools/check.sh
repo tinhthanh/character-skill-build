@@ -8,6 +8,7 @@
 #   tools/check.sh -j 4           → scene cases 4 at a time (default: CPU count − 2)
 #   tools/check.sh --page | --no-page   → run / skip the check page whatever the mode
 #   CHECK_PAGE_SHARDS=n           → split the check page into n headless Chromes (default 3; 1 = one unsharded run)
+#   CHECK_PAGE_TIMEOUT=s          → seconds each check-page shard may take (default 1200)
 # Mọi tham số khác được chuyển nguyên cho tools/check_scene.py.
 # Đợt 47 B: trang tools/check.html chạy SONG SONG với bài kiểm cảnh (cả hai chỉ cần dist/ đã dựng), chia thành
 # CHECK_PAGE_SHARDS phần (?shard=i/n), mỗi phần một Chrome; tools/check_report.py gộp kết quả và đối chiếu rằng
@@ -77,14 +78,16 @@ if [ "$PAGE" = yes ]; then
   n=1; while [ $n -le "$SHARDS" ]; do
     QUERY=; [ "$SHARDS" -gt 1 ] && QUERY="?shard=$n/$SHARDS"
     # Ghi lại lúc mỗi phần xong: bài kiểm cảnh thường xong sau, nên thời gian chờ ở cuối không cho biết trang mất bao lâu.
-    ( CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/check.html$QUERY" --wait PASS,FAIL --size 900x900 --timeout 600 \
+    ( CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/check.html$QUERY" --wait PASS,FAIL --size 900x900 --timeout "${CHECK_PAGE_TIMEOUT:-1200}" \
         --dump "$OUT/shard$n.html" >"$OUT/shard$n.log" 2>&1; date +%s >"$OUT/shard$n.end" ) &
     PIDS="$PIDS $!"; n=$((n+1))
   done
 fi
 
 # Công cụ dựng cảnh từ kịch bản: dựng kịch bản mẫu, và kịch bản sai phải bị từ chối (các trường hợp trong tools/ci/).
-CHECK_SCENE_NO_BUILD=1 python3 tools/check_scene.py "$@" || FAIL=1
+# Các trường hợp `calm` (seek46, so ảnh từng điểm ảnh) đợi trang kiểm tra chạy xong: CHECK_PAGE_DONE=<thư mục>:<số phần>.
+DONE=; [ "$PAGE" = yes ] && DONE="$OUT:$SHARDS"
+CHECK_PAGE_DONE="$DONE" CHECK_SCENE_NO_BUILD=1 python3 tools/check_scene.py "$@" || FAIL=1
 
 if [ "$PAGE" = yes ]; then
   for p in $PIDS; do wait "$p" || true; done; PIDS=
