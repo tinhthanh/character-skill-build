@@ -53,7 +53,7 @@ Một tệp kịch bản:
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
                                        con vật → người: liếm (tay; người bế nó thì liếm mặt), nấp (chạy nấp sau người ấy)
     con vật: [lăn ngửa] [đuổi đuôi] [nhào] [gặm cà rốt]   chó / mèo lăn ngửa, chó đuổi đuôi, mèo nhào, thỏ gặm cà rốt
-    COMBO (cả một chuỗi):              bác sĩ → chó: khám tổng quát · bác sĩ → chó: tiêm phòng (cân, tiêm, cho bánh)
+    COMBO (cả một chuỗi):              bác sĩ → chó: khám tổng quát · bác sĩ → chó: tiêm phòng (cân, tiêm, cho bánh) · bé → chó: chơi ném bóng · bé: [quẩy mừng]
                                        bác sĩ → chó → bé trai: trả thú (bế, trao cho chủ, dặn ba điều, vẫy chào)
                                        lễ tân: [chào khách] · bé trai: [tin vui] / [tin buồn] / [sốt ruột]
     cùng lúc: tên: … | tên: …          các lượt diễn cùng một lúc
@@ -457,6 +457,18 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 # (tay mặc định, như khi chỉ có nó).
                 first = who['holds']
                 who['holds'] = {'R': 'syringe', 'L': item if first == 'syringe' else first} if 'syringe' in (first, item) else {'R': first, 'L': item}
+    # ĐỢT 43 — NGƯỜI NHẬN món đồ (`handOver`) phải có sẵn một món cùng loại cất đi thì mới ĐÓN lấy (`take`, tools/scene.py); không thì
+    # món đồ trôi vào khoảng không ("bé → chó → mẹ: nhặt đồ đưa"). Món của người đưa: món vừa nhặt (`pickUp`, mặc định quả bóng) hay món đang cầm.
+    picked = {}
+    for turn in (t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry])):
+        for step in turn.get('do', []) if isinstance(turn, dict) else []:
+            if isinstance(step, list) and step and step[0] == 'pickUp':
+                picked[turn.get('who')] = next((a['item'] for a in step[1:] if isinstance(a, dict) and isinstance(a.get('item'), str)), 'toy')
+            if not (isinstance(step, list) and len(step) > 1 and step[0] == 'handOver' and isinstance(step[1], str) and step[1].startswith('@')): continue
+            giver = next((c for c in characters if c['name'] == turn.get('who')), None)
+            taker = next((c for c in characters if c['name'] == step[1][1:]), None)
+            kind = picked.get(turn.get('who')) or (giver.get('holds') if giver and isinstance(giver.get('holds'), str) else None)
+            if kind and taker and not taker.get('holds') and not taker.get('species'): taker.update(holds=kind, holdsHidden=True)
     scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters + [n for n in narrators_42a if n['name'] in used], 'script': script}
     # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
     # mặt phẳng của người ấy).

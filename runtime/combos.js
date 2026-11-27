@@ -289,6 +289,128 @@ export const COMBOS = {
     "about": "a sleepy pet (dog or cat): a yawn, a stretch, then lies down and sleeps",
     "steps": ["yawn", "stretch", ["sleep", 3]],
     "vi": ["ngáp rồi ngủ", "lăn ra ngủ", "díp mắt"]
+  },
+  "partyTime": {
+    "params": [],
+    "about": "celebrate big: jump for joy twice, a short dance, then a cheer",
+    "steps": [
+      [
+        "jump",
+        2
+      ],
+      [
+        "dance",
+        "happy",
+        2
+      ],
+      "cheer"
+    ],
+    "vi": [
+      "ăn mừng lớn",
+      "quẩy mừng",
+      "mở tiệc",
+      "tiệc mừng"
+    ]
+  },
+  "lazyAfternoon": {
+    "params": [
+      "pet"
+    ],
+    "about": "a lazy afternoon on the floor: sit down cross-legged, stroke the pet (it comes over), then lie down and doze off while the pet sleeps — they stay lying; \"standUp\" gets up",
+    "steps": [
+      "sitOnFloor",
+      [
+        "stroke",
+        "$pet"
+      ],
+      {
+        "step": [
+          "lieDown",
+          "floor",
+          {
+            "sleep": true
+          }
+        ],
+        "with": {
+          "$pet": [
+            [
+              "sleep",
+              3
+            ]
+          ]
+        }
+      }
+    ],
+    "vi": [
+      "nghỉ trưa với thú",
+      "nằm nghỉ với thú",
+      "chiều lười biếng"
+    ]
+  },
+  "rushToPet": {
+    "params": [
+      "pet"
+    ],
+    "about": "a scare: startle, run to the pet, stroke it, then a relieved breath",
+    "steps": [
+      "startle",
+      [
+        "run",
+        "$pet"
+      ],
+      [
+        "stroke",
+        "$pet"
+      ],
+      "relief"
+    ],
+    "vi": [
+      "hốt hoảng chạy tới",
+      "chạy tới xem thú",
+      "lo lắng chạy tới"
+    ]
+  },
+  "tidyUp": {
+    "params": [
+      "pet",
+      "person"
+    ],
+    "about": "tidy up: pick up the toy by the pet, then hand it to someone",
+    "steps": [
+      [
+        "pickUp",
+        "$pet"
+      ],
+      [
+        "handOver",
+        "$person"
+      ]
+    ],
+    "vi": [
+      "nhặt đồ đưa",
+      "nhặt đồ chơi đưa"
+    ]
+  },
+  "scaredPet": {
+    "params": [
+      "person"
+    ],
+    "about": "a frightened pet: it trembles, then runs to hide behind the person and peeks out (it stays there) — in a 3D set stand it 60–120 further back (z) than the person",
+    "steps": [
+      [
+        "tremble",
+        1.5
+      ],
+      [
+        "hide",
+        "$person"
+      ]
+    ],
+    "vi": [
+      "thú sợ hãi",
+      "sợ chạy trốn",
+      "sợ nấp sau"
+    ]
   }
 };
 // END COMBOS

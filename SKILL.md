@@ -239,7 +239,7 @@ recipes are in [references/hyperframes.md](references/hyperframes.md); complete 
 | To… | Use | Details |
 |---|---|---|
 | chain one character's actions | `VGCharacter.sequence(rig, steps)` | `references/actions.md` |
-| play a ready-made short scene (check-up, vaccination, greeting, sending a pet home) | a combo step: `['fullCheckup', pet]` | `references/actions.md` → Combos |
+| play a ready-made short scene (check-up, vaccination, greeting, sending a pet home, a bath, fetch, coming home to a pet, a party, a nap on the floor with a pet, rushing to a pet, tidying a toy away, a sleepy pet, a scared pet hiding) | a combo step: `['fullCheckup', pet]` | `references/actions.md` → Combos |
 | have characters take turns | `VGCharacter.conversation(turns, { camera })` | `hyperframes.md` → Staging recipes |
 | speak without audio / with audio | `['explain', text, dur]` / `['speakCues', cues]` + `tools/cues.py voice.wav --js` | `hyperframes.md` → Voice-over |
 | set the tone of a line | `{ mood }` on the speaking step | `actions.md` → Tone of voice |
