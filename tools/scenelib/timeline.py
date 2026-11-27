@@ -1,6 +1,6 @@
 """Phases 7 and 8 of a build: host setup code, cards, the conversation lines and the camera code of the timeline."""
 import os, re
-from .actions import CARE_35, CARE_ACTIONS, GESTURES, MOTION_42D
+from .actions import CARE_REACH, CARE_ACTIONS, GESTURES, WHOLE_BODY
 from .assets import _svg, copy_asset
 from .schema import CARD_KEYS
 from .util import PERSON, fail, html_text, js
@@ -10,7 +10,7 @@ from .views import plane_of
 def pose_characters(st):
     """Setup code of the hosts: depth in the set, start poses, items, wearables, props drawn in front."""
     base, body, copied, gear_ops, height, names = st.take('base', 'body', 'copied', 'gear_ops', 'height', 'names')
-    narrators_42a, notes, out, props, setup, stage_set = st.take('narrators_42a', 'notes', 'out', 'props', 'setup', 'stage_set')
+    narrators, notes, out, props, setup, stage_set = st.take('narrators', 'notes', 'out', 'props', 'setup', 'stage_set')
     start, style, toasts, track, width = st.take('start', 'style', 'toasts', 'track', 'width')
     # Bối cảnh 3D: host của nhân vật do createSet đặt — mang tên trong kịch bản (data-name) để `set.framing()` nhắc đúng người.
     if stage_set is not None: setup.append("    const host = (name) => { const element = document.createElement('div'); element.dataset.name = name; return element; };")
@@ -18,7 +18,7 @@ def pose_characters(st):
     pet_depths = {}
     if stage_set is not None:
         for op in gear_ops:
-            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_35 + CARE_ACTIONS: continue
+            if op['kind'] not in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry') + CARE_REACH + CARE_ACTIONS: continue
             pet, person = names.get(op.get('target') or ''), names.get(op.get('who') or '')
             if not pet or not person or not pet['_pet'] or person['_pet'] or pet.get('on'): continue
             pet_depths.setdefault(pet['name'], []).append((op['turn'], plane_of(st, person)))
@@ -29,7 +29,7 @@ def pose_characters(st):
                 if abs(z - kept[-1][1]) > 5: kept.append((turn, z, hops[n - 1][0]))
             if len(kept) > 1: pet_depths[name] = kept
             else: del pet_depths[name]
-    for narrator in narrators_42a.values():
+    for narrator in narrators.values():
         # Người dẫn (đợt 42 A): một rig có miệng để căn giờ lời + phụ đề, gắn vào một thẻ div RỜI — không `set.place`, không clip, không vào `framing()`.
         setup.append(f"    const {narrator['name']} = VGCharacter.createCharacter(document.createElement('div'), {{ id: {js(narrator['id'])} }}).rig;      // narrator: a voice, no body on screen")
     for who in names.values():
@@ -335,7 +335,7 @@ def cards_and_camera(st):
                          + js(list(GESTURES)) + ".includes(step.name)).flatMap((step) => [0.4, 0.55, 0.7].map((f) => T0 + step.start + step.duration * f)));\n") if gestured else ''
             # ĐỢT 42 D: các lúc (mỗi 10 % bước) người trong chủ thể chạy / nhảy / múa — khung lấy cả người ở đỉnh cú nhảy, lúc tay giơ cao.
             hand_code += ("    const bodyTimes42d = (a, b, rigs) => talk.turns.slice(a, b + 1).filter((turn) => rigs.includes(turn.rig)).flatMap((turn) => turn.steps.filter((step) => "
-                          + js(list(MOTION_42D)) + ".includes(step.name)).flatMap((step) => [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map((f) => T0 + step.start + step.duration * f)));\n") if any(b.get('body42d') for b in beats) else ''
+                          + js(list(WHOLE_BODY)) + ".includes(step.name)).flatMap((step) => [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map((f) => T0 + step.start + step.duration * f)));\n") if any(b.get('body42d') for b in beats) else ''
             moves.append("    // \"camera\": \"auto\" — the camera chooses every shot (a shot lasts at least 2.5 s; turns with their own \"view\" keep it).\n" + hand_code +
                          "    CUTS.push(...set.direct(tl, [\n      " + ',\n      '.join(items) + "\n    ]));")
         if autos:

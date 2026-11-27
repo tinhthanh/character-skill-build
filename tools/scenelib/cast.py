@@ -1,6 +1,6 @@
 """Phase 2 of a build: the characters — checked, placed in the frame / set, given their items."""
 import os, re
-from .actions import DESK_39, DESK_OPTIONS, DESK_PAY
+from .actions import DESK_ACTIONS, DESK_OPTIONS, DESK_PAY
 from .schema import CHARACTER_KEYS, ITEM_KINDS, PERSON_WEARABLES, WEARABLES
 from .sets import ROOM_DEFAULTS
 from .util import PERSON, PET, fail, js, known, slug
@@ -92,10 +92,10 @@ def place_cast(st):
                     who['holds'] = dict(mine, **{free: item}); who['holdsHidden'] = [free]
         # ĐỢT 42 E: người NHẶT đồ (`["pickUp", …, { "item": "bowl" }]`) mà không cầm gì: có sẵn món ấy ĐANG CẤT — `pickUp` lấy nó ra khi tay nắm
         # lấy món đồ dưới sàn. (Rig tự cho món đồ khi gọi một mình; trong cả cảnh, trạng thái đầu cảnh phải biết trước là món đồ đang cất.)
-        picks_42e = [step for t in bag_turns if isinstance(t, dict) and t.get('who') == name and isinstance(t.get('do'), list) for step in t['do'] if step == 'pickUp' or (isinstance(step, list) and step and step[0] == 'pickUp')]
-        if not pet and picks_42e and 'holds' not in who:
-            options_42e = next((a for a in (picks_42e[0][1:] if isinstance(picks_42e[0], list) else []) if isinstance(a, dict)), {})
-            who['holds'], who['holdsHidden'] = options_42e.get('item', 'toy'), True
+        picks = [step for t in bag_turns if isinstance(t, dict) and t.get('who') == name and isinstance(t.get('do'), list) for step in t['do'] if step == 'pickUp' or (isinstance(step, list) and step and step[0] == 'pickUp')]
+        if not pet and picks and 'holds' not in who:
+            pick_options = next((a for a in (picks[0][1:] if isinstance(picks[0], list) else []) if isinstance(a, dict)), {})
+            who['holds'], who['holdsHidden'] = pick_options.get('item', 'toy'), True
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')
@@ -167,7 +167,7 @@ def place_cast(st):
                 if not isinstance(turn, dict): continue
                 for step in (turn.get('do') or []) if isinstance(turn.get('do'), list) else []:
                     name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-                    if name in DESK_39: yield turn, step, name
+                    if name in DESK_ACTIONS: yield turn, step, name
     payers = [turn.get('who') for turn, step, name in desk_steps() if name in DESK_PAY]
     if payers and stage_set is not None and payers[0] in names and not any(item.get('kind') == 'paystand' for item in stage_set.get('cutouts', [])):
         counters = [box for box in stage_set.get('boxes', []) if 'counter' in str(box.get('name', ''))]

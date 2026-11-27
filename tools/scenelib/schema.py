@@ -4,9 +4,9 @@ TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('narrator', 'name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
 CHARACTER_KEYS = CHARACTER_KEYS + ('inTub',)               # đợt 42 F: con vật đứng trong chậu tắm (tự thêm, cỡ vừa nó)
-NARRATOR_KEYS_42A = ('narrator', 'name', 'voice')            # đợt 42 A: người dẫn không hiện hình chỉ có tên, giọng đọc
-NARRATOR_TURN_KEYS_42A = ('who', 'say', 'audio', 'dur', 'voice', 'view')
-NARRATOR_RIG_42A = 'vet'                                     # rig vô hình mượn để có miệng / cue / phụ đề; không bao giờ `set.place`
+NARRATOR_KEYS = ('narrator', 'name', 'voice')            # đợt 42 A: người dẫn không hiện hình chỉ có tên, giọng đọc
+NARRATOR_TURN_KEYS = ('who', 'say', 'audio', 'dur', 'voice', 'view')
+NARRATOR_RIG = 'vet'                                     # rig vô hình mượn để có miệng / cue / phụ đề; không bao giờ `set.place`
 
 
 WEARABLES = ('cone', 'bandage')                          # phụ kiện thú đeo suốt cảnh (rig.wear)

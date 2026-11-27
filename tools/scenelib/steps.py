@@ -1,10 +1,10 @@
 """The JS code of one step / one turn of the conversation (`step_code`, `turn_code`) and the care / desk helpers they use.
 Each takes the build state `st` first (see state.py); they read the cast, the set and the frame size from it."""
 import os, re
-from .actions import (CARE_35, CARE_38, CARE_38_HOLD, CARE_38_OPTIONS, CARE_42F, CARE_ACTIONS, CHART_ACTIONS, DESK_39, DESK_ITEM, DESK_NOUN,
-    DESK_PAY, FLOOR_42E, MOTION_42D, PAIR_38, PAIR_PARTS, PET_MOOD_MARKS, RESTRAIN, RESTRAIN_PAIRS, SIZE_39, TALK_39)
+from .actions import (CARE_REACH, HANDS_ON_CARE, HANDS_ON_HOLD, HANDS_ON_OPTIONS, GROOMING, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ITEM, DESK_NOUN,
+    DESK_PAY, FLOOR_ACTIONS, WHOLE_BODY, PAIR_PARTNER, PAIR_PARTS, PET_MOOD_MARKS, RESTRAIN, RESTRAIN_PAIRS, SHOW_SIZE_GAP, PRESENTER_ACTIONS)
 from .audio import speak_line
-from .floor import floor_step_42e
+from .floor import floor_step
 from .schema import MARKS, MOODS, PET_MOODS, TURN_KEYS
 from .sets import ROOM_DEFAULTS
 from .util import fail, js, known, slug
@@ -43,18 +43,18 @@ def care_code(st, step, where, actor):
         if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
             fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
     if name == 'givePill' and len(step) > 2: fail(f'{where}: "givePill" takes just the pet: ["givePill", "@pet"] — got {js(step)}')
-    if name in CARE_42F:          # đợt 42 F: ["bathPet", "@pet", { "hold": 1.8 }], ["brushTeeth", "@pet", { "hold": 2 }], ["towelDry", "@pet", { "hold": 2.2 }]
+    if name in GROOMING:          # đợt 42 F: ["bathPet", "@pet", { "hold": 1.8 }], ["brushTeeth", "@pet", { "hold": 2 }], ["towelDry", "@pet", { "hold": 2.2 }]
         options = step[2] if len(step) > 2 else {}
-        lo, hi, d = CARE_38_HOLD[name]
+        lo, hi, d = HANDS_ON_HOLD[name]
         if len(step) > 3 or not isinstance(options, dict) or set(options) - {'hold'}: fail(f'{where}: "{name}" takes ["{name}", "@pet", {{ "hold": {d:g} }}] — got {js(step)}')
         if 'hold' in options and not (isinstance(options['hold'], (int, float)) and not isinstance(options['hold'], bool) and lo <= options['hold'] <= hi): fail(f'{where}: "{name}" hold must be {lo:g}…{hi:g} seconds — got {js(options["hold"])}')
         if name == 'bathPet' and not names[step[1][1:]].get('inTub'): reach_notes.append(f'{where}: "{step[1][1:]}" is bathed but does not stand in a tub — add "inTub": true to it (a tub sized to it is added)')
-    elif name in CARE_38:
+    elif name in HANDS_ON_CARE:
         # ĐỢT 38 A: ["clipNails", "@pet", { "hold": 1.8 }], ["eyeDrops", "@pet"], ["cleanEars", "@pet"], ["scanChip", "@pet", { "id": "900 …" }].
         options = step[2] if len(step) > 2 else {}
-        lo, hi, _ = CARE_38_HOLD[name]
+        lo, hi, _ = HANDS_ON_HOLD[name]
         usage = {'clipNails': '{ "hold": 1.8 }', 'eyeDrops': '{ "hold": 1.2 }', 'cleanEars': '{ "hold": 1.8 }', 'scanChip': '{ "id": "900 123 456 789", "hold": 1.6 }'}[name]
-        if len(step) > 3 or not isinstance(options, dict) or set(options) - CARE_38_OPTIONS[name]: fail(f'{where}: "{name}" takes ["{name}", "@pet", {usage}] — got {js(step)}')
+        if len(step) > 3 or not isinstance(options, dict) or set(options) - HANDS_ON_OPTIONS[name]: fail(f'{where}: "{name}" takes ["{name}", "@pet", {usage}] — got {js(step)}')
         if 'hold' in options and not (isinstance(options['hold'], (int, float)) and lo <= options['hold'] <= hi): fail(f'{where}: "{name}" hold must be {lo:g}…{hi:g} seconds — got {js(options["hold"])}')
         if 'paw' in options and options['paw'] != 'front': fail(f'{where}: "clipNails" paw must be "front" (the near front paw) — got {js(options["paw"])}')
         if 'id' in options and not (isinstance(options['id'], str) and options['id'].strip() and len(options['id']) <= 24): fail(f'{where}: "scanChip" id is the chip number as text of up to 24 characters, such as "900 123 456 789" — got {js(options["id"])}')
@@ -62,7 +62,7 @@ def care_code(st, step, where, actor):
     walked = (float(other['x']) - float(other['_x0'])) / other['_unit'] if other.get('_unit') and other.get('_x0') is not None else 0
     at = f", {{ at: {round(walked, 1):g} }}" if abs(walked) > 0.5 else ''
     aim = f"set.target({actor}, {pet}, {js('rear' if name == 'takeTemp' else 'lips')}{at})" if stage_set is not None else pet
-    if name in CARE_38 and stage_set is not None: aim = f"set.target({actor}, {pet}, 'head'{at})"      # đợt 38 A: giữa mặt con vật — rig đo các chỗ khác trên hình nó
+    if name in HANDS_ON_CARE and stage_set is not None: aim = f"set.target({actor}, {pet}, 'head'{at})"      # đợt 38 A: giữa mặt con vật — rig đo các chỗ khác trên hình nó
     return '[' + ', '.join([js(name), aim] + [js(item) for item in step[2:]]) + ']'
 
 
@@ -184,7 +184,7 @@ def step_code(st, step, where, actor=None):
     # ĐỢT 39 C — NGƯỜI DẪN: kiểm tra đối số ngay ở đây; khung DỌC: bảng hẹp / khe hẹp (`{ narrow: true }`, như reo); chụp ảnh tự sướng
     # cần điện thoại trong tay (đang cất cũng được) và nhận `{ "with": "@người / con vật" }`.
     talk = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-    if talk in TALK_39 and actor in names:
+    if talk in PRESENTER_ACTIONS and actor in names:
         if names[actor]['_pet']: fail(f'{where}: "{talk}" is done by a person — a pet cannot {talk}')
         args = list(step[1:]) if isinstance(step, list) else []
         if talk == 'holdSign':
@@ -193,7 +193,7 @@ def step_code(st, step, where, actor=None):
             if len(args) > 1 and not (isinstance(args[1], (int, float)) and args[1] > 0): fail(f'{where}: ["holdSign", text, seconds] — seconds is a number > 0, got {js(args[1])}')
             if len(args) > 2 and not (isinstance(args[2], dict) and set(args[2]) <= {'color', 'narrow'}): fail(f'{where}: ["holdSign", text, seconds, {{ "color": "#hex" }}] — got {js(args[2])}')
         if talk == 'showSize':
-            if args and not (args[0] in SIZE_39 or (isinstance(args[0], (int, float)) and not isinstance(args[0], bool) and args[0] > 0)): fail(f'{where}: ["showSize", size] — size is "small", "medium", "big" or a number > 0, got {js(args[0])}')
+            if args and not (args[0] in SHOW_SIZE_GAP or (isinstance(args[0], (int, float)) and not isinstance(args[0], bool) and args[0] > 0)): fail(f'{where}: ["showSize", size] — size is "small", "medium", "big" or a number > 0, got {js(args[0])}')
             if len(args) > 1 and not (isinstance(args[1], (int, float)) and args[1] > 0): fail(f'{where}: ["showSize", size, seconds] — seconds is a number > 0, got {js(args[1])}')
         if talk == 'yawnStretch' and args and not (isinstance(args[0], (int, float)) and args[0] > 0): fail(f'{where}: ["yawnStretch", seconds] — seconds is a number > 0, got {js(args[0])}')
         if talk == 'takeSelfie':
@@ -218,7 +218,7 @@ def step_code(st, step, where, actor=None):
     # ĐỢT 42 D — chạy / nhảy lên / nhảy múa: kiểm tra đối số ngay ở đây (lỗi rõ ràng thay cho lỗi của trình duyệt lúc dựng).
     motion = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
     if motion in ('run', 'dance') and actor in names and names[actor]['_pet']: fail(f'{where}: "{motion}" is a person\'s action — for a pet use "walk", "jump" or "play"')
-    if motion in MOTION_42D and actor in names and not names[actor]['_pet']:          # "jump" của thú là động tác của rig thú
+    if motion in WHOLE_BODY and actor in names and not names[actor]['_pet']:          # "jump" của thú là động tác của rig thú
         args = list(step[1:]) if isinstance(step, list) else []
         num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
         if motion == 'run' and (len(args) > 2 or (args and not num(args[0])) or (len(args) > 1 and not (isinstance(args[1], dict) and set(args[1]) <= {'speed', 'steps'}))):
@@ -262,7 +262,7 @@ def step_code(st, step, where, actor=None):
             return '[' + ', '.join(["'showXray'", spot] + extra) + ']'
     # ĐỢT 39 A — quầy thu ngân: bước một mình (quét QR, quẹt thẻ, rót nước, đóng dấu, lau quầy); thối tiền / đóng dấu với đích là người kia: người đưa phải cầm đồ.
     desk = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-    if desk in DESK_39 and actor in names and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')): return desk_code(st, step, desk, where, actor)
+    if desk in DESK_ACTIONS and actor in names and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')): return desk_code(st, step, desk, where, actor)
     if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and not desk_holds(st, actor, DESK_ITEM[desk]):
         fail(f'{where}: "{desk}" needs {"banknotes" if desk == "giveChange" else "a stamp card"} in hand — give "{actor}" "holds": {js(DESK_ITEM[desk])}')
     if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and names[step[1][1:]]['_pet']:
@@ -274,7 +274,7 @@ def step_code(st, step, where, actor=None):
     if desk in ('giveChange', 'stampCard') and actor in names and isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and desk_counter(st, names[actor]):
         return f"[{js(desk)}, {step[1][1:]}, {{ top: {desk_counter(st, names[actor])[1][1]} }}]"      # mặt quầy: tay và đồ vật nằm trên quầy, không khuất sau nó
     # HAI NGƯỜI (đợt 38 C): đích là một NGƯỜI khác ("@tên"); đưa túi thuốc cần túi trong tay, nhận túi cần túi đang cất.
-    if care in tuple(PAIR_38) + PAIR_PARTS and actor in names and step != 'stampCard':
+    if care in tuple(PAIR_PARTNER) + PAIR_PARTS and actor in names and step != 'stampCard':
         if names[actor]['_pet']: fail(f'{where}: "{care}" is done by a person — a pet cannot {care}')
         if not (isinstance(step, list) and len(step) == 2 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and not names[step[1][1:]]['_pet'] and step[1][1:] != actor):
             fail(f'{where}: "{care}" needs the other person: ["{care}", "@<person name>"] — got {js(step)}')
@@ -289,12 +289,12 @@ def step_code(st, step, where, actor=None):
             fail(f'{where}: "takeBag" needs a put-away medicine bag — give "{actor}" "holds": "bag" and "holdsHidden": true (["handOverBag", "@{actor}"] alone in a turn does it for you)')
     # ĐỢT 42 E — SÁT SÀN: kiểm tra đối số; nằm SOFA trong bối cảnh 3D: mặt nằm cao đúng bằng mặt hộp dưới người (`lift`, đơn vị khung).
     floor = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-    if floor in FLOOR_42E and actor in names:
-        code = floor_step_42e(step, where, names[actor], stage_set, fail)
+    if floor in FLOOR_ACTIONS and actor in names:
+        code = floor_step(step, where, names[actor], stage_set, fail)
         if code: return code
     if isinstance(step, str): return js(step)
     if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
-    if step[0] in CARE_35: return care_code(st, step, where, actor)
+    if step[0] in CARE_REACH: return care_code(st, step, where, actor)
     parts = []
     for item in step:
         if isinstance(item, str) and item.startswith('@'):
@@ -323,12 +323,12 @@ def step_code(st, step, where, actor=None):
 
 def turn_code(st, turn, where):
     base, height, hiders, marks_on, names = st.take('base', 'height', 'hiders', 'marks_on', 'names')
-    narrators_42a, scene, stage_set, voices, width = st.take('narrators_42a', 'scene', 'stage_set', 'voices', 'width')
-    if isinstance(turn, dict) and turn.get('who') in narrators_42a: names_42a = narrators_42a
-    else: names_42a = names
-    if not isinstance(turn, dict) or turn.get('who') not in names_42a: fail(f'{where}: "who" must name a character in the scene (got {js(turn.get("who") if isinstance(turn, dict) else turn)})')
+    narrators, scene, stage_set, voices, width = st.take('narrators', 'scene', 'stage_set', 'voices', 'width')
+    if isinstance(turn, dict) and turn.get('who') in narrators: speakers_of = narrators
+    else: speakers_of = names
+    if not isinstance(turn, dict) or turn.get('who') not in speakers_of: fail(f'{where}: "who" must name a character in the scene (got {js(turn.get("who") if isinstance(turn, dict) else turn)})')
     known(where, turn, TURN_KEYS)
-    who = names_42a[turn['who']]
+    who = speakers_of[turn['who']]
     steps = []
     # `mood`: lượt CÓ lời thì cả câu được nói bằng nét mặt ấy; lượt không lời thì là một nhịp nét mặt
     # trước các động tác của lượt.
@@ -431,7 +431,7 @@ def turn_code(st, turn, where):
     if not steps: fail(f'{where}: a turn needs "say", "do", "mood", "enter" or "exit"')
     body = f"[{who['name']}, " + ', '.join(steps) + ']'
     # Câu nói NHẮC TÊN một con vật trong cảnh ("Bella rất khoẻ mạnh") mà không khai `shot`: đưa cả con vật vào khung.
-    if 'shot' not in turn and 'say' in turn and who['name'] not in narrators_42a:
+    if 'shot' not in turn and 'say' in turn and who['name'] not in narrators:
         mentioned = [other['name'] for other in names.values() if other['_pet'] and re.search(r'(?<!\w)' + re.escape(other['name']) + r'(?!\w)', str(turn['say']), re.IGNORECASE)]
         if mentioned: turn = dict(turn, shot=[who['name']] + mentioned)
     if 'shot' in turn:

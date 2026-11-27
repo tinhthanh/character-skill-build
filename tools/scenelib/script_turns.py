@@ -2,12 +2,12 @@
 One long loop: its parts share many per-entry variables (backs, turned_back, first_turn…) and `continue` out of the entry,
 so it is kept whole here rather than split into functions."""
 import os
-from .actions import (BATH_BACK_42F, CARE_35, CARE_38, CARE_38_GAP, CARE_38_HEAD, CARE_38_HOLD, CARE_ACTIONS, CHART_ACTIONS, CONE_BACK, DESK_39,
-    DESK_PAY, FLOOR_42E, FLOOR_GAP_43, FLOOR_GAP_KID_43, GESTURES, KID_IDS_43, LICK_BEAT_40, MOTION_42D, PAIR_38, PAIR_GAP, PAY_REACH, PET_ACTS,
-    PET_CLOSE, PET_CLOSE_FILL, PET_FILL_40, PICK_GAP_42E, PILL_HEAD, PREP_ACTIONS, REACH_ACTIONS, RESTRAIN, RESTRAIN_GAP, RUN_GAP_42D, RUN_TO_42D,
-    TALK_39, TUG_SNOUT, TUG_STAND)
-from .camera import pet_fill_42a
-from .floor import floor_turn_42e, restore_42e
+from .actions import (BATH_BACK, CARE_REACH, HANDS_ON_CARE, HANDS_ON_GAP, HANDS_ON_HEAD, HANDS_ON_HOLD, CARE_ACTIONS, CHART_ACTIONS, CONE_BACK, DESK_ACTIONS,
+    DESK_PAY, FLOOR_ACTIONS, FLOOR_GAP, FLOOR_GAP_KID, GESTURES, KID_IDS, LICK_BEAT, WHOLE_BODY, PAIR_PARTNER, PAIR_GAP, PAY_REACH, PET_ACTS,
+    PET_CLOSE, PET_CLOSE_FILL, PET_CLOSE_FILLS, PICK_GAP, PILL_HEAD, PREP_ACTIONS, REACH_ACTIONS, RESTRAIN, RESTRAIN_GAP, RUN_GAP, RUN_TO,
+    PRESENTER_ACTIONS, TUG_SNOUT, TUG_STAND)
+from .camera import pet_group_fill
+from .floor import floor_turn, restore_seated
 from .schema import CAT_BREEDS, CAT_SPECIES, SCREEN_KINDS, SHOW_KEYS
 from .steps import desk_counter, desk_stand, showxray_listener, step_code, turn_code
 from .util import fail, js, known
@@ -38,7 +38,7 @@ def write_turns(st):
             if 'bullets' in show and (not isinstance(show['bullets'], list) or not all(isinstance(item, str) for item in show['bullets'])): fail(f'{where}: "show.bullets" must be a list of strings')
             if 'image' in show and not os.path.isfile(os.path.join(base, show['image'])): fail(f'{where}: show.image not found: {show["image"]} (looked in {base})')
             shows.append(dict(show, turn=flat))
-        flat += len(entry['together']) + len(entry.get('_narr42a', [])) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
+        flat += len(entry['together']) + len(entry.get('_narrator_turns', [])) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else 1
         backs = []                                          # (người, quãng) — lùi lại sau lượt này
         turned_back = []                                    # (con vật, người) — con vật quay lại nhìn người ấy sau lượt này (takeTemp)
         first_turn = emitted[0]                             # nhịp của đạo diễn tự động: gồm cả các bước lại gần / lùi lại
@@ -71,18 +71,18 @@ def write_turns(st):
                     turns.append((f'  // {pet["name"]} goes a rope\'s length from {person["name"]} for the "tugOfWar"', f"[{pet['name']}, ['walk', 4, {round(move / pet['_unit'])}]]"))
                     emitted[0] += 1
                     pet['x'] = float(pet['x']) + move
-        undo_42e = []
+        undo_seated = []
         for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]):
-            restore_42e(undo_42e)
+            restore_seated(undo_seated)
             if not isinstance(turn, dict) or turn.get('who') not in names: continue
             who = names[turn['who']]
             if who['_pet']: continue
-            floor_turn_42e(who, turn, undo_42e)          # ĐỢT 42 E: đang ngồi bệt / nằm — như người ngồi (con vật đi tới, không tự quỳ)
+            floor_turn(who, turn, undo_seated)          # ĐỢT 42 E: đang ngồi bệt / nằm — như người ngồi (con vật đi tới, không tự quỳ)
             # QUỲ XUỐNG với con vật dưới SÀN (vuốt ve, cho ăn, khám, chải lông): người đứng thẳng thì tay chỉ tới lưng gần đuôi
             # con chó, không tới đầu — người thật sẽ ngồi xuống (đợt 28: tay cách đầu chó 12 % chiều cao người, đo bằng
             # tools/acting_check.py). Người đang ngồi, hay đã tự quỳ trong lượt ấy, thì thôi.
             steps = turn.get('do') if isinstance(turn.get('do'), list) else []
-            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush', 'takeTemp', 'givePill', RESTRAIN) + CARE_ACTIONS + CARE_38
+            low = [step for step in steps if isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'giveTreat', 'examine', 'brush', 'takeTemp', 'givePill', RESTRAIN) + CARE_ACTIONS + HANDS_ON_CARE
                    and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet'] and not names[step[1][1:]].get('on')]
             if stage_set is not None and low and not who.get('seated') and 'kneel' not in steps and not any(isinstance(step, list) and step and step[0] == 'kneel' for step in steps):
                 turn['do'] = ['kneel'] + steps + ['standUp']
@@ -104,12 +104,12 @@ def write_turns(st):
                     emitted[0] += 1
                     who['x'] = float(who['x']) + move
             # ĐỢT 42 E: NHẶT đồ chơi cạnh một con vật (`["pickUp", "@cho"]`): bước lại cho món đồ (cạnh chân trước nó, phía người) vào tầm tay lúc ngồi
-            # xổm — giữa người cách giữa con vật `PICK_GAP_42E` × chiều cao người, ở phía đang đứng.
+            # xổm — giữa người cách giữa con vật `PICK_GAP` × chiều cao người, ở phía đang đứng.
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
                 if not (isinstance(step, list) and len(step) > 1 and step[0] == 'pickUp' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']): continue
                 pet = names[step[1][1:]]
                 px = float(pet['x']) + pet.get('_drop', 0)
-                move = px + (1 if float(who['x']) >= px else -1) * PICK_GAP_42E * who['_host_height'] - float(who['x'])
+                move = px + (1 if float(who['x']) >= px else -1) * PICK_GAP * who['_host_height'] - float(who['x'])
                 if abs(move) > 0.04 * who['_host_height']:
                     turns.append((f'  // {who["name"]} steps up to {step[1][1:]} to "pickUp" the toy by it', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                     emitted[0] += 1
@@ -126,7 +126,7 @@ def write_turns(st):
                         emitted[0] += 1
                         mate['x'] = float(mate['x']) + move
             for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_35 + CARE_ACTIONS + tuple(PAIR_38) and isinstance(step[1], str) and step[1][1:] in names): continue
+                if not (isinstance(step, list) and len(step) > 1 and step[0] in ('stroke', 'handOver', 'listen', 'inject', 'carry', 'handshake', 'examine', 'giveTreat', 'brush', 'handOverPet', RESTRAIN) + CARE_REACH + CARE_ACTIONS + tuple(PAIR_PARTNER) and isinstance(step[1], str) and step[1][1:] in names): continue
                 names[step[1][1:]].setdefault('_reachers', set()).add(who['name'])      # ai với tay tới nó (đặt chiều sâu con vật, đợt 32)
                 # CON VẬT TỰ ĐI SANG MẶT PHẲNG NGƯỜI KẾ (đợt 34): người trước với tới nó ở chiều sâu khác (> 5 đơn vị) — nó sẽ dời chiều
                 # sâu trước lượt này (`set.depth`, xem `pet_depths`). Không có lần cắt cảnh nào ở giữa thì nó TRƯỢT 0,45 s trên hình
@@ -134,7 +134,7 @@ def write_turns(st):
                 # theo bước đi ấy. Người kế ngồi thì nó vốn đi tới họ ("comes over") — chỉ ép bước ấy có, dù quãng ngắn.
                 hop_pet = names[step[1][1:]]
                 hop = None
-                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry', RESTRAIN) + CARE_35 + CARE_ACTIONS:
+                if stage_set is not None and hop_pet['_pet'] and not hop_pet.get('on') and step[0] in ('stroke', 'examine', 'giveTreat', 'brush', 'listen', 'inject', 'carry', RESTRAIN) + CARE_REACH + CARE_ACTIONS:
                     plane = plane_of(st, who)
                     if hop_pet.get('_plane') is not None and abs(plane - hop_pet['_plane']) > 5: hop = hop_pet
                     hop_pet['_plane'] = plane
@@ -188,10 +188,10 @@ def write_turns(st):
                 # giữa thân — tay phía xa của người chibi không với tới chân trước, bàn tay giữ dừng ở bụng con chó (đo trên ảnh).
                 # ĐỢT 38 A: cắt móng / nhỏ mắt / lau tai / quét chip — đứng ở PHÍA ĐẦU con vật (như băng chân), sát đầu nó: hai tay cùng tới
                 # chân trước, cằm, tai, gáy mà không vắt qua thân nó.
-                if step[0] in CARE_38 and target['_pet'] and not who.get('seated'):
+                if step[0] in HANDS_ON_CARE and target['_pet'] and not who.get('seated'):
                     head = -1 if target.get('faces') in names and float(names[target['faces']]['x']) < float(target['x']) else 1
-                    reach_x = float(target['x']) + target.get('_drop', 0) + head * (0.08 if str(target.get('species', '')) in CAT_SPECIES else CARE_38_HEAD) * target['_host_height']
-                    move = reach_x + head * CARE_38_GAP[step[0]] * (1 if target.get('on') else 0.6) * who['_host_height'] - float(who['x'])      # quỳ với con vật dưới sàn: vai thấp, tay ngắn — sát hơn
+                    reach_x = float(target['x']) + target.get('_drop', 0) + head * (0.08 if str(target.get('species', '')) in CAT_SPECIES else HANDS_ON_HEAD) * target['_host_height']
+                    move = reach_x + head * HANDS_ON_GAP[step[0]] * (1 if target.get('on') else 0.6) * who['_host_height'] - float(who['x'])      # quỳ với con vật dưới sàn: vai thấp, tay ngắn — sát hơn
                     if abs(move) > 0.03 * who['_host_height']:
                         turns.append((f'  // {who["name"]} goes to the head end of {step[1][1:]} for "{step[0]}"', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
                         emitted[0] += 1
@@ -217,7 +217,7 @@ def write_turns(st):
                 # sát đầu gối (0,22). Đợt 29–30 nó dừng xa hơn (0,3) mà vẫn sau hai ống chân, cùng lớp với người: bà trên sofa phải
                 # cúi 40° qua đầu gối, con mèo khuất 34 % sau ống chân và bàn tay; tay ông ghế đá khuất hẳn sau mặt con chó.
                 if who.get('seated') and target['_pet'] and stage_set is not None and not target.get('on'):
-                    wanted = ((FLOOR_GAP_KID_43 if who.get('id') in KID_IDS_43 else FLOOR_GAP_43) if who.get('_floor42e') else 0.22) * who['_host_height']
+                    wanted = ((FLOOR_GAP_KID if who.get('id') in KID_IDS else FLOOR_GAP) if who.get('_on_floor') else 0.22) * who['_host_height']
                     # BÊN NÀO (đợt 31): bên con vật đi tới — không vòng qua trước hai ống chân người ngồi. Phía ĐẦU GỐI: nó vẽ TRÊN người
                     # (`over`, không khuất sau ống chân), tay đặt lên đỉnh đầu ('crown'). Phía HÔNG (không có chân che): người vẽ trước
                     # như thường, tay đặt lên đỉnh đầu ('top', 15 % xuống) — nhắm giữa mặt thì bàn tay che mất mặt nó (đo: đầu mèo lộ 57 %),
@@ -290,7 +290,7 @@ def write_turns(st):
                 turns.append((f'  // {pet["name"]} turns its tail to {who["name"]} for "takeTemp"', f"[{pet['name']}, ['face', {js(away)}]]"))
                 emitted[0] += 1
                 turned_back.append((pet, who))
-        restore_42e(undo_42e)
+        restore_seated(undo_seated)
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
             speakers.append((emitted[0], names[talker['who']]['side'] if talker else None))      # lượt không lời: cả hai nửa sáng
@@ -342,12 +342,12 @@ def write_turns(st):
                 # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
                 if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
                     gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:], **({'hold': step[2]} if step[0] in ('takeTemp', RESTRAIN) and len(step) > 2 else {}),
-                                     **({'hold': step[2].get('hold', CARE_38_HOLD[step[0]][2]), 'id': step[2].get('id')} if step[0] in CARE_38 and len(step) > 2 and isinstance(step[2], dict) else {}),
+                                     **({'hold': step[2].get('hold', HANDS_ON_HOLD[step[0]][2]), 'id': step[2].get('id')} if step[0] in HANDS_ON_CARE and len(step) > 2 and isinstance(step[2], dict) else {}),
                                       **({'partner': next((other.get('who') for other in (entry.get('together') or []) if isinstance(other, dict) and other is not turn and other.get('who') in names
                                                            and not names[other['who']]['_pet'] and any(isinstance(item, list) and len(item) > 1 and item[1] == step[1] for item in other.get('do') or [])), None)}
                                          if step[0] == RESTRAIN and isinstance(entry, dict) else {})})
                 # HAI NGƯỜI (đợt 38 C): moments.json đo tay gặp tay, tay ôm qua người kia, tay trên vai, miệng sát tai, túi sang tay.
-                if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_38 and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names:
+                if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_PARTNER and isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names:
                     gear_ops.append({'turn': emitted[0], 'kind': 'pair', 'name': step[0], 'who': turn.get('who'), 'target': step[1][1:]})
                 # ĐẶT XUỐNG (đợt 30): con vật nào, ai đặt — người nhận đặt xuống thì nó trượt về chỗ được bế lần đầu.
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'carry' and isinstance(step[1], str): holding[turn.get('who')] = step[1][1:]
@@ -360,10 +360,10 @@ def write_turns(st):
                 if isinstance(step, list) and len(step) > 1 and step[0] == 'handOverPet' and isinstance(step[1], str) and turn.get('who') in holding: holding[step[1][1:]] = holding.pop(turn.get('who'))
                 # ĐỘNG TÁC TAY của người (đợt 33): moments.json đo bàn tay trong khung ở lúc được hỏi.
                 name = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-                if name in GESTURES and name not in TALK_39 and turn.get('who') in names and not names[turn['who']]['_pet']:      # đợt 39 C: bốn động tác người dẫn đo riêng (`talk39`)
+                if name in GESTURES and name not in PRESENTER_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:      # đợt 39 C: bốn động tác người dẫn đo riêng (`talk39`)
                     gear_ops.append({'turn': emitted[0], 'kind': 'gesture', 'name': name, 'who': turn.get('who'), 'target': None})
                 # NGƯỜI DẪN (đợt 39 C): giơ bảng, ra dấu kích thước, tự sướng, ngáp vươn vai — acting_check đo bảng / khe hai tay / điện thoại / tay qua đầu.
-                if name in TALK_39 and turn.get('who') in names and not names[turn['who']]['_pet']:
+                if name in PRESENTER_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     args_ = step[1:] if isinstance(step, list) else []
                     gear_ops.append({'turn': emitted[0], 'kind': 'talk39', 'name': name, 'who': turn.get('who'), 'target': None,
                                      'hold': next((a for a in args_[1:2] if isinstance(a, (int, float))), None) if name in ('holdSign', 'showSize') else next((a for a in args_[:1] if isinstance(a, (int, float))), None),
@@ -371,7 +371,7 @@ def write_turns(st):
                                      'text': (' / '.join(args_[0]) if isinstance(args_[0], list) else str(args_[0]).replace('|', ' / ')) if name == 'holdSign' and args_ else None,
                                      'with': next((a['with'][1:] for a in args_[1:2] if isinstance(a, dict) and isinstance(a.get('with'), str)), None) if name == 'takeSelfie' else None})
                 # ĐỢT 42 E — SÁT SÀN: ngồi bệt, nằm, nhặt đồ — acting_check đo mông / thân trên mặt sàn, tay tới món đồ, món đồ trong tay (`floor42e`).
-                if name in FLOOR_42E and turn.get('who') in names and not names[turn['who']]['_pet']:
+                if name in FLOOR_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet']:
                     args_ = step[1:] if isinstance(step, list) else []
                     gear_ops.append({'turn': emitted[0], 'kind': 'floor42e', 'name': name, 'who': turn.get('who'), 'target': args_[0][1:] if args_ and isinstance(args_[0], str) and args_[0].startswith('@') else None,
                                      'sofa': name == 'lieDown' and bool(args_) and args_[0] == 'sofa', 'sleep': name == 'lieDown' and len(args_) > 1 and isinstance(args_[1], dict) and bool(args_[1].get('sleep')),
@@ -381,7 +381,7 @@ def write_turns(st):
                     gear_ops.append({'turn': emitted[0], 'kind': 'prep', 'name': name, 'who': turn.get('who'), 'target': None,
                                      'hold': float(step[1]) if name == 'washHands' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], (int, float)) else 2.0})
                 # ĐỢT 39 A: quầy thu ngân / cà phê một mình — moments.json đo tick / dấu đỏ / dòng nước / khăn (acting_check `desk39`).
-                if name in DESK_39 and turn.get('who') in names and not names[turn['who']]['_pet'] and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')):
+                if name in DESK_ACTIONS and turn.get('who') in names and not names[turn['who']]['_pet'] and not (isinstance(step, list) and len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@')):
                     nums = [item for item in (step[1:] if isinstance(step, list) else []) if isinstance(item, (int, float)) and not isinstance(item, bool)]
                     gear_ops.append({'turn': emitted[0], 'kind': 'desk39', 'name': name, 'who': turn.get('who'), 'target': None, 'hold': float(nums[-1]) if nums else None})
                 # ĐỌC BỆNH ÁN / CHỈ PHIM (đợt 35): bìa hồ sơ trước ngực, trong khung; tay chỉ trúng điểm trên phim (acting_check).
@@ -404,7 +404,7 @@ def write_turns(st):
                     gear_ops.append({'turn': emitted[0], 'kind': 'walk', 'who': turn.get('who'), 'target': None, 'dur': float(step[1])})
                 # ĐỢT 42 D: chạy / nhảy / múa — chạy dời chỗ đứng (như `walk`); `["run", "@tên"]` thành quãng tới đứng cạnh người / con vật ấy.
                 motion = step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None
-                if motion in MOTION_42D and turn.get('who') in names and not names[turn['who']]['_pet']:
+                if motion in WHOLE_BODY and turn.get('who') in names and not names[turn['who']]['_pet']:
                     mover, aim = names[turn['who']], None
                     if motion == 'run' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], str):
                         aim = step[1][1:] if step[1].startswith('@') else None
@@ -413,9 +413,9 @@ def write_turns(st):
                         ox = float(other['x']) + other.get('_drop', 0)
                         side = 1 if ox >= float(mover['x']) else -1
                         half = 0.12 * other['_host_height'] if other['_pet'] else 0.1 * other['_host_height']        # nửa bề ngang thân nó, chừng
-                        goal = ox - side * (half + RUN_GAP_42D * 0.5 * mover['_host_height'])
+                        goal = ox - side * (half + RUN_GAP * 0.5 * mover['_host_height'])
                         step[1] = round((goal - float(mover['x'])) / mover['_unit'])
-                        RUN_TO_42D[id(step)] = aim
+                        RUN_TO[id(step)] = aim
                     if motion == 'run' and isinstance(step, list) and len(step) > 1 and isinstance(step[1], (int, float)) and not isinstance(step[1], bool):
                         mover['x'] = float(mover['x']) + float(step[1]) * mover['_unit']
                     gear_ops.append({'turn': emitted[0], 'kind': 'motion42d', 'name': motion, 'who': turn.get('who'), 'target': aim})
@@ -431,22 +431,22 @@ def write_turns(st):
             toasts.append({'turn': emitted[0], 'title': note.get('title', ''), 'text': note.get('text', '')})
         if isinstance(entry, dict) and 'together' in entry:
             if 'shot' in entry: fail(f'{where}: "shot" cannot sit on a "together" entry — put it on one of the turns inside it')
-            known(where, entry, ('together', 'view', '_narr42a'))
-            if not isinstance(entry['together'], list) or not (entry['together'] or entry.get('_narr42a')): fail(f'{where}: "together" must be a non-empty list of turns')
+            known(where, entry, ('together', 'view', '_narrator_turns'))
+            if not isinstance(entry['together'], list) or not (entry['together'] or entry.get('_narrator_turns')): fail(f'{where}: "together" must be a non-empty list of turns')
             if any(isinstance(turn, dict) and 'view' in turn for turn in entry['together']): fail(f'{where}: "view" cannot sit inside "together" — put it on the "together" entry itself (one camera for the whole group), or on a turn of its own')
             # ĐỢT 42: GÓC MÁY CHO CẢ NHÓM — lời dẫn đè lên hình (voice-over): `{ "together": [ { người nói }, { con vật diễn } ], "view": { "on": ["meo"], "size": "close" } }`
             # — máy quay vào động tác trong lúc người kia nói, không cắt sang người nói. Chỉ dạng đối tượng (không có "who" chung để hiểu "close").
             # ĐỢT 42 A: góc cận MỘT con thú, một mình, chưa khai `fill` — choán khung theo động tác nó làm trong nhóm (như góc tự động của lượt riêng): thỏ nhảy vui / chó chổng mông 0,9; mèo chui hộp 0,62…
             if isinstance(entry.get('view'), dict) and 'fill' not in entry['view'] and entry['view'].get('alone') and entry['view'].get('size') == 'close' and isinstance(entry['view'].get('on'), list) and len(entry['view']['on']) == 1:
-                fill_42a = pet_fill_42a(entry)
-                if fill_42a: entry['view'] = dict(entry['view'], fill=fill_42a)
+                group_fill = pet_group_fill(entry)
+                if group_fill: entry['view'] = dict(entry['view'], fill=group_fill)
             if 'view' in entry:
                 if not isinstance(entry['view'], dict): fail(f'{where}: "view" on a "together" entry must be an object — {{ "on": [names], "size": "close" | "medium" | "full" }} or camera values')
                 view_of(st, entry, where)
-            emitted[0] += len(entry['together']) + len(entry.get('_narr42a', []))
+            emitted[0] += len(entry['together']) + len(entry.get('_narrator_turns', []))
             # Lời của người dẫn (đợt 42 A) chạy CÙNG LÚC với nhóm, xếp sau cùng; một mình thì là một lượt thường.
-            parts_42a = [turn_code(st, turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])] + [turn_code(st, turn, f'{where}.narrator') for turn in entry.get('_narr42a', [])]
-            turns.append((None, '{ together: [' + ', '.join(parts_42a) + '] }' if len(parts_42a) > 1 else parts_42a[0]))
+            parts = [turn_code(st, turn, f'{where}.together[{n}]') for n, turn in enumerate(entry['together'])] + [turn_code(st, turn, f'{where}.narrator') for turn in entry.get('_narrator_turns', [])]
+            turns.append((None, '{ together: [' + ', '.join(parts) + '] }' if len(parts) > 1 else parts[0]))
         else:
             code = turn_code(st, entry, where)
             # GÓC CẬN CON VẬT tự động (đợt 35, lượt ba): lượt riêng của con vật làm một động tác của nó (lăn ngửa, đuổi đuôi, nhào, gặm,
@@ -457,10 +457,10 @@ def write_turns(st):
             if stage_set is not None and 'view' not in entry and not names[entry['who']]['_pet'] and any(name in ('sitOnFloor', 'lieDown') for name in acts):
                 entry['view'] = {'on': [entry['who']], 'size': 'full'}
             if stage_set is not None and 'view' not in entry and names[entry['who']]['_pet'] and any(name in PET_CLOSE for name in acts):
-                carrier_40 = next((who for who, held in arms.items() if held == entry['who']), None) if 'struggle' in acts else None          # đợt 40 C: vùng vẫy trong tay — máy đặt tay vào ngực người bế (con vật nằm trong vòng tay: `on` con vật không dựng được góc), thấy cả hai tay đang giữ
+                carrier = next((who for who, held in arms.items() if held == entry['who']), None) if 'struggle' in acts else None          # đợt 40 C: vùng vẫy trong tay — máy đặt tay vào ngực người bế (con vật nằm trong vòng tay: `on` con vật không dựng được góc), thấy cả hai tay đang giữ
                 licked_face = [step for step in entry.get('do') if isinstance(step, list) and step[0] == 'lick' and len(step) > 1 and isinstance(step[1], str) and arms.get(step[1][1:]) == entry['who']]
-                entry['view'] = ({'x': round(float(names[carrier_40]['x'])), 'y': round(170 * names[carrier_40]['_unit']), 'z': round(float(names[carrier_40].get('z', -300))), 'zoom': 1.9, 'dur': 0.3} if carrier_40 else {'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
-                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': PET_FILL_40.get(next((name for name in acts if name in PET_FILL_40), ''), 0.94 if 'leanOnLeg' in acts else 0.88 if ('tugOfWar' in acts or 'leanOnLeg' in acts or ('carryToy' in acts and any(isinstance(st, list) and st and st[0] == 'carryToy' and len(st) > 1 and isinstance(st[1], str) for st in entry.get('do') or []))) else 0.9 if ('playBow' in acts or 'dig' in acts or 'carryToy' in acts) else 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else 0.66 if 'lick' in acts else PET_CLOSE_FILL), 'back': True})      # nằm ngửa: thấp, chặt hơn
+                entry['view'] = ({'x': round(float(names[carrier]['x'])), 'y': round(170 * names[carrier]['_unit']), 'z': round(float(names[carrier].get('z', -300))), 'zoom': 1.9, 'dur': 0.3} if carrier else {'on': [licked_face[0][1][1:]], 'size': 'medium', 'alone': True, 'back': True} if licked_face
+                                 else {'on': [entry['who']], 'size': 'close', 'alone': True, 'fill': PET_CLOSE_FILLS.get(next((name for name in acts if name in PET_CLOSE_FILLS), ''), 0.94 if 'leanOnLeg' in acts else 0.88 if ('tugOfWar' in acts or 'leanOnLeg' in acts or ('carryToy' in acts and any(isinstance(st, list) and st and st[0] == 'carryToy' and len(st) > 1 and isinstance(st[1], str) for st in entry.get('do') or []))) else 0.9 if ('playBow' in acts or 'dig' in acts or 'carryToy' in acts) else 0.74 if 'rollOver' in acts else 0.7 if ('chaseTail' in acts or 'bark' in acts) else 0.66 if 'lick' in acts else PET_CLOSE_FILL), 'back': True})      # nằm ngửa: thấp, chặt hơn
             view_of(st, entry, where)
             if stage_set is not None and 'shot' in entry: fail(f'{where}: "shot" frames the 2D camera — in a 3D set move the camera with "view" instead')
             # Lượt KHÔNG LỜI có `["stroke", "@con vật"]`: con vật đáp lại cùng lúc — mèo gừ gừ, chó vẫy đuôi. Muốn khác thì
@@ -510,15 +510,15 @@ def write_turns(st):
             # HAI NGƯỜI (đợt 38 C): `["highFive" | "hug" | "patShoulder" | "whisper" | "handOverBag", "@người kia"]` một mình — người kia làm
             # phần của mình CÙNG LÚC (đập tay lại, ôm lại, nhìn lại người vỗ vai, nghiêng tai nghe, nhận túi). Một bên làm thì tay vươn vào
             # khoảng không — như bắt tay (đợt 28).
-            paired = [(step[0], step[1][1:]) for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_38 and isinstance(step[1], str) and step[1].startswith('@')]
+            paired = [(step[0], step[1][1:]) for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] in PAIR_PARTNER and isinstance(step[1], str) and step[1].startswith('@')]
             paired = [(kind, name) for kind, name in paired if name in names and not names[name]['_pet'] and name != entry.get('who')]
             if paired and not pets and not shaken and not given and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
                 kind, name = paired[0]
                 me = names[entry['who']]['name']
-                if PAIR_38[kind] == 'lookAt':
+                if PAIR_PARTNER[kind] == 'lookAt':
                     look = f"set.target({name}, {me}, 'head')" if stage_set is not None else me
                     part = f"['lookAt', {look}, {{ hold: 2.6, up: 1.5 }}]"
-                else: part = f"[{js(PAIR_38[kind])}, {me}]"
+                else: part = f"[{js(PAIR_PARTNER[kind])}, {me}]"
                 code = '{ together: [' + code + f", [{names[name]['name']}, {part}]] }}"
                 emitted[0] += 1
             # ĐỢT 39 C: `["takeSelfie", hold, { "with": "@người / con vật" }]` một mình: người kia làm phần của mình CÙNG LÚC — người: `joinSelfie`
@@ -548,11 +548,11 @@ def write_turns(st):
             if pilled and not fed and not pets and 'say' not in entry and code.startswith('[') and all(isinstance(step, list) and step and step[0] == 'givePill' for step in entry.get('do', [])):
                 code = '{ together: [' + code + f", [{names[pilled[0]]['name']}, 0.35, ['openMouth', 1.1], ['chew', 3]]] }}"
                 emitted[0] += 1
-            # ĐỢT 42 F — `["bathPet", "@con vật"]`: người đứng lùi ra `BATH_BACK_42F` đơn vị khung sau bước ấy (con vật rũ nước theo kênh của người — không ghép bước).
+            # ĐỢT 42 F — `["bathPet", "@con vật"]`: người đứng lùi ra `BATH_BACK` đơn vị khung sau bước ấy (con vật rũ nước theo kênh của người — không ghép bước).
             bathed = [step for step in entry.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'bathPet' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']]
             if bathed and not names[entry['who']]['_pet']:
                 bather, tub_pet = names[entry['who']], names[bathed[0][1][1:]]
-                bather['x'] = float(bather['x']) - (1 if float(tub_pet['x']) + tub_pet.get('_drop', 0) >= float(bather['x']) else -1) * BATH_BACK_42F * bather['_unit']
+                bather['x'] = float(bather['x']) - (1 if float(tub_pet['x']) + tub_pet.get('_drop', 0) >= float(bather['x']) else -1) * BATH_BACK * bather['_unit']
             # `["lick", "@người"]` một mình (đợt 35): người ấy CHÌA TAY ra trước mõm cùng lúc (`offerHand`) — không thì con vật liếm
             # không khí. Đang bế con vật thì thôi: nó liếm mặt người bế. Bối cảnh 3D, người đứng, con vật dưới sàn: quỳ xuống trước.
             # đợt 40 C — `struggle` khi đang được bế: báo cho rig ({ carried: true }) — lúc dựng bước, hình con vật có thể chưa nằm trong tay.
@@ -570,14 +570,14 @@ def write_turns(st):
                 code = code.replace(step_code(st, licked[0], where, entry['who']), step_code(st, licked[0][:2] + [times, {'face': True}], where, entry['who']), 1)
                 # Người bế GHÉ MÁ xuống cho nó liếm cùng lúc (đợt 35, lượt hai: mèo trong tay rướn cổ mà không tới mặt).
                 if 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
-                    code = '{ together: [' + code + f", [{names[licked[0][1][1:]]['name']}, ['offerCheek', {round(0.6 + times * LICK_BEAT_40, 2)}]]] }}"
+                    code = '{ together: [' + code + f", [{names[licked[0][1][1:]]['name']}, ['offerCheek', {round(0.6 + times * LICK_BEAT, 2)}]]] }}"
                     emitted[0] += 1
             if licked and names[entry['who']]['_pet'] and 'say' not in entry and code.startswith('[') and len(entry.get('do', [])) == 1:
                 person = names.get(licked[0][1][1:])
                 if arms.get(person['name']) != entry['who']:
                     times = licked[0][2] if len(licked[0]) > 2 and isinstance(licked[0][2], (int, float)) else 5
                     low = stage_set is not None and not person.get('seated') and not names[entry['who']].get('on')      # lượt bốn: quỳ xuống ngang mõm con vật (chồm lên thì lơ lửng)
-                    hand = step_code(st, ['offerHand', '@' + entry['who'], round(0.9 + times * LICK_BEAT_40, 2)], where, person['name'])
+                    hand = step_code(st, ['offerHand', '@' + entry['who'], round(0.9 + times * LICK_BEAT, 2)], where, person['name'])
                     lead = 0.65 if low else 0.6          # lượt bốn: bàn tay tới trước mõm rồi con vật mới liếm (tay không bật ra giữa lúc liếm)
                     pet_code = code if not lead else code.replace(f"[{names[entry['who']]['name']}, ", f"[{names[entry['who']]['name']}, {lead}, ", 1)
                     code = '{ together: [' + pet_code + f", [{person['name']}, " + ("'kneel', " if low else '') + hand + (", 'standUp'" if low else '') + ']] }'
@@ -621,19 +621,19 @@ def write_turns(st):
             if any(isinstance(step, list) and step and step[0] == 'walk' for turn in group if isinstance(turn, dict) for step in (turn.get('do') or [])): beat['move'] = True
             # ĐỢT 42 D: chạy / nhảy / múa — góc TOÀN (cả người, bàn chân), đo cả ở đỉnh cú nhảy; chạy là nhịp có người đi, chạy tới ai thì lấy cả người ấy.
             moving = [(turn, step) for turn in group if isinstance(turn, dict) and turn.get('who') in names and not names[turn['who']]['_pet']
-                      for step in (turn.get('do') or []) if (step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in MOTION_42D]
+                      for step in (turn.get('do') or []) if (step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in WHOLE_BODY]
             if moving and beat.get('subjects') and not beat.get('fixed'):
                 beat['size'] = 'full'; beat['body42d'] = True
                 beat.pop('mid', None)
                 beat['move'] = True             # như nhịp có người đi: đổi góc sau 1 s (không giữ góc cũ 2,5 s — cú nhảy đầu tiên lọt ra ngoài góc cận trước)
                 for turn, step in moving:
-                    for name in [names[turn['who']]['name']] + ([names[RUN_TO_42D[id(step)]]['name']] if isinstance(step, list) and id(step) in RUN_TO_42D else []):
+                    for name in [names[turn['who']]['name']] + ([names[RUN_TO[id(step)]]['name']] if isinstance(step, list) and id(step) in RUN_TO else []):
                         if name not in beat['subjects']: beat['subjects'].append(name)
             # ĐỢT 44 B: NHẶT ĐỒ dưới sàn (`pickUp` không nhắm con vật — món đồ chơi): góc TOÀN người ấy, đổi góc sau 1 s và CẮT thẳng (không lia)
             # — góc trung của câu nói trước còn giữ lúc cúi nhặt thì món đồ ở ngoài đáy khung (`tidyToys` phải tự cho "view" góc toàn).
-            picks_44b = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in names and not names[turn['who']]['_pet']
+            people = [turn for turn in group if isinstance(turn, dict) and turn.get('who') in names and not names[turn['who']]['_pet']
                          and any(step == 'pickUp' or (isinstance(step, list) and step and step[0] == 'pickUp' and not (len(step) > 1 and isinstance(step[1], str) and step[1].startswith('@'))) for step in (turn.get('do') or []))]
-            if picks_44b and beat.get('subjects') and not beat.get('fixed'):
+            if people and beat.get('subjects') and not beat.get('fixed'):
                 beat['size'] = 'full'; beat['floor44b'] = True
                 beat.pop('mid', None)
             beats.append(beat)

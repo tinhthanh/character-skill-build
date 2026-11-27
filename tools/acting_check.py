@@ -82,20 +82,20 @@ def check_depths(folder):
                      + (f' — slides in view, standing still, for {d["slid"]} frame{"" if d["slid"] == 1 else "s"}' if d['slid'] else '')} for d in (DEPTHS or [])]
 
 
-PAGE_45 = {}            # đợt 45: Chrome đang mở cảnh đang soát — {'folder', 'server', 'page'}; mọi lượt đo (probe, pixel) dùng chung một trang (đợt 46)
+PAGE = {}            # đợt 45: Chrome đang mở cảnh đang soát — {'folder', 'server', 'page'}; mọi lượt đo (probe, pixel) dùng chung một trang (đợt 46)
 
 
-def page45(folder, scale=1):
+def scene_page(folder, scale=1):
     """ĐỢT 45 — MỘT CHROME CHO CẢ LƯỢT SOÁT: trả về trang của cảnh `folder` ở tỉ lệ điểm ảnh `scale`. Lần đầu khởi động Chrome
-    (tools/chrome_run.py `Page45`) và mở cảnh; các lượt sau (`probe`, `pet_pixels`, `person_pixels_44b`) dùng lại ĐÚNG trang ấy.
+    (tools/chrome_run.py `Page45`) và mở cảnh; các lượt sau (`probe`, `pet_pixels`, `person_pixels`) dùng lại ĐÚNG trang ấy.
     ĐỢT 46: không mở lại trang trước mỗi lượt nữa — khung hình giờ chỉ phụ thuộc thời điểm, không phụ thuộc những lần tua trước nó
     (đợt 45 phải mở lại: trang đã tua qua `probe` xếp đuôi con mèo đè lên tay bác sĩ — tools/ci/w46.py giữ điều ấy). Đổi tỉ lệ điểm ảnh
-    thì chỉ đổi cỡ vẽ, không mở lại. `close_page45()` đóng Chrome (check_scene, khi xong cảnh)."""
-    if PAGE_45.get('folder') == folder:
-        page = PAGE_45['page']
+    thì chỉ đổi cỡ vẽ, không mở lại. `close_page()` đóng Chrome (check_scene, khi xong cảnh)."""
+    if PAGE.get('folder') == folder:
+        page = PAGE['page']
         if page.scale != scale: page.set_scale(scale)
         return page
-    close_page45()
+    close_page()
     sys.path.insert(0, HERE)
     from chrome_run import Page45
     html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
@@ -114,16 +114,16 @@ def page45(folder, scale=1):
     except BaseException:
         server.terminate()
         raise
-    PAGE_45.update(folder=folder, server=server, page=page)
+    PAGE.update(folder=folder, server=server, page=page)
     return page
 
 
-def close_page45():
-    if not PAGE_45: return
-    try: PAGE_45['page'].__exit__(None, None, None)
+def close_page():
+    if not PAGE: return
+    try: PAGE['page'].__exit__(None, None, None)
     finally:
-        PAGE_45['server'].terminate()
-        PAGE_45.clear()
+        PAGE['server'].terminate()
+        PAGE.clear()
 
 
 def probe(folder, times):
@@ -138,7 +138,7 @@ def probe(folder, times):
               "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
               "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); if (window.__set.careProbe) out['care@' + t] = window.__set.careProbe(); out['spots@' + t] = window.__set.spotProbe ? window.__set.spotProbe() : []; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
               % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
-    try: found = page45(folder).evaluate(script)
+    try: found = scene_page(folder).evaluate(script)
     except RuntimeError as error: sys.exit(f'acting_check: could not probe {folder}:\n{str(error)[-500:]}')
     if not isinstance(found, dict): sys.exit(f'acting_check: could not probe {folder}:\nthe probe returned nothing')
     shots = found.pop('shots', None)
@@ -196,7 +196,7 @@ SEEN = 0.70            # con vật được chạm: thấy ≥ 70 % hình nó (�
 SEEN_HEAD = 0.60       # … và ≥ 60 % cái đầu
 
 
-def mask45(p, q, limit):
+def diff_mask(p, q, limit):
     """Ảnh 'L' 255 ở chỗ hai ảnh RGB khác nhau quá `limit` ở một kênh màu nào đó (max |p − q| > limit), 0 chỗ khác — phép so điểm ảnh
     của `pet_pixels` làm bằng Pillow (C) thay vì vòng lặp Python từng điểm (đợt 45)."""
     from PIL import ImageChops
@@ -204,7 +204,7 @@ def mask45(p, q, limit):
     return ImageChops.lighter(ImageChops.lighter(r, g), b).point(lambda v: 255 if v > limit else 0)
 
 
-def count45(mask, box=None):
+def count_pixels(mask, box=None):
     """Số điểm 255 của ảnh 'L' (trong `box` = (x0, y0, x1, y1), x1 / y1 không tính; ngoài ảnh là 0)."""
     if box is not None:
         if box[2] <= box[0] or box[3] <= box[1]: return 0
@@ -212,7 +212,7 @@ def count45(mask, box=None):
     return mask.histogram()[255]
 
 
-def clip45(region, zoom, W, H):
+def clip_region(region, zoom, W, H):
     """Vùng chụp (px CSS nguyên, trong khung W × H px CSS) phủ `region` = (x0, y0, x1, y1) điểm ảnh ở tỉ lệ `zoom`; None nếu rỗng."""
     import math
     x0, y0 = max(0, math.floor(region[0] / zoom)), max(0, math.floor(region[1] / zoom))
@@ -220,7 +220,7 @@ def clip45(region, zoom, W, H):
     return (x0, y0, x1 - x0, y1 - y0) if x1 > x0 and y1 > y0 else None
 
 
-def shot45(page, clip, keep=None):
+def shot_region(page, clip, keep=None):
     """Chụp vùng `clip` (px CSS) của trang, trả về ảnh RGB (gốc ảnh = góc trên trái của vùng, ở tỉ lệ điểm ảnh của trang). `keep`: ghi PNG ra đó."""
     import io
     from PIL import Image
@@ -237,7 +237,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
     'head', 'hand'}}: tỉ lệ điểm ảnh của hình con vật (c khác b) mà ảnh thường cũng thấy (a khác b) — trong khung hình vẽ đầu
     + thân (`parts` của actingProbe) để bóng dưới sàn không lẫn vào; `hand`: trong khung hình vẽ của bàn tay gần con vật nhất,
     tỉ lệ điểm ảnh của bàn tay (d khác e) mà ảnh thường vẫn thấy như ở d (a giống d: không bị gì che).
-    Đợt 45: chụp trong Chrome chung của cảnh (`page45`; đợt 46: cùng trang với các lượt khác, không mở lại), chỉ VÙNG được đo (khung đầu + thân con vật, khung bàn
+    Đợt 45: chụp trong Chrome chung của cảnh (`scene_page`; đợt 46: cùng trang với các lượt khác, không mở lại), chỉ VÙNG được đo (khung đầu + thân con vật, khung bàn
     tay nới thêm dải tìm khe 80 px), không ghi ra đĩa, so điểm ảnh bằng Pillow (C); d, e chỉ chụp khi có bàn tay để đo. Ảnh một vùng có thể
     lệch 1–2 mức màu so với cùng chỗ trên ảnh cả khung (Chrome vẽ theo ô khác) — mọi số đo trên 69 cảnh CI vẫn như trước."""
     try:
@@ -249,7 +249,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
     if keep: os.makedirs(keep, exist_ok=True)
     zoom = float(scale or 1)
     z = int(scale or 1)
-    try: page = page45(folder, z)
+    try: page = scene_page(folder, z)
     except RuntimeError as error: sys.exit(f'acting_check: could not capture {folder}:\n{str(error)[-500:]}')
     VW, VH = page.size
     W, H = VW * z, VH * z
@@ -291,27 +291,27 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
         if hb:
             margin = reach + band + 2
             region = [min(region[0], int(hb['x0']) - margin), min(region[1], int(hb['y0']) - margin), max(region[2], int(hb['x1']) + margin + 1), max(region[3], int(hb['y1']) + margin + 1)]
-        clip = clip45(region, zoom, VW, VH)
+        clip = clip_region(region, zoom, VW, VH)
         ox, oy = clip[0] * z, clip[1] * z
         at = lambda bx: (bx[0] - ox, bx[1] - oy, bx[2] - ox, bx[3] - oy)          # khung điểm ảnh trong ảnh → trong vùng chụp
-        a = shot45(page, clip, base and base + '-a.png')
+        a = shot_region(page, clip, base and base + '-a.png')
         page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()")
-        b = shot45(page, clip, base and base + '-b.png')
+        b = shot_region(page, clip, base and base + '-b.png')
         page.evaluate(f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()")
-        c = shot45(page, clip, base and base + '-c.png')
-        pet_mask = mask45(c, b, 12)                                   # hình con vật
-        seen_mask = ImageChops.darker(pet_mask, mask45(a, b, 12))     # … mà ảnh thường cũng thấy
+        c = shot_region(page, clip, base and base + '-c.png')
+        pet_mask = diff_mask(c, b, 12)                                   # hình con vật
+        seen_mask = ImageChops.darker(pet_mask, diff_mask(a, b, 12))     # … mà ảnh thường cũng thấy
         counts = {}
         # 'all': điểm trong một khung hình vẽ nào đó; mỗi khung: điểm trong nó (x0 ≤ x ≤ x1, trong vùng [x0, x1) của mọi khung).
         rects = {k: (max(x0, math.ceil(r['x0'])), max(y0, math.ceil(r['y0'])), min(x1, math.floor(r['x1']) + 1), min(y1, math.floor(r['y1']) + 1)) for k, r in boxes.items()}
         union = Image.new('L', pet_mask.size, 0)
         for rect in rects.values():
             if rect[2] > rect[0] and rect[3] > rect[1]: union.paste(255, at(rect))
-        total = count45(ImageChops.darker(pet_mask, union), at((x0, y0, x1, y1)))
-        if total: counts['all'] = (total, count45(ImageChops.darker(seen_mask, union), at((x0, y0, x1, y1))))
+        total = count_pixels(ImageChops.darker(pet_mask, union), at((x0, y0, x1, y1)))
+        if total: counts['all'] = (total, count_pixels(ImageChops.darker(seen_mask, union), at((x0, y0, x1, y1))))
         for k, rect in rects.items():
-            total = count45(pet_mask, at(rect))
-            if total: counts[k] = (total, count45(seen_mask, at(rect)))
+            total = count_pixels(pet_mask, at(rect))
+            if total: counts[k] = (total, count_pixels(seen_mask, at(rect)))
         out = {part: shown / total for part, (total, shown) in counts.items() if total >= 30 * zoom * zoom}
         if not (hb and 'all' in out):
             page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; return 0; }})()")
@@ -319,22 +319,22 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
         # d: người chạm ở lớp trên cùng; e: như d, hai bàn tay (nhóm `-coTayL/R`) tô một màu hồng sẫm — chỗ d khác e là
         # đúng hình bàn tay. (Ẩn cả người chỉ để hiện bàn tay thì không được: cánh tay trước thân bị mask theo hình thân.)
         page.evaluate(f"(() => {{ const h = {host}, p = {person}; if (h) h.style.zIndex = h.dataset.z; if (p) {{ p.dataset.z = p.style.zIndex; p.style.zIndex = 99999; }} return 0; }})()")
-        d = shot45(page, clip, base and base + '-d.png')
+        d = shot_region(page, clip, base and base + '-d.png')
         page.evaluate(f"(() => {{ const p = {person}; if (p) for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) {{ g.dataset.fill = g.style.fill; g.style.fill = '#ff00ff'; }} return 0; }})()")
-        e = shot45(page, clip, base and base + '-e.png')
+        e = shot_region(page, clip, base and base + '-e.png')
         page.evaluate(f"(() => {{ const p = {person}; if (p) {{ p.style.zIndex = p.dataset.z; for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) g.style.fill = g.dataset.fill || ''; }} return 0; }})()")
         hx0, hy0 = max(0, int(hb['x0'])), max(0, int(hb['y0']))
         hx1, hy1 = min(W, int(hb['x1']) + 1), min(H, int(hb['y1']) + 1)
         if hx1 <= hx0 or hy1 <= hy0: return out
         hand_box = at((hx0, hy0, hx1, hy1))
-        mine_mask = mask45(d.crop(hand_box), e.crop(hand_box), 12)                 # điểm của bàn tay
+        mine_mask = diff_mask(d.crop(hand_box), e.crop(hand_box), 12)                 # điểm của bàn tay
         # BÀN TAY THẤY ĐƯỢC (đợt 35): ảnh thường khác ảnh "người trên cùng" quá HAZE mới là bị che. Lớp nắng / sương mờ của bối cảnh
         # (vệt nắng cửa sổ phòng khám) phủ cả bàn tay lẫn con vật, đổi màu đều 17–22 — bàn tay vẽ trên con vật vẫn rõ mà đếm là
         # "khuất" (băng chân corgi trên bàn khám: 5 % thấy được). Thân con vật / vành loa che thì khác xa hơn nhiều.
-        veiled = mask45(a.crop(hand_box), d.crop(hand_box), HAZE)
-        mine = count45(mine_mask)
+        veiled = diff_mask(a.crop(hand_box), d.crop(hand_box), HAZE)
+        mine = count_pixels(mine_mask)
         if mine < 30 * zoom * zoom: return out
-        shown = count45(ImageChops.darker(mine_mask, ImageChops.invert(veiled)))
+        shown = count_pixels(ImageChops.darker(mine_mask, ImageChops.invert(veiled)))
         # TIẾP XÚC (đợt 31): phần bàn tay nằm sát (≤ 3 px) hình con vật — đè lên nó hay chạm mép (chín điểm: dời ±3 px mỗi chiều). Tay
         # thấy trọn mà không sát hình con vật là tay lơ lửng trên đầu nó. Ngoài vùng chụp là ngoài ảnh (vùng chụp phủ mọi chỗ khác).
         near_mask = None
@@ -342,10 +342,10 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
             for dy in (-band, 0, band):
                 moved = pet_mask.crop((hand_box[0] + dx, hand_box[1] + dy, hand_box[2] + dx, hand_box[3] + dy))
                 near_mask = moved if near_mask is None else ImageChops.lighter(near_mask, moved)
-        near = count45(ImageChops.darker(mine_mask, near_mask))
+        near = count_pixels(ImageChops.darker(mine_mask, near_mask))
         # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
         # lưng (con vật vẽ trước người), không phải đặt lên đó.
-        sunk = count45(ImageChops.darker(ImageChops.darker(mine_mask, veiled), pet_mask.crop(hand_box)))
+        sunk = count_pixels(ImageChops.darker(ImageChops.darker(mine_mask, veiled), pet_mask.crop(hand_box)))
         out['px'] = mine / (zoom * zoom)
         out['hand'] = shown / mine; out['contact'] = near / mine; out['sunk'] = sunk / mine
         # KHE HỞ (đợt 32): tay không sát con vật thì cách nó bao nhiêu px (tìm tới 80 px quanh khung bàn tay, mỗi `stride` px).
@@ -388,7 +388,7 @@ def pet_pixels(folder, jobs, keep=None, scale=None):
     return result
 
 
-def person_pixels_44b(folder, jobs):
+def person_pixels(folder, jobs):
     """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC BAO NHIÊU, đo bằng pixel (như `pet_pixels`). `jobs`: [(lúc, tên, khung đầu, khung ngực)]. Ở mỗi lúc
     chụp ba ảnh: a — như thường; b — ẩn host người ấy; c — host người ấy lên lớp trên cùng. Trong mỗi khung: phần điểm ảnh của hình người ấy
     (c khác b) mà ảnh thường cũng thấy (a khác b) — mặt quầy, máy tính, màn hình trước họ che thì không thấy. Trả về {(lúc, tên): (đầu, ngực)}.
@@ -399,7 +399,7 @@ def person_pixels_44b(folder, jobs):
         return None
     html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
     comp = re.search(r'data-composition-id="([^"]+)"', html).group(1)
-    try: page = page45(folder)
+    try: page = scene_page(folder)
     except RuntimeError: return None
     W, H = page.size
     tl = f'window.__timelines[{json.dumps(comp)}]'
@@ -414,16 +414,16 @@ def person_pixels_44b(folder, jobs):
             live = [s for s in spans if s]
             if not live:
                 result[(t, name)] = (None, None); continue
-            clip = clip45((min(s[0] for s in live), min(s[1] for s in live), max(s[2] for s in live), max(s[3] for s in live)), 1, W, H)
+            clip = clip_region((min(s[0] for s in live), min(s[1] for s in live), max(s[2] for s in live), max(s[3] for s in live)), 1, W, H)
             page.evaluate(f'(() => {{ {tl}.seek({t}, false); window.__set.update(); for (const h of {others}) h.style.visibility = "hidden"; return 0; }})()')
-            a = shot45(page, clip)
+            a = shot_region(page, clip)
             page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()")
-            b = shot45(page, clip)
+            b = shot_region(page, clip)
             page.evaluate(f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()")
-            c = shot45(page, clip)
+            c = shot_region(page, clip)
             page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; for (const o of document.querySelectorAll('[data-set3d][data-name]')) o.style.visibility = ''; return 0; }})()")
-            body = mask45(c, b, 12)
-            seen = ImageChops.darker(body, mask45(a, b, 12))
+            body = diff_mask(c, b, 12)
+            seen = ImageChops.darker(body, diff_mask(a, b, 12))
             def share(span):
                 # Mỗi 2 px mỗi chiều, từ góc trên trái của khung.
                 if not span: return None
@@ -441,7 +441,7 @@ def person_pixels_44b(folder, jobs):
 CLERK_HEAD, CLERK_CHEST = 0.85, 0.5      # đợt 44 B: người sau quầy — thấy ≥ 85 % đầu (mặt), ≥ 50 % ngực (dải dưới cằm)
 
 
-def check_clerk_44b(folder, moments, shots):
+def check_clerk(folder, moments, shots):
     """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC (lễ tân, dược sĩ): ở mỗi khoảnh khắc của moments.json người ấy trong khung (đầu trong khung), thấy
     ≥ 85 % hình đầu và ≥ 50 % dải ngực ngay dưới cằm (bề ngang bằng đầu, cao 18 % chiều cao người) — mặt quầy, máy tính trên quầy không che
     (0.82.0: máy tính đứng chắn ngực người ngồi quầy; CI chỉ soát chỗ đặt máy tính). Chỉ ở góc mở đầu và các lúc chính người ấy diễn (góc cận
@@ -462,7 +462,7 @@ def check_clerk_44b(folder, moments, shots):
     for job in jobs: seen.setdefault((job[0], job[1]), job)
     jobs = list(seen.values())
     if not jobs: return []
-    found = person_pixels_44b(folder, jobs)
+    found = person_pixels(folder, jobs)
     if found is None: return [{'scene': folder, 'what': 'the person behind the counter is seen', 'ok': None, 'note': 'not measured (no PIL or no capture)'}]
     out = []
     for t, name, _, _ in jobs:
@@ -474,10 +474,10 @@ def check_clerk_44b(folder, moments, shots):
     return out
 
 
-TORSO_44B = False      # đợt 44 B: `--torso44b` — chấm cả "thân không đầu" (xem check_torso_44b)
+TORSO_CHECK = False      # đợt 44 B: `--torso44b` — chấm cả "thân không đầu" (xem check_torso)
 
 
-def check_torso_44b(folder, moments, shots):
+def check_torso(folder, moments, shots):
     """ĐỢT 44 B — THÂN KHÔNG ĐẦU: ở mỗi khoảnh khắc của moments.json, không người nào bị mép TRÊN khung cắt quá 15 % chiều cao đầu mà thân áo (dải
     30 % chiều cao người ngay dưới cằm) vẫn thấy ≥ 6 % chiều cao khung và ≥ 30 % bề ngang thân (≈ bề ngang đầu) trong khung (góc cận con vật 42 C: bé đứng ngay
     sau con mèo — thấy cái áo, mất đầu). Chỉ chạy với `--torso44b`: góc `alone` (cố ý bỏ qua người khác) vẫn để lẹm như cũ."""
@@ -693,16 +693,16 @@ def check_gesture(folder, c, frames):
 
 # ĐỢT 39 B — sáu cử chỉ thường ngày: cái làm nên chữ "đọc được" của từng cử chỉ, đo từ `g39` (`rig.gesture39Probe()` qua `set.careProbe()`).
 # Mọi khoảng cách tính theo chiều cao KHUÔN MẶT trên khung (bé đầu to, người ngồi, góc cận / toàn đều cùng thước).
-G39 = ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')
-G39_LIPS = 0.38        # suỵt: đầu ngón trỏ cách tâm miệng ≤ 38 % chiều cao mặt
-G39_PALM = 0.75        # ôm trán: đầu ngón / bàn tay cách giữa hai mắt ≤ 75 % chiều cao mặt, và đầu đã gục (headPitch ≥ 0,3)
-G39_BROW = 0.55        # chào: đầu ngón tay cách chân mày bên ấy ≤ 55 % chiều cao mặt (bàn tay ở trán, không ở má / tai)
-G39_OK = (0.45, 1.9)   # OK: tâm vòng tròn cách tâm mặt theo bề ngang trong 0,45–1,9 bề ngang mặt, lệch chiều dọc so với mắt ≤ 0,9 chiều cao mặt
-G39_EYE = 0.7          # lau nước mắt: bàn tay cách MỘT mắt ≤ 70 % chiều cao mặt (một trong ba lúc đo), nước mắt đã chảy trước đó
-G39_SWAY = 3.0         # cười lớn: kênh đầu / vai dao động ≥ 3 đơn vị giữa các lúc đo (đầu ngả, vai rung), mắt híp ≥ 0,6, miệng ≥ 0,5
+EVERYDAY_GESTURES = ('laugh', 'wipeTears', 'facepalm', 'shush', 'okSign', 'salute')
+SHUSH_LIPS = 0.38        # suỵt: đầu ngón trỏ cách tâm miệng ≤ 38 % chiều cao mặt
+FACEPALM_PALM = 0.75        # ôm trán: đầu ngón / bàn tay cách giữa hai mắt ≤ 75 % chiều cao mặt, và đầu đã gục (headPitch ≥ 0,3)
+SALUTE_BROW = 0.55        # chào: đầu ngón tay cách chân mày bên ấy ≤ 55 % chiều cao mặt (bàn tay ở trán, không ở má / tai)
+OK_RING = (0.45, 1.9)   # OK: tâm vòng tròn cách tâm mặt theo bề ngang trong 0,45–1,9 bề ngang mặt, lệch chiều dọc so với mắt ≤ 0,9 chiều cao mặt
+WIPE_EYE = 0.7          # lau nước mắt: bàn tay cách MỘT mắt ≤ 70 % chiều cao mặt (một trong ba lúc đo), nước mắt đã chảy trước đó
+LAUGH_SWAY = 3.0         # cười lớn: kênh đầu / vai dao động ≥ 3 đơn vị giữa các lúc đo (đầu ngả, vai rung), mắt híp ≥ 0,6, miệng ≥ 0,5
 
 
-def check_gesture39(folder, c, scales):
+def check_everyday_gesture(folder, c, scales):
     """ĐỢT 39 B: ngón trỏ chặn môi (suỵt), lòng bàn tay úp lên mắt + đầu gục (ôm trán), bàn tay ở chân mày (chào), vòng OK cạnh mặt
     ngang mắt, bàn tay chạm mắt (lau nước mắt), đầu + vai chuyển động + mắt híp, miệng há (cười lớn)."""
     name, who_n = c['name'], c['who']
@@ -718,18 +718,18 @@ def check_gesture39(folder, c, scales):
         p = g(mid)
         tips = [p.get('tip' + k) for k in 'LR' if p.get('tip' + k)]
         d = min((dist(t, p['mouth']) / face(p) for t in tips), default=None) if p.get('mouth') else None
-        row('the index finger at the lips', d is not None and d <= G39_LIPS, f'fingertip {d * 100:.0f} % of the face height from the mouth at {mid:g} s (most {G39_LIPS * 100:g} %)' if d is not None else 'no finger shape shown')
+        row('the index finger at the lips', d is not None and d <= SHUSH_LIPS, f'fingertip {d * 100:.0f} % of the face height from the mouth at {mid:g} s (most {SHUSH_LIPS * 100:g} %)' if d is not None else 'no finger shape shown')
     elif name == 'facepalm':
         p = g(mid)
         tips = [p.get('hand' + k) for k in 'LR' if p.get('hand' + k) and p.get('chao' + k)]
         eyes = {'x': (p['eyeL']['x'] + p['eyeR']['x']) / 2, 'y': (p['eyeL']['y'] + p['eyeR']['y']) / 2} if p.get('eyeL') and p.get('eyeR') else None
         d = min((dist(t, eyes) / face(p) for t in tips), default=None) if eyes else None
-        row('the palm over the eyes', d is not None and d <= G39_PALM, f'palm {d * 100:.0f} % of the face height from the eyes at {mid:g} s (most {G39_PALM * 100:g} %)' if d is not None else 'no flat hand shown')
+        row('the palm over the eyes', d is not None and d <= FACEPALM_PALM, f'palm {d * 100:.0f} % of the face height from the eyes at {mid:g} s (most {FACEPALM_PALM * 100:g} %)' if d is not None else 'no flat hand shown')
         row('the head dropped into the hand', p.get('pitch', 0) >= 0.3, f'head pitch {p.get("pitch", 0):g} at {mid:g} s (at least 0.3)')
     elif name == 'salute':
         p = g(mid)
         best = min(((dist(p['tip' + k], p['brow' + k]) / face(p), k) for k in 'LR' if p.get('tip' + k) and p.get('chao' + k) and p.get('brow' + k)), default=None)
-        row('the flat hand at the brow', best is not None and best[0] <= G39_BROW, f'fingertip {best[0] * 100:.0f} % of the face height from the brow at {mid:g} s (most {G39_BROW * 100:g} %)' if best else 'no flat hand shown')
+        row('the flat hand at the brow', best is not None and best[0] <= SALUTE_BROW, f'fingertip {best[0] * 100:.0f} % of the face height from the brow at {mid:g} s (most {SALUTE_BROW * 100:g} %)' if best else 'no flat hand shown')
     elif name == 'okSign':
         p = g(mid)
         tips = [p.get('tip' + k) for k in 'LR' if p.get('tip' + k)]
@@ -737,7 +737,7 @@ def check_gesture39(folder, c, scales):
         else:
             t = tips[0]
             dx, dy = abs(t['x'] - p['face']['x']) / p['face']['w'], abs(t['y'] - (p['eyeL']['y'] + p['eyeR']['y']) / 2) / face(p)
-            row('the OK circle beside the face', G39_OK[0] <= dx <= G39_OK[1] and dy <= 0.9, f'circle {dx:.2f} face widths out, {dy * 100:.0f} % of the face height off eye level at {mid:g} s')
+            row('the OK circle beside the face', OK_RING[0] <= dx <= OK_RING[1] and dy <= 0.9, f'circle {dx:.2f} face widths out, {dy * 100:.0f} % of the face height off eye level at {mid:g} s')
     elif name == 'wipeTears':
         best = None
         for t in c['times']:
@@ -746,14 +746,14 @@ def check_gesture39(folder, c, scales):
                 if p.get('hand' + k) and p.get('ov' + k, 0) > 0.5 and p.get('eyeL') and p.get('eyeR'):
                     d = min(dist(p['hand' + k], p['eyeL']), dist(p['hand' + k], p['eyeR'])) / face(p)
                     if best is None or d < best: best = d
-        row('the hand at the eye', best is not None and best <= G39_EYE, f'hand {best * 100:.0f} % of the face height from an eye (most {G39_EYE * 100:g} %)' if best is not None else 'no hand raised to the face at the times asked')
+        row('the hand at the eye', best is not None and best <= WIPE_EYE, f'hand {best * 100:.0f} % of the face height from an eye (most {WIPE_EYE * 100:g} %)' if best is not None else 'no hand raised to the face at the times asked')
     elif name == 'laugh':
         ps = [g(t) for t in c['times']]
         sway = max(max(p.get(key, 0) for p in ps) - min(p.get(key, 0) for p in ps) for key in ('tilt', 'drop', 'shoulders', 'pitch'))
         pitch = max(p.get('pitch', 0) for p in ps) - min(p.get('pitch', 0) for p in ps)
         row('eyes squeezed, mouth wide open', max(p.get('eyesShut', 0) for p in ps) >= 0.6 and max(p.get('mouthOpen', 0) for p in ps) >= 0.5,
             f'eyes shut {max(p.get("eyesShut", 0) for p in ps):g}, mouth {max(p.get("mouthOpen", 0) for p in ps):g}')
-        row('head and shoulders move with the laugh', sway >= G39_SWAY or pitch >= 0.5, f'channels move {sway:g} (shoulders / head), pitch {pitch:g}')
+        row('head and shoulders move with the laugh', sway >= LAUGH_SWAY or pitch >= 0.5, f'channels move {sway:g} (shoulders / head), pitch {pitch:g}')
     return out
 
 
@@ -791,21 +791,21 @@ THROUGH = 0.03         # nấp: chạy ngang qua chân người mà đường s�
                        # (đợt 35, lượt hai: con shiba xa hơn cô bé 30 đơn vị — 1,6 %, Gemini thấy đi xuyên; xa hơn 100 — 5,3 %)
 
 
-PET_ACTS_40_NAMES = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
-# ĐỢT 40 B — mèo & thỏ: các phép đo riêng (xem check_pet40). Người chấm xem thưa (~1 khung / giây): dáng chính phải GIỮ ≥ 1 s.
+CAT_RABBIT_ACTS = ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')
+# ĐỢT 40 B — mèo & thỏ: các phép đo riêng (xem check_dog_act). Người chấm xem thưa (~1 khung / giây): dáng chính phải GIỮ ≥ 1 s.
 CLOSE_ACTS += ('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox', 'binky', 'flop', 'periscope', 'noseTwitch')      # đợt 40 B
-AIR_40 = ('binky', 'sitInBox')       # đợt 40 B: động tác có cú nhảy — bàn chân rời sàn là đúng
-HOLD_40 = 1.0          # dáng giữ ≥ 1 s
+AIRBORNE_ACTS = ('binky', 'sitInBox')       # đợt 40 B: động tác có cú nhảy — bàn chân rời sàn là đúng
+PET_POSE_HOLD = 1.0          # dáng giữ ≥ 1 s
 LOAF_FLAT = 0.6        # nằm ổ bánh mì / nằm vật: đỉnh lưng cách sàn ≤ 60 % lúc đầu (đo theo chiều cao thân người xem thấy — máy quay có thể đổi cỡ giữa chừng)
 BLINK_SHUT = 0.3       # chớp mắt chậm: mắt nhắm khi cao ≤ 30 % lúc mở, nhắm liền ≥ 0,6 s
 ARCH_BIG = 1.25        # cong lưng: đỉnh lưng (cả lông dựng) cao ≥ 1,25 lần lúc đầu, giữ ≥ 1 s
 TOY_AWAY = 0.12        # vờn: cuộn len đi xa dần ≥ 12 % chiều cao con vật
 BOX_OVER = 0.25        # chui hộp: đầu chìm xuống dưới miệng hộp ≤ 25 % chiều cao đầu
-LIFT_40 = 0.12         # nhảy vui: bàn chân thấp nhất cách sàn ≥ 12 % chiều cao con vật (`tall`); đứng hai chân: bàn chân trước cách sàn ≥ 8 %
+HOP_LIFT = 0.12         # nhảy vui: bàn chân thấp nhất cách sàn ≥ 12 % chiều cao con vật (`tall`); đứng hai chân: bàn chân trước cách sàn ≥ 8 %
 TWITCH_N = 4           # giật mũi: mũi đổi chiều (phình / xẹp) ≥ 4 lần, biên độ ≥ 15 % bề ngang mũi
 
 
-def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `check_pet40` là của đợt 40 A)
+def check_cat_rabbit_act(folder, c, track, what):      # đợt 40 B (tên riêng: `check_dog_act` là của đợt 40 A)
     """Phép đo riêng cho mười động tác đợt 40 B (track = các khung mỗi 0,1 s suốt bước)."""
     name, who, times = c['name'], c['who'], c.get('samples', [])
     fr = [f[who] for f in track if f.get(who)]
@@ -833,7 +833,7 @@ def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `chec
     top = [(a['ground'] - a['parts']['back']['y0']) / (a.get('tall') or 1) if a['parts'].get('back') else 0 for a in fr]      # đỉnh lưng cách sàn, theo `tall`
     if name in ('loaf', 'flop'):
         got = run([v <= LOAF_FLAT * top[0] for v in top])
-        return ok_('a low, compact shape, held', got >= HOLD_40, f'the top of the back is ≤ {LOAF_FLAT * 100:.0f} % of its first height for {got:.1f} s running (least {HOLD_40:g} s; lowest {min(top) / top[0] * 100:.0f} %)')
+        return ok_('a low, compact shape, held', got >= PET_POSE_HOLD, f'the top of the back is ≤ {LOAF_FLAT * 100:.0f} % of its first height for {got:.1f} s running (least {PET_POSE_HOLD:g} s; lowest {min(top) / top[0] * 100:.0f} %)')
     if name == 'slowBlink':
         eye = [h(a['eye']) if a.get('eye') else None for a in fr]
         if None in eye: return []
@@ -850,23 +850,23 @@ def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `chec
         return ok_('the toy bounces away', away >= TOY_AWAY and hop >= 0.05, f'the ball moves {away * 100:.0f} % of the cat\'s height away (least {TOY_AWAY * 100:g} %), bounces {hop * 100:.0f} % high (least 5 %) over {len(xs)} frames')
     if name == 'archBack':
         got = run([v >= ARCH_BIG * top[0] for v in top])
-        return ok_('back arched, fur puffed up, held', got >= HOLD_40, f'the top of the back is ≥ {ARCH_BIG:g} × its resting height for {got:.1f} s running (least {HOLD_40:g}); highest {max(top) / top[0]:.2f} ×')
+        return ok_('back arched, fur puffed up, held', got >= PET_POSE_HOLD, f'the top of the back is ≥ {ARCH_BIG:g} × its resting height for {got:.1f} s running (least {PET_POSE_HOLD:g}); highest {max(top) / top[0]:.2f} ×')
     if name == 'sitInBox':
         flags = []
         for a in fr:
             hd, bx = a['parts'].get('head'), a.get('box')
             flags.append(bool(hd and bx and (hd['x0'] + hd['x1']) / 2 >= bx['x0'] and (hd['x0'] + hd['x1']) / 2 <= bx['x1'] and (hd['y1'] - bx['y0']) <= BOX_OVER * h(hd) and hd['y0'] < bx['y0'] - 0.5 * h(hd)))
         got = run(flags)
-        return ok_('head and ears out of the box, held', got >= HOLD_40, f'the head sits above the box rim, inside its width, for {got:.1f} s running (least {HOLD_40:g})')
+        return ok_('head and ears out of the box, held', got >= PET_POSE_HOLD, f'the head sits above the box rim, inside its width, for {got:.1f} s running (least {PET_POSE_HOLD:g})')
     if name == 'binky':
         lift = max((a['ground'] - max(p['y1'] for p in a['paws'])) / (a.get('tall') or 1) for a in fr if a.get('paws')) if any(a.get('paws') for a in fr) else 0
         widths = [a['parts']['back']['x1'] - a['parts']['back']['x0'] for a in fr if a['parts'].get('back')]
         twist = min(widths) / max(widths) if widths else 1
-        return ok_('jumps clear of the floor with a twist', lift >= LIFT_40 and twist <= 0.85, f'highest lift {lift * 100:.0f} % of its height (least {LIFT_40 * 100:g} %), body width narrows to {twist * 100:.0f} % in the twist (at most 85 %)')
+        return ok_('jumps clear of the floor with a twist', lift >= HOP_LIFT and twist <= 0.85, f'highest lift {lift * 100:.0f} % of its height (least {HOP_LIFT * 100:g} %), body width narrows to {twist * 100:.0f} % in the twist (at most 85 %)')
     if name == 'periscope':
         flags = [bool(a.get('front') and all((a['ground'] - p['y1']) / (a.get('tall') or 1) >= 0.08 for p in a['front'].values()) and v >= 1.1 * top[0]) for a, v in zip(fr, top)]
         got = run(flags)
-        return ok_('stands up on the hind legs, front paws off the floor, held', got >= HOLD_40, f'front paws ≥ 8 % of its height off the floor and the back ≥ 1.1 × higher for {got:.1f} s running (least {HOLD_40:g})')
+        return ok_('stands up on the hind legs, front paws off the floor, held', got >= PET_POSE_HOLD, f'front paws ≥ 8 % of its height off the floor and the back ≥ 1.1 × higher for {got:.1f} s running (least {PET_POSE_HOLD:g})')
     if name == 'noseTwitch':
         w = [a['nose']['x1'] - a['nose']['x0'] for a in fr if a.get('nose')]
         if len(w) < 8: return ok_('the nose twitches', False, f'the nose is measured in only {len(w)} frames')
@@ -877,22 +877,22 @@ def check_pet40b(folder, c, track, what):      # đợt 40 B (tên riêng: `chec
         return ok_('the nose twitches fast', flips >= TWITCH_N and amp >= 0.15, f'the nose swells and shrinks {flips} times (least {TWITCH_N}), by {amp * 100:.0f} % of its width (least 15 %) over {len(w)} frames')
     return []
 # ĐỢT 40 C — thú ở phòng khám: tư thế đạt được và GIỮ ≥ 1 s (người chấm xem ~1 khung / giây), đủ lớn trong khung, đo bằng khung hình vẽ.
-CLINIC_40 = ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')
-CROUCH_40 = 0.4        # sợ run: bốn chân gập — khoảng đáy lưng → đáy bàn chân ngắn đi ≥ 40 % so với lúc đứng …
-HOLD_40 = 1.0          # … và giữ tư thế ≥ 1 s liền
-SHAKE_40 = 10          # sợ run: thân đổi chiều lắc ≥ 10 lần
-SHAKE_AMP_40 = 0.008   # … mỗi lần lệch ≥ 0,8 % bề ngang thân
-DROOP_40 = 0.08        # lừ đừ: đầu thấp hơn lúc đứng ≥ 8 % chiều cao khung lưng (trên bàn chân), giữ ≥ 1 s
-WRITHE_40 = 6          # vùng vẫy: đầu đổi chiều ≥ 6 lần
-WRITHE_AMP_40 = 0.04   # … mỗi lần ≥ 4 % bề ngang đầu
-ARMS_40 = 0.45         # vùng vẫy trong tay: đầu con vật cách bàn tay gần nhất ≤ 45 % chiều cao người bế ở MỌI khung
-HANDS_40 = 0.008       # … và hai bàn tay lắc theo (khoảng dịch ≥ 0,8 % chiều cao người)
+CLINIC_PET_ACTS = ('shiverAtVet', 'struggle', 'groggy', 'pawAtCone')
+SHIVER_CROUCH = 0.4        # sợ run: bốn chân gập — khoảng đáy lưng → đáy bàn chân ngắn đi ≥ 40 % so với lúc đứng …
+PET_POSE_HOLD = 1.0          # … và giữ tư thế ≥ 1 s liền
+SHIVER_SHAKES = 10          # sợ run: thân đổi chiều lắc ≥ 10 lần
+SHIVER_AMP = 0.008   # … mỗi lần lệch ≥ 0,8 % bề ngang thân
+GROGGY_DROOP = 0.08        # lừ đừ: đầu thấp hơn lúc đứng ≥ 8 % chiều cao khung lưng (trên bàn chân), giữ ≥ 1 s
+STRUGGLE_TURNS = 6          # vùng vẫy: đầu đổi chiều ≥ 6 lần
+STRUGGLE_AMP = 0.04   # … mỗi lần ≥ 4 % bề ngang đầu
+STRUGGLE_ARMS = 0.45         # vùng vẫy trong tay: đầu con vật cách bàn tay gần nhất ≤ 45 % chiều cao người bế ở MỌI khung
+STRUGGLE_HANDS = 0.008       # … và hai bàn tay lắc theo (khoảng dịch ≥ 0,8 % chiều cao người)
 CONE_RING = (0.8, 1.45)    # cào loa: tâm bàn chân trước nằm ở 0,8–1,45 lần bán kính elip nội tiếp khung loa (sát mép vành)
-CONE_TOUCH_40 = 3      # … ở ≥ 3 mốc đo
-LICK_SIZE_40 = 0.075   # liếm (đợt 40 C): lưỡi dài nhất ≥ 7,5 % (bản cũ: mèo 6,2 %) chiều cao KHUNG HÌNH (đọc được ở cỡ cảnh)
-LICK_HOLD_40 = 0.3     # … và nằm trên bàn tay / má ≥ 0,3 s liền
-CARROT_BIG_40 = 0.1    # cà rốt (đợt 40 C): củ nguyên dài ≥ 10 % chiều cao khung hình
-CARROT_HOLD_40 = 0.6   # … mỗi độ dài giữ ≥ 0,6 s (bậc nào cũng thấy ở ~1 khung / giây)
+CONE_TOUCHES = 3      # … ở ≥ 3 mốc đo
+LICK_SIZE = 0.075   # liếm (đợt 40 C): lưỡi dài nhất ≥ 7,5 % (bản cũ: mèo 6,2 %) chiều cao KHUNG HÌNH (đọc được ở cỡ cảnh)
+LICK_HOLD = 0.3     # … và nằm trên bàn tay / má ≥ 0,3 s liền
+CARROT_BIG = 0.1    # cà rốt (đợt 40 C): củ nguyên dài ≥ 10 % chiều cao khung hình
+CARROT_HOLD = 0.6   # … mỗi độ dài giữ ≥ 0,6 s (bậc nào cũng thấy ở ~1 khung / giây)
 
 
 def run_length(flags, dt):
@@ -919,7 +919,7 @@ def reversals(values, least):
     return turns
 
 
-def check_clinic40(folder, c, frames, track):
+def check_clinic_pet(folder, c, frames, track):
     """ĐỘNG TÁC THÚ Ở PHÒNG KHÁM (đợt 40 C): sợ run — thụp thấp (≥ 8 %) giữ ≥ 1 s, thân rung ≥ 10 nhịp; vùng vẫy — đầu quay qua lại, con vật
     GIỮ NGUYÊN trong tay người bế (đầu cách bàn tay ≤ 45 % chiều cao người), hai tay lắc theo; lừ đừ — đầu rũ thấp hơn lưng ≥ 5 % giữ ≥ 1 s,
     thân đung đưa; cào loa — bàn chân trước chạm vành loa ≥ 3 mốc, rồi ngồi xuống."""
@@ -939,16 +939,16 @@ def check_clinic40(folder, c, frames, track):
     leg = lambda a: ((max(p['y1'] for p in a['paws']) - a['parts']['back']['y1']) / max(1, a['parts']['back']['y1'] - a['parts']['back']['y0'])) if a.get('paws') and (a.get('parts') or {}).get('back') else 0
     if name == 'shiverAtVet':
         base = leg(start)
-        low = [(base - leg(a)) / base >= CROUCH_40 if base else False for t, a in seq]
+        low = [(base - leg(a)) / base >= SHIVER_CROUCH if base else False for t, a in seq]
         best = max((base - leg(a)) / base for t, a in seq) if base else 0
         held = run_length(low, dt)
-        out.append({'scene': folder, 'what': f'{what} — crouches low and holds it', 'ok': held >= HOLD_40,
-                    'note': f'{who} has its legs folded {best * 100:.0f} % shorter than standing (back to paws; least {CROUCH_40 * 100:g} %), kept {held:.1f} s (least {HOLD_40:g} s)'})
+        out.append({'scene': folder, 'what': f'{what} — crouches low and holds it', 'ok': held >= PET_POSE_HOLD,
+                    'note': f'{who} has its legs folded {best * 100:.0f} % shorter than standing (back to paws; least {SHIVER_CROUCH * 100:g} %), kept {held:.1f} s (least {PET_POSE_HOLD:g} s)'})
         xs = [cx(a['parts']['head']) for t, a in seq if a['parts'].get('head')]          # đầu lệch nhiều nhất khi cả người rung
         wide = max((a['parts']['back']['x1'] - a['parts']['back']['x0'] for t, a in seq if a['parts'].get('back')), default=1)
-        turns = reversals(xs, SHAKE_AMP_40 * wide)
-        out.append({'scene': folder, 'what': f'{what} — the whole body shivers', 'ok': turns >= SHAKE_40,
-                    'note': f'the body changes direction {turns} times by at least {SHAKE_AMP_40 * 100:g} % of its width (least {SHAKE_40}) over {len(xs)} frames'})
+        turns = reversals(xs, SHIVER_AMP * wide)
+        out.append({'scene': folder, 'what': f'{what} — the whole body shivers', 'ok': turns >= SHIVER_SHAKES,
+                    'note': f'the body changes direction {turns} times by at least {SHIVER_AMP * 100:g} % of its width (least {SHIVER_SHAKES}) over {len(xs)} frames'})
     elif name == 'groggy':
         # ĐẦU CAO BAO NHIÊU trên bàn chân (tâm khung đầu → đáy bàn chân) theo chiều cao khung lưng — đầu rũ thì con số này nhỏ đi
         lift = lambda a: ((max(p['y1'] for p in a['paws']) - cy(a['parts']['head'])) / max(1, a['parts']['back']['y1'] - a['parts']['back']['y0'])) if a.get('paws') and a['parts'].get('head') and a['parts'].get('back') else None
@@ -956,10 +956,10 @@ def check_clinic40(folder, c, frames, track):
         ok_rel = [r for r in rel if r is not None]
         if ok_rel:
             first = sum(ok_rel[:3]) / min(3, len(ok_rel))
-            drooped = [r is not None and first - r >= DROOP_40 for r in rel]
+            drooped = [r is not None and first - r >= GROGGY_DROOP for r in rel]
             held = run_length(drooped, dt)
-            out.append({'scene': folder, 'what': f'{what} — the head droops and stays down', 'ok': held >= HOLD_40,
-                        'note': f'the head hangs up to {(first - min(ok_rel)) * 100:.0f} % of the body height lower above the paws than at the start (least {DROOP_40 * 100:g} %), kept {held:.1f} s (least {HOLD_40:g} s)'})
+            out.append({'scene': folder, 'what': f'{what} — the head droops and stays down', 'ok': held >= PET_POSE_HOLD,
+                        'note': f'the head hangs up to {(first - min(ok_rel)) * 100:.0f} % of the body height lower above the paws than at the start (least {GROGGY_DROOP * 100:g} %), kept {held:.1f} s (least {PET_POSE_HOLD:g} s)'})
         xs = [cx(a['parts']['back']) for t, a in seq if a['parts'].get('back')]
         wide = max((a['parts']['back']['x1'] - a['parts']['back']['x0'] for t, a in seq if a['parts'].get('back')), default=1)
         sway = (max(xs) - min(xs)) / wide if xs else 0
@@ -967,9 +967,9 @@ def check_clinic40(folder, c, frames, track):
     elif name == 'struggle':
         heads = [cx(a['parts']['head']) for t, a in seq if a['parts'].get('head')]
         hwide = max((a['parts']['head']['x1'] - a['parts']['head']['x0'] for t, a in seq if a['parts'].get('head')), default=1)
-        turns = reversals(heads, WRITHE_AMP_40 * hwide)
-        out.append({'scene': folder, 'what': f'{what} — writhes, the head turns from side to side', 'ok': turns >= WRITHE_40,
-                    'note': f'the head changes direction {turns} times by at least {WRITHE_AMP_40 * 100:g} % of its width (least {WRITHE_40}) over {len(heads)} frames'})
+        turns = reversals(heads, STRUGGLE_AMP * hwide)
+        out.append({'scene': folder, 'what': f'{what} — writhes, the head turns from side to side', 'ok': turns >= STRUGGLE_TURNS,
+                    'note': f'the head changes direction {turns} times by at least {STRUGGLE_AMP * 100:g} % of its width (least {STRUGGLE_TURNS}) over {len(heads)} frames'})
         if c.get('carried'):
             carrier = next((n for n, a in (track[0] or {}).items() if a.get('person') and n != who and any(h.get('box') for h in a.get('hands') or [])), None)
             worst, hand_x = None, []
@@ -980,10 +980,10 @@ def check_clinic40(folder, c, frames, track):
                 d = min(((cx(h) - g['x']) ** 2 + (cy(h) - g['y']) ** 2) ** 0.5 for g in q['hands']) / q['tall']
                 if worst is None or d > worst[1]: worst = (t, d)
                 hand_x.append(sum(g['x'] for g in q['hands']) / len(q['hands']) / q['tall'])
-            if worst: out.append({'scene': folder, 'what': f'{what} — stays in {carrier}\'s arms', 'ok': worst[1] <= ARMS_40,
-                                  'note': f'the head is at most {worst[1] * 100:.0f} % of {carrier}\'s height from a hand (at {worst[0]:g} s; limit {ARMS_40 * 100:g} %)'})
-            if hand_x: out.append({'scene': folder, 'what': f'{what} — {carrier} holds on, the hands shake with it', 'ok': max(hand_x) - min(hand_x) >= HANDS_40,
-                                   'note': f'the hands move {(max(hand_x) - min(hand_x)) * 100:.1f} % of {carrier}\'s height (least {HANDS_40 * 100:g} %)'})
+            if worst: out.append({'scene': folder, 'what': f'{what} — stays in {carrier}\'s arms', 'ok': worst[1] <= STRUGGLE_ARMS,
+                                  'note': f'the head is at most {worst[1] * 100:.0f} % of {carrier}\'s height from a hand (at {worst[0]:g} s; limit {STRUGGLE_ARMS * 100:g} %)'})
+            if hand_x: out.append({'scene': folder, 'what': f'{what} — {carrier} holds on, the hands shake with it', 'ok': max(hand_x) - min(hand_x) >= STRUGGLE_HANDS,
+                                   'note': f'the hands move {(max(hand_x) - min(hand_x)) * 100:.1f} % of {carrier}\'s height (least {STRUGGLE_HANDS * 100:g} %)'})
     elif name == 'pawAtCone':
         touches, last_height, worn = 0, None, 0
         for t, a in seq:
@@ -993,8 +993,8 @@ def check_clinic40(folder, c, frames, track):
             ex, ey, rx, ry = cx(cone), cy(cone), (cone['x1'] - cone['x0']) / 2, (cone['y1'] - cone['y0']) / 2
             near = [((cx(b) - ex) / rx) ** 2 + ((cy(b) - ey) / ry) ** 2 for b in (a.get('front') or {}).values()]
             if any(CONE_RING[0] ** 2 <= r <= CONE_RING[1] ** 2 for r in near): touches += 1
-        out.append({'scene': folder, 'what': f'{what} — a front paw at the cone edge', 'ok': worn > 0 and touches >= CONE_TOUCH_40,
-                    'note': f'the cone is drawn at {worn} of {len(seq)} frames; a front paw is on its rim ({CONE_RING[0]:g}–{CONE_RING[1]:g} of the radius) at {touches} (least {CONE_TOUCH_40})'})
+        out.append({'scene': folder, 'what': f'{what} — a front paw at the cone edge', 'ok': worn > 0 and touches >= CONE_TOUCHES,
+                    'note': f'the cone is drawn at {worn} of {len(seq)} frames; a front paw is on its rim ({CONE_RING[0]:g}–{CONE_RING[1]:g} of the radius) at {touches} (least {CONE_TOUCHES})'})
         base, tail = max(leg(a) for t, a in seq[:8]), [leg(a) for t, a in seq[-int(1.8 / dt):-int(0.4 / dt)]]
         out.append({'scene': folder, 'what': f'{what} — gives up and sits', 'ok': bool(tail) and base > 0 and max(tail) <= base * 0.75,
                     'note': f'while it sits (the last 1.8 s) its legs are at most {max(tail) / base * 100 if tail and base else 0:.0f} % of the standing length, back to paws (limit 75 %)'})
@@ -1025,7 +1025,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             up = all((p['y0'] + p['y1']) / 2 < (back['y0'] + back['y1']) / 2 for p in paws)
             out.append({'scene': folder, 'what': f'{what} — back on the floor, paws up', 'ok': abs(off) <= PAW_FLOOR + 0.02 and up,
                         'note': f'the back {off * 100:+.1f} % of its height off the floor (limit ±{(PAW_FLOOR + 0.02) * 100:g} %), ' + ('all four paws above the middle of the body' if up else 'a paw below the middle of the body') + f' at {t:g} s'})
-        elif c['name'] not in AIR_40:
+        elif c['name'] not in AIRBORNE_ACTS:
             worst = None
             for k, f in enumerate(frames):
                 a = f.get(c['who'])
@@ -1048,8 +1048,8 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         share = (span[1] - span[0]) / H if span else 0
         out.append({'scene': folder, 'what': f'{what} — big enough in the frame', 'ok': share >= PET_SHARE,
                     'note': f'{c["who"]} is {share * 100:.0f} % of the frame height at {t:g} s (least {PET_SHARE * 100:g} %)'})
-    if c['name'] in PET_ACTS_40_NAMES and track: out.extend(check_pet40b(folder, c, track, what))       # đợt 40 B
-    if c['name'] in CLINIC_40 and track: out.extend(check_clinic40(folder, c, frames, [f for f in (track or [])]))      # đợt 40 C
+    if c['name'] in CAT_RABBIT_ACTS and track: out.extend(check_cat_rabbit_act(folder, c, track, what))       # đợt 40 B
+    if c['name'] in CLINIC_PET_ACTS and track: out.extend(check_clinic_pet(folder, c, frames, [f for f in (track or [])]))      # đợt 40 C
     if c['name'] == 'chaseTail' and track:
         sides = [1 if f[c['who']]['facing'] >= 0 else -1 for f in track if f[c['who']].get('facing') is not None]
         flips = sum(1 for a, b in zip(sides, sides[1:]) if a != b)
@@ -1096,7 +1096,7 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
         seq = [(t, f[c['who']].get('carrot')) for t, f in zip(c.get('samples', []), track) if f.get(c['who'])]
         lens = [(((b['x1'] - b['x0']) ** 2 + (b['y1'] - b['y0']) ** 2) ** 0.5 if b else 0) for t, b in seq]
         full = max(lens, default=0)
-        out.append({'scene': folder, 'what': f'{what} — a big carrot', 'ok': full / H >= CARROT_BIG_40, 'note': f'the whole carrot is {full / H * 100:.1f} % of the frame height (least {CARROT_BIG_40 * 100:g} %)'})
+        out.append({'scene': folder, 'what': f'{what} — a big carrot', 'ok': full / H >= CARROT_BIG, 'note': f'the whole carrot is {full / H * 100:.1f} % of the frame height (least {CARROT_BIG * 100:g} %)'})
         dt = (seq[1][0] - seq[0][0]) if len(seq) > 1 else 0.2
         runs, cur = [], 0
         for i, v in enumerate(lens):
@@ -1120,8 +1120,8 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             if lens[i] and j - i >= 2: stable_end, stable_val = j, lens[i]
         shrink = sum(1 for i in range(stable_end + 1, len(lens)) if 0 < lens[i] < 0.98 * stable_val) if stable_end >= 0 else 0
         last_hold = run_length([v <= 0.5 * full and v > 0 and abs(v - stable_val) <= 0.012 * full for v in lens], dt)
-        out.append({'scene': folder, 'what': f'{what} — every bite stays visible, the last bit is held then eaten', 'ok': steady >= CARROT_HOLD_40 and last_hold >= 0.8 and shrink >= 2 and lens and lens[-1] == 0,
-                    'note': f'{len(runs)} lengths seen, the shortest held {steady:.1f} s (least {CARROT_HOLD_40:g} s); the last bit (under half of the carrot) shows {last_hold:.1f} s (least 0.8 s) and then shrinks over {shrink} measured frames (least 2) before it is gone ({"gone at the end" if lens and lens[-1] == 0 else "still drawn at the end"})'})
+        out.append({'scene': folder, 'what': f'{what} — every bite stays visible, the last bit is held then eaten', 'ok': steady >= CARROT_HOLD and last_hold >= 0.8 and shrink >= 2 and lens and lens[-1] == 0,
+                    'note': f'{len(runs)} lengths seen, the shortest held {steady:.1f} s (least {CARROT_HOLD:g} s); the last bit (under half of the carrot) shows {last_hold:.1f} s (least 0.8 s) and then shrinks over {shrink} measured frames (least 2) before it is gone ({"gone at the end" if lens and lens[-1] == 0 else "still drawn at the end"})'})
     if c['name'] == 'hide' and track:
         # (lượt bốn) bàn tay người đứng trước không đè lên cái đầu đang ló ra
         worst = None
@@ -1187,8 +1187,8 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
             step = (c['samples'][1] - c['samples'][0]) if len(c.get('samples', [])) > 1 else 1 / 30
             on_target = [g is not None and g <= TONGUE_GAP and size[i] >= TONGUE_LONG * heads[i] for i, g in enumerate(gaps)]
             held_on = run_length(on_target, step)
-            out.append({'scene': folder, 'what': f'{what} {c["target"]} — the tongue is big on screen and rests on the {"cheek" if c.get("carried") else "hand"}', 'ok': longest >= LICK_SIZE_40 and held_on >= LICK_HOLD_40,
-                        'note': f'longest tongue {longest * 100:.1f} % of the frame height (least {LICK_SIZE_40 * 100:g} %), rests on the target {held_on:.2f} s at a stretch (least {LICK_HOLD_40:g} s)'})
+            out.append({'scene': folder, 'what': f'{what} {c["target"]} — the tongue is big on screen and rests on the {"cheek" if c.get("carried") else "hand"}', 'ok': longest >= LICK_SIZE and held_on >= LICK_HOLD,
+                        'note': f'longest tongue {longest * 100:.1f} % of the frame height (least {LICK_SIZE * 100:g} %), rests on the target {held_on:.2f} s at a stretch (least {LICK_HOLD:g} s)'})
             if not c.get('carried'):
                 # (lượt bốn) con vật ĐỨNG trên sàn — cả hai bàn chân trước, không chồm lên lơ lửng; bàn tay không đè lên mặt nó; bàn tay
                 # không bật nhảy giữa hai khung lúc nó đang liếm.
@@ -1225,8 +1225,8 @@ def check_pet_act(folder, c, frames, seen=None, track=None):
 
 
 # ĐỢT 40 A — sáu động tác của chó (số đo từ `set.careProbe()` → `p40` của con vật và của người kéo, cùng `actingProbe` — hình thể).
-TARGETS_40A = set()              # người là đích của một động tác chó đợt 40 A trong cảnh (góc cận con vật cắt họ ở mép)
-PET_40A = ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')
+DOG_TARGETS = set()              # người là đích của một động tác chó đợt 40 A trong cảnh (góc cận con vật cắt họ ở mép)
+DOG_ACTS = ('playBow', 'howl', 'dig', 'carryToy', 'leanOnLeg', 'tugOfWar')
 BOW_CHEST, BOW_RUMP = 20, 6      # chổng mông: vai hạ ≥ 20 đơn vị, hông nhổm ≥ 6 đơn vị so với lúc đứng
 HOLD_POSE = 1.0                  # … và giữ dáng ≥ 1 s (người chấm xem thưa ~1 khung / giây)
 HOWL_HEAD = 25                   # tru: đầu ngửa ≥ 25°
@@ -1238,7 +1238,7 @@ ROPE_STEADY = 0.3                # … dài không đổi quá 30 % giữa các 
 FOOT_SLIDE = 0.04                # kéo co / dựa chân: bàn chân (khung hình) dời ≤ 4 % chiều cao con vật trong lúc giằng co — chân không trượt
 
 
-def check_pet40(folder, c, frames, track):
+def check_dog_act(folder, c, frames, track):
     """ĐỢT 40 A: cái làm nên chữ "đọc được" của từng động tác chó — dáng chổng mông / ngửa đầu tru / bới đất / đồ chơi trong mõm / ngực áp chân người /
     dây kéo co căng giữa mõm và tay người — ở lúc được hỏi và suốt các mốc dày (`samples`)."""
     name, who_n, to_n = c['name'], c['who'], c.get('target')
@@ -1700,7 +1700,7 @@ SELFIE_SIDE = 0.12     # tự sướng: máy cách đường giữa thân ≥ 12
 STRETCH_UP = 0.1       # ngáp vươn vai: hai bàn tay cao hơn giữa mặt ≥ 10 % chiều cao khuôn mặt (ngang trán trở lên)
 
 
-def check_talk39(folder, c, frames):
+def check_presenter(folder, c, frames):
     """NGƯỜI DẪN (đợt 39 C): đo ở ba lúc (tự sướng: thêm lúc chớp sáng) — xem `light_moments` (tools/scene.py)."""
     W, H = frame_size(folder)
     name, out = c['name'], []
@@ -2048,7 +2048,7 @@ def check_people_framed(folder, moments, shots):
             # Người làm NỀN trong góc cận riêng con vật (đợt 35 · s3: chó lăn ngửa, đuổi đuôi — góc cận được cắt người khác): đầu đã
             # ra ngoài mép trên thì người ấy không phải chủ thể của khung — không tính là "lẹm mép" (gộp đợt 35).
             if a.get('headBox') and a['headBox']['y1'] <= 0: continue
-            if a['name'] in TARGETS_40A and (str(m.get('what', '')).endswith(' ' + a['name']) or str(m.get('what', '')).endswith(' reacts')): continue      # đợt 40 A: người là ĐÍCH của dựa chân / kéo co / tha đồ chơi — góc cận con vật cắt họ ở mép (chân, bàn tay cầm dây vẫn trong khung)
+            if a['name'] in DOG_TARGETS and (str(m.get('what', '')).endswith(' ' + a['name']) or str(m.get('what', '')).endswith(' reacts')): continue      # đợt 40 A: người là ĐÍCH của dựa chân / kéo co / tha đồ chơi — góc cận con vật cắt họ ở mép (chân, bàn tay cầm dây vẫn trong khung)
             seen = (min(b['x1'], W) - max(b['x0'], 0)) / (b['x1'] - b['x0'])
             if PERSON_CUT[0] <= seen <= PERSON_CUT[1]: cut.append(f'{a["name"]} {seen * 100:.0f} % ({"left" if b["x0"] < 0 else "right"} edge)')
         out.append({'scene': folder, 'what': f'people inside the frame at {m["t"]:g} s ({m.get("what", "")})', 'ok': not cut, 'note': '; '.join(cut) or 'nobody cut by the left / right edge'})
@@ -2130,7 +2130,7 @@ def box_gap(a, b):
     return (max(0, a['x0'] - b['x1'], b['x0'] - a['x1']) ** 2 + max(0, a['y0'] - b['y1'], b['y0'] - a['y1']) ** 2) ** 0.5
 
 
-def check_care38(folder, c, shots, scales):
+def check_care_tools(folder, c, shots, scales):
     """ĐỢT 38 A: dụng cụ ở đúng chỗ trên con vật, tay kia giữ nó, và cái thấy được của từng động tác — kìm khép / mở nhiều lần, chân nhấc
     lên rồi hạ; giọt thuốc đọng ở đầu vòi, rơi vào mắt, mắt nhắm; bông lau ở gốc tai, con vật lắc đầu khi đã buông tay; máy quét rà trên
     gáy, thẻ mã chip đọc được, không che đầu con vật."""
@@ -2287,12 +2287,12 @@ def check_care38(folder, c, shots, scales):
 
 
 # ĐỢT 42 F — tắm, đánh răng, lau khô (số đo từ `set.careProbe()` → `c42` của người và con vật, `@tub42f` vành các chậu tắm).
-ON_PET_42F = 0.025    # bàn tay (khung) cách thân / đầu / khăn của con vật ≤ 2,5 % chiều cao người
-SPRAY_HIT_42F = 0.03  # cuối tia nước cách lưng con vật (mép trên khung thân) ≤ 3 % chiều cao người
-OFF_PET_42F = 0.02    # lúc con vật rũ nước: mọi bàn tay cách khung thân nó ≥ 2 % chiều cao người (đã buông, đã lùi ra)
+ON_PET = 0.025    # bàn tay (khung) cách thân / đầu / khăn của con vật ≤ 2,5 % chiều cao người
+SPRAY_HIT = 0.03  # cuối tia nước cách lưng con vật (mép trên khung thân) ≤ 3 % chiều cao người
+OFF_PET = 0.02    # lúc con vật rũ nước: mọi bàn tay cách khung thân nó ≥ 2 % chiều cao người (đã buông, đã lùi ra)
 
 
-def check_care42f(folder, c, shots, scales):
+def check_grooming(folder, c, shots, scales):
     """ĐỢT 42 F: tắm — tia nước rơi trên lưng, bọt nổi trên lưng khi hai tay xoa, xả sạch bọt, lông ướt, tai cụp, con vật trong chậu (đường cắt
     trùng vành chậu), rũ nước khi tay đã buông; đánh răng — đầu bàn chải ở miệng đang hé, chải qua lại, tay kia giữ mõm, liếm mép khi đã buông;
     lau khô — khăn trong tay rồi quấn quanh thân, hai tay chà trên khăn, lông khô bông lên, khăn về tay, con vật vui."""
@@ -2330,10 +2330,10 @@ def check_care42f(folder, c, shots, scales):
             end = p['sprayEnd']['y']           # cuối tia nước (theo trục vòi sen)
             inside = b['x0'] - 0.01 * tall(t) <= p['sprayEnd']['x'] <= b['x1'] + 0.01 * tall(t)
             hits.append((t, (max(0, b['y0'] - end, end - (b['y0'] + b['y1']) / 2) / tall(t)) if inside else 1))
-        good = [h for h in hits if h[1] is not None and h[1] <= SPRAY_HIT_42F]
+        good = [h for h in hits if h[1] is not None and h[1] <= SPRAY_HIT]
         worst = max((h for h in hits if h[1] is not None), key=lambda h: h[1], default=None)
         row(f'the water spray lands on its back ({len(hits)} moments)', len(good) == len(hits) and len(hits) >= 4,
-            f'spray seen at {sum(1 for h in hits if h[1] is not None)} of {len(hits)} moments, ending on the back at {len(good)}' + (f'; worst {worst[1] * 100:.1f} % of height off the back at {worst[0]:g} s (limit {SPRAY_HIT_42F * 100:g} %)' if worst else ''))
+            f'spray seen at {sum(1 for h in hits if h[1] is not None)} of {len(hits)} moments, ending on the back at {len(good)}' + (f'; worst {worst[1] * 100:.1f} % of height off the back at {worst[0]:g} s (limit {SPRAY_HIT * 100:g} %)' if worst else ''))
         levels = [pet(t).get('foamLevel', 0) for t in c['foamUp']]
         foam_on = []
         for t in c['lather']:
@@ -2346,8 +2346,8 @@ def check_care42f(folder, c, shots, scales):
             g = hand_gaps(t, body(t))
             if len(g) >= 2: far.append((t, max(g), person(t).get('foamHands', 0)))
         worst = max(far, key=lambda x: x[1]) if far else None
-        row('both hands lather on it, foam on the hands', bool(worst) and worst[1] <= ON_PET_42F and all(x[2] == 2 for x in far) and len(far) == len(c['lather']),
-            f'the farther hand at most {worst[1] * 100:.1f} % of height from the body over {len(far)} moments (limit {ON_PET_42F * 100:g} %), foam on {min(x[2] for x in far)}–{max(x[2] for x in far)} hands' if worst else 'hands not measured')
+        row('both hands lather on it, foam on the hands', bool(worst) and worst[1] <= ON_PET and all(x[2] == 2 for x in far) and len(far) == len(c['lather']),
+            f'the farther hand at most {worst[1] * 100:.1f} % of height from the body over {len(far)} moments (limit {ON_PET * 100:g} %), foam on {min(x[2] for x in far)}–{max(x[2] for x in far)} hands' if worst else 'hands not measured')
         rinsed = [pet(t).get('foamLevel', 1) for t in c['rinsed']]
         wet = [pet(t).get('wet', 0) for t in c['wet']]
         row('rinsed: the foam is gone, the fur stays wet (darker)', max(rinsed) <= 0.05 and min(wet) >= 0.9, f'foam {max(rinsed):.2f} after rinsing; wet {min(wet):.2f} at least after the spray until the shake (want ≥ 0.9)')
@@ -2365,8 +2365,8 @@ def check_care42f(folder, c, shots, scales):
             or f'the pet is cut at the tub\'s front rim and centred in the tub at {len(tubs)} moments')
         shaken = [pet(t).get('nuoc', 0) for t in c['shake']]
         free = [min(g) for g in (hand_gaps(t, body(t)) for t in c['free']) if g]
-        row('it shakes off water after the person steps back', max(shaken) >= 0.3 and bool(free) and min(free) >= OFF_PET_42F,
-            f'droplets {max(shaken):.2f} (least 0.3)' + (f'; the nearest hand {min(free) * 100:.1f} % of height from its body (least {OFF_PET_42F * 100:g} %)' if free else '; hands not measured'))
+        row('it shakes off water after the person steps back', max(shaken) >= 0.3 and bool(free) and min(free) >= OFF_PET,
+            f'droplets {max(shaken):.2f} (least 0.3)' + (f'; the nearest hand {min(free) * 100:.1f} % of height from its body (least {OFF_PET * 100:g} %)' if free else '; hands not measured'))
     elif name == 'brushTeeth':
         at, xs = [], []
         for t in c['brush']:
@@ -2386,13 +2386,13 @@ def check_care42f(folder, c, shots, scales):
             h, head = person(t).get('head'), ((frame(t).get(pet_n) or {}).get('parts') or {}).get('head')
             g = [box_gap(b, head) / tall(t) for b in hands(t)] if head and tall(t) else []
             if len(g) >= 2: held.append(max(g))
-        row('the other hand holds the muzzle', bool(held) and max(held) <= ON_PET_42F, f'both hands at most {max(held) * 100:.1f} % of height from its head (limit {ON_PET_42F * 100:g} %)' if held else 'not measured')
+        row('the other hand holds the muzzle', bool(held) and max(held) <= ON_PET, f'both hands at most {max(held) * 100:.1f} % of height from its head (limit {ON_PET * 100:g} %)' if held else 'not measured')
         licks = [pet(t).get('lick', 0) for t in c['lick']]
         free = []
         for t in c['free']:
             head = ((frame(t).get(pet_n) or {}).get('parts') or {}).get('head')
             if head and hands(t): free.append(min(box_gap(b, head) for b in hands(t)) / max(1, tall(t)))
-        row('then it licks its lips, hands off', max(licks) >= 0.9 and bool(free) and min(free) >= OFF_PET_42F, f'tongue out {max(licks):.2f}' + (f', the nearest hand {min(free) * 100:.1f} % of height from its head (least {OFF_PET_42F * 100:g} %)' if free else ''))
+        row('then it licks its lips, hands off', max(licks) >= 0.9 and bool(free) and min(free) >= OFF_PET, f'tongue out {max(licks):.2f}' + (f', the nearest hand {min(free) * 100:.1f} % of height from its head (least {OFF_PET * 100:g} %)' if free else ''))
     else:
         carried = [person(t).get('kind') == 42 for t in c['carry']]
         wrapped, rubbed, xs = [], [], []
@@ -2406,8 +2406,8 @@ def check_care42f(folder, c, shots, scales):
             if len(g) >= 2: rubbed.append(max(g))
             xs.append(q.get('rub', 0))
         row('the towel comes in the hand, then wraps round it', all(carried) and wrapped and all(wrapped), f'towel in the hand at {sum(carried)} of {len(carried)} moments before, round its body at {sum(wrapped)} of {len(wrapped)} moments while rubbed')
-        row('both hands rub on the towel, the towel moves', bool(rubbed) and max(rubbed) <= ON_PET_42F and max(xs) - min(xs) >= 1.2,
-            f'the farther hand at most {max(rubbed) * 100:.1f} % of height from the towel (limit {ON_PET_42F * 100:g} %), towel shifts {min(xs):+.2f}…{max(xs):+.2f}' if rubbed else 'not measured')
+        row('both hands rub on the towel, the towel moves', bool(rubbed) and max(rubbed) <= ON_PET and max(xs) - min(xs) >= 1.2,
+            f'the farther hand at most {max(rubbed) * 100:.1f} % of height from the towel (limit {ON_PET * 100:g} %), towel shifts {min(xs):+.2f}…{max(xs):+.2f}' if rubbed else 'not measured')
         first, last = pet(c['rub'][0]), pet(c['after'][-1])
         fl, b = last.get('fluff'), body(c['after'][-1])
         puffed = bool(fl and b) and box_of(fl)['y0'] < b['y0'] - 1
@@ -2531,7 +2531,7 @@ DESK_STILL = 0.012    # đóng dấu: lúc ấn, con dấu dời ≤ 1,2 % giữ
 DESK_HANDS = 0.12     # đếm tiền: hai bàn tay cách nhau ≤ 12 % lúc tờ tiền sang tay
 
 
-def check_desk39(folder, c, shots, scales):
+def check_desk(folder, c, shots, scales):
     """QUẦY THU NGÂN / CÀ PHÊ (đợt 39 A), đo ở từng lúc trong `times` theo nhãn trong `phases`:
       • payByQR — `near`: điện thoại cạnh mã QR (≤ DESK_QR); `tick`: dấu tick xanh cạnh điện thoại; payByCard — thẻ chạm máy quẹt (≤ DESK_READER) rồi tick;
       • stampCard — `press`: mặt con dấu trên ô đóng dấu của thẻ, và đứng yên (`samples`); `mark`: dấu đỏ còn trên thẻ sau khi nhấc con dấu;
@@ -2663,15 +2663,15 @@ def check_desk39(folder, c, shots, scales):
 # ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA: đo từ `soles42d` (đáy từng bàn chân, chỗ trong phòng `wx`), `shadow42d` (bóng trên sàn) của
 # `set.actingProbe()`, mỗi 1/30 s suốt bước. Mọi độ cao tính theo chiều cao người trên màn hình (`tall`), độ trượt theo chiều cao người
 # trong phòng (`wtall`) — máy lia / đẩy không thành "bay" hay "trượt".
-FLY_42D = 0.008          # bàn chân THẤP NHẤT cao hơn sàn chừng này → cả hai chân đã rời sàn (pha bay)
-RUN_FLIGHTS_42D = 3      # chạy: ít nhất chừng ấy pha bay tách rời nhau
-JUMP_PEAK_42D = 0.04     # nhảy lên: đỉnh cú nhảy, bàn chân thấp nhất cao hơn sàn ≥ 4 % chiều cao người
-CONTACT_42D = 0.006      # bàn chân "trên sàn": cách sàn không quá chừng ấy
-SKATE_42D = 0.012        # chân trụ trượt: giữa hai khung liền nhau mà bàn chân ấy vẫn trên sàn, nó dời ≤ 1,2 % chiều cao người
-SHADOW_42D = 0.92        # đỉnh cú nhảy: bóng hẹp lại còn ≤ 92 % bề ngang lúc đứng, và vẫn nằm trên sàn (≤ 3 % chiều cao người)
+FLIGHT_LIFT = 0.008          # bàn chân THẤP NHẤT cao hơn sàn chừng này → cả hai chân đã rời sàn (pha bay)
+RUN_FLIGHTS = 3      # chạy: ít nhất chừng ấy pha bay tách rời nhau
+JUMP_PEAK = 0.04     # nhảy lên: đỉnh cú nhảy, bàn chân thấp nhất cao hơn sàn ≥ 4 % chiều cao người
+FOOT_CONTACT = 0.006      # bàn chân "trên sàn": cách sàn không quá chừng ấy
+FOOT_SKATE = 0.012        # chân trụ trượt: giữa hai khung liền nhau mà bàn chân ấy vẫn trên sàn, nó dời ≤ 1,2 % chiều cao người
+JUMP_SHADOW = 0.92        # đỉnh cú nhảy: bóng hẹp lại còn ≤ 92 % bề ngang lúc đứng, và vẫn nằm trên sàn (≤ 3 % chiều cao người)
 
 
-def check_motion42d(folder, c, shots):
+def check_whole_body(folder, c, shots):
     """ĐỢT 42 D: pha bay (cả hai bàn chân rời sàn — chạy: nhiều lần; nhảy: đủ cao, bóng ở lại trên sàn và co lại), chân trụ không trượt,
     hai chân về sàn sau bước, không lún; nhảy / múa: đầu, hai bàn tay, hai bàn chân trong khung suốt bước."""
     W, H = frame_size(folder)
@@ -2683,23 +2683,23 @@ def check_motion42d(folder, c, shots):
     out = []
     offs = [(t, [(a['ground'] - q['y']) / a['tall'] for q in a['soles42d']], a) for t, a in track]
     lows = [(t, min(o), a) for t, o, a in offs]
-    flying = [low > FLY_42D for _, low, _ in lows]
+    flying = [low > FLIGHT_LIFT for _, low, _ in lows]
     flights = sum(1 for n, f in enumerate(flying) if f and (n == 0 or not flying[n - 1]))
     sunk = min(lows, key=lambda x: x[1])
     out.append({'scene': folder, 'what': what('feet never sink into the floor'), 'ok': sunk[1] >= -FEET,
                 'note': f'lowest foot {sunk[1] * 100:+.1f} % of height from the floor at {sunk[0]:g} s (limit −{FEET * 100:g} %)'})
     if name == 'run':
-        out.append({'scene': folder, 'what': what('flight phases (both feet off the floor)'), 'ok': flights >= RUN_FLIGHTS_42D,
-                    'note': f'{flights} separate flight phases, {sum(flying)} of {len(flying)} frames with both feet off the floor (least {RUN_FLIGHTS_42D} phases)'})
+        out.append({'scene': folder, 'what': what('flight phases (both feet off the floor)'), 'ok': flights >= RUN_FLIGHTS,
+                    'note': f'{flights} separate flight phases, {sum(flying)} of {len(flying)} frames with both feet off the floor (least {RUN_FLIGHTS} phases)'})
     if name == 'jump':
         peak = max(lows, key=lambda x: x[1])
-        out.append({'scene': folder, 'what': what('both feet clearly off the floor'), 'ok': peak[1] >= JUMP_PEAK_42D,
-                    'note': f'the lower foot rises {peak[1] * 100:.1f} % of height at {peak[0]:g} s ({flights} jump{"" if flights == 1 else "s"} seen; least {JUMP_PEAK_42D * 100:g} %)'})
+        out.append({'scene': folder, 'what': what('both feet clearly off the floor'), 'ok': peak[1] >= JUMP_PEAK,
+                    'note': f'the lower foot rises {peak[1] * 100:.1f} % of height at {peak[0]:g} s ({flights} jump{"" if flights == 1 else "s"} seen; least {JUMP_PEAK * 100:g} %)'})
         rest, top = lows[0][2].get('shadow42d'), peak[2].get('shadow42d')
         if rest and top and rest['w'] > 0:
             near = abs(top['y'] - peak[2]['ground']) / peak[2]['tall']
-            out.append({'scene': folder, 'what': what('the shadow stays on the floor and shrinks'), 'ok': top['w'] <= rest['w'] * SHADOW_42D and near <= FEET,
-                        'note': f'at the top the shadow is {top["w"] / rest["w"] * 100:.0f} % as wide as standing (most {SHADOW_42D * 100:g} %), {near * 100:.1f} % of height from the floor line'})
+            out.append({'scene': folder, 'what': what('the shadow stays on the floor and shrinks'), 'ok': top['w'] <= rest['w'] * JUMP_SHADOW and near <= FEET,
+                        'note': f'at the top the shadow is {top["w"] / rest["w"] * 100:.0f} % as wide as standing (most {JUMP_SHADOW * 100:g} %), {near * 100:.1f} % of height from the floor line'})
         else: out.append({'scene': folder, 'what': what('the shadow stays on the floor and shrinks'), 'ok': None, 'note': 'no shadow measured'})
     if name == 'dance':
         out.append({'scene': folder, 'what': what('feet stay on the floor'), 'ok': flights == 0,
@@ -2710,12 +2710,12 @@ def check_motion42d(folder, c, shots):
         if t1 - t0 > 0.05 or not a0.get('wtall'): continue
         for q0, f0 in zip(a0['soles42d'], o0):
             q1, f1 = next(((q, f) for q, f in zip(a1['soles42d'], o1) if q['side'] == q0['side']), (None, None))
-            if q1 is None or q0.get('wx') is None or q1.get('wx') is None or f0 > CONTACT_42D or f1 > CONTACT_42D: continue
+            if q1 is None or q0.get('wx') is None or q1.get('wx') is None or f0 > FOOT_CONTACT or f1 > FOOT_CONTACT: continue
             if abs((a1.get('facing') or 0) - (a0.get('facing') or 0)) > 0.04: continue          # đang XOAY tại chỗ (quay ngang để chạy, xoay khi múa): hình giày đổi từ nhìn thẳng sang nhìn nghiêng — không phải trượt
             slip = abs(q1['wx'] - q0['wx']) / a0['wtall']
             if worst is None or slip > worst[1]: worst = (t1, slip, q0['side'])
-    if worst: out.append({'scene': folder, 'what': what('planted feet do not slide'), 'ok': worst[1] <= SKATE_42D,
-                          'note': f'a foot on the floor moves at most {worst[1] * 100:.2f} % of height between two frames ({"left" if worst[2] == "L" else "right"} foot at {worst[0]:g} s; limit {SKATE_42D * 100:g} %)'})
+    if worst: out.append({'scene': folder, 'what': what('planted feet do not slide'), 'ok': worst[1] <= FOOT_SKATE,
+                          'note': f'a foot on the floor moves at most {worst[1] * 100:.2f} % of height between two frames ({"left" if worst[2] == "L" else "right"} foot at {worst[0]:g} s; limit {FOOT_SKATE * 100:g} %)'})
     # ĐẦU, TAY, CHÂN TRONG KHUNG (nhảy, múa): đỉnh cú nhảy không cắt đầu, tay giơ cao không ra ngoài mép, bàn chân không dưới mép dưới.
     if name in ('jump', 'dance'):
         bad = None
@@ -2735,14 +2735,14 @@ def check_motion42d(folder, c, shots):
     return out
 
 
-# ĐỢT 42 E — SÁT SÀN (`floor42e`, set3d `actingProbe` → `floor42e`): ngồi bệt — mông trên sàn (đáy mông cao hơn đường sàn ≤ FLOOR_SEAT_42E chiều
+# ĐỢT 42 E — SÁT SÀN (`floor42e`, set3d `actingProbe` → `floor42e`): ngồi bệt — mông trên sàn (đáy mông cao hơn đường sàn ≤ FLOOR_SEAT chiều
 # cao, không lún), chân chạm sàn; nằm — thân nằm ngang (≥ 70°), chỗ thấp nhất của người trên mặt nằm (sàn / mặt sofa, ±3 %); nhặt — lòng bàn
-# tay tới món đồ lúc nắm (≤ PICK_REACH_42E), bàn chân trên sàn lúc ngồi xổm, món đồ trong tay (và không còn dưới sàn) lúc xong bước.
-FLOOR_SEAT_42E = 0.09          # người ngồi bệt nhìn từ trước: hai ống chân chéo ở GẦN máy hơn mông — đáy mông cao hơn đường sàn dưới ống chân chừng ấy
-PICK_REACH_42E = 0.07
+# tay tới món đồ lúc nắm (≤ PICK_REACH), bàn chân trên sàn lúc ngồi xổm, món đồ trong tay (và không còn dưới sàn) lúc xong bước.
+FLOOR_SEAT = 0.09          # người ngồi bệt nhìn từ trước: hai ống chân chéo ở GẦN máy hơn mông — đáy mông cao hơn đường sàn dưới ống chân chừng ấy
+PICK_REACH = 0.07
 
 
-def check_floor42e(folder, c, frames):
+def check_floor(folder, c, frames):
     out, who, name = [], c['who'], c['name']
     def ok(what, good, note): out.append({'scene': folder, 'what': f'{who} {name} — {what}', 'ok': good, 'note': note})
     seen = [(t, f.get(who)) for t, f in zip(c['times'], frames) if f.get(who) and f[who].get('floor42e') and f[who].get('tall')]
@@ -2753,7 +2753,7 @@ def check_floor42e(folder, c, frames):
             q, tall = a['floor42e'], a['tall']
             if q['sit'] < 0.95: ok(f'sitting on the floor at {t:g} s', False, f'floor sitting only {q["sit"] * 100:.0f} % in'); continue
             up = (a['ground'] - q['seat']['y']) / tall
-            ok(f'hips on the floor at {t:g} s', -FEET <= up <= FLOOR_SEAT_42E, f'the bottom of the hips is {up * 100:+.1f} % of height above the floor line (limit {-FEET * 100:g} … {FLOOR_SEAT_42E * 100:g} %)')
+            ok(f'hips on the floor at {t:g} s', -FEET <= up <= FLOOR_SEAT, f'the bottom of the hips is {up * 100:+.1f} % of height above the floor line (limit {-FEET * 100:g} … {FLOOR_SEAT * 100:g} %)')
             low = (q['low']['y'] - a['ground']) / tall
             ok(f'legs on the floor at {t:g} s', abs(low) <= FEET, f'the lowest point of the folded legs is {low * 100:+.1f} % of height off the floor line (limit ±{FEET * 100:g} %; + sunk, − floating)')
     elif name == 'lieDown':
@@ -2773,7 +2773,7 @@ def check_floor42e(folder, c, frames):
         else:
             size = tall * 11 / 400          # quả bóng ~11 đơn vị khung: đo tới TÂM món đồ
             d = min(((h['x'] - item['at']['x']) ** 2 + (h['y'] - item['at']['y'] + size) ** 2) ** 0.5 for h in a['hands']) / tall
-            ok('hand at the item when it closes', d <= PICK_REACH_42E, f'the palm is {d * 100:.1f} % of height from the {item["kind"]} at {t:g} s (limit {PICK_REACH_42E * 100:g} %)')
+            ok('hand at the item when it closes', d <= PICK_REACH, f'the palm is {d * 100:.1f} % of height from the {item["kind"]} at {t:g} s (limit {PICK_REACH * 100:g} %)')
         if a.get('feet') is not None:
             off = (a['feet'] - a['ground']) / tall
             ok('feet on the floor while squatting', abs(off) <= FEET, f'feet {off * 100:+.1f} % of height off the floor at {t:g} s (limit ±{FEET * 100:g} %)')
@@ -2796,37 +2796,37 @@ def check_floor42e(folder, c, frames):
 
 
 def check_scene(folder):
-    try: return check_scene_45(folder)
-    finally: close_page45()          # đợt 45: Chrome chung của cảnh (page45)
+    try: return check_one_scene(folder)
+    finally: close_page()          # đợt 45: Chrome chung của cảnh (scene_page)
 
 
-def check_scene_45(folder):
+def check_one_scene(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
     # Mọi lúc cần chụp: các dải thời gian của từng phép đo (danh sách số — `reading` của cân là chữ, bỏ qua).
     when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
-    when38 = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
-    when38 += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
-    shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + when38 + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
+    tool_times = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
+    tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
+    shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + tool_times + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
     hide_jobs = [(c['times'][len(c['times']) // 2], c['who'], c.get('target') or c['who']) for c in checks if c['kind'] == 'petAct' and c['name'] == 'hide']
     hidden = pet_pixels_sharp(folder, hide_jobs, KEEP and os.path.join(KEEP, 'hide')) if hide_jobs else None
     results = check_props(folder, moments, cuts) + check_depths(folder) + check_shots(folder, log) + check_seen(folder, checks, KEEP) + check_track(folder, checks, KEEP and os.path.join(KEEP, 'track'))
-    global TARGETS_40A
-    TARGETS_40A = {c['target'] for c in checks if c.get('kind') == 'petAct' and c.get('name') in PET_40A and c.get('target')}
+    global DOG_TARGETS
+    DOG_TARGETS = {c['target'] for c in checks if c.get('kind') == 'petAct' and c.get('name') in DOG_ACTS and c.get('target')}
     results += check_people_framed(folder, moments, shots)
-    results += check_clerk_44b(folder, moments, shots)       # đợt 44 B
-    if TORSO_44B: results += check_torso_44b(folder, moments, shots)
+    results += check_clerk(folder, moments, shots)       # đợt 44 B
+    if TORSO_CHECK: results += check_torso(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
         if c['kind'] == 'motion42d':       # đợt 42 D
-            results.extend(check_motion42d(folder, c, shots))
+            results.extend(check_whole_body(folder, c, shots))
             continue
         if c['kind'] == 'desk39':          # đợt 39 A
-            results.extend(check_desk39(folder, c, shots, scales))
+            results.extend(check_desk(folder, c, shots, scales))
             continue
         if c['kind'] in ('bandage', 'putCone') and c.get('track'): results.extend(check_care(folder, c, shots))
         if c['kind'] == 'prep':
@@ -2839,10 +2839,10 @@ def check_scene_45(folder):
         if c['kind'] == 'readChart' and c.get('reading'): results.extend(check_reading(folder, c, shots))
         if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))
         if c['kind'] == 'care38':
-            results.extend(check_care38(folder, c, shots, scales))
+            results.extend(check_care_tools(folder, c, shots, scales))
             continue
         if c['kind'] == 'care42f':          # đợt 42 F
-            results.extend(check_care42f(folder, c, shots, scales))
+            results.extend(check_grooming(folder, c, shots, scales))
             continue
         if c['kind'] == 'walk':
             worst = None
@@ -2884,17 +2884,17 @@ def check_scene_45(folder):
             results.extend(check_put_down(folder, c, frames))
             continue
         if c['kind'] == 'floor42e':          # đợt 42 E
-            results.extend(check_floor42e(folder, c, frames))
+            results.extend(check_floor(folder, c, frames))
             continue
         if c['kind'] == 'talk39':
             # đợt 39 C: tay trong khung ở lúc giữa (như `gesture`; tự sướng: bỏ lúc chớp sáng ở cuối) + số đo riêng của từng động tác
             hands = {**c, 'times': c['times'][:3]}
             results.extend(check_gesture(folder, hands, frames[:3]))
-            results.extend(check_talk39(folder, c, frames))
+            results.extend(check_presenter(folder, c, frames))
             continue
         if c['kind'] == 'gesture':
             results.extend(check_gesture(folder, c, frames))
-            if c['name'] in G39: results.extend(check_gesture39(folder, c, scales))          # đợt 39 B
+            if c['name'] in EVERYDAY_GESTURES: results.extend(check_everyday_gesture(folder, c, scales))          # đợt 39 B
             continue
         if c['kind'] == 'reaction':
             results.extend(check_reaction(folder, c, frames, log))
@@ -2925,7 +2925,7 @@ def check_scene_45(folder):
             continue
         if c['kind'] == 'petAct':
             results.extend(check_pet_act(folder, c, frames, hidden, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))
-            if c['name'] in PET_40A: results.extend(check_pet40(folder, c, frames, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))
+            if c['name'] in DOG_ACTS: results.extend(check_dog_act(folder, c, frames, [{a['name']: a for a in shots.get(float(t), [])} for t in c.get('samples', [])]))
             continue
         best, asked, lap, bent = None, None, None, None
         for t, frame in zip(c['times'], frames):
@@ -3028,7 +3028,7 @@ if __name__ == '__main__':
     parser.add_argument('--torso44b', action='store_true', help='also fail a person cut at the neck by the top edge (a body without a head) — not on by default: "alone" pet close-ups still let people behind be cut')
     args = parser.parse_args()
     KEEP = args.keep
-    TORSO_44B = args.torso44b
+    TORSO_CHECK = args.torso44b
     results =[r for folder in args.scenes for r in check_scene(folder)]
     for r in results: print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))}: {r["what"]} — {r["note"]}')
     bad = [r for r in results if r['ok'] is False]

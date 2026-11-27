@@ -3,21 +3,21 @@ import json
 from .util import PERSON
 
 
-def floor_turn_42e(who, turn, undo):
+def floor_turn(who, turn, undo):
     """ĐỢT 42 E: người ĐANG Ở DƯỚI SÀN (ngồi bệt / nằm — từ một lượt trước, hay ngay trong lượt này) được xem như người NGỒI trong lượt ấy:
-    con vật đi tới họ (vuốt ve, bế lên lòng), họ không tự quỳ xuống / bước lại gần. Ghi `seated` tạm (trả lại bằng `restore_42e`)."""
+    con vật đi tới họ (vuốt ve, bế lên lòng), họ không tự quỳ xuống / bước lại gần. Ghi `seated` tạm (trả lại bằng `restore_seated`)."""
     steps = turn.get('do') if isinstance(turn.get('do'), list) else []
     named = [step if isinstance(step, str) else step[0] if isinstance(step, list) and step and isinstance(step[0], str) else None for step in steps]
-    down = who.get('_floor42e', False) or any(name in ('sitOnFloor', 'lieDown') for name in named)
+    down = who.get('_on_floor', False) or any(name in ('sitOnFloor', 'lieDown') for name in named)
     for name in named:
-        if name in ('sitOnFloor', 'lieDown'): who['_floor42e'] = True
-        elif name == 'standUp': who['_floor42e'] = False
+        if name in ('sitOnFloor', 'lieDown'): who['_on_floor'] = True
+        elif name == 'standUp': who['_on_floor'] = False
     if down and not who.get('seated'):
         undo.append((who, 'seated' in who, who.get('seated')))
         who['seated'] = True
 
 
-def floor_step_42e(step, where, who, stage_set, fail):
+def floor_step(step, where, who, stage_set, fail):
     """ĐỢT 42 E: kiểm tra `sitOnFloor` / `lieDown` / `pickUp` của một người; trả mã JS khi cần viết lại bước (nằm sofa trong bối cảnh 3D: `lift` =
     chiều cao mặt sofa dưới người, đổi ra đơn vị khung của người ấy), không thì None."""
     name, args = (step, []) if isinstance(step, str) else (step[0], list(step[1:]))
@@ -46,7 +46,7 @@ def floor_step_42e(step, where, who, stage_set, fail):
     return f"['lieDown', 'sofa', {json.dumps(options, ensure_ascii=False)}]"
 
 
-def restore_42e(undo):
+def restore_seated(undo):
     while undo:
         who, had, value = undo.pop()
         if had: who['seated'] = value

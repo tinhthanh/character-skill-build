@@ -69,7 +69,7 @@ def presenter39c(work, problems):
 @case('gestures39b')
 def gestures39b(work, problems):
     # Đợt 39 B: sáu cử chỉ thường ngày (cười lớn, lau nước mắt, ôm trán, suỵt, ra dấu OK, chào) — bàn tay trong khung, ngón ở môi, tay ở
-    # mắt / chân mày, vòng OK cạnh mặt, đầu + vai chuyển động (acting_check `check_gesture39`). Viết bằng kịch bản tiếng Việt.
+    # mắt / chân mày, vòng OK cạnh mặt, đầu + vai chuyển động (acting_check `check_everyday_gesture`). Viết bằng kịch bản tiếng Việt.
     g39 = os.path.join(work, 'g39.txt')
     open(g39, 'w', encoding='utf-8').write('bối cảnh: đường phố\nbác sĩ (vet)\nbé (boy)\nbác sĩ: [cười lớn]\nbé: [lau nước mắt]\nbác sĩ: [ôm trán]\nbé: [suỵt]\nbác sĩ: [ra dấu ok]\nbé: [giơ tay chào]\n')
     done = subprocess.run([sys.executable, os.path.join(HERE, 'script.py'), g39, '--no-build'], capture_output=True, text=True)

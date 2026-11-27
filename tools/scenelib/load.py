@@ -1,9 +1,9 @@
 """Phase 1 of a build: read and check the scene file and its 3D set."""
 import json, os, re
 from .camera import check_camera
-from .expand import expand_combos, narrator_split_42a, pair_restrain
-from .schema import (BACKGROUND_KEYS, BOX_KEYS, CAMERA_KEYS, CUTOUT_KEYS, CUTOUT_KINDS, DRIVE_KEYS, LAMP_KEYS, LIGHT_MOODS, NARRATOR_KEYS_42A,
-    NARRATOR_RIG_42A, PANEL_KEYS, ROOM_KEYS, SCREEN_KINDS, SET_KEYS, TOP_KEYS)
+from .expand import expand_combos, narrator_split, pair_restrain
+from .schema import (BACKGROUND_KEYS, BOX_KEYS, CAMERA_KEYS, CUTOUT_KEYS, CUTOUT_KINDS, DRIVE_KEYS, LAMP_KEYS, LIGHT_MOODS, NARRATOR_KEYS,
+    NARRATOR_RIG, PANEL_KEYS, ROOM_KEYS, SCREEN_KINDS, SET_KEYS, TOP_KEYS)
 from .sets import SET_PRESETS
 from .util import fail, js, known
 
@@ -24,18 +24,18 @@ def load_scene(st):
     scene['script'] = expand_combos(scene.get('script'))
     scene['script'] = pair_restrain(scene['script'])                    # đợt 38 B: giữ con vật vừa khít phần việc người kia
     # ĐỢT 42 A — NGƯỜI DẪN KHÔNG HIỆN HÌNH: `{ "name": "loi_dan", "narrator": true, "voice": "baotrang" }` trong "characters". Chỉ nói (giọng + phụ đề),
-    # không có thân trên màn hình, máy quay không bao giờ chiếu vào. Rút khỏi dàn nhân vật thật ở đây; lượt của họ đi riêng (`_narr42a`).
-    narrators_42a = {}
+    # không có thân trên màn hình, máy quay không bao giờ chiếu vào. Rút khỏi dàn nhân vật thật ở đây; lượt của họ đi riêng (`_narrator_turns`).
+    narrators = {}
     if isinstance(scene.get('characters'), list):
         for who in scene['characters']:
             if not isinstance(who, dict) or not who.get('narrator'): continue
-            known(f'narrator "{who.get("name")}"', who, NARRATOR_KEYS_42A)
+            known(f'narrator "{who.get("name")}"', who, NARRATOR_KEYS)
             if who['narrator'] is not True or not isinstance(who.get('name'), str) or not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', who['name']): fail(f'a narrator is {{ "name": "<identifier>", "narrator": true, "voice": "baotrang" }} — got {js(who)}')
             if who.get('voice') is not None and not isinstance(who['voice'], str): fail(f'narrator "{who["name"]}": "voice" must be a voice name (see `voice-tts voices`)')
-            if who['name'] in narrators_42a or any(c is not who and isinstance(c, dict) and c.get('name') == who['name'] for c in scene['characters']): fail(f'two characters are named "{who["name"]}"')
-            narrators_42a[who['name']] = {'name': who['name'], 'voice': who.get('voice'), '_pet': False, 'x': 0, 'id': NARRATOR_RIG_42A}
-        if narrators_42a:
-            scene['script'] = narrator_split_42a(scene['script'], narrators_42a)
+            if who['name'] in narrators or any(c is not who and isinstance(c, dict) and c.get('name') == who['name'] for c in scene['characters']): fail(f'two characters are named "{who["name"]}"')
+            narrators[who['name']] = {'name': who['name'], 'voice': who.get('voice'), '_pet': False, 'x': 0, 'id': NARRATOR_RIG}
+        if narrators:
+            scene['script'] = narrator_split(scene['script'], narrators)
             scene['characters'] = [c for c in scene['characters'] if not (isinstance(c, dict) and c.get('narrator'))]
     if isinstance(scene.get('background'), dict): known('background', scene['background'], BACKGROUND_KEYS)
     if isinstance(scene.get('camera'), dict): known('camera', scene['camera'], ('kind',))
@@ -119,4 +119,4 @@ def load_scene(st):
         for key, why in (('props', 'use set.boxes'), ('background', 'use set.sky and set.room'), ('camera', 'put "view" on the turns instead')):
             if scene.get(key) and not (key == 'camera' and scene[key] == 'auto'): fail(f'"{key}" cannot be combined with "set" — {why}' + (' — or "camera": "auto" to let the camera choose every shot' if key == 'camera' else ''))
         if scene.get('layout', 'stage') != 'stage': fail('"layout": "presenter" cannot be combined with "set"')
-    st.keep(narrators_42a=narrators_42a, preset_note=preset_note, scene=scene, stage_set=stage_set)
+    st.keep(narrators=narrators, preset_note=preset_note, scene=scene, stage_set=stage_set)

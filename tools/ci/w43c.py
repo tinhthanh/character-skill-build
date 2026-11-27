@@ -11,7 +11,7 @@ def combo43c_case(work, problems, part):
     combo43c = {
         'party43': ({'preset': 'living-room'}, [dict(name='be', id='girl', x=0, z=-560)],
                     [{'who': 'be', 'do': ['partyTime']}], ('"jump", 2', '"dance", "happy", 2', '"cheer"')),
-        # nhóm 2: BÉ ngồi bệt vuốt mèo rồi nằm ngủ cùng nó (con vật dừng xa hơn người ngồi ghế — FLOOR_GAP_43: trước đó bàn tay bé dựng đứng
+        # nhóm 2: BÉ ngồi bệt vuốt mèo rồi nằm ngủ cùng nó (con vật dừng xa hơn người ngồi ghế — FLOOR_GAP: trước đó bàn tay bé dựng đứng
         # cạnh tai con mèo, 7 / 13 mốc không chạm), hốt hoảng chạy tới
         # con chó đang khập khiễng, nhặt quả bóng cạnh con chó rồi đưa cho mẹ (mẹ có quả bóng cất sẵn mới đón lấy — `take`).
         'lazy43': ({'preset': 'living-room'}, [dict(name='be', id='boy', x=-120, z=-560, faces='meo'), dict(name='meo', species='cat', x=160, z=-560, faces='be')],
@@ -73,7 +73,7 @@ def combo43c_case(work, problems, part):
         # Từ kịch bản của combo không được trùng từ của một động tác lẻ (ví dụ "nhảy mừng" đã là `jump`): trùng thì một bên bị nuốt.
         if HERE not in sys.path: sys.path.insert(0, HERE)
         import script as script_mod
-        single = set(script_mod.ACTIONS) | set(script_mod.TARGETED) | set(script_mod.PERSON_42D)
+        single = set(script_mod.ACTIONS) | set(script_mod.TARGETED) | set(script_mod.PERSON_ACTIONS)
         for word, combo_name in script_mod.COMBO_WORDS.items():
             if word in single: problems.append(f'combo {combo_name}: script word "{word}" is already an action word in tools/script.py')
         seen_words = {}

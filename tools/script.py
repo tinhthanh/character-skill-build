@@ -88,8 +88,8 @@ PRESETS = {'phòng khám': 'exam', 'khám': 'exam', 'lễ tân': 'reception', 'q
 BOXES = {'exam': {'table': (100, -480, 200, 160)}, 'reception': {'counter': (-520, -430, 440, 140), 'bench': (330, -820, 360, 120)},
          'pharmacy': {'counter': (-260, -420, 520, 130)}, 'park': {'bench': (220, -880, 340, 110)},
          'living-room': {'sofa': (-560, -860, 520, 180), 'coffee-table': (80, -700, 220, 120)}, 'street': {}}       # x, z, rộng, sâu
-STAFF_IDS_44A = {'pharmacist', 'clerk', 'receptionist', 'barista'}       # đợt 44 A: người đứng sau quầy nhà thuốc
-PHARMACY_STAFF_44A, PHARMACY_GUEST_44A = (0, -620), (150, -380)          # quầy x −260…260, z −420…−550; chỗ gợi ý của preset (màn hình x −230 — đợt 44 B)
+COUNTER_STAFF_IDS = {'pharmacist', 'clerk', 'receptionist', 'barista'}       # đợt 44 A: người đứng sau quầy nhà thuốc
+PHARMACY_STAFF_SPOT, PHARMACY_GUEST_SPOT = (0, -620), (150, -380)          # quầy x −260…260, z −420…−550; chỗ gợi ý của preset (màn hình x −230 — đợt 44 B)
 ON_WORDS = {'bàn': ('table', 'coffee-table', 'counter'), 'quầy': ('counter',), 'ghế': ('bench', 'sofa'), 'sofa': ('sofa',), 'ghế đá': ('bench',)}
 PERSON_MOODS = {'vui': 'happy', 'buồn': 'sad', 'ngạc nhiên': 'surprised', 'giận': 'angry', 'tức giận': 'angry', 'suy nghĩ': 'thinking', 'cười': 'laughing',
                 'cười lớn': 'laughing', 'lo': 'worried', 'lo lắng': 'worried', 'bối rối': 'confused', 'mệt': 'tired', 'khóc': 'crying', 'ngượng': 'embarrassed',
@@ -98,8 +98,8 @@ PET_MOODS = {'vui': 'happy', 'hào hứng': 'excited', 'phấn khích': 'excited
              'hối lỗi': 'guilty', 'có lỗi': 'guilty', 'đau': 'pain', 'buồn ngủ': 'sleepy'}
 # ĐỢT 40 A — sáu động tác của chó (gộp vào ACTIONS / TARGETED ngay sau khi hai bảng ấy được định nghĩa). "rủ chơi" giờ là `playBow` (chổng mông, một mình);
 # "chó → bé: kéo co" / "dựa chân" / "tha đồ chơi" cần người làm đích.
-ACTIONS_40A = {'rủ chơi': 'playBow', 'chổng mông': 'playBow', 'tru': 'howl', 'hú': 'howl', 'đào': 'dig', 'đào đất': 'dig', 'bới': 'dig',
-               'ngậm đồ chơi': 'carryToy', 'tha đồ chơi': 'carryToy'}; TARGETED_40A = {'kéo co': ('tugOfWar', None), 'dựa chân': ('leanOnLeg', None), 'dựa vào chân': ('leanOnLeg', None),
+ACTIONS_DOG = {'rủ chơi': 'playBow', 'chổng mông': 'playBow', 'tru': 'howl', 'hú': 'howl', 'đào': 'dig', 'đào đất': 'dig', 'bới': 'dig',
+               'ngậm đồ chơi': 'carryToy', 'tha đồ chơi': 'carryToy'}; TARGETED_DOG = {'kéo co': ('tugOfWar', None), 'dựa chân': ('leanOnLeg', None), 'dựa vào chân': ('leanOnLeg', None),
                'tha đồ chơi': ('carryToy', None), 'ngậm đồ chơi': ('carryToy', None)}
 ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc đầu': 'shake', 'vỗ tay': 'clap', 'giơ ngón cái': 'thumbsUp', 'like': 'thumbsUp',
            'suy nghĩ': 'ponder', 'khoanh tay': 'crossArms', 'chống nạnh': 'handsOnHips', 'nhún vai': 'shrug', 'reo': 'cheer', 'ăn mừng': 'cheer',
@@ -117,18 +117,18 @@ ACTIONS = {'vẫy tay': 'wave', 'chào': 'wave', 'gật đầu': 'nod', 'lắc �
            # đợt 35: hồ sơ & phim X-quang (người)
            'đọc bệnh án': 'readChart', 'xem bệnh án': 'readChart', 'đọc hồ sơ': 'readChart', 'xem hồ sơ': 'readChart',
            'chỉ phim': 'showXray', 'chỉ phim x-quang': 'showXray', 'xem phim x-quang': 'showXray', 'chỉ x-quang': 'showXray'}
-ACTIONS.update(ACTIONS_40A)       # đợt 40 A
+ACTIONS.update(ACTIONS_DOG)       # đợt 40 A
 # ĐỢT 39 B — sáu cử chỉ thường ngày không đạo cụ. "cười" vẫn là TÂM TRẠNG ("tên (cười): lời"); "[cười lớn]" / "[cười ha hả]" trong ngoặc
 # vuông là ĐỘNG TÁC cười cả người (`laugh`: ngửa đầu, vai rung, tay ôm bụng) — xem BRACKET_FIRST. "(cười lớn)" trong ngoặc tròn vẫn là nét mặt.
 ACTIONS.update({'cười lớn': 'laugh', 'cười ha hả': 'laugh', 'lau nước mắt': 'wipeTears', 'chùi nước mắt': 'wipeTears', 'che mặt': 'facepalm',
                 'ôm trán': 'facepalm', 'facepalm': 'facepalm', 'suỵt': 'shush', 'ra hiệu im lặng': 'shush', 'ok': 'okSign', 'ra dấu ok': 'okSign',
                 'giơ tay chào': 'salute', 'chào kiểu quân đội': 'salute', 'salute': 'salute'})
-# ĐỢT 42 D — cả thân: "[chạy]" chạy tại chỗ, "bé → chó: chạy tới" chạy tới đứng cạnh nó (TARGETED_42D), "[nhảy lên]" / "[nhảy cẫng]" nhảy
-# mừng, "[nhảy múa]" / "[quẩy]" nhảy múa. "[nhảy]" của NGƯỜI là nhảy múa (PERSON_42D); của THÚ vẫn là `jump` (chó nhảy chồm).
+# ĐỢT 42 D — cả thân: "[chạy]" chạy tại chỗ, "bé → chó: chạy tới" chạy tới đứng cạnh nó (TARGETED_RUN), "[nhảy lên]" / "[nhảy cẫng]" nhảy
+# mừng, "[nhảy múa]" / "[quẩy]" nhảy múa. "[nhảy]" của NGƯỜI là nhảy múa (PERSON_ACTIONS); của THÚ vẫn là `jump` (chó nhảy chồm).
 ACTIONS.update({'chạy': 'run', 'chạy tại chỗ': 'run', 'nhảy lên': 'jump', 'nhảy cẫng': 'jump', 'nhảy cẫng lên': 'jump', 'nhảy mừng': 'jump',
                 'nhảy múa': 'dance', 'quẩy': 'dance', 'nhảy nhót': 'dance', 'múa': 'dance'})
-PERSON_42D = {'nhảy': 'dance'}
-TARGETED_42D = {'chạy tới': ('run', None), 'chạy lại': ('run', None), 'chạy đến': ('run', None), 'chạy lại gần': ('run', None), 'chạy về phía': ('run', None)}
+PERSON_ACTIONS = {'nhảy': 'dance'}
+TARGETED_RUN = {'chạy tới': ('run', None), 'chạy lại': ('run', None), 'chạy đến': ('run', None), 'chạy lại gần': ('run', None), 'chạy về phía': ('run', None)}
 BRACKET_FIRST = {'cười lớn'}              # trong "[…]": từ này vừa là tâm trạng vừa là động tác — ưu tiên ĐỘNG TÁC
 TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('giveTreat', {'kind': 'pill'}), 'cho bánh': ('giveTreat', None), 'cho ăn': ('giveTreat', None),
             'vuốt ve': ('stroke', None), 'xoa đầu': ('stroke', None), 'khám': ('examine', None), 'soi đèn': ('examine', None), 'rọi đèn': ('shine', None), 'rọi đèn pin': ('shine', None), 'soi đèn pin': ('shine', None), 'bế': ('carry', None),
@@ -138,8 +138,8 @@ TARGETED = {'cho thuốc': ('giveTreat', {'kind': 'pill'}), 'uống thuốc': ('
             'băng chân': ('bandage', None), 'băng bó': ('bandage', None), 'quấn băng': ('bandage', None), 'băng': ('bandage', None),
             'đeo loa': ('putCone', None), 'đeo vòng chống liếm': ('putCone', None), 'đeo vòng cổ chống liếm': ('putCone', None),
             'liếm': ('lick', None), 'liếm tay': ('lick', None), 'liếm mặt': ('lick', None), 'nấp': ('hide', None), 'trốn': ('hide', None), 'nấp sau': ('hide', None)}
-TARGETED.update(TARGETED_40A)      # đợt 40 A
-TARGETED.update(TARGETED_42D)      # đợt 42 D
+TARGETED.update(TARGETED_DOG)      # đợt 40 A
+TARGETED.update(TARGETED_RUN)      # đợt 42 D
 # ĐỢT 39 A — quầy thu ngân & quầy cà phê: trả tiền (quét mã QR / quẹt thẻ), thối tiền, đóng dấu thẻ, rót nước, lau quầy. Người làm tự có đồ cần cầm
 # (điện thoại, thẻ ngân hàng, xấp tiền, thẻ tích điểm, cốc) — xem `needs` bên dưới; người nhận có sẵn món đồ đang cất (tools/scene.py).
 TARGETED.update({'thối tiền': ('giveChange', None), 'trả tiền thừa': ('giveChange', None), 'đóng dấu': ('stampCard', None), 'đóng dấu thẻ': ('stampCard', None)})
@@ -188,18 +188,18 @@ SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': '
 # [giơ bảng: "Giảm 20%, hôm nay"]), "[to cỡ này]" / "[nhỏ cỡ này]" / "[ra dấu kích thước]", "[selfie]" / "[chụp ảnh tự sướng]" / "[chụp hình]" (tự có điện thoại
 # cất sẵn trong tay), "[ngáp]" / "[vươn vai]" (người: ngáp + vươn hai tay qua đầu — thú vẫn ngáp / vươn vai kiểu thú), và "bác sĩ → bé trai: selfie" (chụp CÙNG).
 SIGN_WORDS = ('giơ bảng', 'giơ biển', 'giơ tấm bảng')
-PRESENT_39 = {'to cỡ này': ['showSize', 'big'], 'to thế này': ['showSize', 'big'], 'nhỏ cỡ này': ['showSize', 'small'], 'bé cỡ này': ['showSize', 'small'],
+PRESENTER_WORDS = {'to cỡ này': ['showSize', 'big'], 'to thế này': ['showSize', 'big'], 'nhỏ cỡ này': ['showSize', 'small'], 'bé cỡ này': ['showSize', 'small'],
               'cỡ này': ['showSize', 'medium'], 'ra dấu kích thước': ['showSize', 'medium'], 'ra dấu to cỡ này': ['showSize', 'big'],
               'chụp ảnh tự sướng': ['takeSelfie'], 'chụp ảnh': ['takeSelfie'], 'selfie': ['takeSelfie'], 'chụp hình': ['takeSelfie'], 'tự sướng': ['takeSelfie'],
               'ngáp': ['yawnStretch'], 'vươn vai': ['yawnStretch'], 'ngáp vươn vai': ['yawnStretch']}
-TARGETED_39 = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie', 'chụp hình': 'takeSelfie', 'chụp ảnh': 'takeSelfie', 'tự sướng': 'takeSelfie'}
+TARGETED_PRESENTER = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie', 'chụp hình': 'takeSelfie', 'chụp ảnh': 'takeSelfie', 'tự sướng': 'takeSelfie'}
 SIGN_TEXT = re.compile(r'(' + '|'.join(SIGN_WORDS) + r')\s*:\s*("[^"]*"|[^,\]]*)', re.IGNORECASE)
 
 
-NARRATOR_IDS_42A = ('lồng tiếng', 'không hiện', 'giọng dẫn')       # đợt 42 A: mã của người dẫn không hiện hình
-VOICEOVER_42A = re.compile(r'^(.+?)\s*\(\s*lồng tiếng\s*\)\s*→\s*(.+?)\s*:\s*(\[.*\])\s*\|\s*(.+)$', re.IGNORECASE)      # "mẹ (lồng tiếng) → mèo: [chui hộp] | lời"
-TOGETHER_42A = re.compile(r'^cùng lúc\s*(?:\(([^)]*)\))?\s*:\s*(.*)$', re.IGNORECASE)
-SIZES_42A = {'cận': 'close', 'cận cảnh': 'close', 'trung': 'medium', 'trung cảnh': 'medium', 'toàn': 'full', 'toàn cảnh': 'full'}
+NARRATOR_IDS = ('lồng tiếng', 'không hiện', 'giọng dẫn')       # đợt 42 A: mã của người dẫn không hiện hình
+VOICEOVER_LINE = re.compile(r'^(.+?)\s*\(\s*lồng tiếng\s*\)\s*→\s*(.+?)\s*:\s*(\[.*\])\s*\|\s*(.+)$', re.IGNORECASE)      # "mẹ (lồng tiếng) → mèo: [chui hộp] | lời"
+TOGETHER_LINE = re.compile(r'^cùng lúc\s*(?:\(([^)]*)\))?\s*:\s*(.*)$', re.IGNORECASE)
+SHOT_SIZES = {'cận': 'close', 'cận cảnh': 'close', 'trung': 'medium', 'trung cảnh': 'medium', 'toàn': 'full', 'toàn cảnh': 'full'}
 
 
 class ScriptError(Exception):
@@ -241,7 +241,7 @@ def parse(text, first_line=1):
     return head, cast, lines
 
 
-def stage_sofa_44a(script, characters, boxes, portrait):
+def stage_sofa(script, characters, boxes, portrait):
     """ĐỢT 44 A — NẰM SOFA ("bé: [nằm sofa]", "ngủ trưa cùng thú"): người có lượt `["lieDown", "sofa", …]` mà chưa ngồi trên hộp nào được đứng
     sẵn ở mép trước sofa (x giữa sofa, z = mặt trước + 12 — như tools/scene.py đòi) từ đầu cảnh; con vật nằm ngủ cùng lượt ấy (`together`)
     nằm trên sàn ngay trước sofa, lệch sang phải."""
@@ -284,20 +284,20 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
     # NHÂN VẬT và CHỖ ĐỨNG. Ai "trên bàn / ghế / quầy" thì lên hộp ấy; người đầu tiên đứng cạnh hộp có thú trên đó; còn
     # lại dàn sang trái (hay ra hai bên khi không có hộp nào), cùng một độ sâu để tay với tới nhau.
     names, characters, labels = set(), [], {}
-    narrators_42a, narrator_labels_42a = [], set()
+    narrators, narrator_labels = [], set()
     boxes = BOXES[preset]
     for who in cast:
         name = slug(who['label'])
         while name in names: name += '_2'
         names.add(name); labels[who['label'].lower()] = name
         pet = who['id'] in PET_SPECIES
-        if who['id'].lower() in NARRATOR_IDS_42A:            # đợt 42 A: người dẫn không hiện hình — chỉ tên + giọng, không chỗ đứng
+        if who['id'].lower() in NARRATOR_IDS:            # đợt 42 A: người dẫn không hiện hình — chỉ tên + giọng, không chỗ đứng
             voice = None
             for option in who['options']:
                 if option.lower().startswith('giọng '): voice = option.split(' ', 1)[1].strip()
                 else: raise ScriptError(f'{who["where"]}: người dẫn không hiện hình chỉ nhận tuỳ chọn "giọng …" — thấy "{option}"')
-            narrators_42a.append({'name': name, 'narrator': True, **({'voice': voice} if voice else {})})
-            narrator_labels_42a.add(name)
+            narrators.append({'name': name, 'narrator': True, **({'voice': voice} if voice else {})})
+            narrator_labels.add(name)
             continue
         entry = {'name': name, ('species' if pet else 'id'): who['id'], 'z': -560}
         for option in who['options']:
@@ -334,9 +334,9 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         # ĐỢT 44 A — NHÀ THUỐC: người bán (dược sĩ…) đứng SAU quầy, sát mép sau; khách (và thú của họ) đứng TRƯỚC quầy, sát mép trước, lệch
         # sang phải của màn hình hiển thị — không đứng sau quầy và màn hình (trước đây ai cũng ở z −560: khách khuất sau quầy, túi thuốc
         # trao sau màn hình). Hai mặt phẳng chỉ cách nhau ~200 (bề sâu quầy 130): trao túi qua quầy vẫn khớp tay.
-        staff = [c for c in floor if str(c.get('id', '')).lower() in STAFF_IDS_44A]
-        for n, c in enumerate(staff): c['x'], c['z'] = PHARMACY_STAFF_44A[0] - 220 * n, PHARMACY_STAFF_44A[1]
-        for n, c in enumerate(c for c in floor if c not in staff): c['x'], c['z'] = PHARMACY_GUEST_44A[0] + 250 * n, PHARMACY_GUEST_44A[1]
+        staff = [c for c in floor if str(c.get('id', '')).lower() in COUNTER_STAFF_IDS]
+        for n, c in enumerate(staff): c['x'], c['z'] = PHARMACY_STAFF_SPOT[0] - 220 * n, PHARMACY_STAFF_SPOT[1]
+        for n, c in enumerate(c for c in floor if c not in staff): c['x'], c['z'] = PHARMACY_GUEST_SPOT[0] + 250 * n, PHARMACY_GUEST_SPOT[1]
     else:
         step = 300
         for n, c in enumerate(floor): c['x'] = round((n - (len(floor) - 1) / 2) * step)
@@ -349,21 +349,21 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
 
     def is_pet(name): return any(c['name'] == name and 'species' in c for c in characters)
 
-    def together_42a(turns, option, where):
+    def together_entry(turns, option, where):
         """Các lượt của một nhóm `cùng lúc` → mục `together`. Có "(quay …)" hay có người dẫn không hiện hình: thêm "view" — máy quay vào
         những ai đang DIỄN (không phải người nói): một con thú → cận, một mình (độ choán khung do scene.py chọn theo động tác); thú + người hay nhiều thú → trung."""
         entry = {'together': turns}
-        if option is None and not any(turn['who'] in narrator_labels_42a for turn in turns): return entry
+        if option is None and not any(turn['who'] in narrator_labels for turn in turns): return entry
         subjects, size = [], None
         for word in [part.strip() for part in (option or '').split(',') if part.strip()]:
-            if word.lower() in SIZES_42A: size = SIZES_42A[word.lower()]
+            if word.lower() in SHOT_SIZES: size = SHOT_SIZES[word.lower()]
             elif word.lower().startswith('quay '): subjects += [who_of(label, where) for label in re.split(r'\s+và\s+|\s*\+\s*', word[5:].strip()) if label]
             else: raise ScriptError(f'{where}: không hiểu "{word}" trong "cùng lúc (…)" — viết "quay mèo" hay "quay mèo và mẹ", rồi cận / trung / toàn: "cùng lúc (quay mèo, cận): …"')
         if option is not None and not subjects and size is None: raise ScriptError(f'{where}: "cùng lúc (…)" cần "quay <ai>" — ví dụ "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"')
-        actors = [turn['who'] for turn in turns if turn['who'] not in narrator_labels_42a]
+        actors = [turn['who'] for turn in turns if turn['who'] not in narrator_labels]
         subjects = list(dict.fromkeys(subjects or [who for who in actors if not any(t['who'] == who and 'say' in t for t in turns)] or actors))
         if not subjects: raise ScriptError(f'{where}: nhóm này không có ai hiện trên hình để máy quay — thêm một nhân vật diễn')
-        if any(who in narrator_labels_42a for who in subjects): raise ScriptError(f'{where}: người dẫn không hiện hình, máy không quay được — "quay …" phải là một người hay con vật trong cảnh')
+        if any(who in narrator_labels for who in subjects): raise ScriptError(f'{where}: người dẫn không hiện hình, máy không quay được — "quay …" phải là một người hay con vật trong cảnh')
         size = size or ('close' if len(subjects) == 1 and is_pet(subjects[0]) else 'medium')
         entry['view'] = {'on': subjects, 'size': size, **({'alone': True} if len(subjects) == 1 else {})}
         return entry
@@ -372,7 +372,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         """Một lượt: "tên (tâm trạng): lời" · "tên: [hành động…]" · "tên → tên khác: hành động"."""
         m = re.match(r'^(.+?)\s*→\s*(.+?)\s*:\s*(.+)$', body)
         if m and m.group(3).strip().lower().strip('[]') in COMBO_WORDS:
-            if who_of(m.group(1), where) in narrator_labels_42a: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
+            if who_of(m.group(1), where) in narrator_labels: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
             who, verb = who_of(m.group(1), where), m.group(3).strip().lower().strip('[]')
             name = COMBO_WORDS[verb]
             targets = [f'@{who_of(part, where)}' for part in re.split(r'\s*→\s*', m.group(2))]
@@ -383,13 +383,13 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             return {'who': who, 'do': [[name] + targets]}
         if m:
             who, target, verb = who_of(m.group(1), where), who_of(m.group(2), where), m.group(3).strip().lower().strip('[]')
-            if who in narrator_labels_42a or target in narrator_labels_42a: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
+            if who in narrator_labels or target in narrator_labels: raise ScriptError(f'{where}: người dẫn không hiện hình chỉ nói được — "{m.group(1).strip()}: <lời>"')
             chip = CHIP_VERB.match(verb)
             if chip: return {'who': who, 'do': [['scanChip', f'@{target}', {'id': chip.group(2)}]]}
-            if verb in TARGETED_39:          # ĐỢT 39 C: "bác sĩ → bé trai: selfie" — chụp ảnh tự sướng CÙNG người / con vật kia
+            if verb in TARGETED_PRESENTER:          # ĐỢT 39 C: "bác sĩ → bé trai: selfie" — chụp ảnh tự sướng CÙNG người / con vật kia
                 if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người — thú không cầm điện thoại')
                 if target == who: raise ScriptError(f'{where}: "{verb}" cùng một người khác — "bác sĩ → bé trai: {verb}"')
-                return {'who': who, 'do': [[TARGETED_39[verb], 1.6, {'with': f'@{target}'}]]}
+                return {'who': who, 'do': [[TARGETED_PRESENTER[verb], 1.6, {'with': f'@{target}'}]]}
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
             action, extra = TARGETED[verb]
             step = [action, f'@{target}'] + ([extra] if extra else [])
@@ -398,7 +398,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         if not m: raise ScriptError(f'{where}: không hiểu dòng này — viết "tên: lời", "tên: [hành động]" hay "tên → tên khác: hành động"')
         who, mood_word, rest = who_of(m.group(1), where), (m.group(2) or '').strip().lower(), m.group(3).strip()
         pet, turn = is_pet(who), {'who': who}
-        if who in narrator_labels_42a and (mood_word or rest.startswith('[')): raise ScriptError(f'{where}: "{m.group(1).strip()}" là người dẫn không hiện hình — chỉ có lời ("{m.group(1).strip()}: <lời>"), không tâm trạng, không [hành động]')
+        if who in narrator_labels and (mood_word or rest.startswith('[')): raise ScriptError(f'{where}: "{m.group(1).strip()}" là người dẫn không hiện hình — chỉ có lời ("{m.group(1).strip()}: <lời>"), không tâm trạng, không [hành động]')
         if mood_word:
             table = PET_MOODS if pet else PERSON_MOODS
             mood = table.get(mood_word) or (mood_word if mood_word in table.values() else None)
@@ -420,12 +420,12 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 elif word in SKIES: turn['sky'] = SKIES[word]
                 elif word in COMBO_WORDS and not COMBOS[COMBO_WORDS[word]]['params']: turn.setdefault('do', []).append(COMBO_WORDS[word])
                 elif word in COMBO_WORDS: raise ScriptError(f'{where}: "{word}" cần đích — viết "tên → con vật: {word}"')
-                elif word.startswith('giơ bảng#') or word in SIGN_WORDS or (not pet and word in PRESENT_39):         # ĐỢT 39 C
+                elif word.startswith('giơ bảng#') or word in SIGN_WORDS or (not pet and word in PRESENTER_WORDS):         # ĐỢT 39 C
                     if pet: raise ScriptError(f'{where}: {m.group(1).strip()} là thú — "{word}" chỉ dành cho người')
                     if word in SIGN_WORDS or (word.startswith('giơ bảng#') and not signs[int(word.split('#')[1])]):
                         raise ScriptError(f'{where}: "giơ bảng" cần chữ trên bảng — "{m.group(1).strip()}: [giơ bảng: Giảm 20%]" (1–3 dòng ngắn, ngắt bằng |)')
-                    turn.setdefault('do', []).append(['holdSign', signs[int(word.split('#')[1])]] if word.startswith('giơ bảng#') else list(PRESENT_39[word]))
-                elif not pet and word in PERSON_42D: turn.setdefault('do', []).append(PERSON_42D[word])          # đợt 42 D: người "nhảy" là nhảy múa
+                    turn.setdefault('do', []).append(['holdSign', signs[int(word.split('#')[1])]] if word.startswith('giơ bảng#') else list(PRESENTER_WORDS[word]))
+                elif not pet and word in PERSON_ACTIONS: turn.setdefault('do', []).append(PERSON_ACTIONS[word])          # đợt 42 D: người "nhảy" là nhảy múa
                 elif word in ACTIONS or re.match(r'^[a-zA-Z]+$', word): turn.setdefault('do', []).append(ACTIONS.get(word, word))
                 else: raise ScriptError(f'{where}: không biết hành động "{word}" — ví dụ: {", ".join(list(ACTIONS)[:14])}…')
         else:
@@ -433,10 +433,10 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             turn['say'] = rest
         return turn
 
-    def attach_toast_42a(entry, note):
+    def attach_toast(entry, note):
         """Thẻ thông báo gắn vào lượt của một nhân vật thật (người dẫn không hiện hình không mang thẻ); không có thì giữ lại cho lượt sau."""
         group = entry['together'] if 'together' in entry else [entry]
-        turn = next((t for t in group if t['who'] not in narrator_labels_42a), None)
+        turn = next((t for t in group if t['who'] not in narrator_labels), None)
         if turn is None: return False
         turn['toast'] = note
         return True
@@ -450,27 +450,27 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             pending = {'title': parts[0], **({'text': parts[1]} if len(parts) > 1 and parts[1] else {})}
             continue
         # ĐỢT 42 A — "mẹ (lồng tiếng) → mèo: [chui hộp] | Mèo nhà mình thích chui hộp lắm." = "cùng lúc (quay mèo): mẹ: Mèo nhà mình… | mèo: [chui hộp]"
-        voice_over = VOICEOVER_42A.match(line)
-        together = TOGETHER_42A.match(line)
+        voice_over = VOICEOVER_LINE.match(line)
+        together = TOGETHER_LINE.match(line)
         if voice_over:
             speaker, actor, action, words = voice_over.groups()
-            script.append(together_42a([turn_of(f'{speaker}: {words}', where), turn_of(f'{actor}: {action}', where)], f'quay {actor}', where))
+            script.append(together_entry([turn_of(f'{speaker}: {words}', where), turn_of(f'{actor}: {action}', where)], f'quay {actor}', where))
         elif together:
             parts = [part.strip() for part in together.group(2).split('|') if part.strip()]
             if len(parts) < 2: raise ScriptError(f'{where}: "cùng lúc:" cần ít nhất hai lượt, cách nhau bằng "|"')
-            script.append(together_42a([turn_of(part, where) for part in parts], together.group(1), where))
+            script.append(together_entry([turn_of(part, where) for part in parts], together.group(1), where))
         else:
             script.append(turn_of(line, where))
-        if pending and attach_toast_42a(script[-1], pending): pending = None
-    if pending and script and not attach_toast_42a(script[-1], pending): raise ScriptError('thông báo: không có nhân vật nào trên hình để gắn thẻ — đặt nó trước lượt của một người hay con vật')
+        if pending and attach_toast(script[-1], pending): pending = None
+    if pending and script and not attach_toast(script[-1], pending): raise ScriptError('thông báo: không có nhân vật nào trên hình để gắn thẻ — đặt nó trước lượt của một người hay con vật')
     if not script: raise ScriptError('kịch bản chưa có dòng thoại / hành động nào')
     script = expand_combos(script)              # combo → từng lượt: đồ cầm (ống tiêm, bìa hồ sơ), cái cân… tính như viết tay
-    stage_sofa_44a(script, characters, boxes, portrait)
+    stage_sofa(script, characters, boxes, portrait)
 
     # Chỉ giữ nhân vật CÓ MẶT trong kịch bản của cảnh này (phim nhiều cảnh: dàn nhân vật khai một lần cho cả phim).
     used = {name for pair in re.findall(r'"who": "([^"]+)"|"@([^"]+)"', json.dumps(script, ensure_ascii=False)) for name in pair if name}
     characters = [c for c in characters if c['name'] in used] or characters
-    if narrators_42a and not characters: raise ScriptError('chỉ có người dẫn không hiện hình — cần ít nhất một nhân vật trên hình')
+    if narrators and not characters: raise ScriptError('chỉ có người dẫn không hiện hình — cần ít nhất một nhân vật trên hình')
     # ĐỒ CẦN CẦM cho một động tác: "tiêm" cần ống tiêm, "dắt" cần dây dắt — người viết kịch bản không phải tự khai (đợt 28:
     # "bác sĩ → mèo: tiêm" dừng hẳn với lỗi "not holding a syringe").
     needs = {'inject': 'syringe', 'leash': 'leash', 'readChart': 'clipboard', 'handOverBag': 'bag',
@@ -506,7 +506,7 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
             taker = next((c for c in characters if c['name'] == step[1][1:]), None)
             kind = picked.get(turn.get('who')) or (giver.get('holds') if giver and isinstance(giver.get('holds'), str) else None)
             if kind and taker and not taker.get('holds') and not taker.get('species'): taker.update(holds=kind, holdsHidden=True)
-    scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters + [n for n in narrators_42a if n['name'] in used], 'script': script}
+    scene = {'id': slug(os.path.splitext(os.path.basename(base))[0]).replace('_', '-'), 'set': {'preset': preset}, 'characters': characters + [n for n in narrators if n['name'] in used], 'script': script}
     # CÂN (đợt 35): một cái cân trên sàn cạnh người cân đầu tiên, phía không có con vật, cùng độ sâu (con vật được đặt lên nó trong
     # mặt phẳng của người ấy).
     weighs = [(turn['who'], step[1][1:]) for turn in script if isinstance(turn, dict) for step in turn.get('do', []) if isinstance(step, list) and step and step[0] == 'weigh']

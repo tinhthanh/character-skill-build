@@ -1,6 +1,6 @@
 """Camera of the turns: a turn's "view" (`view_of`), the auto director's beat of an entry (`beat_of`), the hand plane of a person."""
 import math
-from .actions import CARE_38, DESK_39, DESK_PAY, PREP_ACTIONS
+from .actions import HANDS_ON_CARE, DESK_ACTIONS, DESK_PAY, PREP_ACTIONS
 from .camera import CAMERA_SPEED, NORMAL_LENS, check_camera
 from .schema import CAMERA_KEYS, VIEW_KEYS, VIEW_SIZES
 from .sets import ROOM_DEFAULTS
@@ -18,7 +18,7 @@ def plane_of(st, person):
     return float(person.get('z', -300))
 
 
-def pets_only_view_42c(st, turn, subjects, view):
+def pets_only_view(st, turn, subjects, view):
     """Đợt 42 C: view có CON VẬT đang làm động tác cùng người chỉ đứng đó / nói (lời dẫn) → chỉ lấy con vật làm chủ thể (người vẫn được
     tránh mép khung): con vật ≥ 35 % khung. Có `fill` riêng, hay người cũng làm động tác (`do`) → giữ nguyên."""
     names = st.names
@@ -46,7 +46,7 @@ def view_of(st, turn, where):
     if isinstance(view, dict) and 'on' in view:
         known(f'{where}.view', view, VIEW_KEYS)
         subjects = view['on'] if isinstance(view['on'], list) else [view['on']]
-        subjects = pets_only_view_42c(st, turn, subjects, view)
+        subjects = pets_only_view(st, turn, subjects, view)
         if not subjects or any(name not in names for name in subjects): fail(f'{where}: "view.on" must name characters in the scene — got {js(view["on"])}')
         if view.get('size', 'medium') not in VIEW_SIZES: fail(f'{where}: "view.size" must be {", ".join(VIEW_SIZES)} — got {js(view.get("size"))}')
         extra = {key: view[key] for key in ('yaw', 'pitch') if key in view}
@@ -146,10 +146,10 @@ def beat_of(st, entry, first, last):
         low_hands = any(isinstance(step, list) and step and step[0] in ('handshake', 'handOver', 'handOverPet', 'weigh', 'giveChange', 'stampCard') for step in turn.get('do', []))
         # Cho thuốc / đo nhiệt độ (đợt 35, lượt ba): GÓC CẬN người + con vật — viên thuốc, miệng con vật, mặt người nhìn nhiệt kế chỉ
         # vài pixel ở góc trung hai người (Gemini đọc ~1 khung / giây).
-        if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') + CARE_38 for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
+        if any(isinstance(step, list) and step and step[0] in ('givePill', 'takeTemp') + HANDS_ON_CARE for step in turn.get('do', [])) and targets and names[targets[0]]['_pet']:
             return dict(span, subjects=[who['name'], names[targets[0]]['name']], size='close')
         # ĐỢT 39 A: quầy thu ngân / cà phê một mình — góc trung (tờ tiền, thẻ, con dấu, bình rót, khăn chỉ vài pixel ở góc toàn).
-        if not targets and any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in DESK_39 for step in turn.get('do', [])):
+        if not targets and any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in DESK_ACTIONS for step in turn.get('do', [])):
             return dict(span, subjects=[who['name']], size='full' if any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in DESK_PAY + ('wipeCounter',) for step in turn.get('do', [])) else 'medium')
         # Rửa tay, đeo / tháo găng (đợt 38 B): góc trung một mình người ấy — bọt, găng ở hai bàn tay trước ngực chỉ vài pixel ở góc toàn.
         if not targets and any((step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in PREP_ACTIONS for step in turn.get('do', [])):

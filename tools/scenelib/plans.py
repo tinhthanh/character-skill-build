@@ -1,14 +1,14 @@
 """Measurement plans of the care and desk actions: the moments (seconds into the step) moments.json measures."""
-from .actions import BATH_RINSE_42F, BATH_SPRAY_42F, CARE_38_HOLD, CARE_42F, DESK_PAY, bath_shake_42f
+from .actions import BATH_RINSE, BATH_SPRAY, HANDS_ON_HOLD, GROOMING, DESK_PAY, bath_shake_at
 
 
-def care38_plan(op, t0):
+def care_plan_tools(op, t0):
     """ĐỢT 38 A: các lúc đo của cắt móng / nhỏ mắt / lau tai / quét chip, tính từ đầu bước `t0` theo đúng nhịp của runtime/rig-svg.js
     (`hold` của bước). `times`: ba lúc tay ở trên con vật (lúc giữa là lúc được hỏi); `gaze`: đầu hướng về đâu; `check`: số đo riêng của
     acting_check (`care38`) — kìm khép / mở và chân nhấc, giọt thuốc rơi vào mắt và mắt nhắm, bông ở gốc tai và đầu lắc, máy quét rà trên gáy
     và thẻ mã chip."""
-    if op['kind'] in CARE_42F: return care42f_plan(op, t0)          # đợt 42 F
-    kind, hold = op['kind'], float(op.get('hold') or CARE_38_HOLD[op['kind']][2])
+    if op['kind'] in GROOMING: return care_plan_grooming(op, t0)          # đợt 42 F
+    kind, hold = op['kind'], float(op.get('hold') or HANDS_ON_HOLD[op['kind']][2])
     r = lambda a: round(t0 + a, 2)
     every = lambda a, b, d=0.1: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
     who, pet = op['who'], op['target']
@@ -42,16 +42,16 @@ def care38_plan(op, t0):
     return {'times': times, 'gaze': gaze, 'check': dict(check, kind='care38', name=kind, who=who, target=pet, times=times), 'ask': ask}
 
 
-def care42f_plan(op, t0):
+def care_plan_grooming(op, t0):
     """ĐỢT 42 F: các lúc đo của tắm / đánh răng / lau khô, tính từ đầu bước `t0` theo đúng nhịp của runtime/rig-svg.js (`hold` của bước) — xem
     `check_care42f` của tools/acting_check.py."""
-    kind, hold = op['kind'], float(op.get('hold') or CARE_38_HOLD[op['kind']][2])
+    kind, hold = op['kind'], float(op.get('hold') or HANDS_ON_HOLD[op['kind']][2])
     r = lambda a: round(t0 + a, 2)
     every = lambda a, b, d=0.2: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
     who, pet = op['who'], op['target']
     if kind == 'bathPet':
-        W, E1 = 0.55, 0.55 + BATH_SPRAY_42F
-        L0 = E1 + 0.55; R0 = L0 + 0.35 + hold; W2 = R0 + 0.75; E2 = W2 + BATH_RINSE_42F; SH = bath_shake_42f(hold)
+        W, E1 = 0.55, 0.55 + BATH_SPRAY
+        L0 = E1 + 0.55; R0 = L0 + 0.35 + hold; W2 = R0 + 0.75; E2 = W2 + BATH_RINSE; SH = bath_shake_at(hold)
         times = [r(W + 0.8), r(L0 + 0.35 + hold / 2), r(W2 + 0.7)]
         check = {'spray': every(W + 0.3, E1 - 0.15) + every(W2 + 0.3, E2 - 0.15), 'lather': every(L0 + 0.5, R0 - 0.1), 'wet': [r(E1 + 0.1), r(SH - 0.2)],
                  'rinsed': [r(E2 + 0.25)], 'foamUp': [r(L0 + 0.5), r(R0 - 0.1)], 'shake': every(SH + 0.2, SH + 0.95, 0.05), 'free': [r(SH + 0.25), r(SH + 0.7)],
@@ -82,7 +82,7 @@ def care_window(kind, length):
     return [round(a + 0.15 * n, 2) for n in range(int((b - a) / 0.15) + 1)]
 
 
-def desk39_plan(name, t0, span, hold):
+def desk_plan(name, t0, span, hold):
     """ĐỢT 39 A — lúc đo của một bước quầy thu ngân / cà phê (giây tuyệt đối): `times` (mọi lúc cần chụp), `phases` (lúc nào đo gì), `samples` (mỗi 1/30 s).
     Số liệu trùng RigSVG (runtime/rig-svg.js): quét 0,6 s + 0,45 s tiến sát + hold; đếm 0,6 + 0,62 × 4 tờ; ấn dấu 1,35 s; rót 1,25 s + 1,9 s; lau 0,55 s + hold."""
     r = lambda *v: [round(t0 + x, 2) for x in v if x < span - 0.1]

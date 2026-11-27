@@ -1,7 +1,7 @@
 """moments.json: the moments of a built 3D scene that tools/light_audit.py and tools/acting_check.py check."""
-from .actions import (CARE_38, CARE_ACTIONS, CHART_ACTIONS, DESK_39, DESK_ASK, PAIR_ASK, PAIR_TIMES, PET_ACTS_40, PET_ACT_ASK, REACH_ACTIONS,
-    REACH_TIMES, RESTRAIN, SIZE_39)
-from .plans import care38_plan, care_window, desk39_plan
+from .actions import (HANDS_ON_CARE, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ASK, PAIR_ASK, PAIR_TIMES, CAT_RABBIT_ACTS, PET_ACT_ASK, REACH_ACTIONS,
+    REACH_TIMES, RESTRAIN, SHOW_SIZE_GAP)
+from .plans import care_plan_tools, care_window, desk_plan
 
 
 def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, names):
@@ -69,8 +69,8 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                           for step in timings['reaches'][n] if step['name'] == op['kind']), None)
             if reach: t0, t1 = float(reach['start']), float(reach['start']) + float(reach['duration'])
             times = [round(t0 + (t1 - t0) * f, 2) for f in ((0.35, 0.82, 0.95) if op['kind'] == 'carry' else REACH_TIMES.get(op['kind'], (0.4, 0.55, 0.7)))]
-            plan38 = care38_plan(op, t0) if op['kind'] in CARE_38 and reach and pet else None          # đợt 38 A: lúc đo theo nhịp của động tác
-            if plan38: times = plan38['times']
+            tool_plan = care_plan_tools(op, t0) if op['kind'] in HANDS_ON_CARE and reach and pet else None          # đợt 38 A: lúc đo theo nhịp của động tác
+            if tool_plan: times = tool_plan['times']
             pet = pet_of(op['target'])
             ask = ([f'Does {op["who"]}\'s hand touch, or almost touch, the {"animal" if pet else "other person"} ({op["target"]})?']
                    if REACH_ACTIONS[op['kind']] != 'hands' else [f'Do the hands of {op["who"]} and {op["target"]} meet (touch or almost touch)?'])
@@ -82,7 +82,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           **({'samples': [round(t0 + n / 30, 3) for n in range(int((t1 - t0) * 30) + 1)]} if op['kind'] == 'carry' else {}),
                                           # SOI (đợt 37): đầu quay / cúi về đầu con vật lúc soi tai, mắt, răng — không nhìn ra máy quay.
                                           **({'gaze': [{'times': times, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}]} if op['kind'] == 'examine' and pet else {}),
-                                          **({'gaze': plan38['gaze']} if plan38 else {}),
+                                          **({'gaze': tool_plan['gaze']} if tool_plan else {}),
                                           # VUỐT (đợt 32): dải mốc mỗi 0,1 s suốt các lần vuốt (0,45…1,7 s của bước) — tay có áp sát và
                                           # trượt theo đầu / lưng con vật suốt động tác không, không chỉ ở lúc được hỏi.
                                           **({'track': [round(t0 + 0.45 + 0.1 * n, 2) for n in range(13) if 0.45 + 0.1 * n <= (t1 - t0) - 0.3]} if op['kind'] == 'stroke' and pet else {}),
@@ -119,15 +119,15 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                                           'gaze': [{'times': pill, 'aim': 'pet', 'on': op['target'], 'what': f'{op["target"]}\'s head'}],
                                           # NHAI (đợt 36): độ há mỗi 0,1 s suốt quãng con vật nhai sau khi khép miệng (bước + 2,2 … 4,8 s; miệng khép xong lúc ~2,1 s)
                                           'chew': [round(float(reach['start']) + 2.2 + i * 0.1, 2) for i in range(27)]}})
-            if plan38:
-                moments.append({'t': plan38['times'][1], 'what': f'{op["who"]} {op["kind"]} {op["target"]} — the tool at work', 'ask': plan38['ask'], 'check': plan38['check']})
+            if tool_plan:
+                moments.append({'t': tool_plan['times'][1], 'what': f'{op["who"]} {op["kind"]} {op["target"]} — the tool at work', 'ask': tool_plan['ask'], 'check': tool_plan['check']})
             if op['kind'] != 'examine': continue                                      # khám: còn khoảnh khắc đèn soi ở dưới
-        if op['kind'] == 'desk39' or (op['kind'] == 'pair' and op['name'] in DESK_39):
+        if op['kind'] == 'desk39' or (op['kind'] == 'pair' and op['name'] in DESK_ACTIONS):
             # ĐỢT 39 A — quầy thu ngân / cà phê: lúc đo theo nhịp của rig (RigSVG.PAY_* / COUNT_* / STAMP_* / POUR_* …), tools/acting_check.py `desk39`.
             step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
                          for step in timings['reaches'][n] if step['name'] == op['name']), None)
             if not step: continue
-            plan = desk39_plan(op['name'], float(step['start']), float(step['duration']), op.get('hold'))
+            plan = desk_plan(op['name'], float(step['start']), float(step['duration']), op.get('hold'))
             if not plan: continue
             check = dict({'kind': 'desk39', 'name': op['name'], 'who': op['who'], 'target': op.get('target')}, **plan)
             moments.append({'t': plan['times'][len(plan['times']) // 2], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op.get('target') else ''),
@@ -277,7 +277,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                 ask = [f'Is {who} yawning wide (mouth open, eyes shut) with both arms stretched up over the head?']
             times = [round(t0 + m, 2) for m in marks]
             moments.append({'t': times[1], 'what': f'{who} {name}', 'ask': ask + [f'Are {who}\'s hands inside the frame (not cut off by its edge)?'],
-                            'check': {'kind': 'talk39', 'name': name, 'who': who, 'times': times, 'size': SIZE_39.get(op.get('size'), op.get('size')) if name == 'showSize' else None, 'with': op.get('with')}})
+                            'check': {'kind': 'talk39', 'name': name, 'who': who, 'times': times, 'size': SHOW_SIZE_GAP.get(op.get('size'), op.get('size')) if name == 'showSize' else None, 'with': op.get('with')}})
             continue
         if op['kind'] == 'motion42d':
             # ĐỢT 42 D — CHẠY, NHẢY LÊN, NHẢY MÚA: mỗi 1/30 s suốt bước (pha bay, chân trụ không trượt, đầu / tay / chân trong khung) và
@@ -318,7 +318,7 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             # bàn chân trước); nấp — mỗi 0,1 s suốt bước (không chạy xuyên qua người).
             span = {'chaseTail': (t0 + 0.4, t1 - 2.0, 1 / 15), 'knead': (t0 + 0.6, t1 - 0.4, 0.06), 'hide': (t0, t1, 0.1), 'lick': (t0 + 0.3, t1 - 0.4, 1 / 30), 'eatCarrot': (t0 + 0.4, t1 - 0.1, 0.1), 'shiverAtVet': (t0, t1, 1 / 30), 'struggle': (t0, t1, 1 / 30), 'groggy': (t0, t1, 0.1), 'pawAtCone': (t0, t1, 1 / 15),
                     'playBow': (t0 + 0.5, t1 - 0.5, 0.2), 'howl': (t0 + 1.1, t1 - 0.7, 0.2), 'dig': (t0 + 0.4, t1 - 0.5, 0.06), 'carryToy': (t0 + 0.7, t1 - 0.3, 0.2),
-                    'leanOnLeg': (t0 + 0.6, t1 - 0.5, 0.2), 'tugOfWar': (t0 + 0.9, t1 - 0.6, 0.1), **{name: (t0 + 0.1, t1 - 0.1, 0.1) for name in PET_ACTS_40}}.get(op['name'])      # đợt 40 A, B, C (C: bốn động tác mới; cà rốt đo kỹ hơn)
+                    'leanOnLeg': (t0 + 0.6, t1 - 0.5, 0.2), 'tugOfWar': (t0 + 0.9, t1 - 0.6, 0.1), **{name: (t0 + 0.1, t1 - 0.1, 0.1) for name in CAT_RABBIT_ACTS}}.get(op['name'])      # đợt 40 A, B, C (C: bốn động tác mới; cà rốt đo kỹ hơn)
             samples = [round(span[0] + span[2] * n, 2) for n in range(int((span[1] - span[0]) / span[2]) + 1)] if span and span[1] > span[0] else []
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' {op["target"]}' if op['target'] else ''), 'ask': [PET_ACT_ASK[op['name']]],
                             'check': dict({'kind': 'petAct', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'carried': op.get('carried', False), 'times': times},

@@ -1,13 +1,13 @@
 """Expanding the script before the build: combos (runtime/combos.js), restrain timing, narrator turns."""
 import json, os, re
 from .actions import PARTNER_SECONDS, RESTRAIN, RESTRAIN_PAIRS, RESTRAIN_TAIL
-from .schema import NARRATOR_TURN_KEYS_42A
+from .schema import NARRATOR_TURN_KEYS
 from .util import ROOT, fail, js, known
 
 
-def narrator_split_42a(script, narrators):
+def narrator_split(script, narrators):
     """ĐỢT 42 A: tách lượt của NGƯỜI DẪN (giọng, không hiện hình) khỏi các lượt của nhân vật thật. Lượt riêng → mục `together` rỗng kèm
-    `_narr42a`; lượt trong `together` → dời sang `_narr42a` của mục ấy. Nhờ vậy mọi bước đo / dựng góc máy chỉ thấy nhân vật thật."""
+    `_narrator_turns`; lượt trong `together` → dời sang `_narrator_turns` của mục ấy. Nhờ vậy mọi bước đo / dựng góc máy chỉ thấy nhân vật thật."""
     if not narrators: return script
     out = []
     for index, entry in enumerate(script):
@@ -17,15 +17,15 @@ def narrator_split_42a(script, narrators):
         if not voices:
             out.append(entry); continue
         for turn in voices:
-            known(f'{where} (narrator "{turn["who"]}")', turn, NARRATOR_TURN_KEYS_42A)
+            known(f'{where} (narrator "{turn["who"]}")', turn, NARRATOR_TURN_KEYS)
             if not isinstance(turn.get('say'), str) or not turn['say'].strip(): fail(f'{where}: the narrator "{turn["who"]}" has no body — a turn of theirs needs a "say" line (nothing else)')
         if group is not entry.get('together'):                        # lượt riêng của người dẫn: "view" (nếu có) thuộc về mục
-            wrapper = {'together': [], '_narr42a': [{k: v for k, v in entry.items() if k != 'view'}]}
+            wrapper = {'together': [], '_narrator_turns': [{k: v for k, v in entry.items() if k != 'view'}]}
             if 'view' in entry: wrapper['view'] = entry['view']
             out.append(wrapper)
         else:
             if any('view' in turn for turn in voices): fail(f'{where}: put "view" on the "together" entry, not on the narrator\'s turn')
-            out.append(dict(entry, together=[turn for turn in group if turn not in voices], _narr42a=[dict(turn) for turn in voices]))
+            out.append(dict(entry, together=[turn for turn in group if turn not in voices], _narrator_turns=[dict(turn) for turn in voices]))
     return out
 
 
