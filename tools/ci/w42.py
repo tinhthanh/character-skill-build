@@ -41,7 +41,7 @@ def framing42c(work, problems, part):
                 if needle not in done.stdout: problems.append(f"{scene42c['id']}: acting_check did not measure {needle!r}")
     if part == 'laptop':
         # Quầy lễ tân: máy tính không còn đứng chắn ngực người ngồi quầy ở chỗ gợi ý (x -300).
-        reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scene.py'), encoding='utf-8').read())] if item), None)
+        reception42c = next((item for item in [__import__('re').search(r"'laptop', 'x': (-?\d+)", open(os.path.join(HERE, 'scenelib', 'sets.py'), encoding='utf-8').read())] if item), None)
         if not reception42c or abs(int(reception42c.group(1)) + 300) < 80: problems.append('reception preset: the laptop must not stand in front of the receptionist spot (x -300)')
 
 

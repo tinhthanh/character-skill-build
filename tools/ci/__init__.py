@@ -145,9 +145,9 @@ def vocab():
     combos = open(os.path.join(ROOT, 'runtime', 'combos.js'), encoding='utf-8').read()
     block = re.search(r'BEGIN COMBOS(.*)END COMBOS', combos, re.S)
     words.update(re.findall(r'^  "?(\w+)"?: ', block.group(1) if block else '', re.M))
-    scene = open(os.path.join(TOOLS, 'scene.py'), encoding='utf-8').read()
-    for table in ('SET_PRESETS', 'PRESETS'):
-        body = re.search(r'^' + table + r' = \{(.*?)^\}', scene, re.S | re.M)
+    for table, file in (('SET_PRESETS', 'sets.py'), ('PRESETS', 'assets.py')):          # bối cảnh 3D dựng sẵn, nền 2D dựng sẵn
+        source = open(os.path.join(TOOLS, 'scenelib', file), encoding='utf-8').read()
+        body = re.search(r'^' + table + r' = \{(.*?)^\}', source, re.S | re.M)
         if body: words.update(re.findall(r"^    '([\w-]+)':", body.group(1), re.M))
     words.update(os.path.splitext(f)[0] for f in os.listdir(os.path.join(ROOT, 'characters')) if f.endswith('.js') and f not in ('index.js', '_template.js'))
     rig = ''.join(open(os.path.join(ROOT, 'runtime', *f), encoding='utf-8').read() for f in (('rig-thu.js',), ('pet', 'shared.js')))     # bảng giống loài nằm ở pet/shared.js
