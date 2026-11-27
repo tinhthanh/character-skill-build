@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.85.0
+
+Faster: `tools/acting_check.py` (wave 45). The scene step of `sh tools/check.sh` went from about 9 min to 4.5 min (271 s
+wall, 62 cases). Across all 69 CI scenes, acting_check time went from 2785 s to 721 s. Old and new give identical output
+on every scene, 2419 measure lines, with no differences.
+
+- **Where the time was**: Chrome drawing each screenshot, not the Python pixel loops (1–5 s per scene). The software
+  compositor took 1–3.5 s per 1920×1080 frame of a 3D set, and more at 2×.
+- **Draw only what is measured**: shots now set the draw viewport to the measured region
+  (`Emulation.setDeviceMetricsOverride` `viewport`) and clip to it. That is 3–7× faster per shot, with the same pixels.
+- **One Chrome per scene**: `tools/chrome_run.py` has a reusable page (`Page45`) instead of several launches. The page is
+  reloaded before each pass to keep results exact (see Known).
+- **Pixel work**: done in memory with Pillow's C operations instead of PNG files and per-pixel Python loops. The two
+  hand shots are skipped when no hand is measured. `--keep` saves only the clipped regions.
+- **Slowest cases now**: combo41 211 s, example_scene 171 s, framing44b 145 s, floor42e 137 s (clinic_tools35 was 538 s).
+
+Known
+- **What a frame shows can depend on the seeks made before it.** Reusing the page after `probe` changed two scenes: at
+  10.14 s in `acting` the cat's tail drew over the doctor's arm, and the hand dropped from 100 % to 86 % visible. A
+  freshly loaded page gives the old result. This looks like a layering issue in `runtime/set3d.js`. A render that seeks
+  out of order, or splits frames across workers, may be affected too. Not fixed yet.
+
 ## 0.84.0
 
 Fixed: the known problems of 0.82.0 and 0.83.0 (wave 44, two Opus agents in parallel), and a faster test harness. Also
