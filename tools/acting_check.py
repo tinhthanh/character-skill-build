@@ -82,12 +82,24 @@ def check_depths(folder):
                      + (f' — slides in view, standing still, for {d["slid"]} frame{"" if d["slid"] == 1 else "s"}' if d['slid'] else '')} for d in (DEPTHS or [])]
 
 
-def probe(folder, times):
-    """Mở cảnh, tua tới từng lúc trong `times`, trả về {lúc: [số đo của từng nhân vật]}."""
+PAGE_45 = {}            # đợt 45: Chrome đang mở cảnh đang soát — {'folder', 'server', 'page', 'used'}; mọi lượt đo (probe, pixel) dùng chung
+
+
+def page45(folder, scale=1):
+    """ĐỢT 45 — MỘT CHROME CHO CẢ LƯỢT SOÁT: trả về trang của cảnh `folder` VỪA MỞ (chưa tua lần nào) ở tỉ lệ điểm ảnh `scale`. Lần đầu khởi
+    động Chrome (tools/chrome_run.py `Page45`); các lượt sau (`probe`, `pet_pixels`, `person_pixels_44b`) chỉ mở lại trang trong Chrome ấy.
+    Mỗi lượt vẫn bắt đầu từ trang mới mở như trước: số đo phụ thuộc thứ tự tua trước đó (thử: dùng tiếp trang sau `probe` thì bàn tay bác sĩ
+    trên con mèo đổi từ 100 % thành 86 % thấy được). `close_page45()` đóng Chrome (check_scene, khi xong cảnh)."""
+    if PAGE_45.get('folder') == folder:
+        page = PAGE_45['page']
+        if PAGE_45['used'] or page.scale != scale: page.load(scale)
+        PAGE_45['used'] = True
+        return page
+    close_page45()
+    sys.path.insert(0, HERE)
+    from chrome_run import Page45
     html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
-    found = re.search(r'data-composition-id="([^"]+)"', html)
-    if not found: sys.exit(f'acting_check: {folder}/index.html has no data-composition-id')
-    if 'window.__set = set' not in html: sys.exit(f'acting_check: {folder} was built before tools/scene.py exposed the set — build it again')
+    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
     chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
     if not chrome: sys.exit('acting_check: no Chrome found (tools/chrome.sh)')
     with socket.socket() as probe_socket:
@@ -98,28 +110,46 @@ def probe(folder, times):
         for _ in range(50):
             if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
             time.sleep(0.1)
-        # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
-        script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
-                  "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
-                  "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
-                  "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); if (window.__set.careProbe) out['care@' + t] = window.__set.careProbe(); out['spots@' + t] = window.__set.spotProbe ? window.__set.spotProbe() : []; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
-                  % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
-        size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
-        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
-                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--eval', script], capture_output=True, text=True)
-        if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not probe {folder}:\n{done.stderr.strip()[-500:]}')
-        found = json.loads(done.stdout)
-        shots = found.pop('shots', None)
-        global DEPTHS
-        DEPTHS = found.pop('depths', None)
-        global SCALES, SPOTS
-        SCALES = {float(k[7:]): v for k, v in found.items() if k.startswith('scales@')}
-        SCALES.update({('paws', float(k[5:])): v for k, v in found.items() if k.startswith('paws@')})
-        SCALES.update({('care', float(k[5:])): v for k, v in found.items() if k.startswith('care@')})
-        SPOTS = {float(k[6:]): v for k, v in found.items() if k.startswith('spots@')}
-        return {float(k): v for k, v in found.items() if '@' not in k}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
-    finally:
+        page = Page45(url, chrome, (int(size.group(1)), int(size.group(2))) if size else (1920, 1080), 'window.__sceneTimings', 90, scale).__enter__()
+    except BaseException:
         server.terminate()
+        raise
+    PAGE_45.update(folder=folder, server=server, page=page, used=True)
+    return page
+
+
+def close_page45():
+    if not PAGE_45: return
+    try: PAGE_45['page'].__exit__(None, None, None)
+    finally:
+        PAGE_45['server'].terminate()
+        PAGE_45.clear()
+
+
+def probe(folder, times):
+    """Mở cảnh, tua tới từng lúc trong `times`, trả về {lúc: [số đo của từng nhân vật]}."""
+    html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
+    found = re.search(r'data-composition-id="([^"]+)"', html)
+    if not found: sys.exit(f'acting_check: {folder}/index.html has no data-composition-id')
+    if 'window.__set = set' not in html: sys.exit(f'acting_check: {folder} was built before tools/scene.py exposed the set — build it again')
+    # Mỗi lúc: số đo diễn xuất (`actingProbe`) và đồ vật bị mép khung cắt (`propFraming`, đợt 30 — bộ dựng cũ không có thì []).
+    script = ("(() => { const tl = window.__timelines[%s], out = {}; for (const t of %s) { tl.seek(t, false); out[t] = window.__set.actingProbe(); "
+              "out['props@' + t] = window.__set.propFraming ? window.__set.propFraming() : null; "
+              "out['scales@' + t] = (() => { const v = window.__set.view.getBoundingClientRect(); return [...window.__set.view.querySelectorAll('svg[data-prop=\\'scale\\']')].map((g) => { const r = g.getBoundingClientRect(); return { x0: r.left - v.left, x1: r.right - v.left, top: r.top - v.top + r.height * 441 / 470 }; }); })(); "
+              "if (window.__set.paws) out['paws@' + t] = window.__set.paws(); if (window.__set.careProbe) out['care@' + t] = window.__set.careProbe(); out['spots@' + t] = window.__set.spotProbe ? window.__set.spotProbe() : []; } out.shots = window.__set.shotLog || null; out.depths = (%s)(tl); return out; })()"
+              % (json.dumps(found.group(1)), json.dumps(sorted(set(times))), DEPTH_JS))
+    try: found = page45(folder).evaluate(script)
+    except RuntimeError as error: sys.exit(f'acting_check: could not probe {folder}:\n{str(error)[-500:]}')
+    if not isinstance(found, dict): sys.exit(f'acting_check: could not probe {folder}:\nthe probe returned nothing')
+    shots = found.pop('shots', None)
+    global DEPTHS
+    DEPTHS = found.pop('depths', None)
+    global SCALES, SPOTS
+    SCALES = {float(k[7:]): v for k, v in found.items() if k.startswith('scales@')}
+    SCALES.update({('paws', float(k[5:])): v for k, v in found.items() if k.startswith('paws@')})
+    SCALES.update({('care', float(k[5:])): v for k, v in found.items() if k.startswith('care@')})
+    SPOTS = {float(k[6:]): v for k, v in found.items() if k.startswith('spots@')}
+    return {float(k): v for k, v in found.items() if '@' not in k}, {float(k[6:]): v for k, v in found.items() if k.startswith('props@')}, shots
 
 
 def gap(point, box):
@@ -166,195 +196,246 @@ SEEN = 0.70            # con vật được chạm: thấy ≥ 70 % hình nó (�
 SEEN_HEAD = 0.60       # … và ≥ 60 % cái đầu
 
 
+def mask45(p, q, limit):
+    """Ảnh 'L' 255 ở chỗ hai ảnh RGB khác nhau quá `limit` ở một kênh màu nào đó (max |p − q| > limit), 0 chỗ khác — phép so điểm ảnh
+    của `pet_pixels` làm bằng Pillow (C) thay vì vòng lặp Python từng điểm (đợt 45)."""
+    from PIL import ImageChops
+    r, g, b = ImageChops.difference(p, q).split()
+    return ImageChops.lighter(ImageChops.lighter(r, g), b).point(lambda v: 255 if v > limit else 0)
+
+
+def count45(mask, box=None):
+    """Số điểm 255 của ảnh 'L' (trong `box` = (x0, y0, x1, y1), x1 / y1 không tính; ngoài ảnh là 0)."""
+    if box is not None:
+        if box[2] <= box[0] or box[3] <= box[1]: return 0
+        mask = mask.crop(box)
+    return mask.histogram()[255]
+
+
+def clip45(region, zoom, W, H):
+    """Vùng chụp (px CSS nguyên, trong khung W × H px CSS) phủ `region` = (x0, y0, x1, y1) điểm ảnh ở tỉ lệ `zoom`; None nếu rỗng."""
+    import math
+    x0, y0 = max(0, math.floor(region[0] / zoom)), max(0, math.floor(region[1] / zoom))
+    x1, y1 = min(W, math.ceil(region[2] / zoom)), min(H, math.ceil(region[3] / zoom))
+    return (x0, y0, x1 - x0, y1 - y0) if x1 > x0 and y1 > y0 else None
+
+
+def shot45(page, clip, keep=None):
+    """Chụp vùng `clip` (px CSS) của trang, trả về ảnh RGB (gốc ảnh = góc trên trái của vùng, ở tỉ lệ điểm ảnh của trang). `keep`: ghi PNG ra đó."""
+    import io
+    from PIL import Image
+    data = page.capture(clip)
+    if keep:
+        with open(keep, 'wb') as f: f.write(data)
+    return Image.open(io.BytesIO(data)).convert('RGB')
+
+
 def pet_pixels(folder, jobs, keep=None, scale=None):
     """CON VẬT THẤY ĐƯỢC BAO NHIÊU (đợt 31), đo bằng pixel. `jobs`: [(lúc, tên con vật, tên người chạm)]. Ở mỗi lúc chụp năm
     ảnh: a — như thường; b — ẩn host con vật; c — host con vật lên lớp trên cùng (z-index; nhân vật nằm trên các lớp phẳng
     xếp theo z-index, set3d.js); d — host người chạm lên lớp trên cùng; e — như d, hai bàn tay tô hồng sẫm. Trả về {(lúc, tên): {'all',
     'head', 'hand'}}: tỉ lệ điểm ảnh của hình con vật (c khác b) mà ảnh thường cũng thấy (a khác b) — trong khung hình vẽ đầu
     + thân (`parts` của actingProbe) để bóng dưới sàn không lẫn vào; `hand`: trong khung hình vẽ của bàn tay gần con vật nhất,
-    tỉ lệ điểm ảnh của bàn tay (d khác e) mà ảnh thường vẫn thấy như ở d (a giống d: không bị gì che)."""
+    tỉ lệ điểm ảnh của bàn tay (d khác e) mà ảnh thường vẫn thấy như ở d (a giống d: không bị gì che).
+    Đợt 45: chụp trong Chrome chung của cảnh (`page45`, trang mở lại cho lượt này), chỉ VÙNG được đo (khung đầu + thân con vật, khung bàn
+    tay nới thêm dải tìm khe 80 px), không ghi ra đĩa, so điểm ảnh bằng Pillow (C); d, e chỉ chụp khi có bàn tay để đo. Ảnh một vùng có thể
+    lệch 1–2 mức màu so với cùng chỗ trên ảnh cả khung (Chrome vẽ theo ô khác) — mọi số đo trên 69 cảnh CI vẫn như trước."""
     try:
-        from PIL import Image
+        from PIL import Image, ImageChops
     except ImportError:
         return None
-    import tempfile
     html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
     comp = re.search(r'data-composition-id="([^"]+)"', html).group(1)
-    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
-    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
-    with socket.socket() as probe_socket:
-        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
-    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={os.path.abspath(folder)}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    out = keep or tempfile.mkdtemp(prefix='pet-seen-')
-    os.makedirs(out, exist_ok=True)
-    try:
-        url = f'http://127.0.0.1:{port}/__project/index.html'
-        for _ in range(50):
-            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
-            time.sleep(0.1)
-        tl = f'window.__timelines[{json.dumps(comp)}]'
-        steps, bases = [], []
-        for n, (t, name, toucher) in enumerate(jobs):
-            host = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(name)} + '\"]')"
-            person = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(toucher)} + '\"]')"
-            base = os.path.join(out, f'{os.path.basename(os.path.normpath(folder))}-pet{n}')
-            steps += [{'eval': f'(() => {{ {tl}.seek({t}, false); window.__set.update(); return window.__set.actingProbe(); }})()'},
-                      {'screenshot': base + '-a.png'},
-                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()"},
-                      {'screenshot': base + '-b.png'},
-                      {'eval': f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()"},
-                      {'screenshot': base + '-c.png'},
-                      # d: người chạm ở lớp trên cùng; e: như d, hai bàn tay (nhóm `-coTayL/R`) tô một màu hồng sẫm — chỗ d khác e là
-                      # đúng hình bàn tay. (Ẩn cả người chỉ để hiện bàn tay thì không được: cánh tay trước thân bị mask theo hình thân.)
-                      {'eval': f"(() => {{ const h = {host}, p = {person}; if (h) h.style.zIndex = h.dataset.z; if (p) {{ p.dataset.z = p.style.zIndex; p.style.zIndex = 99999; }} return 0; }})()"},
-                      {'screenshot': base + '-d.png'},
-                      {'eval': f"(() => {{ const p = {person}; if (p) for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) {{ g.dataset.fill = g.style.fill; g.style.fill = '#ff00ff'; }} return 0; }})()"},
-                      {'screenshot': base + '-e.png'},
-                      {'eval': f"(() => {{ const p = {person}; if (p) {{ p.style.zIndex = p.dataset.z; for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) g.style.fill = g.dataset.fill || ''; }} return 0; }})()"}]
-            bases.append(base)
-        plan = os.path.join(out, 'pet-steps.json')
-        json.dump(steps, open(plan, 'w', encoding='utf-8'))
-        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
-                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan, '--scale', str(scale or 1)], capture_output=True, text=True)
-        if done.returncode != 0 or not done.stdout.strip(): sys.exit(f'acting_check: could not capture {folder}:\n{done.stderr.strip()[-500:]}')
-        probes = json.loads(done.stdout.strip().splitlines()[-1])[0::6]
-        zoom = float(scale or 1)
-        # Ảnh chụp ở tỉ lệ zoom (đợt 34): mọi toạ độ của actingProbe (px CSS) nhân zoom; ngưỡng tính bằng px (dải sát 3 px, tìm khe 80 px,
-        # tối thiểu 30 điểm) cũng tính theo px CSS.
-        def grow(value, key=None):
-            if isinstance(value, dict): return {name: grow(item, name) for name, item in value.items()}
-            if isinstance(value, list): return [grow(item, key) for item in value]
-            return value * zoom if isinstance(value, (int, float)) and not isinstance(value, bool) and key in ('x', 'y', 'x0', 'x1', 'y0', 'y1', 'tall') else value
-        probes = [[grow(actor) for actor in probe] if isinstance(probe, list) else probe for probe in probes]
-        result = {}
-        for (t, name, toucher), base, probe in zip(jobs, bases, probes):
-            pet = next((a for a in probe if a['name'] == name), None)
-            if not pet or not pet.get('parts'): continue
-            a, b, c = (Image.open(base + k).convert('RGB') for k in ('-a.png', '-b.png', '-c.png'))
-            W, H = a.size
-            pa, pb, pc = a.load(), b.load(), c.load()
-            differ = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > 12
-            counts = {}
-            boxes = pet['parts']
-            x0, y0 = max(0, int(min(r['x0'] for r in boxes.values()))), max(0, int(min(r['y0'] for r in boxes.values())))
-            x1, y1 = min(W, int(max(r['x1'] for r in boxes.values())) + 1), min(H, int(max(r['y1'] for r in boxes.values())) + 1)
-            for y in range(y0, y1):
-                for x in range(x0, x1):
-                    inside = [k for k, r in boxes.items() if r['x0'] <= x <= r['x1'] and r['y0'] <= y <= r['y1']]
-                    if not inside or not differ(pc[x, y], pb[x, y]): continue
-                    seen = differ(pa[x, y], pb[x, y])
-                    for k in ['all'] + inside:
-                        total, shown = counts.get(k, (0, 0)); counts[k] = (total + 1, shown + seen)
-            result[(t, name)] = {part: shown / total for part, (total, shown) in counts.items() if total >= 30 * zoom * zoom}
-            who = next((a for a in probe if a['name'] == toucher), None)
-            if who and who.get('hands') and who.get('tall') and 'all' in result[(t, name)]:
-                d, e = (Image.open(base + k).convert('RGB') for k in ('-d.png', '-e.png'))
-                pd, pe = d.load(), e.load()
-                # BÀN TAY THẤY ĐƯỢC (đợt 35): ảnh thường khác ảnh "người trên cùng" quá HAZE mới là bị che. Lớp nắng / sương mờ của bối cảnh
-                # (vệt nắng cửa sổ phòng khám) phủ cả bàn tay lẫn con vật, đổi màu đều 17–22 — bàn tay vẽ trên con vật vẫn rõ mà đếm là
-                # "khuất" (băng chân corgi trên bàn khám: 5 % thấy được). Thân con vật / vành loa che thì khác xa hơn nhiều.
-                veiled = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > HAZE
-                centre = lambda bx: ((bx['x0'] + bx['x1']) / 2, (bx['y0'] + bx['y1']) / 2)
-                spots = [centre(bx) for bx in boxes.values()]
-                hand = min(who['hands'], key=lambda h: min((h['x'] - x) ** 2 + (h['y'] - y) ** 2 for x, y in spots))
-                # Trong khung hình vẽ của bàn tay (cổ tay trở ra), không phải một vòng quanh lòng bàn tay: vòng ấy lấy cả đầu gối
-                # người ngồi ngay sau con vật.
-                hb = hand.get('box') or {'x0': hand['x'] - who['tall'] * 0.03, 'x1': hand['x'] + who['tall'] * 0.03, 'y0': hand['y'] - who['tall'] * 0.03, 'y1': hand['y'] + who['tall'] * 0.03}
-                # TIẾP XÚC (đợt 31): phần bàn tay nằm sát (≤ 3 px) hình con vật — đè lên nó hay chạm mép. Tay thấy trọn mà không sát
-                # hình con vật là tay lơ lửng trên đầu nó.
-                pet_px = lambda x, y: 0 <= x < W and 0 <= y < H and differ(pc[x, y], pb[x, y])
-                mine = shown = near = sunk = 0
-                hand_px = []
-                for y in range(max(0, int(hb['y0'])), min(H, int(hb['y1']) + 1)):
-                    for x in range(max(0, int(hb['x0'])), min(W, int(hb['x1']) + 1)):
-                        if not differ(pd[x, y], pe[x, y]): continue
-                        mine += 1; seen_px = not veiled(pa[x, y], pd[x, y]); shown += seen_px
-                        band = round(3 * zoom)
-                        near += any(pet_px(x + dx, y + dy) for dx in (-band, 0, band) for dy in (-band, 0, band))
-                        # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
-                        # lưng (con vật vẽ trước người), không phải đặt lên đó.
-                        sunk += (not seen_px) and pet_px(x, y)
-                        hand_px.append((x, y))
-                if mine >= 30 * zoom * zoom:
-                    result[(t, name)]['px'] = mine / (zoom * zoom)
-                    result[(t, name)]['hand'] = shown / mine; result[(t, name)]['contact'] = near / mine; result[(t, name)]['sunk'] = sunk / mine
-                    # KHE HỞ (đợt 32): tay không sát con vật thì cách nó bao nhiêu px (tìm tới 80 px quanh khung bàn tay).
-                    gap_px = 0.0
-                    if not near:
-                        reach, stride = int(80 * zoom), max(2, int(2 * zoom))
-                        pets = [(x, y) for y in range(max(0, int(hb['y0']) - reach), min(H, int(hb['y1']) + reach + 1), stride)
-                                for x in range(max(0, int(hb['x0']) - reach), min(W, int(hb['x1']) + reach + 1), stride) if pet_px(x, y)]
-                        gap_px = min((min((hx - x) ** 2 + (hy - y) ** 2 for x, y in pets) ** 0.5 for hx, hy in hand_px[::max(3, int(3 * zoom * zoom))]), default=81.0 * zoom) if pets else 81.0 * zoom
-                    result[(t, name)]['gap'] = gap_px / who['tall']
-        return result
-    finally:
-        server.terminate()
-        if not keep:
-            for item in os.listdir(out): os.remove(os.path.join(out, item))
-            os.rmdir(out)
+    if keep: os.makedirs(keep, exist_ok=True)
+    zoom = float(scale or 1)
+    z = int(scale or 1)
+    try: page = page45(folder, z)
+    except RuntimeError as error: sys.exit(f'acting_check: could not capture {folder}:\n{str(error)[-500:]}')
+    VW, VH = page.size
+    W, H = VW * z, VH * z
+    tl = f'window.__timelines[{json.dumps(comp)}]'
+    # Ảnh chụp ở tỉ lệ zoom (đợt 34): mọi toạ độ của actingProbe (px CSS) nhân zoom; ngưỡng tính bằng px (dải sát 3 px, tìm khe 80 px,
+    # tối thiểu 30 điểm) cũng tính theo px CSS.
+    def grow(value, key=None):
+        if isinstance(value, dict): return {name: grow(item, name) for name, item in value.items()}
+        if isinstance(value, list): return [grow(item, key) for item in value]
+        return value * zoom if isinstance(value, (int, float)) and not isinstance(value, bool) and key in ('x', 'y', 'x0', 'x1', 'y0', 'y1', 'tall') else value
+    band, reach, stride = round(3 * zoom), int(80 * zoom), max(2, int(2 * zoom))
+
+    def measure(n, t, name, toucher):
+        """Số đo của một lúc: dict (có thể rỗng), hay None khi con vật không có / không có khung hình vẽ (không ghi vào kết quả)."""
+        import math
+        host = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(name)} + '\"]')"
+        person = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(toucher)} + '\"]')"
+        base = keep and os.path.join(keep, f'{os.path.basename(os.path.normpath(folder))}-pet{n}')
+        probe = page.evaluate(f'(() => {{ {tl}.seek({t}, false); window.__set.update(); return window.__set.actingProbe(); }})()')
+        probe = [grow(actor) for actor in probe] if isinstance(probe, list) else probe
+        pet = next((a for a in probe if a['name'] == name), None)
+        if not pet or not pet.get('parts'): return None
+        boxes = pet['parts']
+        x0, y0 = max(0, int(min(r['x0'] for r in boxes.values()))), max(0, int(min(r['y0'] for r in boxes.values())))
+        x1, y1 = min(W, int(max(r['x1'] for r in boxes.values())) + 1), min(H, int(max(r['y1'] for r in boxes.values())) + 1)
+        if x1 <= x0 or y1 <= y0: return {}
+        # Bàn tay sẽ đo (nếu con vật đủ lớn): bàn tay của người chạm gần giữa các khung hình vẽ con vật nhất.
+        who = next((a for a in probe if a['name'] == toucher), None)
+        hb = None
+        if who and who.get('hands') and who.get('tall'):
+            centre = lambda bx: ((bx['x0'] + bx['x1']) / 2, (bx['y0'] + bx['y1']) / 2)
+            spots = [centre(bx) for bx in boxes.values()]
+            hand = min(who['hands'], key=lambda h: min((h['x'] - x) ** 2 + (h['y'] - y) ** 2 for x, y in spots))
+            # Trong khung hình vẽ của bàn tay (cổ tay trở ra), không phải một vòng quanh lòng bàn tay: vòng ấy lấy cả đầu gối
+            # người ngồi ngay sau con vật.
+            hb = hand.get('box') or {'x0': hand['x'] - who['tall'] * 0.03, 'x1': hand['x'] + who['tall'] * 0.03, 'y0': hand['y'] - who['tall'] * 0.03, 'y1': hand['y'] + who['tall'] * 0.03}
+        # Vùng chụp: khung con vật, và khung bàn tay nới rộng bằng dải tìm khe (80 px) + dải sát (3 px) — mọi điểm ảnh phép đo đọc tới.
+        region = [x0, y0, x1, y1]
+        if hb:
+            margin = reach + band + 2
+            region = [min(region[0], int(hb['x0']) - margin), min(region[1], int(hb['y0']) - margin), max(region[2], int(hb['x1']) + margin + 1), max(region[3], int(hb['y1']) + margin + 1)]
+        clip = clip45(region, zoom, VW, VH)
+        ox, oy = clip[0] * z, clip[1] * z
+        at = lambda bx: (bx[0] - ox, bx[1] - oy, bx[2] - ox, bx[3] - oy)          # khung điểm ảnh trong ảnh → trong vùng chụp
+        a = shot45(page, clip, base and base + '-a.png')
+        page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()")
+        b = shot45(page, clip, base and base + '-b.png')
+        page.evaluate(f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()")
+        c = shot45(page, clip, base and base + '-c.png')
+        pet_mask = mask45(c, b, 12)                                   # hình con vật
+        seen_mask = ImageChops.darker(pet_mask, mask45(a, b, 12))     # … mà ảnh thường cũng thấy
+        counts = {}
+        # 'all': điểm trong một khung hình vẽ nào đó; mỗi khung: điểm trong nó (x0 ≤ x ≤ x1, trong vùng [x0, x1) của mọi khung).
+        rects = {k: (max(x0, math.ceil(r['x0'])), max(y0, math.ceil(r['y0'])), min(x1, math.floor(r['x1']) + 1), min(y1, math.floor(r['y1']) + 1)) for k, r in boxes.items()}
+        union = Image.new('L', pet_mask.size, 0)
+        for rect in rects.values():
+            if rect[2] > rect[0] and rect[3] > rect[1]: union.paste(255, at(rect))
+        total = count45(ImageChops.darker(pet_mask, union), at((x0, y0, x1, y1)))
+        if total: counts['all'] = (total, count45(ImageChops.darker(seen_mask, union), at((x0, y0, x1, y1))))
+        for k, rect in rects.items():
+            total = count45(pet_mask, at(rect))
+            if total: counts[k] = (total, count45(seen_mask, at(rect)))
+        out = {part: shown / total for part, (total, shown) in counts.items() if total >= 30 * zoom * zoom}
+        if not (hb and 'all' in out):
+            page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; return 0; }})()")
+            return out
+        # d: người chạm ở lớp trên cùng; e: như d, hai bàn tay (nhóm `-coTayL/R`) tô một màu hồng sẫm — chỗ d khác e là
+        # đúng hình bàn tay. (Ẩn cả người chỉ để hiện bàn tay thì không được: cánh tay trước thân bị mask theo hình thân.)
+        page.evaluate(f"(() => {{ const h = {host}, p = {person}; if (h) h.style.zIndex = h.dataset.z; if (p) {{ p.dataset.z = p.style.zIndex; p.style.zIndex = 99999; }} return 0; }})()")
+        d = shot45(page, clip, base and base + '-d.png')
+        page.evaluate(f"(() => {{ const p = {person}; if (p) for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) {{ g.dataset.fill = g.style.fill; g.style.fill = '#ff00ff'; }} return 0; }})()")
+        e = shot45(page, clip, base and base + '-e.png')
+        page.evaluate(f"(() => {{ const p = {person}; if (p) {{ p.style.zIndex = p.dataset.z; for (const g of p.querySelectorAll('[id$=\"-coTayL\"] *, [id$=\"-coTayR\"] *')) g.style.fill = g.dataset.fill || ''; }} return 0; }})()")
+        hx0, hy0 = max(0, int(hb['x0'])), max(0, int(hb['y0']))
+        hx1, hy1 = min(W, int(hb['x1']) + 1), min(H, int(hb['y1']) + 1)
+        if hx1 <= hx0 or hy1 <= hy0: return out
+        hand_box = at((hx0, hy0, hx1, hy1))
+        mine_mask = mask45(d.crop(hand_box), e.crop(hand_box), 12)                 # điểm của bàn tay
+        # BÀN TAY THẤY ĐƯỢC (đợt 35): ảnh thường khác ảnh "người trên cùng" quá HAZE mới là bị che. Lớp nắng / sương mờ của bối cảnh
+        # (vệt nắng cửa sổ phòng khám) phủ cả bàn tay lẫn con vật, đổi màu đều 17–22 — bàn tay vẽ trên con vật vẫn rõ mà đếm là
+        # "khuất" (băng chân corgi trên bàn khám: 5 % thấy được). Thân con vật / vành loa che thì khác xa hơn nhiều.
+        veiled = mask45(a.crop(hand_box), d.crop(hand_box), HAZE)
+        mine = count45(mine_mask)
+        if mine < 30 * zoom * zoom: return out
+        shown = count45(ImageChops.darker(mine_mask, ImageChops.invert(veiled)))
+        # TIẾP XÚC (đợt 31): phần bàn tay nằm sát (≤ 3 px) hình con vật — đè lên nó hay chạm mép (chín điểm: dời ±3 px mỗi chiều). Tay
+        # thấy trọn mà không sát hình con vật là tay lơ lửng trên đầu nó. Ngoài vùng chụp là ngoài ảnh (vùng chụp phủ mọi chỗ khác).
+        near_mask = None
+        for dx in (-band, 0, band):
+            for dy in (-band, 0, band):
+                moved = pet_mask.crop((hand_box[0] + dx, hand_box[1] + dy, hand_box[2] + dx, hand_box[3] + dy))
+                near_mask = moved if near_mask is None else ImageChops.lighter(near_mask, moved)
+        near = count45(ImageChops.darker(mine_mask, near_mask))
+        # KHUẤT SAU con vật (đợt 32): điểm của bàn tay nằm trong hình nó mà ảnh thường không thấy — tay lún qua viền đầu /
+        # lưng (con vật vẽ trước người), không phải đặt lên đó.
+        sunk = count45(ImageChops.darker(ImageChops.darker(mine_mask, veiled), pet_mask.crop(hand_box)))
+        out['px'] = mine / (zoom * zoom)
+        out['hand'] = shown / mine; out['contact'] = near / mine; out['sunk'] = sunk / mine
+        # KHE HỞ (đợt 32): tay không sát con vật thì cách nó bao nhiêu px (tìm tới 80 px quanh khung bàn tay, mỗi `stride` px).
+        gap_px = 0.0
+        if not near:
+            hw = hx1 - hx0
+            hand_px = [(hx0 + i % hw, hy0 + i // hw) for i, v in enumerate(mine_mask.tobytes()) if v]
+            sx0, sy0 = max(0, int(hb['x0']) - reach), max(0, int(hb['y0']) - reach)
+            sx1, sy1 = min(W, int(hb['x1']) + reach + 1), min(H, int(hb['y1']) + reach + 1)
+            rows = {}
+            if sx1 > sx0 and sy1 > sy0:
+                area = pet_mask.crop(at((sx0, sy0, sx1, sy1))).tobytes()
+                sw = sx1 - sx0
+                for y in range(sy0, sy1, stride):
+                    row = area[(y - sy0) * sw:(y - sy0 + 1) * sw:stride]
+                    xs = [sx0 + i * stride for i, v in enumerate(row) if v]
+                    if xs: rows[y] = xs
+            if rows:
+                # Khoảng cách nhỏ nhất (chính xác như so từng cặp): mỗi hàng điểm con vật, điểm gần nhất theo chiều ngang (bisect).
+                import bisect
+                best = None
+                for hx, hy in hand_px[::max(3, int(3 * zoom * zoom))]:
+                    for y, xs in rows.items():
+                        dy2 = (hy - y) ** 2
+                        if best is not None and dy2 >= best: continue
+                        i = bisect.bisect_left(xs, hx)
+                        for x in xs[max(0, i - 1):i + 1]:
+                            d2 = (hx - x) ** 2 + dy2
+                            if best is None or d2 < best: best = d2
+                gap_px = best ** 0.5 if best is not None else 81.0 * zoom
+            else: gap_px = 81.0 * zoom
+        out['gap'] = gap_px / who['tall']
+        return out
+
+    result = {}
+    for n, (t, name, toucher) in enumerate(jobs):
+        try: found = measure(n, t, name, toucher)
+        except RuntimeError as error: sys.exit(f'acting_check: could not capture {folder}:\n{str(error)[-500:]}')
+        if found is not None: result[(t, name)] = found
+    return result
 
 
 def person_pixels_44b(folder, jobs):
     """ĐỢT 44 B — NGƯỜI SAU QUẦY THẤY ĐƯỢC BAO NHIÊU, đo bằng pixel (như `pet_pixels`). `jobs`: [(lúc, tên, khung đầu, khung ngực)]. Ở mỗi lúc
     chụp ba ảnh: a — như thường; b — ẩn host người ấy; c — host người ấy lên lớp trên cùng. Trong mỗi khung: phần điểm ảnh của hình người ấy
-    (c khác b) mà ảnh thường cũng thấy (a khác b) — mặt quầy, máy tính, màn hình trước họ che thì không thấy. Trả về {(lúc, tên): (đầu, ngực)}."""
+    (c khác b) mà ảnh thường cũng thấy (a khác b) — mặt quầy, máy tính, màn hình trước họ che thì không thấy. Trả về {(lúc, tên): (đầu, ngực)}.
+    Đợt 45: trong Chrome chung của cảnh (trang mở lại cho lượt này), chỉ chụp vùng hai khung, so bằng Pillow (C)."""
     try:
-        from PIL import Image
+        from PIL import ImageChops
     except ImportError:
         return None
-    import tempfile
     html = open(os.path.join(folder, 'index.html'), encoding='utf-8').read()
     comp = re.search(r'data-composition-id="([^"]+)"', html).group(1)
-    size = re.search(r'data-width="(\d+)" data-height="(\d+)"', html)
-    chrome = subprocess.run(['sh', os.path.join(HERE, 'chrome.sh')], capture_output=True, text=True).stdout.strip()
-    with socket.socket() as probe_socket:
-        probe_socket.bind(('127.0.0.1', 0)); port = probe_socket.getsockname()[1]
-    server = subprocess.Popen([sys.executable, os.path.join(HERE, 'serve.py'), str(port), f'--mount={os.path.abspath(folder)}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    out = tempfile.mkdtemp(prefix='clerk-seen-')
+    try: page = page45(folder)
+    except RuntimeError: return None
+    W, H = page.size
+    tl = f'window.__timelines[{json.dumps(comp)}]'
+    result = {}
     try:
-        url = f'http://127.0.0.1:{port}/__project/index.html'
-        for _ in range(50):
-            if subprocess.run(['curl', '-s', '-o', os.devnull, url]).returncode == 0: break
-            time.sleep(0.1)
-        tl = f'window.__timelines[{json.dumps(comp)}]'
-        steps, bases = [], []
-        for n, (t, name, _, _) in enumerate(jobs):
+        for t, name, head, chest in jobs:
             host = f"document.querySelector('[data-set3d][data-name=\"' + {json.dumps(name)} + '\"]')"
-            base = os.path.join(out, f'clerk{n}')
             # Người / con vật KHÁC ẩn đi ở cả ba ảnh: chỉ đo quầy và đồ trên quầy che (khách đứng trước quầy che mặt dược sĩ là chuyện dàn cảnh).
             others = f"window.__set.actingProbe().map((a) => a.name).filter((other) => other !== {json.dumps(name)}).map((other) => document.querySelector('[data-set3d][data-name=\"' + other + '\"]')).filter(Boolean)"
-            steps += [{'eval': f'(() => {{ {tl}.seek({t}, false); window.__set.update(); for (const h of {others}) h.style.visibility = "hidden"; return 0; }})()'},
-                      {'screenshot': base + '-a.png'},
-                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()"},
-                      {'screenshot': base + '-b.png'},
-                      {'eval': f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()"},
-                      {'screenshot': base + '-c.png'},
-                      {'eval': f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; for (const o of document.querySelectorAll('[data-set3d][data-name]')) o.style.visibility = ''; return 0; }})()"}]
-            bases.append(base)
-        plan = os.path.join(out, 'steps.json')
-        json.dump(steps, open(plan, 'w', encoding='utf-8'))
-        done = subprocess.run([sys.executable, os.path.join(HERE, 'chrome_run.py'), url, '--chrome', chrome, '--wait-js', 'window.__sceneTimings', '--timeout', '90',
-                               '--size', f'{size.group(1)}x{size.group(2)}' if size else '1920x1080', '--steps', plan], capture_output=True, text=True)
-        if done.returncode != 0: return None
-        differ = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) > 12
-        result = {}
-        for (t, name, head, chest), base in zip(jobs, bases):
-            a, b, c = (Image.open(base + k).convert('RGB') for k in ('-a.png', '-b.png', '-c.png'))
-            W, H = a.size
-            pa, pb, pc = a.load(), b.load(), c.load()
-            def share(box):
-                total = shown = 0
-                for y in range(max(0, int(box['y0'])), min(H, int(box['y1']) + 1), 2):
-                    for x in range(max(0, int(box['x0'])), min(W, int(box['x1']) + 1), 2):
-                        if not differ(pc[x, y], pb[x, y]): continue
-                        total += 1; shown += differ(pa[x, y], pb[x, y])
-                return shown / total if total >= 20 else None
-            result[(t, name)] = (share(head), share(chest))
-        return result
-    finally:
-        server.terminate()
-        for item in os.listdir(out): os.remove(os.path.join(out, item))
-        os.rmdir(out)
+            spans = [(max(0, int(box['x0'])), max(0, int(box['y0'])), min(W, int(box['x1']) + 1), min(H, int(box['y1']) + 1)) for box in (head, chest)]
+            spans = [s if s[2] > s[0] and s[3] > s[1] else None for s in spans]
+            live = [s for s in spans if s]
+            if not live:
+                result[(t, name)] = (None, None); continue
+            clip = clip45((min(s[0] for s in live), min(s[1] for s in live), max(s[2] for s in live), max(s[3] for s in live)), 1, W, H)
+            page.evaluate(f'(() => {{ {tl}.seek({t}, false); window.__set.update(); for (const h of {others}) h.style.visibility = "hidden"; return 0; }})()')
+            a = shot45(page, clip)
+            page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.visibility = 'hidden'; return 0; }})()")
+            b = shot45(page, clip)
+            page.evaluate(f"(() => {{ const h = {host}; if (h) {{ h.style.visibility = ''; h.dataset.z = h.style.zIndex; h.style.zIndex = 99999; }} return 0; }})()")
+            c = shot45(page, clip)
+            page.evaluate(f"(() => {{ const h = {host}; if (h) h.style.zIndex = h.dataset.z; for (const o of document.querySelectorAll('[data-set3d][data-name]')) o.style.visibility = ''; return 0; }})()")
+            body = mask45(c, b, 12)
+            seen = ImageChops.darker(body, mask45(a, b, 12))
+            def share(span):
+                # Mỗi 2 px mỗi chiều, từ góc trên trái của khung.
+                if not span: return None
+                box = (span[0] - clip[0], span[1] - clip[1], span[2] - clip[0], span[3] - clip[1])
+                w = box[2] - box[0]
+                grid = lambda m: sum(row.count(255) for row in (lambda data: (data[r * w:(r + 1) * w:2] for r in range(0, box[3] - box[1], 2)))(m.crop(box).tobytes()))
+                total = grid(body)
+                return grid(seen) / total if total >= 20 else None
+            result[(t, name)] = (share(spans[0]), share(spans[1]))
+    except RuntimeError:
+        return None
+    return result
 
 
 CLERK_HEAD, CLERK_CHEST = 0.85, 0.5      # đợt 44 B: người sau quầy — thấy ≥ 85 % đầu (mặt), ≥ 50 % ngực (dải dưới cằm)
@@ -2715,6 +2796,11 @@ def check_floor42e(folder, c, frames):
 
 
 def check_scene(folder):
+    try: return check_scene_45(folder)
+    finally: close_page45()          # đợt 45: Chrome chung của cảnh (page45)
+
+
+def check_scene_45(folder):
     moments = json.load(open(os.path.join(folder, 'moments.json'), encoding='utf-8'))
     checks = [m['check'] for m in moments if m.get('check')]
     if not checks and not moments: return []
@@ -2938,12 +3024,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Measure the acting of 3D scenes: hands reaching, feet on the floor, pets put down and in view, furniture at the frame edges, medium shots narrower than full ones.')
     parser.add_argument('scenes', nargs='+', help='scene folders built by tools/scene.py')
     parser.add_argument('--json', help='also write the measurements here')
-    parser.add_argument('--keep', help='keep the frames captured to see how much of each pet shows')
+    parser.add_argument('--keep', help='keep the frames captured to see how much of each pet shows (only the region measured)')
     parser.add_argument('--torso44b', action='store_true', help='also fail a person cut at the neck by the top edge (a body without a head) — not on by default: "alone" pet close-ups still let people behind be cut')
     args = parser.parse_args()
     KEEP = args.keep
     TORSO_44B = args.torso44b
-    results = [r for folder in args.scenes for r in check_scene(folder)]
+    results =[r for folder in args.scenes for r in check_scene(folder)]
     for r in results: print(f'  {"✓" if r["ok"] else "·" if r["ok"] is None else "✗"} {os.path.basename(os.path.normpath(r["scene"]))}: {r["what"]} — {r["note"]}')
     bad = [r for r in results if r['ok'] is False]
     kept = sum(1 for r in results if r.get('kept'))

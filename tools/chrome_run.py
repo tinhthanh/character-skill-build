@@ -42,8 +42,12 @@ class DevTools:
         return data
 
     def _take(self, count):
-        while len(self.buffer) < count:
-            self.buffer += self._read()
+        # Gom các mẩu vào danh sách rồi nối một lần (đợt 45): ảnh chụp vài MB mà cộng dồn `bytes` từng mẩu 64 KB thì chép lại cả bộ đệm mỗi lần.
+        if len(self.buffer) < count:
+            parts, have = [self.buffer], len(self.buffer)
+            while have < count:
+                chunk = self._read(); parts.append(chunk); have += len(chunk)
+            self.buffer = b''.join(parts)
         data, self.buffer = self.buffer[:count], self.buffer[count:]
         return data
 
@@ -80,6 +84,122 @@ class DevTools:
             self.events.append(reply)
 
 
+AWAKE = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']
+
+
+def launch(chrome_bin, profile):
+    """Khởi động Chrome headless với hồ sơ `profile`; trả về (tiến trình, địa chỉ DevTools — None nếu không khởi động được)."""
+    # Chrome đôi khi treo ngay lúc khởi động mà không in gì, không thoát (gặp khi nhiều Chrome khởi động cùng lúc —
+    # tools/check_scene.py -j): đọc stderr có hạn chờ (select), quá 30 s thì giết và thử lại, tối đa 3 lần.
+    # macOS: khi màn hình tắt (máy khoá), cửa sổ bị coi là bị che → Chrome thôi vẽ khung → lệnh chụp ảnh treo mãi.
+    # Ba cờ AWAKE (như puppeteer) giữ trang luôn được vẽ, kể cả khi màn hình tắt (thử lại được: tắt màn hình giữa lúc
+    # acting_check chụp — không có cờ thì "socket.timeout", có cờ thì xong bình thường).
+    endpoint, chrome = None, None
+    for attempt in range(3):
+        chrome = subprocess.Popen([chrome_bin, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+                                   *AWAKE, '--remote-debugging-port=0', f'--user-data-dir={profile}', 'about:blank'],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        said, started = b'', time.time()
+        while time.time() - started < 30:
+            if select.select([chrome.stderr], [], [], 0.5)[0]:
+                chunk = os.read(chrome.stderr.fileno(), 65536)
+                if not chunk: break
+                said += chunk
+                found = re.search(rb'DevTools listening on (ws://\S+)', said)
+                if found: endpoint = found.group(1).decode(); break
+            elif chrome.poll() is not None: break
+        if endpoint: break
+        chrome.kill(); chrome.wait()
+        shutil.rmtree(profile, ignore_errors=True); os.makedirs(profile, exist_ok=True)
+    return chrome, endpoint
+
+
+class Page45:
+    """ĐỢT 45 — MỘT LẦN MỞ TRANG, NHIỀU LƯỢT ĐO: mở `url` trong Chrome headless, chờ `wait_js` đúng, rồi để công cụ gọi (tools/acting_check.py)
+    tự hỏi trang (`evaluate`) và chụp (`capture`, có thể chỉ một vùng) bao nhiêu lần tuỳ ý trong cùng một lần mở — mỗi lần mở Chrome + dựng
+    cảnh mất vài giây. Dùng như `with Page45(...) as page:`; mở không được thì ném RuntimeError (có lỗi của trang nếu có)."""
+
+    def __init__(self, url, chrome_bin, size=(1920, 1080), wait_js='true', timeout=90, scale=1):
+        self.url, self.chrome_bin, self.size, self.wait_js, self.scale = url, chrome_bin, size, wait_js, scale
+        self.timeout = timeout * max(1.0, float(os.environ.get('CHROME_RUN_TIMEOUT_SCALE') or 1))
+        self.chrome, self.profile, self.view = None, None, None
+
+    def __enter__(self):
+        self.profile = tempfile.mkdtemp(prefix='chrome-run-')
+        try:
+            self.chrome, endpoint = launch(self.chrome_bin, self.profile)
+            if not endpoint: raise RuntimeError('Chrome did not start')
+            self.tools = DevTools(endpoint)
+            target = self.tools.call('Target.createTarget', {'url': 'about:blank'})['targetId']
+            self.session = self.tools.call('Target.attachToTarget', {'targetId': target, 'flatten': True})['sessionId']
+            self.call('Page.enable'); self.call('Runtime.enable')
+            self.load(self.scale)
+            return self
+        except BaseException:
+            self.__exit__(None, None, None)
+            raise
+
+    def load(self, scale=None):
+        """(Mở lại) trang từ đầu ở tỉ lệ điểm ảnh `scale` và chờ `wait_js` — như một lần mở mới, không phải khởi động lại Chrome."""
+        if scale is not None: self.set_scale(scale)
+        # Đánh dấu trang cũ: chưa sang trang mới thì `wait_js` (đúng ở trang cũ) chưa tính.
+        self.evaluate('window.__oldPage45 = true')
+        self.call('Page.navigate', {'url': self.url})
+        deadline = time.time() + self.timeout
+        while time.time() < deadline:
+            if self.evaluate(f'!window.__oldPage45 && !!({self.wait_js})'): return
+            time.sleep(0.05)
+        raise RuntimeError(f'the page did not finish within {self.timeout:.0f}s' + ''.join(f'\n  page error: {e}' for e in self.errors()[:3]))
+
+    def __exit__(self, *_):
+        try:
+            if self.chrome and self.chrome.poll() is None:
+                try: self.tools.call('Browser.close')
+                except Exception: pass
+                try: self.chrome.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.chrome.terminate()
+                    try: self.chrome.wait(timeout=5)
+                    except subprocess.TimeoutExpired: self.chrome.kill()
+        finally:
+            if self.profile: shutil.rmtree(self.profile, ignore_errors=True)
+
+    def call(self, method, params=None):
+        return self.tools.call(method, params, self.session)
+
+    def evaluate(self, expression):
+        return self.call('Runtime.evaluate', {'expression': expression, 'returnByValue': True}).get('result', {}).get('value')
+
+    def set_scale(self, scale, view=None):
+        """Tỉ lệ điểm ảnh của ảnh chụp (2: gấp đôi mỗi chiều) — giữ nguyên bố cục. `view`: (x, y, w, h) px CSS — Chrome chỉ vẽ vùng ấy (trang
+        không thấy gì đổi: vẫn rộng, cao như cũ)."""
+        self.scale, self.view = scale, view
+        metrics = {'width': self.size[0], 'height': self.size[1], 'deviceScaleFactor': scale, 'mobile': False}
+        if view: metrics['viewport'] = {'x': view[0], 'y': view[1], 'width': view[2], 'height': view[3], 'scale': 1}
+        self.call('Emulation.setDeviceMetricsOverride', metrics)
+
+    def capture(self, clip=None):
+        """Hai nhịp vẽ rồi chụp PNG (bytes). `clip`: (x, y, w, h) px CSS nguyên — chỉ vùng ấy; ảnh ra (w × tỉ lệ) × (h × tỉ lệ) điểm ảnh.
+        Có `clip` thì Chrome cũng CHỈ VẼ vùng ấy (viewport của setDeviceMetricsOverride, đặt trước nhịp vẽ): cảnh 3D có lớp mờ / hoà trộn
+        lớn, bộ ghép hình phần mềm (--disable-gpu) vẽ cả khung 1920 × 1080 mất 1–3 s mỗi khung; vẽ riêng vùng chụp nhanh gấp 3–7 lần,
+        điểm ảnh như chụp `clip` trên khung đầy đủ (đợt 45)."""
+        if (clip or None) != self.view: self.set_scale(self.scale, clip or None)
+        self.call('Runtime.evaluate', {'expression': 'new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))', 'awaitPromise': True})
+        params = {'format': 'png', 'optimizeForSpeed': True}
+        if clip: params['clip'] = {'x': clip[0], 'y': clip[1], 'width': clip[2], 'height': clip[3], 'scale': 1}
+        return base64.b64decode(self.call('Page.captureScreenshot', params)['data'])
+
+    def errors(self):
+        out = []
+        for event in self.tools.events:
+            if event.get('method') == 'Runtime.exceptionThrown':
+                detail = event['params']['exceptionDetails']
+                out.append((detail.get('exception', {}).get('description') or detail.get('text', '')).split('\n')[0])
+            elif event.get('method') == 'Runtime.consoleAPICalled' and event['params'].get('type') == 'error':
+                out.append(' '.join(str(a.get('value', a.get('description', ''))) for a in event['params'].get('args', [])))
+        return out
+
+
 def main():
     parser = argparse.ArgumentParser(description='Run a page in headless Chrome until it reports it is finished.')
     parser.add_argument('url')
@@ -110,29 +230,7 @@ def main():
     # "Directory not empty" và biến một lượt chạy thành công thành thất bại.
     profile = tempfile.mkdtemp(prefix='chrome-run-')
     try:
-        # Chrome đôi khi treo ngay lúc khởi động mà không in gì, không thoát (gặp khi nhiều Chrome khởi động cùng lúc —
-        # tools/check_scene.py -j): đọc stderr có hạn chờ (select), quá 30 s thì giết và thử lại, tối đa 3 lần.
-        endpoint = None
-        for attempt in range(3):
-            # macOS: khi màn hình tắt (máy khoá), cửa sổ bị coi là bị che → Chrome thôi vẽ khung → lệnh chụp ảnh treo mãi.
-            # Ba cờ dưới (như puppeteer) giữ trang luôn được vẽ, kể cả khi màn hình tắt (thử lại được: tắt màn hình giữa lúc
-            # acting_check chụp — không có cờ thì "socket.timeout", có cờ thì xong bình thường).
-            awake = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']
-            chrome = subprocess.Popen([args.chrome, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
-                                       *awake, '--remote-debugging-port=0', f'--user-data-dir={profile}', 'about:blank'],
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            said, started = b'', time.time()
-            while time.time() - started < 30:
-                if select.select([chrome.stderr], [], [], 0.5)[0]:
-                    chunk = os.read(chrome.stderr.fileno(), 65536)
-                    if not chunk: break
-                    said += chunk
-                    found = re.search(rb'DevTools listening on (ws://\S+)', said)
-                    if found: endpoint = found.group(1).decode(); break
-                elif chrome.poll() is not None: break
-            if endpoint: break
-            chrome.kill(); chrome.wait()
-            shutil.rmtree(profile, ignore_errors=True); os.makedirs(profile, exist_ok=True)
+        chrome, endpoint = launch(args.chrome, profile)
         try:
             if not endpoint:
                 print('chrome_run: Chrome did not start', file=sys.stderr); sys.exit(4)

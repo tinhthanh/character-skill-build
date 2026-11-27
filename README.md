@@ -88,6 +88,12 @@ or when it is tagged `smoke`. It is a fast loop, not a proof: a change to a shar
 never name the changed words. **Run the full `sh tools/check.sh` (no arguments) before merging or
 releasing.** `tools/check.html` always runs whole, after the scene cases (≈ 4 min).
 
+`tools/acting_check.py` (used by most scene cases) opens one headless Chrome per scene and reloads
+the page for each pass (probe, pets in view, stroke tracks, 2× re-measure, people behind counters), so
+every pass still starts from a freshly loaded page: what a moment renders can depend on the seeks made
+before it. Its pixel measures capture only the region they read, with Chrome drawing only that region
+(software compositing of a full 3D set frame took 1–3 s a shot), and compare pixels with Pillow.
+
 **Adding checks for a new wave:** create `tools/ci/wNN.py` (do not edit other waves' modules):
 
 ```python
