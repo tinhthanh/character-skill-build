@@ -62,8 +62,9 @@ def pose_characters(st):
             if who.get('_scooter'):
                 # Ngồi trên yên: đặt ở chỗ xe XUẤT PHÁT, nâng lên `rideLift` (đơn vị khung → px), thế cầm lái từ khung đầu,
                 # quay theo hướng xe chạy — trước khi dựng hội thoại (các lượt của nó bắt đầu từ thế ấy).
-                ride = who['_scooter']; start = ride['drive']['from'] if ride.get('drive') else float(ride['x'])
-                setup.append(f"    const {who['name']}Spot = set.place({who['name']}, {{ x: {start:g}, z: {depth_z:g}, height: {who['_host_height']:g} }});")
+                # `ride_x`, không phải `start`: `start` là góc máy đầu cảnh — lượt `view` có "back" (không góc máy nào trước nó) quay về nó.
+                ride = who['_scooter']; ride_x = ride['drive']['from'] if ride.get('drive') else float(ride['x'])
+                setup.append(f"    const {who['name']}Spot = set.place({who['name']}, {{ x: {ride_x:g}, z: {depth_z:g}, height: {who['_host_height']:g} }});")
                 setup.append(f"    {who['name']}Spot.y = cutout{ride['_n']}Prop.rideLift({who['name']}) * {who['_host_height']:g} / {PERSON[1]};   // on the seat of {ride['name']}")
                 setup.append(f"    {who['name']}.state.ride = 1; {who['name']}.state.facing = {-1 if ride.get('facing') == 'left' else 1};      // riding")
             else:

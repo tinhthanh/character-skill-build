@@ -182,6 +182,22 @@ def motion42d(work, problems):
             if needle not in html: problems.append(f'riding example: {needle!r} not in index.html')
         if 'vet.state.facing = 0.55' in html or 'vet.state.facing = -0.55' in html: problems.append('riding example: the rider is also turned toward someone at the start (it should face the way it rides)')
 
+    # Cảnh cưỡi xe mà máy quay về góc khởi đầu (view có "back", không góc máy nào trước nó): chỗ đặt người lái từng đè biến `start` (góc
+    # máy đầu) bằng toạ độ x của xe → `set.cut(-1500)` và trang báo "Cannot use 'in' operator to search for 'pitch' in -1500".
+    back = json.load(open(ride, encoding='utf-8'))
+    back['script'][1]['view'] = {'on': [back['script'][1]['who']], 'size': 'medium', 'back': True}
+    path = os.path.join(os.path.dirname(ride), f'_check_{TAG}_rideback.json')
+    try:
+        json.dump(back, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+        done = build(path, os.path.join(work, 'rideback'))
+    finally:
+        if os.path.exists(path): os.remove(path)
+    if done.returncode != 0: problems.append('riding + "back" view: the scene does not build: ' + (done.stderr.strip() or done.stdout.strip())[-300:])
+    else:
+        html = open(os.path.join(work, 'rideback', 'index.html'), encoding='utf-8').read()
+        if not re.search(r'set\.cut\(\{"yaw": 0, "pitch": 6, [^)]*\), T0 \+ talk\.turns\[2\]\.start\)', html):
+            problems.append('riding + "back" view: the camera does not cut back to the opening angle at turn 2 (set.cut({...}))')
+
     # Sửa đợt 42: thẻ KẾT THÚC trong bối cảnh 3D mà máy quay về góc khởi đầu — trước đây vòng lặp vẽ thẻ đè biến `start` (góc máy đầu) bằng
     # chuỗi giữ chỗ '__OUTRO_START__', ra `set.cut("__OUTRO_START__")` và trang báo "set.cut: unknown camera key "0"" (thợ dựng video tìm ra).
     outro42 = {'id': 'outro42', 'camera': 'auto', 'set': {'preset': 'living-room'}, 'outro': {'title': 'VetGo', 'text': 'Chăm boss mỗi ngày'},
