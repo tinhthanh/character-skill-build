@@ -99,7 +99,9 @@ def seek_check_46(folder, count=8, scale=0.5, seed=46):
         end = scene.duration()
         rand = random.Random(seed)
         times = sorted(round(end * (i + rand.uniform(0.15, 0.85)) / count, 3) for i in range(count))
-        first = {t: scene.frame(t) for t in times}
+        # Lượt đầu cũng chụp tới khi hai ảnh liền nhau trùng nhau: ảnh đầu tiên chụp ngay sau khi mở trang, Chrome có thể chưa vẽ xong
+        # (runner CI: luôn lệch ở lúc sớm nhất của cảnh floor, 233 điểm ảnh) — ảnh gốc vẽ dở thì lần chụp lại nào cũng "khác".
+        first = {t: scene.frame(t, settle=True) for t in times}
         scene.fresh()
         grid = [round(end * i / 120, 3) for i in range(121)]
         rand.shuffle(grid)
