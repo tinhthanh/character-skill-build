@@ -54,6 +54,19 @@ HANDS_ON_GAP.update({'bathPet': 0.12, 'brushTeeth': 0.19, 'towelDry': 0.12})
 BATH_SPRAY, BATH_RINSE, BATH_BACK = 1.6, 1.5, 34       # rig-svg.js `BATH_SPRAY42F`, `BATH_RINSE42F`, `BATH_BACK42F` (đơn vị khung người)
 
 
+# ĐỢT 49 B — SẤY LÔNG (`blowDry`: vòi máy sấy, gió vào lưng, lông gợn rồi khô bông) và TỈA LÔNG (`trimFur`: kéo / tông-đơ dọc lưng, túm lông rụng,
+# lông gọn): như 42 F (đứng ở phía đầu con vật, góc cận, con vật đọc kênh tay người). Sấy theo sau `bathPet` / `towelDry` (lông ướt → khô).
+GROOMING_49B = ('blowDry', 'trimFur')
+HANDS_ON_CARE = HANDS_ON_CARE + GROOMING_49B
+CARE_REACH = CARE_REACH + GROOMING_49B
+REACH_ACTIONS.update({'blowDry': 'body', 'trimFur': 'body'})
+HANDS_ON_OPTIONS.update({'blowDry': {'hold'}, 'trimFur': {'hold', 'tool'}})
+HANDS_ON_HOLD.update({'blowDry': (1, 6, 2.4), 'trimFur': (1, 6, 2.4)})
+HANDS_ON_GAP.update({'blowDry': 0.12, 'trimFur': 0.12})
+TRIM_TOOLS = ('scissors', 'clipper')                     # rig-svg.js `trimFur({ tool })`
+TRIM_FALL = 1.25                                         # rig-svg.js `TRIM_FALL49B`: giây sau nhát cuối, túm lông cuối cùng rơi hết
+
+
 def bath_shake_at(hold):
     """Giây (từ đầu bước `bathPet`) con vật bắt đầu rũ nước — như `RigSVG.bathShakeAt42f`."""
     return round(0.55 + BATH_SPRAY + 0.55 + 0.35 + hold + 0.75 + BATH_RINSE + 1.2, 2)

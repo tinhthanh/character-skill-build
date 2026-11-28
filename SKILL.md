@@ -12,14 +12,15 @@ cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, s
 the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
 clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
-or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
+or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash (`walkOnLeash`: the dog trots ahead, sniffs, looks back), kneel to it,
 sit cross-legged on the floor or lie down (on the floor or a sofa) with a pet beside or on the lap, pick something up off the floor,
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
 read a patient chart (flipping a page), point at an X-ray film, trim its nails (holding the paw up), put drops in its eye,
 clean its ear with a cotton pad, scan its microchip (the number shows on a card),
 hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
 bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
-get a notification on the phone (133 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
+blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
+get a notification on the phone (138 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase
@@ -182,6 +183,14 @@ clips for every voice file.
    Grooming (đợt 42 F): `["bathPet", "@pet"]` on a pet with `"inTub": true` (it stands in a bath tub sized to it — 3D sets), `["towelDry", "@pet"]`,
    `["brushTeeth", "@pet"]` — the pet's wet / foamy / fluffy fur, open mouth, shake-off and lip-lick follow the person by themselves.
    Scripts: "tắm" (the tub comes by itself), "lau khô" / "lau khô lông", "đánh răng"; cast option "trong chậu".
+   Props by name (đợt 49 A): a step may name a set cutout as `"@<name>"`. Boarding: a cutout `{ "kind": "cage", "name": "chuong", "x", "z", "size": [170, 140] }`
+   (two layers — inside behind the pet, barred front with a door in front), `["putInCage", "@meo", "@chuong"]` (picks the pet up if needed, walks beside
+   the cage, opens the door one-handed, sets it in, closes), `["takeOutOfCage", "@meo", "@chuong"]` (ends holding it); `"inCage": "chuong"` starts a pet
+   inside. The person stands just in front of the cage (z 12–60 more). Rig: `putInCage(pet, cageFrontProp | { at, scale, door })`, props `cage` + `cageFront`.
+   Grooming 2 (đợt 49 B): `["blowDry", "@pet", { "hold": 2.4 }]` (dryer nozzle aimed down at its back, air stream, the other hand fluffs the fur —
+   fur ripples, ears back, eyes squint; wet → dry and fluffy, so it follows `bathPet` / `towelDry`), `["trimFur", "@pet", { "tool": "clipper" }]`
+   (`"scissors"` by default — long tufts trimmed along the back fall to the floor / table, the other hand steadies it, the coat ends neater).
+   A sitting cat / rabbit stands up for both. Scripts: "sấy lông" / "sấy khô", "tỉa lông" / "cắt tỉa" (scissors), "cạo lông" / "tông đơ" (clipper).
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

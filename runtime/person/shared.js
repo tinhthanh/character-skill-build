@@ -45,6 +45,8 @@ const NGHI = Object.freeze({
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
+  leashPet49c: 0,               // đợt 49 C: con vật đang dắt = `leashPets49c[leashPet49c − 1]` (0: con của `leash`, `leashed`) — trạng thái, nên một người dắt lần lượt nhiều con
+  leashRope49c: 0,              // đợt 49 C: 0…1 dây dắt võng theo ĐỘ DÀI THẬT của nó (`walkOnLeash`) thay cho độ võng cố định — giữ tới `unleash`
   rope: 0,                      // đợt 40 A: 1 = đang KÉO CO (`pullToy`) — dây thừng căng từ tay tới mõm con chó
   watchL: 0, watchR: 0,
   heartL: 0, heartR: 0,         // trái tim bật ra trên bàn tay 'tim' (bắn tim): 0 = chưa có, 1 = đủ lớn
@@ -67,6 +69,10 @@ const NGHI = Object.freeze({
   // (0…1), `petRub42f` khăn xô theo nhịp chà (−1…1), `petMood42f` −1 khó chịu (tai cụp) … 1 vui, `petGape42f` miệng hé cho đánh răng, `petLick42f`
   // liếm mép, `petShake42f` pha rũ nước 0 → 1 (con vật tự lắc — đã buông tay). `spray42fL/R` 0…1 tia nước từ vòi sen trong tay ấy (gadget 40), `sprayT42f` pha chảy của tia nước.
   petWet42f: 0, petFoam42f: 0, petDry42f: 0, petTowel42f: 0, petRub42f: 0, petMood42f: 0, petGape42f: 0, petLick42f: 0, petShake42f: 0, spray42fL: 0, spray42fR: 0, sprayT42f: 0,
+  // ĐỢT 49 B — sấy, tỉa lông (runtime/person/grooming.js): `air49bL/R` 0…1 luồng gió từ vòi sấy trong tay ấy (gadget 43), `snip49bL/R` 0…1 kéo mở
+  // (gadget 44), `buzz49bL/R` 0…1 tông-đơ chạy (gadget 45), `groomT49b` đồng hồ của động tác (gió chảy, lông gợn); con vật đọc `petBlow49b` gió vào lông,
+  // `petStand49b` 0…1 con vật đứng dậy (mèo / thỏ đang ngồi), `petShag49b` lông dài chưa tỉa (GIỮ), `petCutT49b` / `petCutDur49b` giây đã tỉa / giây tỉa hết lưng, `petTrimStart49b` / `petTrimEnd49b` chỗ đầu / cuối đường tỉa (GIỮ) — runtime/pet/grooming.js.
+  air49bL: 0, air49bR: 0, snip49bL: 0, snip49bR: 0, buzz49bL: 0, buzz49bR: 0, groomT49b: 0, petStand49b: 0, petBlow49b: 0, petShag49b: 0, petCutT49b: 0, petCutDur49b: 0, petTrimStart49b: 0, petTrimEnd49b: 0,
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
   ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,
@@ -101,6 +107,9 @@ const NGHI = Object.freeze({
   // ĐỢT 38 C — HAI NGƯỜI: 1 = người này vẽ TRƯỚC người đang cùng diễn (`rig.pairWith`) trong bối cảnh 3D — miệng và bàn tay khum khi
   // thì thầm, bàn tay đặt lên vai khi vỗ vai không khuất sau đầu / tóc người kia.
   pairFront: 0, pairSlot: 0,    // `pairSlot`: người kia là mục nào của `rig.pairList` (như `omSlot`) — mỗi khung đúng người của lần ấy
+  // ĐỢT 49 A — CHUỒNG LƯU TRÚ (`putInCage`, `takeOutOfCage`): `cageDoor49a` 0 đóng … 1 mở cửa chuồng người này đang mở; `cageMove49a` số lần người này đã
+  // dời con vật vào / ra chuồng (lần thứ n đã dời khi `cageMove49a` > n − 0,5 — RigThu.dropX; GIỮ như `picked42e`); `free49aL/R` 1 = tay ấy rời con vật đang bế (mở cửa).
+  cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
 });
 
 const MAU_MAC_DINH = {

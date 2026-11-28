@@ -46,8 +46,11 @@ Một tệp kịch bản:
                                        cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
                                        giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
                                        tắm (con vật tự đứng trong chậu tắm: xối nước, xoa bọt, xả, rũ nước), đánh răng, lau khô (khăn tắm, lông bông)
+                                       sấy lông / sấy khô (vòi máy sấy, lông khô bông), tỉa lông / cắt tỉa (kéo, túm lông rụng), cạo lông / tông đơ (tông-đơ)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
+    tên → con vật: dắt đi dạo           dắt chó (hay mèo đeo yếm) đi dạo — tự móc dây, chó kiệu trước, đánh hơi, ngoái lại; "dắt chó đi dạo",
+                                       "dắt đi", "dắt đi dạo sang trái", "dắt đi dạo 200" (quãng, đơn vị khung); dây vẫn móc ("tháo dây" sau)
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
@@ -167,6 +170,7 @@ from scene import COMBOS, expand_combos       # noqa: E402
 # ĐỢT 38 B — phối hợp và chuẩn bị ở phòng khám: giữ con vật cho người khác làm ("cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm"),
 # rửa tay, đeo / tháo găng tay ("bác sĩ: [rửa tay, đeo găng]").
 TARGETED.update({'giữ': ('restrain', None), 'giữ con vật': ('restrain', None), 'giữ chặt': ('restrain', None)})
+ACTIONS.update({'tháo dây': 'unleash', 'tháo dây dắt': 'unleash', 'tháo xích': 'unleash'})          # đợt 49 C — sau "dắt đi dạo" (dây vẫn móc)
 ACTIONS.update({'rửa tay': 'washHands', 'đeo găng': 'putOnGloves', 'đeo găng tay': 'putOnGloves', 'tháo găng': 'takeOffGloves', 'tháo găng tay': 'takeOffGloves'})
 COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
 SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
@@ -181,6 +185,11 @@ ACTIONS.update({'run sợ': 'shiverAtVet', 'sợ run': 'shiverAtVet', 'giãy': '
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 TARGETED.update({'tắm': ('bathPet', None), 'tắm cho': ('bathPet', None), 'tắm rửa': ('bathPet', None), 'đánh răng': ('brushTeeth', None), 'đánh răng cho': ('brushTeeth', None),
                  'chải răng': ('brushTeeth', None), 'lau khô': ('towelDry', None), 'lau khô lông': ('towelDry', None), 'lau khô cho': ('towelDry', None)})      # ĐỢT 42 F — tắm (con vật tự vào chậu tắm), đánh răng, lau khô bằng khăn
+# ĐỢT 49 B — sấy lông (vòi máy sấy, lông khô bông), tỉa lông bằng kéo (mặc định) hay tông-đơ ("cạo lông", "... bằng tông đơ").
+TARGETED.update({'sấy': ('blowDry', None), 'sấy lông': ('blowDry', None), 'sấy khô': ('blowDry', None), 'sấy khô lông': ('blowDry', None), 'sấy cho': ('blowDry', None),
+                 'tỉa lông': ('trimFur', None), 'cắt tỉa': ('trimFur', None), 'cắt tỉa lông': ('trimFur', None), 'cắt lông': ('trimFur', None), 'tỉa lông bằng kéo': ('trimFur', None),
+                 'cạo lông': ('trimFur', {'tool': 'clipper'}), 'tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}),
+                 'cắt lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông-đơ': ('trimFur', {'tool': 'clipper'})})
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 ACTIONS.update({'ngồi bệt': 'sitOnFloor', 'ngồi xếp bằng': 'sitOnFloor', 'ngồi bệt xuống': 'sitOnFloor', 'nằm xuống': 'lieDown', 'nằm sàn': 'lieDown', 'nằm sofa': ['lieDown', 'sofa'], 'nằm ngủ': ['lieDown', 'floor', {'sleep': True}], 'nhặt': 'pickUp', 'nhặt lên': 'pickUp', 'nhặt đồ chơi': 'pickUp', 'nhặt bóng': 'pickUp'}); TARGETED.update({'nhặt': ('pickUp', None), 'nhặt lên': ('pickUp', None), 'nhặt đồ chơi': ('pickUp', None)})      # ĐỢT 42 E — sát sàn: ngồi bệt, nằm (sàn / sofa), nhặt đồ ("bé → chó: nhặt" — đồ chơi cạnh con chó)
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}
@@ -192,6 +201,9 @@ PRESENTER_WORDS = {'to cỡ này': ['showSize', 'big'], 'to thế này': ['showS
               'cỡ này': ['showSize', 'medium'], 'ra dấu kích thước': ['showSize', 'medium'], 'ra dấu to cỡ này': ['showSize', 'big'],
               'chụp ảnh tự sướng': ['takeSelfie'], 'chụp ảnh': ['takeSelfie'], 'selfie': ['takeSelfie'], 'chụp hình': ['takeSelfie'], 'tự sướng': ['takeSelfie'],
               'ngáp': ['yawnStretch'], 'vươn vai': ['yawnStretch'], 'ngáp vươn vai': ['yawnStretch']}
+# ĐỢT 49 C — DẮT CHÓ ĐI DẠO: "bé → chó: dắt đi dạo" / "dắt chó đi dạo" / "dắt đi" / "dắt cún đi dạo sang trái 250" → ["walkOnLeash", "@chó", 4, ±quãng]
+# (mặc định 300 đơn vị khung sang phải). Dây tự móc nếu chưa móc, quai dây tự giao (tools/scene.py). "dắt" một mình vẫn là móc dây (`leash`).
+WALK_49C = re.compile(r'^dắt(?: [^\s\d]+)? đi(?: dạo)?(?: (sang trái|sang phải|về bên trái|về bên phải))?(?: (\d+))?$')
 TARGETED_PRESENTER = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie', 'chụp hình': 'takeSelfie', 'chụp ảnh': 'takeSelfie', 'tự sướng': 'takeSelfie'}
 SIGN_TEXT = re.compile(r'(' + '|'.join(SIGN_WORDS) + r')\s*:\s*("[^"]*"|[^,\]]*)', re.IGNORECASE)
 
@@ -390,6 +402,10 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người — thú không cầm điện thoại')
                 if target == who: raise ScriptError(f'{where}: "{verb}" cùng một người khác — "bác sĩ → bé trai: {verb}"')
                 return {'who': who, 'do': [[TARGETED_PRESENTER[verb], 1.6, {'with': f'@{target}'}]]}
+            walk49c = WALK_49C.match(verb)          # ĐỢT 49 C: "bé → chó: dắt đi dạo" (sang trái / phải, quãng tuỳ chọn)
+            if walk49c:
+                if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người cầm dây — "bé → chó: dắt đi dạo"')
+                return {'who': who, 'do': [['walkOnLeash', f'@{target}', 4, (-1 if walk49c.group(1) and 'trái' in walk49c.group(1) else 1) * int(walk49c.group(2) or 300)]]}
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
             action, extra = TARGETED[verb]
             step = [action, f'@{target}'] + ([extra] if extra else [])

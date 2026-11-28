@@ -2066,7 +2066,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!rs.length) return null; const r = rect({ left: Math.min(...rs.map((q) => q.left)), right: Math.max(...rs.map((q) => q.right)), top: Math.min(...rs.map((q) => q.top)), bottom: Math.max(...rs.map((q) => q.bottom)) });
               return { side, y: r.y1, x: (r.x0 + r.x1) / 2, wx: at.scale ? actor.where + ((r.x0 + r.x1) / 2 - at.x) / at.scale : null }; }).filter(Boolean),
             wtall: actor.height || 0, lift42d: +(rig.s.lift42d || 0).toFixed(2),
-            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}) };
+            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}),
+          // ĐỢT 49 C — DÂY DẮT (`leash`, `walkOnLeash`): hai đầu và điểm điều khiển của dây trên màn hình, vòng cổ con vật đang dắt, độ dài
+          // dây (`leashRope49c` > 0: độ dài thật, px) — acting_check `leash49c` đo dây nối tay với vòng cổ, con vật trong tầm dây.
+          ...(person && e.leash ? { leash49c: (() => {
+            const shown = e.leash.style.display !== 'none', d = (e.leash.getAttribute('d') || '').match(/-?[\d.]+/g), now = typeof rig._leashNow49c === 'function' ? rig._leashNow49c() : null, pet = now ? now.pet : rig.leashed;
+            const ends = shown && d && d.length >= 6 ? [0, 2, 4].map((n) => point(rig.svg, +d[n], +d[n + 1])) : null;
+            const collar = pet && pet.el && pet.el.vong ? rect(pet.el.vong.getBoundingClientRect()) : null;
+            const unit = point(rig.svg, 0, 0), unit1 = point(rig.svg, 0, 100), scale = unit && unit1 ? Math.hypot(unit1.x - unit.x, unit1.y - unit.y) / 100 : 0;
+            return { shown, a: ends && ends[0], c: ends && ends[1], b: ends && ends[2], collar: collar && { x: (collar.x0 + collar.x1) / 2, y: (collar.y0 + collar.y1) / 2 },
+                     hand: (now ? now.hand : rig.leashHand) || null, rope: +(rig.s.leashRope49c || 0).toFixed(2), ropeLength: rig.constructor.LEASH_ROPE_49C ? rig.constructor.LEASH_ROPE_49C * 470 * 0.96 * scale : null };
+          })() } : {}) };
       });
     },
 
@@ -2133,7 +2143,25 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c42 = Object.fromEntries(Object.entries(rig.care42fProbe()).map(([key, v]) => [key, one(v)]));
       }
+      // đợt 49 B: sấy / tỉa lông (`rig.groom49bProbe()` của người và con vật — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.groom49bProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
+      }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
+      // ĐỢT 49 A — chuồng: khung trước (`cageFront`) — ô cửa (px trong `view`), cửa đang vẽ (khung hình của nó), lớp vẽ của host khung trước; người: độ mở cửa…
+      out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {
+        const door = svg.querySelector('[data-cage-door49a]'), ctm = svg.getScreenCTM(), host = svg.parentNode;
+        if (!door || !ctm || (host && host.style.display === 'none')) return null;
+        const at = (x, y) => { const q = new DOMPoint(x, y).matrixTransform(ctm); return { x: (q.x - box.left) * sx, y: (q.y - box.top) * sy }; }, a = at(+door.dataset.x0, +door.dataset.y0), b = at(+door.dataset.x1, +door.dataset.y1), d = door.getBoundingClientRect();
+        return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: { x0: (d.left - box.left) * sx, y0: (d.top - box.top) * sy, x1: (d.right - box.left) * sx, y1: (d.bottom - box.top) * sy }, layer: +((host && host.style.zIndex) || 0) };
+      }).filter(Boolean);
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (rig && typeof rig.cage49aProbe === 'function' && out[name]) out[name].cage49a = rig.cage49aProbe();
+      }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;

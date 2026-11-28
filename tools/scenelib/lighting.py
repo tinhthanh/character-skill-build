@@ -1,4 +1,5 @@
 """moments.json: the moments of a built 3D scene that tools/light_audit.py and tools/acting_check.py check."""
+from .cage import cage_plan          # đợt 49 A
 from .actions import (HANDS_ON_CARE, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ASK, PAIR_ASK, PAIR_TIMES, CAT_RABBIT_ACTS, PET_ACT_ASK, REACH_ACTIONS,
     REACH_TIMES, RESTRAIN, SHOW_SIZE_GAP)
 from .plans import care_plan_tools, care_window, desk_plan
@@ -58,6 +59,14 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
     for op in gear_ops:
         pet = pet_of(op['target'])
+        if op['kind'] == 'cage49a':
+            # ĐỢT 49 A — chuồng: lúc mở cửa, lúc con vật đã trong chuồng (cửa đóng) / đã trên tay — tools/acting_check.py `cage49a`.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            plan = cage_plan(op, float(step['start']), float(step['duration']))
+            moments.append({'t': plan['times'][1], 'what': f'{op["who"]} {op["name"]} {op["target"]}', 'ask': plan['ask'], 'check': plan['check']})
+            continue
         if op['kind'] in REACH_ACTIONS:
             # Lượt có động tác chạm: đo ở 30 / 50 / 70 % lượt — tay tới đích ở ÍT NHẤT một lúc là đạt.
             if op['turn'] >= len(turns): continue
@@ -294,6 +303,20 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
                    'dance': f'Is {op["who"]} dancing to a beat (bouncing, arms swinging / up), with the whole body in the frame?'}[op['name']]
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' to {op["target"]}' if op.get('target') else ''), 'ask': [ask],
                             'check': {'kind': 'motion42d', 'name': op['name'], 'who': op['who'], 'target': None, 'to42d': op.get('target'), 'times': times, 'samples': samples, 'after': [after]}})
+            continue
+        if op['kind'] == 'leash49c':
+            # ĐỢT 49 C — DẮT CHÓ ĐI DẠO: mỗi 1/15 s từ lúc dây đã móc (0,45 s) tới hết bước — dây nối tay với vòng cổ, con vật trong tầm dây, cả hai
+            # đi, cả hai trong khung (acting_check `leash49c`).
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            samples = [round(t0 + 0.45 + n / 15, 3) for n in range(int((t1 - t0 - 0.45) * 15) + 1)]
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            moments.append({'t': times[1], 'what': f'{op["who"]} walks {op["target"]} on a leash', 'ask': [
+                f'Is {op["who"]} walking {op["target"]} on a leash — a red leash line from {op["who"]}\'s hand to the collar of {op["target"]}, who trots a little ahead?',
+                'Are both of them (the whole person and the whole animal) inside the frame?'],
+                'check': {'kind': 'leash49c', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'times': times, 'samples': samples, 'moves': bool(op.get('moves')), 'to': 'hands'}})
             continue
         if op['kind'] == 'gesture':
             # ĐỘNG TÁC TAY (đợt 33): ở 40 / 55 / 70 % bước, bàn tay của người làm nằm trong khung — góc trung khung dọc lấy bề ngang

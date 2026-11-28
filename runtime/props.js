@@ -296,6 +296,49 @@ function screen(x, y, w, h, image) {
 const DEFAULT_COLOR = { paystand: '#2f9e8f', xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
 DEFAULT_COLOR.tub = '#5fb8e8';                 // đợt 42 F: sọc xanh nước trên thành chậu tắm
 
+// ĐỢT 49 A — CHUỒNG LƯU TRÚ (gửi thú: `putInCage` / `takeOutOfCage`), nhìn thẳng, đứng trên sàn. HAI ĐẠO CỤ cùng cỡ, cùng chỗ: `cage` là LÒNG chuồng
+// (vách sau, hai vách bên một tông tối, tấm nệm) vẽ SAU con vật; `cageFront` là KHUNG TRƯỚC + CỬA SONG (`data-cage-door49a`) vẽ TRƯỚC nó — con vật đứng
+// giữa hai lớp là "ở trong chuồng": song cửa đè lên nó, thanh dưới che bàn chân. `width` × `height`: cỡ ngoài (khung người 400 × 470, mặc định 170 × 140);
+// `door`: phía BẢN LỀ ('left' mặc định) — người mở cửa đứng phía bên kia (chốt). Cửa do rig người xoay quanh bản lề (`RigSVG._drawCages49a`).
+const CAGE49A = { w: 170, h: 140, bar: 10, top: 20, rail: 16, line: '#5e4130', steel: '#eef3f6', wall: '#f6efe2', shade: '#dccfbb', mat: '#f3b6a0' };
+// Hình học chung của hai lớp (khung 400 × 470): mép ngoài, ô cửa, bản lề, chốt, sàn trong chuồng.
+export function cageShape49a({ w = CAGE49A.w, height = CAGE49A.h, door = 'left' } = {}) {
+  const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, top = F - height, c = CAGE49A;
+  const open = { x0: x0 + c.bar, x1: x1 - c.bar, y0: top + c.top, y1: F - c.rail };
+  const hinge = door === 'right' ? open.x1 : open.x0, latch = door === 'right' ? open.x0 + 7 : open.x1 - 7;
+  return { x0, x1, top, floor: F, open, door, hinge, latch: { x: latch, y: (open.y0 + open.y1) / 2 }, inside: { x: 200, y: F } };
+}
+DRAW.cage = ({ w, height, door = 'left', dark }) => {
+  const g = cageShape49a({ w, height, door }), c = CAGE49A, d = 14;
+  return `
+    <rect x="${g.x0}" y="${g.top}" width="${g.x1 - g.x0}" height="${g.floor - g.top}" rx="6" fill="${c.shade}" stroke="${c.line}" stroke-width="1.6"/>
+    <path d="M ${g.x0 + d} ${g.top + d} H ${g.x1 - d} V ${g.floor - 8} H ${g.x0 + d} Z" fill="${c.wall}" stroke="${c.line}" stroke-width="1" stroke-opacity=".45"/>
+    <path d="M ${g.x0 + 2} ${g.top + 2} L ${g.x0 + d} ${g.top + d} M ${g.x1 - 2} ${g.top + 2} L ${g.x1 - d} ${g.top + d}" stroke="${c.line}" stroke-width="1" stroke-opacity=".45"/>
+    <rect x="${g.x0 + d + 6}" y="${g.floor - 22}" width="${g.x1 - g.x0 - 2 * d - 12}" height="14" rx="7" fill="${c.mat}" stroke="${c.line}" stroke-width="1.2"/>
+    <rect x="${g.x0}" y="${g.floor - 6}" width="${g.x1 - g.x0}" height="6" rx="2" fill="${dark}"/>`;
+};
+DRAW.cageFront = ({ w, height, door = 'left', color, dark }) => {
+  const g = cageShape49a({ w, height, door }), c = CAGE49A, o = g.open, ow = o.x1 - o.x0, n = Math.max(4, Math.round(ow / 15));
+  const bars = Array.from({ length: n - 1 }, (_, i) => o.x0 + ow * (i + 1) / n);
+  const side = door === 'right' ? -1 : 1, hx = g.hinge - side * 1;
+  return `
+    <path d="M ${g.x0 + 6} ${g.top} H ${g.x1 - 6} Q ${g.x1} ${g.top} ${g.x1} ${g.top + 6} V ${g.floor} H ${g.x0} V ${g.top + 6} Q ${g.x0} ${g.top} ${g.x0 + 6} ${g.top} Z
+             M ${o.x0} ${o.y0} V ${o.y1} H ${o.x1} V ${o.y0} Z" fill="${color}" fill-rule="evenodd" stroke="${c.line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M ${g.x0 + 3} ${g.floor - 5} H ${g.x1 - 3}" stroke="${dark}" stroke-width="4" stroke-linecap="round"/>
+    <rect x="${200 - 22}" y="${g.top + 4}" width="44" height="12" rx="2" fill="#ffffff" stroke="${c.line}" stroke-width="1"/>
+    <path d="M ${200 - 16} ${g.top + 8.5} H ${200 + 12} M ${200 - 16} ${g.top + 12} H ${200 + 4}" stroke="#9aa5ad" stroke-width="1.4" stroke-linecap="round"/>
+    <g data-cage-door49a="" data-hinge="${g.hinge}" data-door="${door}" data-x0="${o.x0}" data-x1="${o.x1}" data-y0="${o.y0}" data-y1="${o.y1}">
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${ow - 2}" height="${o.y1 - o.y0 - 2}" rx="2" fill="none" stroke="${c.line}" stroke-width="5.4"/>
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${ow - 2}" height="${o.y1 - o.y0 - 2}" rx="2" fill="none" stroke="${c.steel}" stroke-width="3"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')} M ${o.x0 + 2} ${(o.y0 + o.y1) / 2} H ${o.x1 - 2}" stroke="${c.line}" stroke-width="4.2" stroke-linecap="round"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')} M ${o.x0 + 2} ${(o.y0 + o.y1) / 2} H ${o.x1 - 2}" stroke="${c.steel}" stroke-width="2" stroke-linecap="round"/>
+      <rect x="${g.latch.x - 4}" y="${g.latch.y - 9}" width="8" height="18" rx="3" fill="${dark}" stroke="${c.line}" stroke-width="1.2"/>
+    </g>
+    <rect x="${hx - 3}" y="${o.y0 + 8}" width="6" height="12" rx="2" fill="${dark}" stroke="${c.line}" stroke-width="1"/>
+    <rect x="${hx - 3}" y="${o.y1 - 20}" width="6" height="12" rx="2" fill="${dark}" stroke="${c.line}" stroke-width="1"/>`;
+};
+DEFAULT_COLOR.cage = '#6fb6d9'; DEFAULT_COLOR.cageFront = '#6fb6d9';      // khung sơn tĩnh điện xanh trời; song cửa inox sáng
+
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
@@ -313,7 +356,8 @@ export const PROP_KINDS = Object.keys(DRAW);
  *     facing   laptop: 'away' (nắp quay ra người xem — máy của người đứng sau bàn) | 'viewer'; xe máy: 'right' (mặc định) | 'left'
  *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
  *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
- *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'
+ *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'; chuồng (`cage` / `cageFront`, đợt 49 A): phía BẢN LỀ cửa, 'left' (mặc định) | 'right'
+ *     (đợt 49 A) `cage` = lòng chuồng (vẽ SAU con vật), `cageFront` = khung trước + cửa song (vẽ TRƯỚC nó) — cùng `width` / `height` (cỡ ngoài, 170 × 140), cùng host
  * Trả về { svg, kind, seatY, notify }; xe máy thêm `rideLift(rig)` (nâng người lái bao nhiêu đơn vị khung để ngồi trên yên)
  * và `roll(distance, duration, ease)` (timeline quay bánh khi xe đi `distance` đơn vị khung). Host nên có cùng `bottom` và
  * `height` với host của nhân vật.
@@ -353,6 +397,8 @@ export function createProp(host, kind, options = {}) {
   </svg>`;
   const svg = host.firstElementChild;
   const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  // ĐỢT 49 A: chuồng — hình học trong khung 400 × 470 (ô cửa, bản lề, chốt, sàn trong chuồng) cho `putInCage` / `takeOutOfCage`.
+  if (kind === 'cage' || kind === 'cageFront') prop.cage = cageShape49a({ w: o.w, height: o.height, door: o.door });
   if (kind === 'xray') {
     // CHỖ CHỈ trên phim, trong khung 400 × 470 (`showXray` của người đứng cạnh, cùng cỡ host): `rig.showXray(prop.spot)`.
     const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;

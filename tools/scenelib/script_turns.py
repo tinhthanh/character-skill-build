@@ -4,12 +4,14 @@
 emit.py (the code of the turn). A step gets what it reads as arguments (the shared lists and tables it appends to, the entry, the
 person of the turn); none returns anything — they add to `turns`, `views`, `gear_ops`… and move people (`x`) in place."""
 from .actions import CONE_BACK, RUN_TO, WHOLE_BODY
+from .cage import walk_to_prop          # đợt 49 A
 from .approach import pets_walk_up, kneel_to_low_pet, walk_to_pay_stand, walk_to_pick_up, join_selfie, walk_into_reach, turn_tail_for_temp
 from .emit import emit_together, emit_turn
 from .entry_cues import collect_shows, collect_popup, collect_lamps, collect_power_and_sky, collect_toasts
 from .floor import floor_turn, restore_seated
 from .moments import record_moments
 from .views import beat_of
+from . import leash49c          # đợt 49 C — dắt chó đi dạo
 
 
 def write_turns(st):
@@ -36,10 +38,12 @@ def write_turns(st):
             floor_turn(who, turn, undo_seated)          # ĐỢT 42 E: đang ngồi bệt / nằm — như người ngồi (con vật đi tới, không tự quỳ)
             kneel_to_low_pet(names, stage_set, turn, who)
             walk_to_pay_stand(emitted, st, turn, turns, who)
+            walk_to_prop(emitted, st, turn, turns, who)          # đợt 49 A: bước tới cạnh đồ vật bước ấy gọi tên (chuồng)
             walk_to_pick_up(emitted, names, turn, turns, who)
             join_selfie(emitted, names, turn, turns, who)
             walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, turn, turns, where, who)
             turn_tail_for_temp(emitted, names, turn, turned_back, turns, who)
+            leash49c.walk_up(emitted, names, reach_notes, stage_set, turn, turns, where, who)          # đợt 49 C
         restore_seated(undo_seated)
         if layout == 'split':
             talker = next((turn for turn in (entry.get('together', []) if isinstance(entry, dict) and isinstance(entry.get('together'), list) else [entry]) if isinstance(turn, dict) and turn.get('say') and turn.get('who') in names), None)
@@ -49,10 +53,13 @@ def write_turns(st):
         collect_power_and_sky(emitted, entry, power_ops, sky_ops, stage_set, where)
         record_moments(arms, emitted, entry, gear_ops, holding, names, reach_notes, st, stage_set, where)
         collect_toasts(emitted, entry, toasts, where)
+        leash49c.moments_op(emitted, entry, gear_ops, names, where)          # đợt 49 C
         if isinstance(entry, dict) and 'together' in entry:
+            leash49c.together_part(entry, names)          # đợt 49 C: con vật được dắt bước cùng lúc
             emit_together(emitted, entry, st, turns, where)
         else:
             emit_turn(arms, emitted, entry, gear_ops, names, reach_notes, st, stage_set, turns, where)
+        leash49c.after(entry, names)          # đợt 49 C: chỗ đứng mới của người dắt và con vật
         _step_back_after(backs, emitted, entry, names, turned_back, turns)
         _director_beat(beats, director, emitted, entry, first_turn, names, st)
 
@@ -110,4 +117,5 @@ def _director_beat(beats, director, emitted, entry, first_turn, names, st):
         if people and beat.get('subjects') and not beat.get('fixed'):
             beat['size'] = 'full'; beat['floor44b'] = True
             beat.pop('mid', None)
+        leash49c.beat(beat, entry, names)          # đợt 49 C: góc toàn người dắt + con vật, đổi góc sớm
         beats.append(beat)

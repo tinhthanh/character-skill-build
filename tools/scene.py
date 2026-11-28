@@ -102,6 +102,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                { "speed": 0.5…2 }), ["jump", 2, { "height": 1 }] (jump for joy), ["dance", "happy", 2, { "bpm": 120 }]
                ("gentle" for older people) — their turns get a full shot (feet in the frame, the head kept in at the top of a jump). Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
                ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
+               Walk a dog (đợt 49 C): ["walkOnLeash", "@dog", 4, 300] — its own turn, first step; clips the leash on if needed (a leash
+               handle is given if "holds" is empty), the dog walks with the person (added for you), trots ahead (behind when it starts on the
+               far side), sniffs, looks back; both "x" move; the leash stays on ("unleash" later). Cats too (harness); rabbits refused.
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign", everyday gestures "laugh", "wipeTears", "facepalm", "shush", "okSign", "salute"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].
@@ -141,6 +144,20 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                it, on its box or the floor — 3D sets): shower spray on its back, foam lathered in with both hands, rinsed; the person
                steps back and the pet shakes off water. ["towelDry", "@pet"] (wraps a towel round it, rubs — the fur turns fluffy),
                ["brushTeeth", "@pet"] (holds the muzzle, the mouth opens, short brush strokes, then it licks its lips).
+               PROPS BY NAME (wave 49 A): a step can name a 3D-set cutout as "@<its name>", like a character — the tool resolves it,
+               walks the person to stand beside it first, and refuses an unknown name, a character's name or a prop of the wrong kind.
+               Boarding: a set.cutouts { "kind": "cage", "name": "chuong", "x": -280, "z": -600, "size": [170, 140], "door": "left" }
+               (a cage on the floor: its inside drawn behind a pet in it, the front frame with a barred door in front; "size" in its
+               400 × 470 person-sized frame, "door" = the hinge side — left out, the side away from whoever opens it first).
+               ["putInCage", "@meo", "@chuong", { "hold": 0.5 }] — picks the pet up first if not carrying it (a "carry" turn is added),
+               steps beside the cage on the latch side, kneels, opens the door with one hand (the other arm holds the pet), lowers it
+               inside, closes the door. ["takeOutOfCage", "@meo", "@chuong"] — opens, lifts it out, closes, stands holding it (then
+               "putDown" sets it by the feet, away from the cage, or "handOverPet"). A pet can start inside: "inCage": "chuong" on it
+               (no x / z). The person must stand just in front of the cage: z 12–60 more than the cage's. Dogs, cats and rabbits; a pet
+               too big for the door opening is refused (give a bigger "size").
+               Grooming 2 (wave 49 B): ["blowDry", "@pet", { "hold": 2.4 }] (dryer nozzle aimed at its back, a visible air stream, the
+               fur blown about, ears back, eyes squinting — the fur turns dry and fluffy), ["trimFur", "@pet", { "tool": "scissors" |
+               "clipper", "hold": 2.4 }] (tufts fall as the tool passes along the back; the coat ends neater). A sitting pet stands up.
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).

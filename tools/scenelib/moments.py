@@ -19,7 +19,7 @@ def record_moments(arms, emitted, entry, gear_ops, holding, names, reach_notes, 
             # Động tác CHẠM (tay tới con vật / tới tay người kia): cho moments.json — đo bằng máy (tools/acting_check.py) và hỏi người chấm.
             if isinstance(step, list) and len(step) > 1 and step[0] in REACH_ACTIONS and step[0] != 'examine' and isinstance(step[1], str) and step[1].startswith('@'):      # khám: ghi ở dưới
                 gear_ops.append({'turn': emitted[0], 'kind': step[0], 'who': turn.get('who'), 'target': step[1][1:], **({'hold': step[2]} if step[0] in ('takeTemp', RESTRAIN) and len(step) > 2 else {}),
-                                 **({'hold': step[2].get('hold', HANDS_ON_HOLD[step[0]][2]), 'id': step[2].get('id')} if step[0] in HANDS_ON_CARE and len(step) > 2 and isinstance(step[2], dict) else {}),
+                                 **({'hold': step[2].get('hold', HANDS_ON_HOLD[step[0]][2]), 'id': step[2].get('id'), **({'tool': step[2]['tool']} if 'tool' in step[2] else {})} if step[0] in HANDS_ON_CARE and len(step) > 2 and isinstance(step[2], dict) else {}),
                                   **({'partner': next((other.get('who') for other in (entry.get('together') or []) if isinstance(other, dict) and other is not turn and other.get('who') in names
                                                        and not names[other['who']]['_pet'] and any(isinstance(item, list) and len(item) > 1 and item[1] == step[1] for item in other.get('do') or [])), None)}
                                      if step[0] == RESTRAIN and isinstance(entry, dict) else {})})
