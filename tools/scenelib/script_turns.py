@@ -12,6 +12,7 @@ from .floor import floor_turn, restore_seated
 from .moments import record_moments
 from .views import beat_of
 from . import leash49c          # đợt 49 C — dắt chó đi dạo
+from . import exam50a          # đợt 50 A — phòng khám: kính hiển vi, xe đẩy siêu âm
 
 
 def write_turns(st):
@@ -39,10 +40,12 @@ def write_turns(st):
             kneel_to_low_pet(names, stage_set, turn, who)
             walk_to_pay_stand(emitted, st, turn, turns, who)
             walk_to_prop(emitted, st, turn, turns, who)          # đợt 49 A: bước tới cạnh đồ vật bước ấy gọi tên (chuồng)
+            exam50a.walk_up(emitted, st, turn, turns, who)          # đợt 50 A: bước tới cạnh kính hiển vi
             walk_to_pick_up(emitted, names, turn, turns, who)
             join_selfie(emitted, names, turn, turns, who)
             walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, turn, turns, where, who)
             turn_tail_for_temp(emitted, names, turn, turned_back, turns, who)
+            exam50a.turn_tail(emitted, names, turn, turned_back, turns, who)          # đợt 50 A: sờ nắn / siêu âm từ phía đuôi
             leash49c.walk_up(emitted, names, reach_notes, stage_set, turn, turns, where, who)          # đợt 49 C
         restore_seated(undo_seated)
         if layout == 'split':
@@ -54,6 +57,7 @@ def write_turns(st):
         record_moments(arms, emitted, entry, gear_ops, holding, names, reach_notes, st, stage_set, where)
         collect_toasts(emitted, entry, toasts, where)
         leash49c.moments_op(emitted, entry, gear_ops, names, where)          # đợt 49 C
+        exam50a.moments_op(emitted, entry, gear_ops, names)          # đợt 50 A
         if isinstance(entry, dict) and 'together' in entry:
             leash49c.together_part(entry, names)          # đợt 49 C: con vật được dắt bước cùng lúc
             emit_together(emitted, entry, st, turns, where)

@@ -2166,6 +2166,42 @@ try {
         }
         groomer.svg.remove();
       }
+      // ĐỢT 50 A — sờ nắn, siêu âm, kính hiển vi (chó, mèo, thỏ): đầu dò / lọ gel chỉ trong tay lúc dùng, thẻ ảnh hiện lúc rà rồi tắt; con vật nằm nghiêng lúc
+      // siêu âm, có gel trên bụng, dậy sau đó; giật mình khẽ khi bị sờ; `lieOnSide` là thế giữ tới `standUp`; hình mới chỉ dựng khi dùng; đối số sai bị từ chối.
+      {
+        const vet = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+        const kind = () => ['L', 'R'].map((k) => Math.round(vet.s['gadget' + k])).find((g) => g === 46 || g === 47) || 0;
+        for (const [species] of [['dog'], ['cat'], ['rabbit']]) {
+          const pet = L.createPet(spot('left:995px;top:118px;width:100px;height:82px'), { species }).rig;
+          pet.s.huong = -1; pet.apDung();
+          const scan = L.sequence(vet, [['useUltrasound', pet]]);
+          scan.time(1.2); if (kind() !== 47) hong('useUltrasound', `${species}: no gel bottle in the hand at 1.2 s`);
+          scan.time(3); const q = pet.exam50aProbe(), p = vet.exam50aProbe();
+          if (kind() !== 46 || !p.card || !(q.side > 0.95) || !(q.gelLevel > 0.9)) hong('useUltrasound', `${species}: while scanning — probe ${kind()}, card ${!!p.card}, lying ${q.side}, gel ${q.gelLevel}`);
+          scan.time(scan.duration()); const q2 = pet.exam50aProbe();
+          if (kind() || vet.exam50aProbe().card || q2.side > 0.05 || q2.gelLevel > 0) hong('useUltrasound', `${species}: the probe / card / gel stays, or it does not get up afterwards`);
+          scan.kill();
+          const feel = L.sequence(vet, [['palpate', pet, { part: species === 'cat' ? 'flank' : 'belly' }]]);
+          let flinch = 0; for (let a = 0.6; a < 1.4; a += 0.05) { feel.time(a); flinch = Math.max(flinch, pet.exam50aProbe().flinch); }
+          if (!(flinch > 0.5)) hong('palpate', `${species}: no small flinch at the first press (${flinch})`);
+          feel.time(feel.duration()); if (pet.exam50aProbe().press > 0) hong('palpate', `${species}: still pressed after`);
+          feel.kill();
+          const lie = L.sequence(pet, ['lieOnSide', ['idle', 0.6]], { breathe: false }); lie.progress(1);
+          if (!(pet.s.side50a === 1 && pet.s.nam === 1)) hong('lieOnSide', `${species}: lieOnSide is a held pose until standUp (side50a ${pet.s.side50a})`);
+          const up = L.sequence(pet, ['standUp'], { breathe: false }); up.progress(1);
+          if (pet.s.side50a !== 0 || pet.s.nam !== 0) hong('lieOnSide', `${species}: standUp does not get it up`);
+          up.kill(); lie.kill(); pet.svg.remove();
+        }
+        const fresh = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'nurse' }).rig;
+        if (fresh.svg.querySelector('[data-gadget="46"], [data-gadget="47"], [data-scan50a]')) hong('useUltrasound', 'the probe / gel bottle / scan card are built before they are used');
+        const micro = L.sequence(fresh, [['lookMicroscope']]); micro.time(2); if (!(fresh.exam50aProbe().micro > 0.9)) hong('lookMicroscope', 'does not bend over the microscope'); micro.kill();
+        for (const [label, fn, needle] of [['palpate', () => vet.palpate(null, { part: 'head' }), "'belly' or 'flank'"], ['useUltrasound', () => vet.useUltrasound(null, { hold: 30 }), 'hold'],
+                                           ['useUltrasound', () => vet.useUltrasound(null, { screen: 'cart' }), 'screen must be'], ['lookMicroscope', () => vet.lookMicroscope({ x: 'a' }), 'target must be']]) {
+          let why = ''; try { fn(); } catch (error) { why = error.message; }
+          if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
+        }
+        vet.svg.remove(); fresh.svg.remove();
+      }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;
       if (patient.el.cone.style.display === 'none') hong('wear', 'createPet({ wear: ["cone"] }) shows no cone');

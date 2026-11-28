@@ -36,6 +36,7 @@ import stance from './person/stance.js';
 import speech from './person/speech.js';
 import cage from './person/cage.js';
 import grooming from './person/grooming.js';
+import exam50a from './person/exam50a.js';
 import leash49c from './person/leash49c.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
@@ -1433,6 +1434,7 @@ export class RigSVG {
     this._drawCareTools();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
     this._drawBathTools();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
     this._drawGroomTools49b();                // đợt 49 B: máy sấy (luồng gió), kéo tỉa, tông-đơ — hình dựng lần đầu dùng
+    this._drawExam50a();                      // đợt 50 A: đầu dò siêu âm, lọ gel (giọt gel), thẻ ảnh siêu âm — hình dựng lần đầu dùng
     this._drawDeskTools();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this._veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -2189,5 +2191,9 @@ export class RigSVG {
   static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
+exam50a(RigSVG);       // đợt 50 A
+// ĐỢT 50 A — PHÒNG KHÁM: sờ nắn bụng / sườn (`palpate`), siêu âm (`useUltrasound`: con vật nằm nghiêng, gel, đầu dò 46, lọ gel 47, thẻ ảnh), soi kính hiển vi
+// (`lookMicroscope`) — runtime/person/exam50a.js; con vật đọc `petSide50a`, `petPress50a`, `petGel50a`… (runtime/pet/exam50a.js).
+RigSVG.DONG_TAC.push('palpate', 'useUltrasound', 'lookMicroscope');      // đợt 50 A
 leash49c(RigSVG);       // đợt 49 C
 export { veKhuonMat, beRongTaiY, veChanMay };

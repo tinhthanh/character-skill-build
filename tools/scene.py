@@ -158,6 +158,12 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                Grooming 2 (wave 49 B): ["blowDry", "@pet", { "hold": 2.4 }] (dryer nozzle aimed at its back, a visible air stream, the
                fur blown about, ears back, eyes squinting — the fur turns dry and fluffy), ["trimFur", "@pet", { "tool": "scissors" |
                "clipper", "hold": 2.4 }] (tufts fall as the tool passes along the back; the coat ends neater). A sitting pet stands up.
+               Exam room (wave 50 A): ["palpate", "@pet", { "part": "belly" | "flank", "hold": 2 }] (both hands on its belly / flanks,
+               pressing gently), ["useUltrasound", "@pet", "@<cart>", { "hold": 2.6 }] (the pet lies on its side on the table, gel, a probe
+               on its belly, a generic scan picture; "@<cart>" — a picture cutout of the set with a "name", optional: the person glances at
+               its screen), ["lookMicroscope", "@<microscope>", { "hold": 2 }] (walks up beside a microscope picture cutout, eye to the
+               eyepiece, turns the knob; without a name: the set's only microscope picture, or mimed). The pet turns its tail to the person
+               first (hands never cross its face). Pet pose: "lieOnSide".
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).

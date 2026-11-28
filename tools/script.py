@@ -47,6 +47,9 @@ Một tệp kịch bản:
                                        giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
                                        tắm (con vật tự đứng trong chậu tắm: xối nước, xoa bọt, xả, rũ nước), đánh răng, lau khô (khăn tắm, lông bông)
                                        sấy lông / sấy khô (vòi máy sấy, lông khô bông), tỉa lông / cắt tỉa (kéo, túm lông rụng), cạo lông / tông đơ (tông-đơ)
+                                       sờ bụng / sờ nắn / khám bụng, sờ sườn (hai tay ấn nhẹ), siêu âm (con vật nằm nghiêng, gel, đầu dò, ảnh siêu âm;
+                                       liếc xe đẩy siêu âm của bối cảnh nếu có — con vật phải ở trên bàn)
+    tên: [soi kính hiển vi] [xem kính hiển vi]   cúi vào kính hiển vi của bối cảnh (bước tới cạnh nó), vặn núm, gật · thú: [nằm phơi bụng] (nằm nghiêng)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên → con vật: dắt đi dạo           dắt chó (hay mèo đeo yếm) đi dạo — tự móc dây, chó kiệu trước, đánh hơi, ngoái lại; "dắt chó đi dạo",
@@ -190,6 +193,13 @@ TARGETED.update({'sấy': ('blowDry', None), 'sấy lông': ('blowDry', None), '
                  'tỉa lông': ('trimFur', None), 'cắt tỉa': ('trimFur', None), 'cắt tỉa lông': ('trimFur', None), 'cắt lông': ('trimFur', None), 'tỉa lông bằng kéo': ('trimFur', None),
                  'cạo lông': ('trimFur', {'tool': 'clipper'}), 'tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}),
                  'cắt lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông-đơ': ('trimFur', {'tool': 'clipper'})})
+# ĐỢT 50 A — phòng khám: sờ nắn bụng / sườn, siêu âm (con vật nằm nghiêng; xe đẩy siêu âm của bối cảnh nếu có), soi kính hiển vi (kính của bối cảnh
+# nếu có), con vật tự nằm nghiêng. ("nằm nghiêng" của thỏ vẫn là `flop`.)
+TARGETED.update({'sờ bụng': ('palpate', None), 'sờ nắn': ('palpate', None), 'sờ nắn bụng': ('palpate', None), 'nắn bụng': ('palpate', None), 'khám bụng': ('palpate', None),
+                 'sờ sườn': ('palpate', {'part': 'flank'}), 'sờ nắn sườn': ('palpate', {'part': 'flank'}), 'khám sườn': ('palpate', {'part': 'flank'}),
+                 'siêu âm': ('useUltrasound', None), 'siêu âm bụng': ('useUltrasound', None), 'siêu âm cho': ('useUltrasound', None)})
+ACTIONS.update({'soi kính hiển vi': 'lookMicroscope', 'xem kính hiển vi': 'lookMicroscope', 'nhìn kính hiển vi': 'lookMicroscope', 'soi kính': 'lookMicroscope',
+                'nằm phơi bụng': 'lieOnSide', 'nằm nghiêng sang bên': 'lieOnSide', 'nằm nghiêng ra': 'lieOnSide'})
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 ACTIONS.update({'ngồi bệt': 'sitOnFloor', 'ngồi xếp bằng': 'sitOnFloor', 'ngồi bệt xuống': 'sitOnFloor', 'nằm xuống': 'lieDown', 'nằm sàn': 'lieDown', 'nằm sofa': ['lieDown', 'sofa'], 'nằm ngủ': ['lieDown', 'floor', {'sleep': True}], 'nhặt': 'pickUp', 'nhặt lên': 'pickUp', 'nhặt đồ chơi': 'pickUp', 'nhặt bóng': 'pickUp'}); TARGETED.update({'nhặt': ('pickUp', None), 'nhặt lên': ('pickUp', None), 'nhặt đồ chơi': ('pickUp', None)})      # ĐỢT 42 E — sát sàn: ngồi bệt, nằm (sàn / sofa), nhặt đồ ("bé → chó: nhặt" — đồ chơi cạnh con chó)
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}

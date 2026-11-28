@@ -20,6 +20,7 @@ clean its ear with a cotton pad, scan its microchip (the number shows on a card)
 hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
 bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
 blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
+feel its belly or flanks, scan it with ultrasound (it lies on its side, gel, a probe, a generic scan picture), look into a microscope at the lab bench,
 get a notification on the phone (138 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
@@ -191,6 +192,11 @@ clips for every voice file.
    fur ripples, ears back, eyes squint; wet → dry and fluffy, so it follows `bathPet` / `towelDry`), `["trimFur", "@pet", { "tool": "clipper" }]`
    (`"scissors"` by default — long tufts trimmed along the back fall to the floor / table, the other hand steadies it, the coat ends neater).
    A sitting cat / rabbit stands up for both. Scripts: "sấy lông" / "sấy khô", "tỉa lông" / "cắt tỉa" (scissors), "cạo lông" / "tông đơ" (clipper).
+   Exam room (đợt 50 A): `["palpate", "@pet", { "part": "belly" | "flank" }]` (both hands, fingers spread, pressing gently; a small flinch, then calm),
+   `["useUltrasound", "@pet", "@cart"]` (the pet lies on its side, gel, a probe slid on its belly, a generic scan picture; the person glances at the cart's
+   screen — a picture cutout named "cart"; optional; the pet must be on a table), `["lookMicroscope", "@kinh"]` (walks up beside a microscope picture cutout,
+   leans in, eye at the eyepiece, turns the knob). The pet turns its tail to the person first. Pet pose `lieOnSide`. Scripts: "sờ bụng", "sờ nắn", "khám bụng",
+   "sờ sườn", "siêu âm", "[soi kính hiển vi]", pet "[nằm phơi bụng]".
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

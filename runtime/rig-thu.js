@@ -42,6 +42,7 @@ import tricks from './pet/tricks.js';
 import mood from './pet/mood.js';
 import grooming from './pet/grooming.js';
 import leash49c from './pet/leash49c.js';
+import exam50a from './pet/exam50a.js';
 
 // Các động tác nằm theo nhóm trong runtime/pet/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -408,6 +409,7 @@ export class RigThu {
     this._veSpeciesProps(s, H, S, ng);       // đợt 40 B
     this._veBath(s, H, S);             // đợt 42 F: ướt / bọt / khăn / lông bông / chậu tắm
     this._veGroom49b(s, H, S);         // đợt 49 B: lông gợn trong gió máy sấy, túm lông dài / rụng khi tỉa, lông gọn sau khi tỉa
+    this._veExam50a(s, H, S);          // đợt 50 A: bụng lộ ra khi nằm nghiêng, gel siêu âm trên bụng, thân lún khi bị ấn
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
     // đợt 40 C: đang vùng vẫy trong tay người bế (`vung` đổi) thì người bế vẽ lại — hai tay lắc theo (rig-svg.js `squirm`). Chặn đệ quy: người vẽ lại có thể gọi `apDung` của con vật.
     if (held && this.carrier && !this._dongBo && (+s.vung || 0) !== this._vungCu) {
@@ -688,6 +690,8 @@ export class RigThu {
     if (lying) Object.assign(so, LIE, { ngoi: 0 });
     so.flop = this.s.flop;
     if ((giu.flop ?? so.flop) > 0.5) Object.assign(so, RigThu.FLOP);       // đợt 40 B: thỏ nằm vật ra — khép về dáng ấy chứ không về dáng nằm thường
+    if (this.s.side50a) so.side50a = this.s.side50a;
+    if ((giu.side50a ?? so.side50a) > 0.5) Object.assign(so, RigThu.SIDE50A);       // đợt 50 A: nằm nghiêng (`lieOnSide`) — khép về dáng ấy
     t.to(this.s, { ...so, ...giu, duration: d, ease: 'power2.inOut' }, at);
     return t;
   }
@@ -893,14 +897,16 @@ export class RigThu {
     }
     const f = this._bathFace();        // đợt 42 F: mặt / miệng theo việc tắm, đánh răng, lau khô
     const g = this._groomFace49b();    // đợt 49 B: tai rạp, mắt nheo trong gió máy sấy
-    if (!paw && !chin && !blink && !shake && !f && !g) return s;
+    const x50a = this._exam50aView();  // đợt 50 A: nằm nghiêng cho siêu âm, giật mình khẽ khi bị sờ bụng
+    if (!paw && !chin && !blink && !shake && !f && !g && !x50a) return s;
     const add = { dau: -RigThu.CHIN_UP * chin + RigThu.SHAKE_TURN * shake, dauY: -3 * chin, dauX: 4 * shake, taiL: 1.3 * shake, taiR: -1.3 * shake };
     return new Proxy(s, { get: (o, key) => {
       if (key === 'tnNhac') return pha(o.tnNhac, 1, paw);
       if (key === 'tnGoc') return pha(o.tnGoc, RigThu.PAW_LIFT, paw);
       const v = key === 'matY' ? Math.max(o.matY, blink) : key in add ? o[key] + add[key] : o[key];
       const w = f && key in f ? f[key](v) : v;          // đợt 42 F
-      return g && key in g ? g[key](w) : w;             // đợt 49 B
+      const w2 = g && key in g ? g[key](w) : w;             // đợt 49 B
+      return x50a && key in x50a ? x50a[key](w2) : w2;      // đợt 50 A
     } });
   }
 
@@ -936,6 +942,7 @@ export class RigThu {
     if (which === 'scruff') return this._framePoint(e.nguc, -nv.dayThan * 0.35, -nv.dayThan * 0.92);
     if (which === 'back') { const ry = +e.thanE.getAttribute('ry') || nv.dayThan; return this._framePoint(e.thanE, 0, -ry * 0.95); }
     if (which === 'mouth42f') return this._framePoint(e.dau, side * 9.5 * nv.mom.co * 0.45, nv.mom.y + 2);      // đợt 42 F: miệng, lệch về phía `side` (đánh răng)
+    if (which === 'belly50a' || which === 'flank50a') return this._examPoint50a(which);      // đợt 50 A: bụng / sườn (sờ nắn, đầu dò siêu âm)
     if (which === 'rump49b') return this._framePoint(e.mong, nv.dayThan * 0.15, -(nv.dayThan + 1) * 0.9);      // đợt 49 B: mông (cuối đường tỉa lông)
     throw new Error(`[character] carePoint: unknown spot ${JSON.stringify(which)} (paw, eye, ear, chin, crown, scruff, back)`);
   }
@@ -1149,3 +1156,5 @@ export class RigThu {
 }
 for (const install of [poses, play, basic, species, tricks, mood, grooming]) install(RigThu);
 leash49c(RigThu);       // đợt 49 C
+exam50a(RigThu);        // đợt 50 A
+RigThu.STANCE.push('lieOnSide'); RigThu.TEN_DONG_TAC.lieOnSide = 'Nằm nghiêng';      // đợt 50 A: thế giữ của cả ba loài (`standUp` để dậy)

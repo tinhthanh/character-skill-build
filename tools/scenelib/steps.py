@@ -9,6 +9,7 @@ from .schema import MARKS, MOODS, PET_MOODS, TURN_KEYS
 from .sets import ROOM_DEFAULTS
 from .util import fail, js, known, slug
 from . import cage as cage49a          # đợt 49 A
+from . import exam50a          # đợt 50 A
 
 
 # ĐỢT 35 — CÂN, ĐO NHIỆT ĐỘ, CHO UỐNG THUỐC: kiểm tra đối số, rồi viết bước. Cân: tên một cutout "scale" (có "name") — trong
@@ -19,6 +20,7 @@ def care_code(st, step, where, actor):
     if actor not in names or names[actor]['_pet']: fail(f'{where}: "{name}" is done by a person, not a pet')
     if len(step) < 2 or not (isinstance(step[1], str) and step[1].startswith('@') and step[1][1:] in names and names[step[1][1:]]['_pet']):
         fail(f'{where}: "{name}" needs the pet as its second item, e.g. ["{name}", "@dog"' + (', "scale"]' if name == 'weigh' else ']') + f' — got {js(step)}')
+    if name in exam50a.EXAM_50A: return exam50a.care_code(st, step, where, actor)          # đợt 50 A: sờ nắn, siêu âm (xe đẩy "@tên")
     pet = step[1][1:]
     if name == 'weigh':
         if stage_set is None: fail(f'{where}: "weigh" needs a 3D set ("set") with a "scale" cutout that has a "name"')
@@ -300,6 +302,7 @@ def step_code(st, step, where, actor=None):
     if floor in FLOOR_ACTIONS and actor in names:
         code = floor_step(step, where, names[actor], stage_set, fail)
         if code: return code
+    if (step == exam50a.MICRO or (isinstance(step, list) and step and step[0] == exam50a.MICRO)) and actor in names: return exam50a.micro_code(st, step, where, actor)          # đợt 50 A: kính hiển vi ("@tên")
     if isinstance(step, str): return js(step)
     if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
     if step[0] in CARE_REACH: return care_code(st, step, where, actor)
