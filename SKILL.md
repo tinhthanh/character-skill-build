@@ -19,6 +19,7 @@ read a patient chart (flipping a page), point at an X-ray film, trim its nails (
 clean its ear with a cotton pad, scan its microchip (the number shows on a card),
 hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
 bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
+blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
 get a notification on the phone (133 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
@@ -182,6 +183,10 @@ clips for every voice file.
    Grooming (đợt 42 F): `["bathPet", "@pet"]` on a pet with `"inTub": true` (it stands in a bath tub sized to it — 3D sets), `["towelDry", "@pet"]`,
    `["brushTeeth", "@pet"]` — the pet's wet / foamy / fluffy fur, open mouth, shake-off and lip-lick follow the person by themselves.
    Scripts: "tắm" (the tub comes by itself), "lau khô" / "lau khô lông", "đánh răng"; cast option "trong chậu".
+   Grooming 2 (đợt 49 B): `["blowDry", "@pet", { "hold": 2.4 }]` (dryer nozzle aimed down at its back, air stream, the other hand fluffs the fur —
+   fur ripples, ears back, eyes squint; wet → dry and fluffy, so it follows `bathPet` / `towelDry`), `["trimFur", "@pet", { "tool": "clipper" }]`
+   (`"scissors"` by default — long tufts trimmed along the back fall to the floor / table, the other hand steadies it, the coat ends neater).
+   A sitting cat / rabbit stands up for both. Scripts: "sấy lông" / "sấy khô", "tỉa lông" / "cắt tỉa" (scissors), "cạo lông" / "tông đơ" (clipper).
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

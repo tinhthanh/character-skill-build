@@ -613,6 +613,10 @@ const NGHI = Object.freeze({
   // (0…1), `petRub42f` khăn xô theo nhịp chà (−1…1), `petMood42f` −1 khó chịu (tai cụp) … 1 vui, `petGape42f` miệng hé cho đánh răng, `petLick42f`
   // liếm mép, `petShake42f` pha rũ nước 0 → 1 (con vật tự lắc — đã buông tay). `spray42fL/R` 0…1 tia nước từ vòi sen trong tay ấy (gadget 40), `sprayT42f` pha chảy của tia nước.
   petWet42f: 0, petFoam42f: 0, petDry42f: 0, petTowel42f: 0, petRub42f: 0, petMood42f: 0, petGape42f: 0, petLick42f: 0, petShake42f: 0, spray42fL: 0, spray42fR: 0, sprayT42f: 0,
+  // ĐỢT 49 B — sấy, tỉa lông (runtime/person/grooming.js): `air49bL/R` 0…1 luồng gió từ vòi sấy trong tay ấy (gadget 43), `snip49bL/R` 0…1 kéo mở
+  // (gadget 44), `buzz49bL/R` 0…1 tông-đơ chạy (gadget 45), `groomT49b` đồng hồ của động tác (gió chảy, lông gợn); con vật đọc `petBlow49b` gió vào lông,
+  // `petStand49b` 0…1 con vật đứng dậy (mèo / thỏ đang ngồi), `petShag49b` lông dài chưa tỉa (GIỮ), `petCutT49b` / `petCutDur49b` giây đã tỉa / giây tỉa hết lưng, `petTrimStart49b` / `petTrimEnd49b` chỗ đầu / cuối đường tỉa (GIỮ) — runtime/pet/grooming.js.
+  air49bL: 0, air49bR: 0, snip49bL: 0, snip49bR: 0, buzz49bL: 0, buzz49bR: 0, groomT49b: 0, petStand49b: 0, petBlow49b: 0, petShag49b: 0, petCutT49b: 0, petCutDur49b: 0, petTrimStart49b: 0, petTrimEnd49b: 0,
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
   ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,
@@ -7936,6 +7940,269 @@ const __default = (RigSVG) => mix(RigSVG, class {
 return { default: __default };
 })();
 
+/* ───── runtime/person/grooming.js ───── */
+__m['runtime/person/grooming.js'] = (function () {
+// runtime/person/grooming.js — đợt 49 B: grooming after the bath — blow-dry (`blowDry`) and trim the coat (`trimFur`).
+// Methods of `RigSVG`, installed by runtime/rig-svg.js: `this` is the rig, `RigSVG` its class.
+//
+// Như đợt 42 F (runtime/person/care.js): quay nghiêng về con vật (`_care38`), dụng cụ CHỈ HIỆN trong tay gần — 43 máy sấy cầm tay (vòi thổi + ống
+// gió), 44 kéo tỉa lông, 45 tông-đơ điện. Ba hình ấy KHÔNG có sẵn trong markup của người: `_drawGroomTools49b` dựng chúng vào ngăn `gadgetL/R`
+// lần đầu kênh `gadget` của tay ấy là 43–45 (nhân vật chưa từng sấy / tỉa thì SVG y như trước đợt này).
+// Việc tay làm lên con vật là kênh của người, con vật đọc lại khi vẽ (runtime/pet/grooming.js): `petBlow49b` gió thổi vào lông (0…1),
+// `petShag49b` lông dài xù chưa tỉa (0…1, GIỮ), `petCutT49b` giây đã tỉa (đi thẳng theo thời gian — túm lông thứ i rụng ở `i`/n × `petCutDur49b`,
+// GIỮ), `petCutDur49b` giây tỉa hết lưng (GIỮ); `groomT49b` đồng hồ của động tác (gió chảy, lông gợn, tông-đơ rung). Lông ướt → khô bông dùng lại
+// kênh đợt 42 F (`petWet42f`, `petDry42f`, `petMood42f`).
+
+const { clamp, chuanHoaGoc, mix } = __m['runtime/person/shared.js'];
+
+const AIR_LEN49B = 36;                 // luồng gió dài chừng ấy (đơn vị khung bàn tay) từ miệng vòi sấy
+const NOZZLE49B = 41;                  // miệng vòi sấy cách cổ tay chừng ấy theo bàn tay (gadget 43)
+const SCISSORS_TIP49B = 44;            // mũi kéo (gadget 44)
+const CLIPPER_TIP49B = 39;             // lưỡi tông-đơ (gadget 45)
+
+// Hình ba dụng cụ (hệ cổ tay: lòng bàn tay ở (0, 10), dụng cụ chĩa theo +y).
+const TOOL49B = {
+  // MÁY SẤY: tay cầm xanh ngọc trong nắm tay, vòi thổi trắng thuôn dần, miệng vòi dẹt; ống gió gân xám rủ ra sau; LUỒNG GIÓ (`data-air49b`):
+  // năm vệt trắng viền xanh nhạt loe ra, gợn và chảy theo `groomT49b`, vài cụm gió tròn trôi theo.
+  43: `<g data-gadget="43"><path d="M 0 -5 C -2 -18 -18 -22 -22 -10 S -20 14 -30 22" fill="none" stroke="#5b6b78" stroke-width="6" stroke-linecap="round"/>
+        <path d="M 0 -5 C -2 -18 -18 -22 -22 -10 S -20 14 -30 22" fill="none" stroke="#9aa7b2" stroke-width="3.400" stroke-linecap="round" stroke-dasharray="2.200 2.600"/>
+        <g data-solid49b=""><rect x="-4.800" y="-7" width="9.600" height="22" rx="3.600" fill="#2f9e8f" stroke="#1d5f56" stroke-width="1.200"/>
+        <path d="M -5.600 14 L -3.600 ${NOZZLE49B - 3} L 3.600 ${NOZZLE49B - 3} L 5.600 14 Z" fill="#eef3f6" stroke="#4a5562" stroke-width="1.200" stroke-linejoin="round"/>
+        <rect x="-6.400" y="${NOZZLE49B - 4}" width="12.800" height="5" rx="1.800" fill="#b9c4cd" stroke="#4a5562" stroke-width="1.200"/></g>
+        <g data-air49b="" style="display:none"><path data-cone49b="" fill="#e3f5fd" fill-opacity=".5" stroke="#bfe4f6" stroke-width="1.200" stroke-opacity=".8"/>${[0, 1, 2].map((n) => `<path data-flow="${n}" fill="none" stroke="#a9d8f0" stroke-width="4" stroke-linecap="round" opacity=".55"/><path data-flow-core="${n}" fill="none" stroke="#ffffff" stroke-width="2.200" stroke-linecap="round" stroke-dasharray="11 7"/>`).join('')}
+          ${[0, 1, 2, 3].map((n) => `<circle data-puff="${n}" fill="#ffffff" fill-opacity=".8" stroke="#9fd0ea" stroke-width="1.100"/>`).join('')}</g></g>`,
+  // KÉO TỈA: hai vòng cầm xanh ngọc trong nắm tay, hai lưỡi thép quay quanh chốt (0, 21) — mở / khép theo `snip49b`.
+  44: `<g data-gadget="44"><circle cx="-4.400" cy="7" r="4.600" fill="none" stroke="#2f9e8f" stroke-width="2.600"/><circle cx="4.400" cy="7" r="4.600" fill="none" stroke="#2f9e8f" stroke-width="2.600"/>
+        <g data-blade="1"><path d="M -2.600 11 L 1.200 21 L 0.800 ${SCISSORS_TIP49B} L -1.600 21 Z" fill="#dfe5ea" stroke="#3b3f47" stroke-width="1.100" stroke-linejoin="round"/></g>
+        <g data-blade="2"><path d="M 2.600 11 L -1.200 21 L -0.800 ${SCISSORS_TIP49B} L 1.600 21 Z" fill="#c7ced6" stroke="#3b3f47" stroke-width="1.100" stroke-linejoin="round"/></g>
+        <circle cx="0" cy="21" r="1.700" fill="#8a929e" stroke="#3b3f47" stroke-width=".8"/></g>`,
+  // TÔNG-ĐƠ ĐIỆN: thân trắng tròn cạnh, vạch xanh ngọc, công tắc; đầu lưỡi thép có răng; VẠCH RUNG (`data-buzz49b`) hai bên đầu lưỡi khi chạy.
+  45: `<g data-gadget="45"><g data-body49b=""><rect x="-6.200" y="-9" width="12.400" height="37" rx="5.400" fill="#f4f7fa" stroke="#4a5562" stroke-width="1.200"/>
+        <rect x="-6.200" y="6" width="12.400" height="5" fill="#2f9e8f"/><rect x="-2" y="15" width="4" height="7" rx="1.600" fill="#8a929e"/>
+        <path d="M -7.200 28 L 7.200 28 L 6.400 ${CLIPPER_TIP49B - 1} L -6.400 ${CLIPPER_TIP49B - 1} Z" fill="#b9c4cd" stroke="#3b3f47" stroke-width="1.100" stroke-linejoin="round"/>
+        <path d="M -5.600 ${CLIPPER_TIP49B - 1} v 2 M -2.800 ${CLIPPER_TIP49B - 1} v 2 M 0 ${CLIPPER_TIP49B - 1} v 2 M 2.800 ${CLIPPER_TIP49B - 1} v 2 M 5.600 ${CLIPPER_TIP49B - 1} v 2" stroke="#3b3f47" stroke-width="1.100" stroke-linecap="round"/></g>
+        <g data-buzz49b="" style="display:none" fill="none" stroke="#f0a020" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round"><path d="M 10 26 l 3 2 l -3 2 l 3 2 l -3 2"/><path d="M -10 26 l -3 2 l 3 2 l -3 2 l 3 2"/><path d="M 15 23 l 3 2.500 l -3 2.500 l 3 2.500"/><path d="M -15 23 l -3 2.500 l 3 2.500 l -3 2.500"/></g></g>`,
+};
+
+const __default = (RigSVG) => mix(RigSVG, class {
+  static AIR_LEN49B = AIR_LEN49B;
+  static DRYER_DIP49B = 72;          // vòi sấy chĩa xuống chừng ấy độ dưới phương ngang, theo chiều đầu → đuôi con vật (gió không vào mặt nó)
+  static TRIM_V49B = [0.45, 1.75];    // đường tỉa trên lưng: tham số gáy (0) → giữa lưng (1) → mông (2) — RigThu.TRIM_V49B (runtime/pet/grooming.js) dùng cùng số
+  static TRIM_FALL49B = 1.25;        // giây sau nhát cuối: túm lông cuối cùng rơi xuống và tan hết
+
+  // Vẽ theo trạng thái (gọi trong `_drawHeldItems`): dựng hình dụng cụ 43–45 lần đầu dùng, luồng gió máy sấy, kéo mở / khép, tông-đơ rung.
+  _drawGroomTools49b() {
+    const e = this.el, s = this.s, T = +s.groomT49b || 0, f = (v) => v.toFixed(2);
+    for (const side of ['L', 'R']) {
+      const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
+      if (!box || kind < 43 || kind > 45) continue;
+      let tool = [...box.children].find((child) => +child.getAttribute('data-gadget') === kind);
+      if (!tool) { box.insertAdjacentHTML('beforeend', TOOL49B[kind]); tool = box.lastElementChild; }
+      tool.style.display = '';
+      if (kind === 43) {
+        const air = tool.querySelector('[data-air49b]'), v = clamp(+s['air49b' + side] || 0, 0, 1);
+        air.style.display = v > 0.03 ? '' : 'none';
+        if (v > 0.03) {
+          air.setAttribute('opacity', f(Math.min(1, v * 1.3)));
+          const y0 = NOZZLE49B + 1, L = AIR_LEN49B * (0.55 + 0.45 * v);
+          // nón gió trong mờ loe ra từ miệng vòi, ba vệt gió cong chữ S trong nón; lõi trắng đứt khúc chảy ra khỏi vòi
+          tool.querySelector('[data-cone49b]').setAttribute('d', `M -5.5 ${f(y0)} Q ${f(-10 + Math.sin(T * 11))} ${f(y0 + L * 0.5)} -14 ${f(y0 + L)} Q 0 ${f(y0 + L + 4)} 14 ${f(y0 + L)} Q ${f(10 + Math.sin(T * 13))} ${f(y0 + L * 0.5)} 5.5 ${f(y0)} Z`);
+          for (let n = 0; n < 3; n++) {
+            const x0 = (n - 1) * 2.8, x1 = (n - 1) * 8.5, wob = 2.4 * Math.sin(T * 15 + n * 1.9);
+            const d = `M ${f(x0)} ${f(y0 + 1)} C ${f(x0 + wob)} ${f(y0 + L * 0.35)} ${f(x1 - wob)} ${f(y0 + L * 0.65)} ${f(x1)} ${f(y0 + L - 1)}`, off = f(-T * 75 - n * 6);
+            for (const path of tool.querySelectorAll(`[data-flow="${n}"], [data-flow-core="${n}"]`)) { path.setAttribute('d', d); if (path.hasAttribute('stroke-dasharray')) path.setAttribute('stroke-dashoffset', off); }
+          }
+          // cụm gió trôi theo luồng: vị trí = phần lẻ của thời gian, to dần, nhạt dần
+          tool.querySelectorAll('[data-puff]').forEach((c, n) => {
+            const p = ((T * 2.2 + n / 4) % 1 + 1) % 1, x = Math.sin(n * 2.4 + T * 3) * 6 * p;
+            c.setAttribute('cx', f(x)); c.setAttribute('cy', f(y0 + 4 + p * L)); c.setAttribute('r', f(1.6 + 2.6 * p)); c.setAttribute('opacity', f((1 - p) * 0.9));
+          });
+        }
+      } else if (kind === 44) {
+        const open = clamp(+s['snip49b' + side] || 0, 0, 1), a = 2 + 16 * open;
+        tool.querySelector('[data-blade="1"]').setAttribute('transform', `rotate(${f(-a)} 0 21)`);
+        tool.querySelector('[data-blade="2"]').setAttribute('transform', `rotate(${f(a)} 0 21)`);
+      } else {
+        const v = clamp(+s['buzz49b' + side] || 0, 0, 1), buzz = tool.querySelector('[data-buzz49b]'), body = tool.querySelector('[data-body49b]');
+        buzz.style.display = v > 0.05 ? '' : 'none';
+        if (v > 0.05) buzz.setAttribute('opacity', f(v * (0.65 + 0.35 * Math.abs(Math.sin(T * 41)))));
+        const j = v > 0.05 ? 0.45 * v * Math.sin(T * 97) : 0;          // rung rất nhẹ
+        if (j) body.setAttribute('transform', `translate(${f(j)} 0)`); else body.removeAttribute('transform');
+      }
+    }
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 49 B, `set.careProbe` → `c49b`): dụng cụ 43–45 đang cầm, luồng gió và chỗ nó tới (px màn hình), mũi kéo / lưỡi tông-đơ. */
+  groom49bProbe() {
+    const e = this.el, s = this.s, side = ['L', 'R'].find((k) => Math.round(s['gadget' + k]) >= 43 && Math.round(s['gadget' + k]) <= 45) || null;
+    const kind = side ? Math.round(s['gadget' + side]) : 0, tool = side ? [...e['gadget' + side].children].find((child) => +child.getAttribute('data-gadget') === kind) || null : null;
+    const air = tool && kind === 43 ? tool.querySelector('[data-air49b]') : null, shown = air && air.style.display !== 'none';
+    const at = (y) => { if (!tool || !tool.getScreenCTM()) return null; const q = new DOMPoint(0, y).matrixTransform(tool.getScreenCTM()); return { x: q.x, y: q.y, px: true }; };
+    const v = side ? +clamp(+s['air49b' + side] || 0, 0, 1) : 0;
+    return { kind, side, tool, solid: tool && kind === 43 ? tool.querySelector('[data-solid49b]') : tool, air: shown ? air : null, nozzle: kind === 43 ? at(NOZZLE49B) : null, airEnd: shown ? at(NOZZLE49B + 1 + AIR_LEN49B * (0.55 + 0.45 * v)) : null,
+             tip: kind === 44 ? at(SCISSORS_TIP49B - 2) : kind === 45 ? at(CLIPPER_TIP49B) : null, airLevel: +v.toFixed(3),
+             snip: side ? +clamp(+s['snip49b' + side] || 0, 0, 1).toFixed(3) : 0, buzz: side ? +clamp(+s['buzz49b' + side] || 0, 0, 1).toFixed(3) : 0 };
+  }
+
+  // Đầu con vật (tâm, bán kính) từ đỉnh đầu và cằm, trong hệ của `_care38`: điểm nào trên đường lưng nằm trong đầu (thỏ đầu to, gáy khuất sau đầu)
+  // thì tay / dụng cụ không tới đó — đặt ở đó là che mặt nó.
+  _offHead49b(c) {
+    const Hd = c.spot('crown', 'petStand49b', 1), Cn = c.spot('chin', 'petStand49b', 1);
+    const hc = { x: (Hd.x + Cn.x) / 2, y: (Hd.y + Cn.y) / 2 }, hr = Math.hypot(Hd.x - Cn.x, Hd.y - Cn.y) / 2;
+    const off = (q) => !c.pet || Math.hypot(q.x - hc.x, q.y - hc.y) > hr * 1.05 + 4;
+    // Chỗ dự phòng cho tay xa khi không với tới lưng sau đầu: ĐỠ NGỰC (dưới cằm, trên bàn chân trước), dưới mặt nó.
+    const Pw = c.spot('paw', 'petStand49b', 1);
+    off.chest = { x: (Cn.x + Pw.x) / 2, y: Math.max(Cn.y + hr * 0.5, Cn.y + (Pw.y - Cn.y) * 0.6) };
+    return off;
+  }
+
+  /**
+   * SẤY LÔNG con vật `target` (vừa tắm, hay vừa lau khăn): quay nghiêng về nó, tay gần cầm VÒI MÁY SẤY (hiện trong tay, ống gió rủ ra sau) chĩa
+   * chéo xuống lưng — luồng gió trắng thấy rõ tới lông; rà từ gáy về giữa lưng, qua lại `hold` giây; tay kia VÒ XÙ lông trên lưng, sau chỗ gió
+   * thổi. Con vật: lông gợn, dựng lên và rạp theo chiều gió (từ đầu về đuôi), tai rạp ra sau phất phơ, mắt nheo; lông khô dần và BÔNG lên (như
+   * `towelDry` — viền lông xù, đuôi to). Tắt máy, cất vòi (tay về hông), nhìn mặt nó, cười. Lông còn khô bông sau động tác.
+   */
+  blowDry(target = null, { hold = 2.4 } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 1 && hold <= 6)) throw new Error(`[character] blowDry: hold must be 1…6 seconds of drying, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this._care38(t, target, 'blowDry', 0.1), { k, o, dir } = c;
+    // Chỗ trên con vật đo ở dáng ĐỨNG (`petStand49b` — mèo, thỏ đang ngồi thì đứng dậy cho sấy).
+    const Sc = c.spot('scruff', 'petStand49b', 1), B = c.spot('back', 'petStand49b', 1), Hd = c.spot('crown', 'petStand49b', 1), E = c.spot('eye', 'petStand49b', 1), fwd = Hd.x >= Sc.x ? 1 : -1;
+    const along = (u, dy = 0) => ({ x: Sc.x + (B.x - fwd * 8 - Sc.x) * u, y: Sc.y + (B.y - Sc.y) * u + dy });
+    // Vòi sấy chĩa CHÉO XUỐNG (`DRYER_DIP49B`) theo chiều đầu → đuôi con vật: cuối luồng gió tới lưng (như vòi sen của `bathPet`).
+    const dip = RigSVG.DRYER_DIP49B * Math.PI / 180, v = { x: -fwd * Math.cos(dip), y: Math.sin(dip) }, cB = c.hand;      // gió lùa từ đầu về đuôi — không vào mặt nó
+    const aim = (q, lift = 0) => {
+      const end = (NOZZLE49B + 1 + AIR_LEN49B) * cB, palm = { x: q.x - v.x * (end - 10 * cB), y: q.y - lift - v.y * (end - 10 * cB) };
+      const p = c.arm(k, palm.x, palm.y, 10);
+      const fore = k === 'R' ? 90 - p.bat - p.cang : 90 + p.bat + p.cang;
+      const turn = chuanHoaGoc(Math.atan2(v.y, v.x) * 180 / Math.PI - fore);
+      return { ...p, spin: k === 'R' ? turn : -turn };
+    };
+    // Góc xoay dụng cụ đi LIÊN TỤC giữa các nhịp (cộng bội 360°): ±180° kề nhau không được quay vòng ngược qua 0 (vòi sấy chĩa ngược lên một lúc).
+    let spun = +s['gadgetTurn' + k] || 0;
+    const turnTo = (spin) => (spun += chuanHoaGoc(spin - spun));
+    const go = (side, p, at, d, extra = {}) => t.to(s, { ['bat' + side]: p.bat, ['cang' + side]: p.cang, ...(p.spin !== undefined ? { ['gadgetTurn' + side]: turnTo(p.spin) } : {}), ...extra, duration: d, ease: 'sine.inOut' }, at);
+    // Chỗ tay xa vò lông: sau chỗ gió thổi; không với tới (thỏ đầu to, con vật nhỏ: tay xa vắt qua đầu nó) thì gần hơn — chỗ đầu tiên với tới.
+    const off = this._offHead49b(c), lo = [0.85, 1.0, 1.15, 1.3].find((u) => off(along(u))) || 1.3, hi = Math.max(1.3, lo + 0.35);      // gió rà từ sau đầu về giữa lưng
+    const qo = [1.75, 1.45, 1.2, 1.0].map((u) => along(u, 3)).find((q) => off(q) && !(c.arm(o, q.x, q.y + 3, 15).short > 1)) || { x: off.chest.x, y: off.chest.y - 3 };
+    const ringO = [0, 1, 2, 3].map((n) => c.arm(o, qo.x - Math.cos(n * Math.PI / 2) * 4, qo.y + 3 - Math.sin(n * Math.PI / 2) * 2.5, 15)), ro = (n) => ringO[n % 4];
+    const W = 0.6, E1 = W + hold, total = E1 + 1.95;
+    // 0. Vòi sấy hiện trong tay gần, chĩa xuống trên gáy; tay xa tới lưng.
+    const ready = aim(along(lo + 0.05), 10);
+    go(k, ready, 0.05, 0.5, { ['bat' + o]: ro(0).bat, ['cang' + o]: ro(0).cang, dauY: 8, cuoi: 0.6, chum: 0.1, mayL: 0.3, mayR: 0.3 });
+    t.set(s, { ['gadget' + k]: 43, ['air49b' + k]: 0, ['tay' + o]: 'xoe' }, 0.1);
+    t.to(s, { petStand49b: 1, duration: 0.45, ease: 'sine.inOut' }, 0.05);
+    t.fromTo(s, { groomT49b: 0 }, { groomT49b: total, duration: total, ease: 'none', immediateRender: false }, 0);
+    if (c.pet) { (this.caring || (this.caring = new Set())).add(c.pet); t.to(s, { onTopL: 1, onTopR: 1, careFront: 1, duration: 0.02 }, 0.12); }      // như `bathPet`
+    c.look(along(0.4), 0.05, { d: 0.45 });
+    // 1. BẬT MÁY: gió thổi vào lưng; rà từ gáy về giữa lưng và lại; tay xa vò lông (vòng nhỏ); lông khô dần, bông lên.
+    t.to(s, { ['air49b' + k]: 1, duration: 0.2, ease: 'sine.out' }, W);
+    t.to(s, { petBlow49b: 1, duration: 0.3, ease: 'sine.out' }, W);
+    const n = Math.max(2, Math.round(hold / 0.75)), per = hold / n;
+    for (let i = 0; i < n; i++) go(k, aim(along(i % 2 ? lo : hi)), W + i * per, per);
+    for (let a = W, m = 1; a + 0.1 <= E1 + 1e-6; a += 0.1, m++) { const po = ro(m); t.to(s, { ['bat' + o]: po.bat, ['cang' + o]: po.cang, duration: 0.1, ease: 'none' }, a); }
+    c.look(along(0.7), W + 0.1, { d: 0.5 });
+    t.to(s, { petWet42f: 0, duration: hold, ease: 'sine.inOut' }, W);
+    t.to(s, { petDry42f: 1, duration: hold, ease: 'sine.in' }, W + 0.1);
+    t.to(s, { petMood42f: 0.3, duration: 0.6 }, W + hold * 0.5);
+    for (let a = W + 0.4; a < E1 - 0.4; a += 1.2) t.to(s, { dau: N.dau + dir * 3, duration: 0.25, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+    // 2. TẮT MÁY: gió tắt, vòi về hông (cất), tay xa buông; con vật lông bông, vui; nhìn mặt nó, cười, gật.
+    t.to(s, { ['air49b' + k]: 0, duration: 0.15, ease: 'sine.in' }, E1);
+    t.to(s, { petBlow49b: 0, duration: 0.3, ease: 'sine.in' }, E1);
+    go(k, ready, E1 + 0.05, 0.25);
+    t.to(s, { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['aim' + k]: 0, ['gadgetTurn' + k]: spun - chuanHoaGoc(spun), duration: 0.35, ease: 'power2.inOut' }, E1 + 0.3);
+    t.to(s, { ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.4, ease: 'power2.inOut' }, E1 + 0.15);
+    t.set(s, { ['gadget' + k]: 0, ['tay' + k]: 'mo', ['tay' + o]: 'mo' }, E1 + 0.66);
+    if (c.pet) t.to(s, { onTopL: 0, onTopR: 0, careFront: 0, duration: 0.02 }, E1 + 0.55);
+    t.to(s, { petMood42f: 1, duration: 0.35, ease: 'sine.out' }, E1 + 0.3);
+    t.to(s, { petStand49b: 0, duration: 0.5, ease: 'sine.inOut' }, E1 + 0.7);
+    c.look(E, E1 + 0.4, { d: 0.35 });
+    t.to(s, { cuoi: 1, mieng: 0.35, mayL: 0.7, mayR: 0.7, chum: 0, duration: 0.3 }, E1 + 0.5);
+    t.to(s, { dauY: 13, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, E1 + 1.0);
+    this._khep(t, 0.5, E1 + 1.45, { ...c.keep, petWet42f: 0, petDry42f: c.pet ? 1 : 0 });
+    return t;
+  }
+
+  /**
+   * TỈA LÔNG con vật `target` bằng KÉO (`tool: 'scissors'`) hay TÔNG-ĐƠ (`'clipper'`): quay nghiêng về nó; tay xa VÒ XÙ lông trên lưng (lông dài
+   * dựng lên thành túm) rồi ĐỠ SƯỜN giữ nó yên; tay gần đưa dụng cụ (hiện trong tay) dọc lưng từ gáy về mông trong `hold` giây — kéo mở / khép
+   * từng nhát, tông-đơ rung (vạch rung hai bên) — túm lông dài bị cắt RỤNG xuống (rơi rồi tan trên mặt bàn / sàn); con vật đứng yên, dễ chịu. Xong:
+   * lưng gọn — không còn túm dài, viền lông bớt xù (đã sấy bông thì bớt bông), đuôi gọn. Cất dụng cụ, nhìn mặt nó, cười. Lông GIỮ gọn sau động tác.
+   */
+  trimFur(target = null, { tool = 'scissors', hold = 2.4 } = {}) {
+    if (tool !== 'scissors' && tool !== 'clipper') throw new Error(`[character] trimFur: tool must be 'scissors' or 'clipper', got ${JSON.stringify(tool)}`);
+    if (!(Number.isFinite(hold) && hold >= 1 && hold <= 6)) throw new Error(`[character] trimFur: hold must be 1…6 seconds of trimming, got ${JSON.stringify(hold)}`);
+    const t = this.tl(), s = this.s, N = this.NGHI, c = this._care38(t, target, 'trimFur', 0.1), { k, o, dir } = c;
+    const Sc = c.spot('scruff', 'petStand49b', 1), B = c.spot('back', 'petStand49b', 1), E = c.spot('eye', 'petStand49b', 1);       // đo ở dáng đứng (như `blowDry`)
+    // Mông: chỗ trên con vật (RigThu.carePoint 'rump49b'); không có con vật (trang thử) thì kéo dài đường gáy → lưng.
+    const R = c.pet ? c.spot('rump49b', 'petStand49b', 1) : { x: B.x + (B.x - Sc.x) * 0.8, y: B.y + 2 };
+    const path = (u) => (u <= 1 ? { x: Sc.x + (B.x - Sc.x) * u, y: Sc.y + (B.y - Sc.y) * u } : { x: B.x + (R.x - B.x) * (u - 1), y: B.y + (R.y - B.y) * (u - 1) });
+    const G = tool === 'scissors' ? 44 : 45, TIP = tool === 'scissors' ? SCISSORS_TIP49B - 2 : CLIPPER_TIP49B, [Vmin, Vmax] = RigSVG.TRIM_V49B, off = this._offHead49b(c);
+    // Đường tỉa bắt đầu sau đầu con vật (thỏ: gáy khuất sau cái đầu to) — con vật xếp túm lông từ đúng chỗ ấy (`petTrimStart49b`).
+    let V0 = Vmin;
+    while (V0 < 1.2 && !off(path(V0))) V0 = +(V0 + 0.1).toFixed(2);
+    // Dụng cụ CHÚC XUỐNG lưng từ trên (`armDown`, như máy quét chip): bàn tay ở trên lưng, không vắt ngang trước mặt con vật.
+    const cut = (u, lift = 0) => { const q = path(u); return c.armDown(k, q.x, q.y + 1 - lift, TIP); };
+    // Đường tỉa dừng ở chỗ xa nhất tay gần còn với tới (con vật dài, người thấp): con vật xếp túm lông trên đúng quãng ấy (`petTrimEnd49b`).
+    let V1 = Vmax;
+    while (V1 > 1.05 && cut(V1).short > 1) V1 = +(V1 - 0.1).toFixed(2);
+    let spun = +s['gadgetTurn' + k] || 0;          // góc xoay dụng cụ liên tục (như `blowDry`)
+    const turnTo = (spin) => (spun += chuanHoaGoc(spin - spun));
+    const go = (side, p, at, d, ease = 'sine.inOut') => t.to(s, { ['bat' + side]: p.bat, ['cang' + side]: p.cang, ...(p.spin !== undefined ? { ['gadgetTurn' + side]: turnTo(p.spin) } : {}), duration: d, ease }, at);
+    // Tay xa đỡ SƯỜN sau giữa lưng; không với tới (con vật nhỏ dưới sàn, người quỳ ở phía đầu nó: tay xa vắt qua đầu nó) thì đỡ giữa sườn, rồi úp
+    // trên VAI nó (trên lưng, sau gáy), cuối cùng đỡ NGỰC — không để bàn tay duỗi hết cỡ mà dừng trước mặt nó.
+    const steady = [[B.x + (R.x - B.x) * 0.15, B.y + 14], [B.x, B.y + 12], ...[1.2, 1.0, 0.85, 0.7].map((u) => [path(u).x, path(u).y + 3])].filter(([x, y]) => off({ x, y })).concat([[off.chest.x, off.chest.y]]).map(([x, y]) => c.arm(o, x, y, 15));
+    const qo = [1.05, 0.85, 0.7, 1.3].map((u) => path(u)).find((q) => off(q) && !(c.arm(o, q.x, q.y + 3, 15).short > 1)) || { x: off.chest.x, y: off.chest.y - 3 }, flank = steady.find((p) => !(p.short > 1)) || steady[steady.length - 1] || c.arm(o, B.x, B.y + 12, 15);
+    const ringO = [0, 1, 2, 3].map((n) => c.arm(o, qo.x - Math.cos(n * Math.PI / 2) * 4, qo.y + 3 - Math.sin(n * Math.PI / 2) * 3, 15)), ro = (n) => ringO[n % 4];
+    const C0 = 1.0, U = C0 + hold, total = U + 1.9;
+    // 0. Dụng cụ hiện trong tay gần, giơ trên gáy; tay xa tới lưng; lông cũ (lần tỉa trước) trả về chưa tỉa.
+    const ready = cut(V0, 10);
+    t.to(s, { ['bat' + k]: ready.bat, ['cang' + k]: ready.cang, ['gadgetTurn' + k]: turnTo(ready.spin), ['bat' + o]: ro(0).bat, ['cang' + o]: ro(0).cang, dauY: 8, cuoi: 0.6, chum: 0.15, mayL: 0.3, mayR: 0.3, duration: 0.5, ease: 'power2.out' }, 0.05);
+    t.set(s, { ['gadget' + k]: G, ['snip49b' + k]: 0, ['buzz49b' + k]: 0, ['tay' + o]: 'xoe', petShag49b: 0, petCutT49b: 0, petCutDur49b: hold, petTrimStart49b: V0, petTrimEnd49b: V1 }, 0.02);
+    t.fromTo(s, { groomT49b: 0 }, { groomT49b: total, duration: total, ease: 'none', immediateRender: false }, 0);
+    if (c.pet) { (this.caring || (this.caring = new Set())).add(c.pet); t.to(s, { onTopL: 1, onTopR: 1, careFront: 1, duration: 0.02 }, 0.12); }
+    c.look(qo, 0.05, { d: 0.45 });
+    t.to(s, { petStand49b: 1, duration: 0.45, ease: 'sine.inOut' }, 0.05);
+    // 1. VÒ XÙ: tay xa vòng nhỏ trên lưng, lông dài dựng lên thành túm.
+    for (let a = 0.5, m = 1; a + 0.1 <= C0 - 0.2 + 1e-6; a += 0.1, m++) { const po = ro(m); t.to(s, { ['bat' + o]: po.bat, ['cang' + o]: po.cang, duration: 0.1, ease: 'none' }, a); }
+    t.to(s, { petShag49b: 1, duration: 0.45, ease: 'sine.out' }, 0.45);
+    t.to(s, { petMood42f: 0.35, duration: 0.5 }, 0.6);
+    // 2. TỈA: tay xa đỡ sườn; dụng cụ dọc lưng từ gáy về mông, túm lông rụng theo `petCutT49b` (đi thẳng theo giây — con vật tính lúc từng túm rụng).
+    go(o, flank, C0 - 0.2, 0.3);
+    go(k, cut(V0), C0 - 0.3, 0.3);
+    c.look(path(0.6), C0 - 0.2, { d: 0.4 });
+    t.fromTo(s, { petCutT49b: 0 }, { petCutT49b: hold + RigSVG.TRIM_FALL49B, duration: hold + RigSVG.TRIM_FALL49B, ease: 'none', immediateRender: false }, C0);
+    const beat = tool === 'scissors' ? 0.3 : 0.25, n = Math.max(3, Math.round(hold / beat)), per = hold / n;
+    for (let i = 0; i < n; i++) {
+      const a = C0 + i * per, u = V0 + (V1 - V0) * (i + 1) / n;
+      if (tool === 'scissors') {
+        // kéo mở (lùi nhẹ khỏi lông), tiến tới chỗ kế, khép — một nhát
+        go(k, cut(u - (V1 - V0) * 0.5 / n, 1.5), a, per * 0.5);
+        t.to(s, { ['snip49b' + k]: 1, duration: per * 0.4, ease: 'sine.out' }, a);
+        go(k, cut(u), a + per * 0.5, per * 0.5);
+        t.to(s, { ['snip49b' + k]: 0, duration: per * 0.35, ease: 'power2.in' }, a + per * 0.55);
+      } else go(k, cut(u, i % 2 ? 0.8 : 0), a, per, 'none');
+      if (i % 4 === 1) c.look(path(u), a, { d: 0.3 });
+    }
+    if (tool === 'clipper') { t.to(s, { ['buzz49b' + k]: 1, duration: 0.12 }, C0 - 0.15); t.to(s, { ['buzz49b' + k]: 0, duration: 0.12 }, U); }
+    // 3. Xong: nhấc dụng cụ, cất (tay về hông), buông; nhìn mặt nó, cười, gật — lưng gọn.
+    go(k, cut(V1, 10), U + 0.02, 0.25);
+    t.to(s, { ['bat' + k]: N['bat' + k], ['cang' + k]: N['cang' + k], ['aim' + k]: 0, ['gadgetTurn' + k]: spun - chuanHoaGoc(spun), duration: 0.35, ease: 'power2.inOut' }, U + 0.3);
+    t.to(s, { ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.4, ease: 'power2.inOut' }, U + 0.2);
+    t.set(s, { ['gadget' + k]: 0, ['snip49b' + k]: 0, ['tay' + k]: 'mo', ['tay' + o]: 'mo' }, U + 0.66);
+    if (c.pet) t.to(s, { onTopL: 0, onTopR: 0, careFront: 0, duration: 0.02 }, U + 0.55);
+    t.to(s, { petMood42f: 0.9, duration: 0.35, ease: 'sine.out' }, U + 0.4);
+    t.to(s, { petStand49b: 0, duration: 0.5, ease: 'sine.inOut' }, U + 0.7);
+    c.look(E, U + 0.45, { d: 0.35 });
+    t.to(s, { cuoi: 1, mieng: 0.3, mayL: 0.7, mayR: 0.7, chum: 0, duration: 0.3 }, U + 0.55);
+    t.to(s, { dauY: 13, duration: 0.2, ease: 'sine.out', yoyo: true, repeat: 1 }, U + 1.0);
+    this._khep(t, 0.5, U + 1.4, { ...c.keep, ...(c.pet ? { petShag49b: 1, petCutT49b: hold + RigSVG.TRIM_FALL49B, petCutDur49b: hold, petTrimStart49b: V0, petTrimEnd49b: V1 } : { petShag49b: 0, petCutT49b: 0, petCutDur49b: 0 }) });
+    return t;
+  }
+});
+
+return { default: __default };
+})();
+
 /* ───── runtime/rig-svg.js ───── */
 __m['runtime/rig-svg.js'] = (function () {
 // rig-svg.js — Nhân vật 2D SVG thuần, điều khiển bằng GSAP (global `gsap`).
@@ -7974,6 +8241,7 @@ const pairs = __m['runtime/person/pairs.js'].default;
 const floor = __m['runtime/person/floor.js'].default;
 const stance = __m['runtime/person/stance.js'].default;
 const speech = __m['runtime/person/speech.js'].default;
+const grooming = __m['runtime/person/grooming.js'].default;
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -9366,6 +9634,7 @@ class RigSVG {
     }
     this._drawCareTools();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
     this._drawBathTools();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
+    this._drawGroomTools49b();                // đợt 49 B: máy sấy (luồng gió), kéo tỉa, tông-đơ — hình dựng lần đầu dùng
     this._drawDeskTools();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this._veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -9959,6 +10228,7 @@ class RigSVG {
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
+    so.petShag49b = this.s.petShag49b; so.petCutT49b = this.s.petCutT49b; so.petCutDur49b = this.s.petCutDur49b; so.petTrimStart49b = this.s.petTrimStart49b; so.petTrimEnd49b = this.s.petTrimEnd49b;      // đợt 49 B: lông đã tỉa thì còn gọn
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -10105,8 +10375,11 @@ class RigSVG {
   // `petLick42f`) — con vật đọc lại khi vẽ (RigThu._veBath): gọi thẳng hay qua `sequence()` đều đúng nhịp. Con vật trong chậu tắm: đạo cụ `tub`
   // + `pet.inTub42f(rim)` (tools/scene.py: `"inTub": true`).
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
+  // ĐỢT 49 B — SẤY LÔNG (`blowDry`: vòi máy sấy, gadget 43) và TỈA LÔNG (`trimFur`: kéo 44 / tông-đơ 45) — runtime/person/grooming.js; con vật đọc
+  // `petBlow49b`, `petShag49b`, `petCutT49b` (runtime/pet/grooming.js), lông ướt → khô bông qua kênh đợt 42 F.
+  static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
 }
-for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech]) install(RigSVG);
+for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, grooming]) install(RigSVG);
 
 return { RigSVG, veKhuonMat, beRongTaiY, veChanMay };
 })();
@@ -12220,6 +12493,160 @@ const __default = (RigThu) => mix(RigThu, class {
 return { default: __default };
 })();
 
+/* ───── runtime/pet/grooming.js ───── */
+__m['runtime/pet/grooming.js'] = (function () {
+// runtime/pet/grooming.js — đợt 49 B: the pet's side of `blowDry` and `trimFur` (runtime/person/grooming.js) — fur blown in the airflow,
+// ears fluttering back, squinting; long tufts that fall when trimmed; a neater outline afterwards.
+// Methods of `RigThu`, installed by runtime/rig-thu.js: `this` is the rig, `RigThu` its class.
+//
+// Như đợt 42 F: con vật đọc kênh của NGƯỜI đang làm (tập `heldBy38`) mỗi lần vẽ. Các hình (túm lông trên lưng / bụng, túm lông đang rơi) KHÔNG
+// có trong markup: `_veGroom49b` dựng chúng lần đầu có kênh khác 0 — con vật chưa từng được sấy / tỉa thì SVG y như trước đợt này.
+
+const { DAT, clamp, RAD, chinhSang, mix } = __m['runtime/pet/shared.js'];
+
+const NB49B = 10;              // túm lông dọc lưng
+const NU49B = 5;               // túm lông dưới bụng (ở các túm lẻ của lưng)
+const FALL_G49B = 420;         // gia tốc rơi (đơn vị khung / s²)
+const FADE49B = 0.45;          // giây túm lông nằm trên mặt đứng rồi tan
+
+const hat = (i) => Math.abs(Math.sin(i * 2.3 + 0.7));          // "ngẫu nhiên" cố định theo số thứ tự — không dùng Math.random
+
+const __default = (RigThu) => mix(RigThu, class {
+  static TRIM_V49B = [0.45, 1.75];        // = RigSVG.TRIM_V49B: túm thứ i ở tham số V0 + (V1 − V0)(i + ½)/n của đường gáy → lưng → mông (V1: `petTrimEnd49b` của người tỉa)
+
+  // Mức các kênh đợt 49 B gộp từ người làm: gió (lớn nhất) cùng đồng hồ của người ấy, lông xù, giây đã tỉa / giây tỉa hết. Không có gì: null.
+  _groomLevels49b() {
+    if (!this.heldBy38 || !this.heldBy38.size) return null;
+    let blow = 0, phase = 0, shag = 0, cutT = 0, dur = 0, stand = 0, end = 0, start = 0;
+    for (const rig of this.heldBy38) {
+      const q = rig && rig.s;
+      if (!q) continue;
+      const b = clamp(+q.petBlow49b || 0, 0, 1), sh = clamp(+q.petShag49b || 0, 0, 1);
+      if (b > blow) { blow = b; phase = +q.groomT49b || 0; }
+      stand = Math.max(stand, clamp(+q.petStand49b || 0, 0, 1));
+      if (sh > shag || (sh === shag && (+q.petCutDur49b || 0) > dur)) { shag = sh; cutT = Math.max(0, +q.petCutT49b || 0); dur = Math.max(0, +q.petCutDur49b || 0); end = +q.petTrimEnd49b || 0; start = +q.petTrimStart49b || 0; }
+    }
+    if (!blow && !shag && !dur && !stand) return null;
+    return { blow, phase, shag, cutT, dur, stand, end, start, trim: dur > 0 ? clamp(cutT / dur, 0, 1) : 0 };
+  }
+
+  // Phần cộng vào dáng / nét mặt (`_careView`): ĐỨNG DẬY cho người sấy / tỉa (`petStand49b` — mèo, thỏ nghỉ ở dáng ngồi: lưng lộ ra, mặt không
+  // nằm dưới vòi sấy); gió thổi — tai rạp ra sau, phất phơ; mắt nheo. Không có gì thì null.
+  _groomFace49b() {
+    const L = this._groomLevels49b();
+    if (!L || !(L.blow || L.stand)) return null;
+    const { blow, phase, stand } = L;
+    if (!blow) return { ngoi: (v) => v * (1 - stand) };
+    return { ngoi: (v) => v * (1 - stand), taiL: (v) => v - 1.25 * blow + 0.35 * blow * Math.sin(phase * 29), taiR: (v) => v - 1.25 * blow + 0.35 * blow * Math.sin(phase * 29 + 1.4),
+             matY: (v) => Math.max(v, 0.62 * blow), duoi: (v) => v - 6 * blow * Math.sin(phase * 13) };
+  }
+
+  // Các điểm của đường tỉa (khung của `goc`): gáy, giữa lưng, mông — như `carePoint('scruff' | 'back' | 'rump49b')`.
+  _trimLine49b(H, S, mx, my, ang, day) {
+    const d = this.nv.dayThan, rot = (x, y) => ({ x: mx + x * Math.cos(ang) - y * Math.sin(ang), y: my + x * Math.sin(ang) + y * Math.cos(ang) });
+    const Sc = { x: S.x - d * 0.35, y: S.y - d * 0.92 }, B = rot(0, -day * 0.95), R = { x: H.x + d * 0.15, y: H.y - (d + 1) * 0.9 };
+    return (u) => (u <= 1 ? { x: Sc.x + (B.x - Sc.x) * u, y: Sc.y + (B.y - Sc.y) * u } : { x: B.x + (R.x - B.x) * (u - 1), y: B.y + (R.y - B.y) * (u - 1) });
+  }
+
+  // Vẽ phần đợt 49 B (sau `_veBath`). `s`: trạng thái đang vẽ; `H`, `S`: hông, vai.
+  _veGroom49b(s, H, S) {
+    const L = this._groomLevels49b();
+    if (!L && !this._g49b) return;
+    const e = this.el, nv = this.nv, m = this.mau, f = (v) => v.toFixed(2);
+    if (!this._g49b) {
+      // Dựng một lần: túm lông trên thân (trong nhóm `than` — chung bộ lọc viền, liền với dáng thân) và túm lông rơi (sau nhóm `lan`, trước vòng cổ).
+      const tuft = `<path fill="${m.long}" stroke="${m.long}" stroke-width="1.200" stroke-linejoin="round"/>`;
+      e.than.insertAdjacentHTML('beforeend', `<g data-groom49b="coat" style="display:none">${tuft.repeat(NB49B + NU49B)}</g>`);
+      e.lan.insertAdjacentHTML('afterend', `<g data-groom49b="fall" style="display:none">${`<path fill="${m.long}" stroke="${chinhSang(m.long, -0.45)}" stroke-width="1" stroke-linejoin="round"/>`.repeat(NB49B + NU49B)}</g>`);
+      this._g49b = { coat: e.than.lastElementChild, fall: e.lan.nextElementSibling };
+    }
+    const G = this._g49b, Z = L || { blow: 0, phase: 0, shag: 0, cutT: 0, dur: 0, trim: 0 };
+    const mx = (H.x + S.x) / 2, my = (H.y + S.y) / 2, ang = Math.atan2(S.y - H.y, S.x - H.x), nua = Math.hypot(S.x - H.x, S.y - H.y) / 2;
+    const day = +e.thanE.getAttribute('ry') || nv.dayThan, rx = +e.thanE.getAttribute('rx') || nua + nv.dayThan * 0.55;
+    const dry = this._bathLevels ? (this._bathLevels() || { dry: 0 }).dry : 0, trim = Z.trim;
+    // LÔNG GỌN sau khi tỉa: thân bớt phồng, đuôi gọn, viền lông bông (đã sấy / lau khô) nhỏ lại và bớt gợn.
+    if (trim > 0.001) {
+      e.thanE.setAttribute('ry', f(day * (1 - 0.05 * trim)));
+      e.duoi.setAttribute('stroke-width', f(+e.duoi.getAttribute('stroke-width') * (1 - 0.18 * trim) / (1 + 0.4 * dry) * (1 + 0.4 * dry * (1 - 0.7 * trim))));
+    }
+    if (e.fluff42f && dry > 0.03 && (Z.blow > 0.001 || trim > 0.001)) {
+      const d2 = dry * (1 - 0.75 * trim), waveK = 0.07 * d2 * (1 - 0.6 * trim), ripple = 0.05 * Z.blow, ry2 = day * (1 - 0.05 * trim);
+      const Rx = nua + nv.dayThan * 0.55 + 2 + 5 * d2, Ry = ry2 + 2 + 6 * d2, n = 26, pts = [];
+      for (let i = 0; i < n * 2; i++) {
+        const a = (i / (n * 2)) * Math.PI * 2, top = Math.sin(a) < 0 ? 1 : 0.4;
+        const k = (i % 2 ? 1 + waveK : 1) + ripple * top * Math.sin(a * 7 + Z.phase * 23) + (i % 2 ? ripple * 0.8 * top : 0);
+        pts.push(`${f(Math.cos(a) * Rx * k)} ${f(Math.sin(a) * Ry * k)}`);
+      }
+      e.fluff42f.setAttribute('d', 'M ' + pts.join(' L ') + ' Z');
+    }
+    // Đường dáng thân (hệ của thân: x dọc thân, về phía đầu; y xuống): mép trên / dưới ở x — elip thân, ngực, mông.
+    const shapes = [[0, rx, day * (1 - 0.05 * trim)], [nua, nv.dayThan, nv.dayThan], [-nua, nv.dayThan + 1, nv.dayThan + 1]];
+    const edge = (x, sign) => {
+      let best = null;
+      for (const [cx, a, b] of shapes) { const u = (x - cx) / a; if (Math.abs(u) < 1) { const y = sign * b * Math.sqrt(1 - u * u); if (best === null || y * sign > best * sign) best = y; } }
+      return best === null ? sign * day * 0.5 : best;
+    };
+    const line = this._trimLine49b(H, S, mx, my, ang, day), V0 = Z.start || RigThu.TRIM_V49B[0], V1 = Z.end > V0 ? Z.end : RigThu.TRIM_V49B[1];          // quãng người tỉa (`petTrimStart49b`, `petTrimEnd49b`)
+    const toLocal = (q) => { const dx = q.x - mx, dy = q.y - my; return dx * Math.cos(ang) + dy * Math.sin(ang); };
+    const toWorld = (x, y) => ({ x: mx + x * Math.cos(ang) - y * Math.sin(ang), y: my + x * Math.sin(ang) + y * Math.cos(ang) });
+    const blowLen = (4 + 5 * dry) * Z.blow;
+    const coat = [...G.coat.children], fall = [...G.fall.children];
+    let shown = 0, falling = 0, lean = 0;
+    const tuftAt = (i, under) => {
+      const j = under ? 2 * i + 1 : i, u = (j + 0.5) / NB49B, v = V0 + (V1 - V0) * u, x = toLocal(line(v));
+      const sign = under ? 1 : -1, y0 = edge(x, sign) - sign * 2.2;
+      const cutAt = u * Z.dur, cutNow = Z.dur > 0 && Z.cutT >= cutAt;
+      // gió thổi từ đầu về đuôi (−x): túm lông rạp theo, gợn theo đồng hồ của người sấy
+      const lean = (-0.35 - (0.55 + 0.25 * Math.sin(Z.phase * 26 + j * 1.7)) * Z.blow) * (under ? -0.6 : 1);
+      const shagLen = (under ? 7 : 9) * (0.75 + 0.5 * hat(j)) * Z.shag, len = Math.max(cutNow ? 0 : shagLen, blowLen * (under ? 0.5 : 1));
+      return { j, x, y0, sign, lean, len, cutAt, cutNow };
+    };
+    const tuftPath = (x, y0, sign, lean, len, w) => {
+      const tx = x + Math.sin(lean) * len, ty = y0 + sign * Math.cos(lean) * len, cx = x + Math.sin(lean) * len * 0.35, cy = y0 + sign * Math.cos(lean) * len * 0.55;
+      return `M ${f(x - w)} ${f(y0)} Q ${f(cx - w * 0.5)} ${f(cy)} ${f(tx)} ${f(ty)} Q ${f(cx + w * 0.7)} ${f(cy)} ${f(x + w)} ${f(y0)} Z`;
+    };
+    const all = [...Array(NB49B).keys()].map((i) => tuftAt(i, false)).concat([...Array(NU49B).keys()].map((i) => tuftAt(i, true)));
+    all.forEach((q, n) => {
+      const el = coat[n];
+      if (q.len > 0.6) { el.style.display = ''; el.setAttribute('d', tuftPath(q.x, q.y0, q.sign, q.lean, q.len, 3 + 0.8 * hat(q.j + 3))); if (!shown) lean = q.lean; shown++; }
+      else el.style.display = 'none';
+      // TÚM LÔNG RƠI: tách khỏi lông lúc dụng cụ qua (`cutAt` giây sau nhát đầu), rơi xuống mặt đứng (sàn / mặt bàn của nó), nằm đó rồi tan.
+      const fe = fall[n], age = Z.cutT - q.cutAt;
+      if (!(Z.dur > 0 && Z.shag > 0.05 && age >= 0)) { fe.style.display = 'none'; return; }
+      const L0 = (q.sign < 0 ? 9 : 7) * (0.75 + 0.5 * hat(q.j)) * Z.shag, mid = toWorld(q.x + Math.sin(q.lean) * L0 * 0.5, q.y0 + q.sign * Math.cos(q.lean) * L0 * 0.5);
+      const floor = DAT - 2, land = Math.sqrt(Math.max(0, 2 * (floor - mid.y) / FALL_G49B)), a = Math.min(age, land);
+      const x = mid.x + (-10 - 8 * hat(q.j + 1)) * a + 3 * Math.sin(a * 9 + q.j), y = Math.min(floor, mid.y + 0.5 * FALL_G49B * a * a);
+      const op = age <= land ? 1 : 1 - (age - land) / FADE49B;
+      if (op <= 0.02) { fe.style.display = 'none'; return; }
+      const spin = age <= land ? (ang / RAD) + (q.sign < 0 ? 0 : 180) + (q.j % 2 ? 1 : -1) * 260 * a : 90;
+      fe.style.display = ''; falling++;
+      fe.setAttribute('d', tuftPath(0, L0 * 0.6, -1, 0.3, L0 * 1.2, 3.2));
+      fe.setAttribute('transform', `translate(${f(x)} ${f(y)}) rotate(${f(spin)})`);
+      fe.setAttribute('opacity', f(op));
+    });
+    G.coat.style.display = shown ? '' : 'none';
+    if (shown) G.coat.setAttribute('transform', `translate(${f(mx)} ${f(my)}) rotate(${f(ang / RAD)})`);
+    G.fall.style.display = falling ? '' : 'none';
+    this._g49bCount = { shown, falling, lean };
+  }
+
+  /** Số đo cho tools/acting_check.py (đợt 49 B, `set.careProbe` → `c49b`): túm lông trên thân, túm lông đang rơi (thấp nhất / cao nhất), viền lông bông, thân, đầu, các mức. */
+  groom49bProbe() {
+    const e = this.el, L = this._groomLevels49b() || { blow: 0, shag: 0, trim: 0, cutT: 0, dur: 0 }, v = this._careView(this.s), on = (el) => (el && el.style.display !== 'none' ? el : null);
+    const G = this._g49b, n = this._g49bCount || { shown: 0, falling: 0 }, r3 = (x) => +(+x || 0).toFixed(3);
+    const drops = G ? [...G.fall.children].filter((el) => el.style.display !== 'none') : [];
+    const low = drops.length ? drops.reduce((a, b) => (a.getBoundingClientRect().bottom > b.getBoundingClientRect().bottom ? a : b)) : null;
+    const high = drops.length ? drops.reduce((a, b) => (a.getBoundingClientRect().top < b.getBoundingClientRect().top ? a : b)) : null;
+    const bath = (this._bathLevels && this._bathLevels()) || { dry: 0, wet: 0 };
+    return { coat: G ? on(G.coat) : null, fallLow: low, fallHigh: high, fluff: on(e.fluff42f), body: e.thanE, head: e.dau, tufts: n.shown, falling: drops.length,
+             blow: r3(L.blow), shag: r3(L.shag), trim: r3(L.trim), cutT: r3(L.cutT), dry: r3(bath.dry), wet: r3(bath.wet), ears: r3(v.taiL), eyes: r3(v.matY),
+             lean: r3(n.lean || 0) };
+  }
+});
+
+return { default: __default };
+})();
+
 /* ───── runtime/rig-thu.js ───── */
 __m['runtime/rig-thu.js'] = (function () {
 // rig-thu.js — THÚ BỐN CHÂN (chó, mèo) bằng SVG thuần, điều khiển bằng GSAP (global `gsap`).
@@ -12264,6 +12691,7 @@ const basic = __m['runtime/pet/basic.js'].default;
 const species = __m['runtime/pet/species.js'].default;
 const tricks = __m['runtime/pet/tricks.js'].default;
 const mood = __m['runtime/pet/mood.js'].default;
+const grooming = __m['runtime/pet/grooming.js'].default;
 
 // Các động tác nằm theo nhóm trong runtime/pet/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -12627,6 +13055,7 @@ class RigThu {
     if (e.toyM) this._veDoChoi(H, S);
     this._veSpeciesProps(s, H, S, ng);       // đợt 40 B
     this._veBath(s, H, S);             // đợt 42 F: ướt / bọt / khăn / lông bông / chậu tắm
+    this._veGroom49b(s, H, S);         // đợt 49 B: lông gợn trong gió máy sấy, túm lông dài / rụng khi tỉa, lông gọn sau khi tỉa
     if (this.markEl && this.m) drawMark(this.markEl, this.m);
     // đợt 40 C: đang vùng vẫy trong tay người bế (`vung` đổi) thì người bế vẽ lại — hai tay lắc theo (rig-svg.js `squirm`). Chặn đệ quy: người vẽ lại có thể gọi `apDung` của con vật.
     if (held && this.carrier && !this._dongBo && (+s.vung || 0) !== this._vungCu) {
@@ -13108,13 +13537,15 @@ class RigThu {
       if (Math.abs(+q.petShake || 0) > Math.abs(shake)) shake = clamp(+q.petShake || 0, -1, 1);
     }
     const f = this._bathFace();        // đợt 42 F: mặt / miệng theo việc tắm, đánh răng, lau khô
-    if (!paw && !chin && !blink && !shake && !f) return s;
+    const g = this._groomFace49b();    // đợt 49 B: tai rạp, mắt nheo trong gió máy sấy
+    if (!paw && !chin && !blink && !shake && !f && !g) return s;
     const add = { dau: -RigThu.CHIN_UP * chin + RigThu.SHAKE_TURN * shake, dauY: -3 * chin, dauX: 4 * shake, taiL: 1.3 * shake, taiR: -1.3 * shake };
     return new Proxy(s, { get: (o, key) => {
       if (key === 'tnNhac') return pha(o.tnNhac, 1, paw);
       if (key === 'tnGoc') return pha(o.tnGoc, RigThu.PAW_LIFT, paw);
       const v = key === 'matY' ? Math.max(o.matY, blink) : key in add ? o[key] + add[key] : o[key];
-      return f && key in f ? f[key](v) : v;          // đợt 42 F
+      const w = f && key in f ? f[key](v) : v;          // đợt 42 F
+      return g && key in g ? g[key](w) : w;             // đợt 49 B
     } });
   }
 
@@ -13150,6 +13581,7 @@ class RigThu {
     if (which === 'scruff') return this._framePoint(e.nguc, -nv.dayThan * 0.35, -nv.dayThan * 0.92);
     if (which === 'back') { const ry = +e.thanE.getAttribute('ry') || nv.dayThan; return this._framePoint(e.thanE, 0, -ry * 0.95); }
     if (which === 'mouth42f') return this._framePoint(e.dau, side * 9.5 * nv.mom.co * 0.45, nv.mom.y + 2);      // đợt 42 F: miệng, lệch về phía `side` (đánh răng)
+    if (which === 'rump49b') return this._framePoint(e.mong, nv.dayThan * 0.15, -(nv.dayThan + 1) * 0.9);      // đợt 49 B: mông (cuối đường tỉa lông)
     throw new Error(`[character] carePoint: unknown spot ${JSON.stringify(which)} (paw, eye, ear, chin, crown, scruff, back)`);
   }
 
@@ -13360,7 +13792,7 @@ class RigThu {
   }
 
 }
-for (const install of [poses, play, basic, species, tricks, mood]) install(RigThu);
+for (const install of [poses, play, basic, species, tricks, mood, grooming]) install(RigThu);
 
 return { RigThu };
 })();
@@ -17282,6 +17714,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.care42fProbe !== 'function' || !out[name]) continue;
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c42 = Object.fromEntries(Object.entries(rig.care42fProbe()).map(([key, v]) => [key, one(v)]));
+      }
+      // đợt 49 B: sấy / tỉa lông (`rig.groom49bProbe()` của người và con vật — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.groom49bProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
       }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);

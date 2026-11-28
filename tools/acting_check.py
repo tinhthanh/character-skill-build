@@ -2422,6 +2422,142 @@ def check_grooming(folder, c, shots, scales):
     return out
 
 
+# ĐỢT 49 B — sấy lông, tỉa lông (số đo từ `set.careProbe()` → `c49b` của người và con vật; tâm trạng con vật ở `c42`).
+AIR_HIT = 0.035   # cuối luồng gió cách lưng con vật (mép trên khung thân … giữa thân) ≤ 3,5 % chiều cao người
+TIP_ON = 0.03     # mũi kéo / lưỡi tông-đơ cách khung thân con vật ≤ 3 % chiều cao người
+FACE_COVER = 0.3  # một bàn tay / dụng cụ che ≥ 30 % khung đầu con vật là "che mặt" — cho phép ở ≤ 25 % các lúc đo
+
+
+def check_groom49b(folder, c, shots, scales):
+    """ĐỢT 49 B: sấy — luồng gió từ vòi sấy tới lưng con vật, lông gợn / rạp theo gió, tai rạp và mắt nheo, tay kia vò lông, lông khô bông, vui; tỉa —
+    mũi kéo / lưỡi tông-đơ ở lông, kéo mở khép nhiều nhát / tông-đơ rung, túm lông dài trước khi tỉa, túm lông rụng từ lưng xuống mặt đứng, lưng gọn
+    sau đó, tay kia giữ, con vật bình thản. Cả hai: không bàn tay / dụng cụ nào che mặt nó lâu, dụng cụ đủ lớn trên khung."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    person = lambda t: (care(t).get(who_n) or {}).get('c49b') or {}
+    pet = lambda t: (care(t).get(pet_n) or {}).get('c49b') or {}
+    mood = lambda t: ((care(t).get(pet_n) or {}).get('c42') or {}).get('mood', 0)
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    H = lambda t: care(t).get('@H') or frame_size(folder)[1]
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} {pet_n} — {text}', 'ok': ok, 'note': note})
+
+    def hands(t): return [h['box'] for h in (frame(t).get(who_n) or {}).get('hands') or [] if h.get('box')]
+
+    def body(t):
+        b = pet(t).get('body')
+        return box_of(b) if b else None
+
+    def point_gap(p, b): return (max(0, b['x0'] - p['x'], p['x'] - b['x1']) ** 2 + max(0, b['y0'] - p['y'], p['y'] - b['y1']) ** 2) ** 0.5
+
+    def overlap(a, b): return max(0, min(a['x1'], b['x1']) - max(a['x0'], b['x0'])) * max(0, min(a['y1'], b['y1']) - max(a['y0'], b['y0']))
+
+    def covered(t):
+        # MẶT con vật: hai mắt và miệng (`c38` / `c42` của nó), nới ra 35 % khoảng hai mắt. Bàn tay: ô vuông 6 % chiều cao người quanh tâm bàn tay (khung
+        # bàn tay của máy đo gồm cả dụng cụ cầm trong tay). Dụng cụ: phần đặc (máy sấy: tay cầm + vòi; luồng gió trong mờ, ống gió mảnh không tính).
+        q, head = care(t).get(pet_n) or {}, pet(t).get('head')
+        eyes = [e for e in ((q.get('c38') or {}).get('eyes') or []) if e]
+        mouth = (q.get('c42') or {}).get('mouth')
+        if not head or not eyes or not mouth or not tall(t): return None
+        pad = max(0.35 * (abs(eyes[0]['x'] - eyes[-1]['x']) if len(eyes) > 1 else 0), 0.05 * head['w'])      # mắt, mũi, miệng — không tính sau đầu, tai
+        xs = [e['x'] for e in eyes] + [mouth['x']]; ys = [e['y'] for e in eyes] + [mouth['y']]
+        fb = {'x0': min(xs) - pad, 'x1': max(xs) + pad, 'y0': min(ys) - pad, 'y1': max(ys) + pad}
+        area = max(1, (fb['x1'] - fb['x0']) * (fb['y1'] - fb['y0']))
+        r = 0.03 * tall(t)
+        boxes = [{'x0': h['x'] - r, 'x1': h['x'] + r, 'y0': h['y'] - r, 'y1': h['y'] + r} for h in (frame(t).get(who_n) or {}).get('hands') or [] if 'x' in h]
+        tip, grip = person(t).get('tip'), next((h for h in (frame(t).get(who_n) or {}).get('hands') or [] if h.get('side') == person(t).get('side') and 'x' in h), None)
+        if tip and grip:          # kéo / tông-đơ chéo: khung chữ nhật của nó rộng hơn hình nhiều — lấy dọc trục bàn tay → mũi
+            boxes += [{'x0': grip['x'] + (tip['x'] - grip['x']) * f - r / 2, 'x1': grip['x'] + (tip['x'] - grip['x']) * f + r / 2,
+                       'y0': grip['y'] + (tip['y'] - grip['y']) * f - r / 2, 'y1': grip['y'] + (tip['y'] - grip['y']) * f + r / 2} for f in (0.25, 0.5, 0.75, 1.0)]
+        else:
+            tool = person(t).get('solid') or person(t).get('tool')
+            if tool: boxes.append(box_of(tool))
+        return max([overlap(b, fb) / area for b in boxes] or [0])
+
+    work = c['air'] if name == 'blowDry' else c['cut']
+    if name == 'blowDry':
+        hits = []
+        for t in c['air']:
+            p, b = person(t), body(t)
+            if not p.get('air') or not p.get('airEnd') or not b or not tall(t) or p.get('airLevel', 0) < 0.5: hits.append((t, None)); continue
+            e = p['airEnd']
+            inside = b['x0'] - 0.01 * tall(t) <= e['x'] <= b['x1'] + 0.01 * tall(t)
+            hits.append((t, max(0, b['y0'] - e['y'], e['y'] - (b['y0'] + b['y1']) / 2) / tall(t) if inside else 1))
+        seen = [h for h in hits if h[1] is not None]
+        good = [h for h in seen if h[1] <= AIR_HIT]
+        worst = max(seen, key=lambda h: h[1], default=None)
+        row(f'the airflow from the dryer reaches its coat ({len(hits)} moments)', len(hits) >= 4 and len(good) >= 0.85 * len(hits),
+            f'air seen at {len(seen)} of {len(hits)} moments, ending on the back at {len(good)}' + (f'; worst {worst[1] * 100:.1f} % of height off the back at {worst[0]:g} s (limit {AIR_HIT * 100:g} %)' if worst else ''))
+        tufts = [pet(t).get('tufts', 0) for t in c['air']]
+        leans = [pet(t).get('lean', 0) for t in c['ripple']]
+        row('the fur is blown about in the airflow', min(tufts) >= 4 and max(leans) - min(leans) >= 0.12 and min(leans) < -0.4,
+            f'{min(tufts)}–{max(tufts)} tufts standing up on the coat; tuft lean {min(leans):+.2f}…{max(leans):+.2f} rad (want a swing ≥ 0.12, leaning back with the air)')
+        ears = [pet(t).get('ears', 0) for t in c['air']]; eyes = [pet(t).get('eyes', 0) for t in c['air']]
+        row('ears flutter back, eyes squint in the air', max(ears) <= -0.4 and min(eyes) >= 0.45, f'ears at most {max(ears):+.2f} (want ≤ −0.4), eyes shut at least {min(eyes):.2f} (want ≥ 0.45)')
+        on = []
+        for t in c['air']:
+            b = body(t)
+            if b and tall(t) and hands(t): on.append(min(box_gap(h, b) for h in hands(t)) / tall(t))
+        row('the other hand fluffs the fur', bool(on) and sum(1 for g in on if g <= ON_PET) >= 0.8 * len(on), f'a hand on the coat at {sum(1 for g in on if g <= ON_PET)} of {len(on)} moments (within {ON_PET * 100:g} % of height)' if on else 'hands not measured')
+        first, last = pet(c['before'][0]), pet(c['after'][-1])
+        fl, b = last.get('fluff'), body(c['after'][-1])
+        puffed = bool(fl and b) and box_of(fl)['y0'] < b['y0'] - 1
+        row('the coat dries and turns fluffy', last.get('dry', 0) >= 0.95 and last.get('wet', 1) <= 0.05 and puffed,
+            f'dry {first.get("dry", 0):.2f} → {last.get("dry", 0):.2f}, wet {first.get("wet", 0):.2f} → {last.get("wet", 0):.2f}, ' + ('a puffed outline above the body' if puffed else 'NO puffed outline'))
+        moods = [mood(t) for t in c['happy']]
+        row('it looks happy after', min(moods) >= 0.8, f'mood {min(moods):+.2f} at least (want ≥ 0.8)')
+    else:
+        tips = []
+        for t in c['cut']:
+            p, b, coat = person(t), body(t), pet(t).get('coat')
+            if b and coat:                  # lông dài dựng trên lưng (chưa tỉa) cũng là lông
+                cb = box_of(coat); b = {'x0': min(b['x0'], cb['x0']), 'x1': max(b['x1'], cb['x1']), 'y0': min(b['y0'], cb['y0']), 'y1': max(b['y1'], cb['y1'])}
+            if not p.get('tip') or not b or not tall(t): tips.append((t, None)); continue
+            tips.append((t, point_gap(p['tip'], b) / tall(t)))
+        seen = [x for x in tips if x[1] is not None]
+        good = [x for x in seen if x[1] <= TIP_ON]
+        worst = max(seen, key=lambda x: x[1], default=None)
+        what = 'scissors' if c.get('trimTool') != 'clipper' else 'clipper'
+        row(f'the {what} at its coat ({len(tips)} moments)', len(good) >= 0.85 * len(tips) and len(tips) >= 4,
+            f'tool tip within {TIP_ON * 100:g} % of height of its body (and long coat) at {len(good)} of {len(tips)} moments' + (f'; worst {worst[1] * 100:.1f} % at {worst[0]:g} s' if worst else ''))
+        if what == 'scissors':
+            snips = [person(t).get('snip', 0) for t in c['cut']]
+            turns = sum(1 for a, b2, d in zip(snips, snips[1:], snips[2:]) if (b2 - a) * (d - b2) < 0)
+            row('the scissors snip open and shut', max(snips) >= 0.6 and min(snips) <= 0.25 and turns >= 4, f'blades open {min(snips):.2f}…{max(snips):.2f}, {turns} changes (want ≥ 4)')
+        else:
+            buzz = [person(t).get('buzz', 0) for t in c['cut']]
+            row('the clipper runs (buzz lines)', min(buzz) >= 0.9, f'buzz {min(buzz):.2f} at least while clipping (want ≥ 0.9)')
+        before = pet(c['shag'][0])
+        falls = [(t, pet(t)) for t in c['fall']]
+        n_fall = sum(1 for _, q in falls if q.get('falling', 0) > 0)
+        high = any(q.get('fallHigh') and body(t) and q['fallHigh']['y'] < (body(t)['y0'] + body(t)['y1']) / 2 for t, q in falls)
+        low = any(q.get('fallLow') and body(t) and q['fallLow']['y'] > body(t)['y1'] - 0.15 * (body(t)['y1'] - body(t)['y0']) for t, q in falls)
+        row('long tufts on the coat, tufts fall from it as it is trimmed', before.get('tufts', 0) >= 8 and n_fall >= 0.4 * len(falls) and high and low,
+            f'{before.get("tufts", 0)} long tufts before; tufts falling at {n_fall} of {len(falls)} moments, ' + ('from the coat' if high else 'NOT from the coat') + ', ' + ('down to its feet' if low else 'NOT down to its feet'))
+        after, neat = pet(c['after'][-1]), pet((c.get('neat') or c['after'])[0])          # viền lông so ở cùng dáng đứng (con vật ngồi lại sau đó)
+        fa, fb = neat.get('fluff'), before.get('fluff')
+        slimmer = not (fa and fb) or fa['h'] < fb['h'] - 0.5
+        row('the coat ends neater', after.get('tufts', 1) == 0 and neat.get('tufts', 1) == 0 and after.get('trim', 0) >= 0.99 and after.get('falling', 1) == 0 and slimmer,
+            f'{before.get("tufts", 0)} → {after.get("tufts", 0)} long tufts, trimmed {after.get("trim", 0):.2f}, {after.get("falling", 0)} tufts still falling' + (f', fluffy outline {fb["h"]:.1f} → {fa["h"]:.1f} px tall' if fa and fb else ''))
+        held = []
+        for t in c['cut']:
+            b = body(t)
+            g = sorted(box_gap(h, b) / tall(t) for h in hands(t)) if b and tall(t) else []
+            if len(g) >= 2: held.append(g[1])
+        row('the other hand steadies it', bool(held) and sum(1 for g in held if g <= ON_PET) >= 0.8 * len(held), f'both hands on it at {sum(1 for g in held if g <= ON_PET)} of {len(held)} moments (within {ON_PET * 100:g} % of height)' if held else 'hands not measured')
+        moods = [mood(t) for t in c['cut']]
+        row('it stays calm', min(moods) >= 0, f'mood {min(moods):+.2f} at least while trimmed (want ≥ 0)')
+    cov = [x for x in (covered(t) for t in work) if x is not None]
+    row('nothing covers its face for long', bool(cov) and sum(1 for x in cov if x >= FACE_COVER) <= 0.25 * len(cov), f'a hand or the tool covers ≥ {FACE_COVER * 100:g} % of its face at {sum(1 for x in cov if x >= FACE_COVER)} of {len(cov)} moments (at most 25 %; most {max(cov) * 100:.0f} %)' if cov else 'head not measured')
+    when = c['times'][0]
+    tool = person(when).get('tool')
+    size = max(tool['w'], tool['h']) / H(when) if tool else 0
+    row('the tool big enough on screen', size >= TOOL_SEEN, f'the {"dryer" if name == "blowDry" else c.get("trimTool") or "scissors"} is {size * 100:.1f} % of the frame height at {when:g} s (least {TOOL_SEEN * 100:g} %)')
+    return out
+
+
 PAIR_HANDS = 0.04     # đợt 38 C — đập tay / đưa túi: hai lòng bàn tay cách nhau ≤ 4 % chiều cao người thấp hơn ở MỌI lúc đo
 PAIR_ON = 0.06        # vỗ vai: lòng bàn tay cách điểm vai gần của người kia ≤ 6 %; thì thầm: miệng cách đầu người nghe ≤ 6 %
 PAIR_HEADS = 0.04     # ôm: hai cái đầu cách nhau ≤ 4 % (kề nhau)
@@ -2808,6 +2944,7 @@ def check_one_scene(folder):
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     tool_times = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
     tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
+    tool_times += [t for c in checks if c.get('kind') == 'groom49b' for key in ('air', 'ripple', 'before', 'after', 'happy', 'cut', 'shag', 'fall', 'neat') for t in c.get(key) or []]      # đợt 49 B
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + tool_times + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -2842,6 +2979,9 @@ def check_one_scene(folder):
             continue
         if c['kind'] == 'care42f':          # đợt 42 F
             results.extend(check_grooming(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'groom49b':         # đợt 49 B
+            results.extend(check_groom49b(folder, c, shots, scales))
             continue
         if c['kind'] == 'walk':
             worst = None

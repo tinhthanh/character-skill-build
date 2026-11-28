@@ -141,6 +141,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                it, on its box or the floor — 3D sets): shower spray on its back, foam lathered in with both hands, rinsed; the person
                steps back and the pet shakes off water. ["towelDry", "@pet"] (wraps a towel round it, rubs — the fur turns fluffy),
                ["brushTeeth", "@pet"] (holds the muzzle, the mouth opens, short brush strokes, then it licks its lips).
+               Grooming 2 (wave 49 B): ["blowDry", "@pet", { "hold": 2.4 }] (dryer nozzle aimed at its back, a visible air stream, the
+               fur blown about, ears back, eyes squinting — the fur turns dry and fluffy), ["trimFur", "@pet", { "tool": "scissors" |
+               "clipper", "hold": 2.4 }] (tufts fall as the tool passes along the back; the coat ends neater). A sitting pet stands up.
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).

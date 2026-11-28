@@ -34,6 +34,7 @@ import pairs from './person/pairs.js';
 import floor from './person/floor.js';
 import stance from './person/stance.js';
 import speech from './person/speech.js';
+import grooming from './person/grooming.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -1426,6 +1427,7 @@ export class RigSVG {
     }
     this._drawCareTools();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
     this._drawBathTools();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
+    this._drawGroomTools49b();                // đợt 49 B: máy sấy (luồng gió), kéo tỉa, tông-đơ — hình dựng lần đầu dùng
     this._drawDeskTools();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this._veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -2019,6 +2021,7 @@ export class RigSVG {
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
+    so.petShag49b = this.s.petShag49b; so.petCutT49b = this.s.petCutT49b; so.petCutDur49b = this.s.petCutDur49b; so.petTrimStart49b = this.s.petTrimStart49b; so.petTrimEnd49b = this.s.petTrimEnd49b;      // đợt 49 B: lông đã tỉa thì còn gọn
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -2165,6 +2168,9 @@ export class RigSVG {
   // `petLick42f`) — con vật đọc lại khi vẽ (RigThu._veBath): gọi thẳng hay qua `sequence()` đều đúng nhịp. Con vật trong chậu tắm: đạo cụ `tub`
   // + `pet.inTub42f(rim)` (tools/scene.py: `"inTub": true`).
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
+  // ĐỢT 49 B — SẤY LÔNG (`blowDry`: vòi máy sấy, gadget 43) và TỈA LÔNG (`trimFur`: kéo 44 / tông-đơ 45) — runtime/person/grooming.js; con vật đọc
+  // `petBlow49b`, `petShag49b`, `petCutT49b` (runtime/pet/grooming.js), lông ướt → khô bông qua kênh đợt 42 F.
+  static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
 }
-for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech]) install(RigSVG);
+for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, grooming]) install(RigSVG);
 export { veKhuonMat, beRongTaiY, veChanMay };

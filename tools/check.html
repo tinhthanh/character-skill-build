@@ -2112,6 +2112,43 @@ try {
         }
         groomer.svg.remove(); pup.svg.remove(); tubHost.remove();
       }
+      // ĐỢT 49 B — sấy lông, tỉa lông (chó, mèo, thỏ): vòi sấy với luồng gió / kéo / tông-đơ chỉ trong tay; lông gợn, tai rạp, mắt nheo trong gió, khô bông
+      // sau; túm lông dài trước khi tỉa, rụng khi tỉa, hết sau đó; không còn dụng cụ sau động tác; hình dụng cụ / túm lông chỉ dựng khi dùng; đối số sai bị từ chối.
+      {
+        const groomer = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+        const kind = () => ['L', 'R'].map((k) => Math.round(groomer.s['gadget' + k])).find((g) => g >= 43 && g <= 45) || 0;
+        if (groomer.svg.querySelector('[data-gadget="43"], [data-gadget="44"], [data-gadget="45"]')) hong('blowDry', 'the dryer / scissors / clipper are built before they are used (the SVG of every character would change)');
+        for (const [species, tool] of [['dog', 'scissors'], ['cat', 'clipper'], ['rabbit', 'clipper']]) {
+          const pet = L.createPet(spot('left:995px;top:118px;width:100px;height:82px'), { species }).rig;
+          pet.s.huong = -1; pet.apDung();
+          if (pet.svg.querySelector('[data-groom49b]')) hong('trimFur', `${species}: the tufts are built before any grooming`);
+          const dry = L.sequence(groomer, [['blowDry', pet]]);
+          dry.time(0.6 + 1.2);
+          const p1 = groomer.groom49bProbe(), q1 = pet.groom49bProbe();
+          if (kind() !== 43 || !p1.air) hong('blowDry', `${species}: no dryer with an air stream in the hand while drying`);
+          if (!(q1.blow > 0.8 && q1.tufts >= 4 && q1.ears < -0.4 && q1.eyes >= 0.45)) hong('blowDry', `${species}: the fur is not blown about, or the ears / eyes do not react (blow ${q1.blow}, tufts ${q1.tufts}, ears ${q1.ears}, eyes ${q1.eyes})`);
+          dry.time(dry.duration());
+          const q2 = pet.groom49bProbe();
+          if (kind() || q2.blow > 0 || q2.tufts || !(q2.dry > 0.95) || !q2.fluff) hong('blowDry', `${species}: the dryer stays, or the fur is not dry and fluffy afterwards`);
+          dry.kill();
+          const trim = L.sequence(groomer, [['trimFur', pet, { tool }]]), hold = 2.4;
+          trim.time(0.95);
+          if (!(pet.groom49bProbe().tufts >= 8) || kind() !== (tool === 'scissors' ? 44 : 45)) hong('trimFur', `${species}: no long tufts on the coat before trimming, or no ${tool} in the hand`);
+          let fell = 0, snips = [];
+          for (let a = 1.1; a < 1 + hold + 1; a += 0.1) { trim.time(a); fell = Math.max(fell, pet.groom49bProbe().falling); const g = groomer.groom49bProbe(); snips.push(tool === 'scissors' ? g.snip : g.buzz); }
+          if (!fell) hong('trimFur', `${species}: no tufts of fur fall while trimming`);
+          if (tool === 'scissors' ? !(Math.max(...snips) > 0.6 && Math.min(...snips) < 0.25) : !(Math.min(...snips.slice(0, -10)) > 0.9)) hong('trimFur', `${species}: the ${tool} does not ${tool === 'scissors' ? 'snip open and shut' : 'run'}`);
+          trim.time(trim.duration());
+          const q3 = pet.groom49bProbe();
+          if (kind() || q3.tufts || q3.falling || !(q3.trim >= 0.99)) hong('trimFur', `${species}: the ${tool} stays, or tufts remain afterwards (tufts ${q3.tufts}, falling ${q3.falling}, trimmed ${q3.trim})`);
+          trim.kill(); pet.svg.remove();
+        }
+        for (const [label, fn, needle] of [['blowDry', () => groomer.blowDry(null, { hold: 30 }), 'hold'], ['trimFur', () => groomer.trimFur(null, { tool: 'razor' }), "'scissors' or 'clipper'"], ['trimFur', () => groomer.trimFur(groomer), 'pet rig']]) {
+          let why = ''; try { fn(); } catch (error) { why = error.message; }
+          if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
+        }
+        groomer.svg.remove();
+      }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;
       if (patient.el.cone.style.display === 'none') hong('wear', 'createPet({ wear: ["cone"] }) shows no cone');
