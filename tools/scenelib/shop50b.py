@@ -17,8 +17,8 @@ SHELF_KINDS = ('gondola_shelf', 'pet_food_shelf', 'medicine_wall_shelf')
 SHELF_ROWS = {'gondola_shelf': {'middle': 0.62, 'low': 0.14}, 'pet_food_shelf': {'high': 0.78, 'middle': 0.43, 'low': 0.2},
               'medicine_wall_shelf': {'high': 0.68, 'middle': 0.25}}
 SHELF_RATIO = {'gondola_shelf': 380 / 250, 'pet_food_shelf': 320 / 370, 'medicine_wall_shelf': 280 / 200}      # bề ngang / bề cao ảnh (sets.py show)
-SHELF_INSET = 0.1                       # chỗ lấy hàng: trong mép kệ gần người chừng ấy bề ngang kệ
-SHELF_GAP = 0.1                         # người đứng ngoài mép kệ chừng ấy × chiều cao host của họ
+SHELF_INSET = 0.16                      # chỗ lấy hàng: trong mép kệ gần người chừng ấy bề ngang kệ
+SHELF_GAP = 0.06                        # người đứng ngoài mép kệ chừng ấy × chiều cao host của họ
 SHELF_Z = (10, 160)                     # người đứng trước kệ: z của người − z của kệ trong khoảng này
 ITEMS = ('foodBag', 'treatBox', 'can')  # runtime/shop50b-items.js
 LEVELS = ('high', 'middle', 'low')
@@ -167,6 +167,16 @@ def goods_of(who, scene_turns):
         kind = item if isinstance(item, str) else (item or {}).get('kind')
         if kind in ITEMS: return kind
     return None
+
+
+SHOP_HANDOFF_GAP = 0.42   # trao / nhận món hàng qua quầy: hai tâm người cách nhau chừng ấy × chiều cao trung bình — 0,28 (đưa đồ thường) thì đầu khách che nửa
+                          # mặt thu ngân (lượt hai); hai cánh tay duỗi gần hết vẫn gặp nhau ở giữa
+
+
+def handoff_gap(step, who, target, wanted):
+    """`approach.walk_into_reach`: trao / nhận MÓN HÀNG (người đưa đang cầm món hàng) — đứng xa hơn đưa đồ thường để hai khuôn mặt không chồng nhau."""
+    if step[0] != 'handOver' or target.get('_pet') or goods_of(who, []) is None: return wanted
+    return max(wanted, SHOP_HANDOFF_GAP * (who['_host_height'] + target['_host_height']) / 2)
 
 
 def walk_to_shelf(emitted, st, turn, turns, who):

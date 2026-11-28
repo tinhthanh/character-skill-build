@@ -7,7 +7,7 @@ import shutil
 from .common import *  # noqa: F401,F403
 
 # Ảnh kệ giả (cỡ như ảnh của kho sets — loại kệ là TÊN TỆP ảnh): CI không phụ thuộc kho sets.
-SHELF_SVG50B = {'pet_food_shelf': (320, 370), 'gondola_shelf': (380, 250)}
+SHELF_SVG50B = {'pet_food_shelf': (320, 370), 'gondola_shelf': (380, 250), 'cash_counter': (420, 300)}      # quầy thu ngân: ảnh phẳng (mặt quầy ở 186 / 300)
 
 
 def _svg50b(w, h):
@@ -40,11 +40,13 @@ def _specs50b(tag):
                            {'who': 'be', 'do': [['takeFromShelf', '@ke_hang', {'item': 'treatBox', 'level': 'high'}]]},
                            {'who': 'khach', 'do': [['takeFromShelf', '@ke_hang', {'item': 'can', 'level': 'low'}]]}]}
     # Quầy thu ngân: khách lấy túi hạt ở kệ, ra quầy; thu ngân tính tiền (combo: quét — khách đưa cùng lúc —, khách trả QR, trả món hàng, vẫy).
-    till50b = {'id': 'till50b', 'camera': 'auto', 'set': {'preset': 'reception', 'cutouts': [_shelf50b(tag, 'gondola_shelf', x=520, z=-420)]},
-               'characters': [{'name': 'thu_ngan', 'id': 'receptionist', 'x': -330, 'z': -520},
-                              {'name': 'khach', 'id': 'owner_woman', 'x': 200, 'z': -360, 'holds': {'R': 'phone'}, 'holdsHidden': ['R']}],
+    till50b = {'id': 'till50b', 'camera': 'auto',
+               'set': {'room': {'width': 1800}, 'cutouts': [_shelf50b(tag, 'gondola_shelf', x=330, z=-490),
+                                                           {'image': f'_check_{tag}/cash_counter.svg', 'x': -420, 'z': -470, 'height': 300}, {'kind': 'paystand', 'x': -215, 'z': -492, 'y': 114}]},
+               'characters': [{'name': 'thu_ngan', 'id': 'receptionist', 'x': -500, 'z': -500},
+                              {'name': 'khach', 'id': 'owner_woman', 'x': 80, 'z': -440, 'holds': {'R': 'phone'}, 'holdsHidden': ['R']}],
                'script': [{'who': 'khach', 'do': [['takeFromShelf', '@ke_hang', {'item': 'foodBag', 'level': 'middle'}]]},
-                          {'who': 'khach', 'do': [['walk', 4, -330]]},
+                          {'who': 'khach', 'do': [['walk', 4, -200]], 'view': {'on': ['khach', 'thu_ngan'], 'size': 'full'}},
                           {'who': 'thu_ngan', 'do': [['shopCheckout', '@khach']]}]}
     # Không kệ: làm điệu bộ; quét món hàng đang cầm rồi bỏ vào túi (tay cầm máy có túi đang cất); quét món khách đưa (lượt riêng — khách đưa tự thêm).
     mime50b = {'id': 'mime50b', 'camera': 'auto', 'set': {'preset': 'reception'},
@@ -56,7 +58,7 @@ def _specs50b(tag):
     needles = {'shelf50b': ('khach takeFromShelf — the hand is at the shelf', 'khach takeFromShelf — the product is in the hand', 'khach takeFromShelf — reads the label',
                             'khach takeFromShelf — keeps holding the product', 'be takeFromShelf — the hand is at the shelf'),
                'till50b': ('khach takeFromShelf — the hand is at the shelf', "thu_ngan scanBarcode — the product is in the cashier's hand", 'thu_ngan scanBarcode — the red scan line touches the product',
-                           'thu_ngan scanBarcode — the scanner is aimed at the product', 'thu_ngan scanBarcode — bíp: a green flash and the price card', 'khach payByQR'),
+                           'thu_ngan scanBarcode — the scanner is aimed at the product', 'thu_ngan scanBarcode — bíp: a green flash and the price card', 'thu_ngan scanBarcode — both faces stay visible', 'khach payByQR'),
                'mime50b': ('thu_ngan takeFromShelf — keeps holding the product', 'thu_ngan scanBarcode — the red scan line touches the product', "nv scanBarcode — the product is in the cashier's hand",
                            'nv scanBarcode — the red scan line touches the product')}
     return {'shelf50b': shelf50b, 'till50b': till50b, 'mime50b': mime50b}, needles

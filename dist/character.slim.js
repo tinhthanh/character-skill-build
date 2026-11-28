@@ -6316,6 +6316,7 @@ const SCAN_FAN50B = 6.5;               // tia loe ra tới nửa bề ngang ch�
 const TIPTOE_LIFT50B = 9;              // kiễng chân: người nhấc lên chừng ấy đơn vị khung
 const ITEM_DY50B = { foodBag: 35, treatBox: -20, can: -8 };      // tâm món hàng dưới (+) / trên (−) lòng bàn tay chừng ấy đơn vị bàn tay khi cầm thẳng
 const LEVELS50B = ['high', 'middle', 'low'];
+const READ_ZOOM50B = 1.75;             // món hàng phóng to lúc đưa lên trước ngực đọc nhãn (lượt hai: 1,35 thì nhãn quá nhỏ ở góc trung)
 const PUTS50B = ['down', 'keep', 'bag'];
 const SCANNER50B = `<g data-gadget="50"><rect x="-4.6" y="-7" width="9.2" height="22" rx="3.2" fill="#2b2f36" stroke="#15181d" stroke-width="1.1"/>
         <path d="M -7.5 13 L 7.5 13 L 10 ${SCANNER_WINDOW50B - 1} L -10 ${SCANNER_WINDOW50B - 1} Z" fill="#f2b134" stroke="#7a5512" stroke-width="1.2" stroke-linejoin="round"/>
@@ -6474,7 +6475,7 @@ const __default = (RigSVG) => mix(RigSVG, class {
     const t = this.tl(), was = s.huong, c = this.nv.coThan || 1;
     if (auto && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);          // món rig tự cho, trạng thái đầu ghi nó "đang hiện": cất đi
     const sy = this._shoulderY(), mode = spot.y < sy - 22 * c ? 'high' : spot.y > HONG.y + this.hangChan() + 36 * c ? 'low' : 'middle';
-    const turn = dir * (mode === 'low' ? 1 : mode === 'high' ? 0.45 : 0.72);
+    const turn = dir * (mode === 'low' ? 1 : mode === 'high' ? 0.6 : 0.92);
     const reach = this._shelfPose50b(k, spot, dir, turn, mode);
     const ready = this._shelfPose50b(k, { x: spot.x - dir * 16 * c, y: spot.y + (mode === 'high' ? 10 : 6) * c }, dir, turn, mode);
     const free = !(this.holds[o] && s['item' + o] > 0.5);
@@ -6492,9 +6493,9 @@ const __default = (RigSVG) => mix(RigSVG, class {
     t.set(s, { ['tay' + k]: 'nam' }, G - 0.02);
     t.to(s, { ['item' + k]: 1, duration: 0.08 }, G);
     t.to(s, { ['bat' + k]: ready.pose.bat, ['cang' + k]: ready.pose.cang, duration: 0.3, ease: 'power2.inOut' }, G + 0.12);
-    const B = G + 0.42, hold = { x: HONG.x + dir * 30 * c, y: sy + 36 * c - (ITEM_DY50B[item] > 0 ? 12 : 0) * c };
+    const B = G + 0.42, hold = { x: HONG.x + dir * 44 * c, y: sy + (ITEM_DY50B[item] > 0 ? 14 : 26) * c };          // túi treo dưới nắm tay: nắm tay ngang vai, túi trước ngực (góc trung không cắt mất)
     const front = dir * 0.3, rd = this._palmTo(k, hold, this._poseGeo({ huong: front }), true);
-    t.to(s, { tiptoe50b: 0, lift42d: 0, squat42e: 0, than: N.than, dau: N.dau, dauY: 0, huong: front, ['bat' + k]: rd.bat, ['cang' + k]: rd.cang, ['itemZoom' + k]: 1.35, ['itemTilt' + k]: -24,
+    t.to(s, { tiptoe50b: 0, lift42d: 0, squat42e: 0, than: N.than, dau: N.dau, dauY: 0, huong: front, ['bat' + k]: rd.bat, ['cang' + k]: rd.cang, ['itemZoom' + k]: READ_ZOOM50B, ['itemTilt' + k]: -24,
               ...(mode === 'low' && free ? { ['aim' + o]: 0, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o] } : {}), duration: 0.6, ease: 'power2.inOut' }, B);
     const look = { x: hold.x, y: hold.y + ITEM_DY50B[item] * 0.6 * c };
     this._lookTo(t, look, B + 0.15, { d: 0.45, huong: front });

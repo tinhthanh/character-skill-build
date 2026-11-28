@@ -9134,6 +9134,7 @@ const SCAN_FAN50B = 6.5;               // tia loe ra tới nửa bề ngang ch�
 const TIPTOE_LIFT50B = 9;              // kiễng chân: người nhấc lên chừng ấy đơn vị khung
 const ITEM_DY50B = { foodBag: 35, treatBox: -20, can: -8 };      // tâm món hàng dưới (+) / trên (−) lòng bàn tay chừng ấy đơn vị bàn tay khi cầm thẳng
 const LEVELS50B = ['high', 'middle', 'low'];
+const READ_ZOOM50B = 1.75;             // món hàng phóng to lúc đưa lên trước ngực đọc nhãn (lượt hai: 1,35 thì nhãn quá nhỏ ở góc trung)
 const PUTS50B = ['down', 'keep', 'bag'];
 
 // MÁY QUÉT MÃ VẠCH cầm tay (hệ cổ tay: lòng bàn tay ở (0, 10), máy chĩa theo +y): cán đen trong nắm tay, đầu máy vàng cam, ô kính đỏ ở mũi; tia đỏ loe
@@ -9327,7 +9328,9 @@ const __default = (RigSVG) => mix(RigSVG, class {
     if (auto && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);          // món rig tự cho, trạng thái đầu ghi nó "đang hiện": cất đi
     // Tầng: theo ĐỘ CAO THẬT của chỗ lấy so với vai / hông (một kệ thấp có tầng "high" vẫn ngang ngực) — kiễng chân, đứng với, ngồi xổm.
     const sy = this._shoulderY(), mode = spot.y < sy - 22 * c ? 'high' : spot.y > HONG.y + this.hangChan() + 36 * c ? 'low' : 'middle';
-    const turn = dir * (mode === 'low' ? 1 : mode === 'high' ? 0.45 : 0.72);
+    // Quay hẳn về kệ (gần nghiêng hẳn — lượt hai: quay 0,72 thì ở góc trung người như đứng nhìn thẳng cạnh kệ, cánh tay với không rõ); tầng cao: tay phía kệ
+    // giơ lên nên quay vừa phải (quay hẳn thì tay ấy ở sau thân).
+    const turn = dir * (mode === 'low' ? 1 : mode === 'high' ? 0.6 : 0.92);
     const reach = this._shelfPose50b(k, spot, dir, turn, mode);
     const ready = this._shelfPose50b(k, { x: spot.x - dir * 16 * c, y: spot.y + (mode === 'high' ? 10 : 6) * c }, dir, turn, mode);
     const free = !(this.holds[o] && s['item' + o] > 0.5);
@@ -9348,9 +9351,9 @@ const __default = (RigSVG) => mix(RigSVG, class {
     t.to(s, { ['item' + k]: 1, duration: 0.08 }, G);
     t.to(s, { ['bat' + k]: ready.pose.bat, ['cang' + k]: ready.pose.cang, duration: 0.3, ease: 'power2.inOut' }, G + 0.12);
     // 3. Đưa về trước ngực, đứng thẳng lại / hạ gót; quay nửa về người xem — món hàng phóng to một chút cho đọc được.
-    const B = G + 0.42, hold = { x: HONG.x + dir * 30 * c, y: sy + 36 * c - (ITEM_DY50B[item] > 0 ? 12 : 0) * c };
+    const B = G + 0.42, hold = { x: HONG.x + dir * 44 * c, y: sy + (ITEM_DY50B[item] > 0 ? 14 : 26) * c };          // túi treo dưới nắm tay: nắm tay ngang vai, túi trước ngực (góc trung không cắt mất)
     const front = dir * 0.3, rd = this._palmTo(k, hold, this._poseGeo({ huong: front }), true);
-    t.to(s, { tiptoe50b: 0, lift42d: 0, squat42e: 0, than: N.than, dau: N.dau, dauY: 0, huong: front, ['bat' + k]: rd.bat, ['cang' + k]: rd.cang, ['itemZoom' + k]: 1.35, ['itemTilt' + k]: -24,
+    t.to(s, { tiptoe50b: 0, lift42d: 0, squat42e: 0, than: N.than, dau: N.dau, dauY: 0, huong: front, ['bat' + k]: rd.bat, ['cang' + k]: rd.cang, ['itemZoom' + k]: READ_ZOOM50B, ['itemTilt' + k]: -24,
               ...(mode === 'low' && free ? { ['aim' + o]: 0, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o] } : {}), duration: 0.6, ease: 'power2.inOut' }, B);
     const look = { x: hold.x, y: hold.y + ITEM_DY50B[item] * 0.6 * c };
     this._lookTo(t, look, B + 0.15, { d: 0.45, huong: front });

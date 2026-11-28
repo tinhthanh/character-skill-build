@@ -3281,6 +3281,7 @@ SHOP_SHELF = 0.04          # lòng bàn tay cách khung ảnh kệ ≤ chừng �
 SHOP_HOLD = 0.06           # tâm món hàng cách lòng bàn tay cầm nó ≤ chừng ấy (món hàng treo dưới / nằm trên nắm tay)
 SHOP_BEAM = 0.015          # cuối tia đỏ (vạch quét) cách khung món hàng ≤ chừng ấy
 SHOP_BEAM_SHARE = 0.8      # … ở ít nhất chừng ấy phần các lúc đo trong khi tia bật
+SHOP_FACE = 0.15          # quét món hàng của khách: đầu người này che đầu người kia ≤ chừng ấy phần diện tích đầu nhỏ hơn (lượt hai: đầu khách che nửa mặt thu ngân)
 SHOP_AIM = 60              # hướng máy quét (ô kính → cuối tia) lệch hướng ô kính → tâm món hàng ≤ chừng ấy độ (máy sát món hàng to: lệch nhỏ thành góc lớn) — và ô kính NGOÀI món hàng
 
 
@@ -3339,6 +3340,16 @@ def check_shop50b(folder, c, shots, scales):
     n = len(c.get('beam') or [])
     row('the red scan line touches the product', n > 0 and hits >= SHOP_BEAM_SHARE * n, f'{hits}/{n} moments with the end of the beam ≤ {SHOP_BEAM * 100:g} % of height from the product ({", ".join(notes[:6])})')
     row('the scanner is aimed at the product', bool(aims) and max(aims) <= SHOP_AIM, (f'beam off the product centre by at most {max(aims):.0f}°' if aims else 'no beam measured') + f' (limit {SHOP_AIM}°, the scanner outside the product)')
+    if c.get('target'):
+        worst = None
+        for t in (c.get('taken') or []) + (c.get('beam') or []) + (c.get('beep') or []):
+            a, b = (care(t).get(who_n) or {}).get('head'), (care(t).get(c['target']) or {}).get('head')
+            if not a or not b: continue
+            A, B = bx(a), bx(b)
+            share = max(0, min(A['x1'], B['x1']) - max(A['x0'], B['x0'])) * max(0, min(A['y1'], B['y1']) - max(A['y0'], B['y0'])) / max(1, min(a['w'] * a['h'], b['w'] * b['h']))
+            if worst is None or share > worst[1]: worst = (t, share)
+        row(f'both faces stay visible ({who_n} and {c["target"]} do not cover each other)', None if worst is None else worst[1] <= SHOP_FACE,
+            f'the two heads overlap by at most {worst[1] * 100:.0f} % of the smaller head (at {worst[0]:g} s; limit {SHOP_FACE * 100:g} %)' if worst else 'no heads measured')
     for t in c.get('beep') or []:
         q = me(t)
         row('bíp: a green flash and the price card', q.get('beep', 0) > 0.5 and q.get('readout', 0) > 0.5, f'beep {q.get("beep", 0)}, price card {q.get("readout", 0)} at {t:g} s')
