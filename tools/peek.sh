@@ -44,7 +44,8 @@ URL="http://127.0.0.1:$PORT/tools/peek.html?src=/__project/$NAME&t=$TIMES&w=${PE
 # MỘT lượt Chrome: đợi trang báo xong (title DONE / ERROR) rồi mới lấy DOM và chụp ảnh. Bản cũ
 # chụp theo ngân sách thời gian ảo nên composition nặng cho ra các ô CHƯA tua, không cảnh báo.
 rm -f "$OUT"                                   # hỏng thì không để lại ảnh cũ cho người ta xem nhầm
-CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "$URL" --wait DONE,ERROR --size 1200x800 --dump "$WORK/dom" --log "$WORK/log" \
+# PEEK_TIMEOUT=giây (mặc định 120, nhân CHROME_RUN_TIMEOUT_SCALE như mọi trang): composition nặng trên máy bận cần lâu hơn.
+CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "$URL" --wait DONE,ERROR --timeout "${PEEK_TIMEOUT:-120}" --size 1200x800 --dump "$WORK/dom" --log "$WORK/log" \
   --screenshot "$WORK/sheet.png" --size-js "(() => { try { const i = JSON.parse(document.getElementById('info').textContent); return i.sheet ? i.sheet.width + ',' + i.sheet.height : ''; } catch (e) { return ''; } })()" || true
 [ -f "$WORK/dom" ] || : > "$WORK/dom"
 python3 tools/peek_report.py < "$WORK/dom" || {
