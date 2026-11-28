@@ -34,7 +34,7 @@ các mục `check` (đợt 28): động tác chạm (vuốt ve, khám, cho ăn, 
     trọn trong khung — không lẹm mép trái / phải / trên (góc trung khung dọc theo đầu + thân áo để tay ra ngoài mép).
   • PHẢN ỨNG CON VẬT (đợt 33): lượt của con vật (sợ, giật mình…) — nó nằm trong khung ở lúc giữa lượt; theo ngay sau góc chèn con
     vật (sau góc đơn người làm) thì góc chèn giữ tới hết lượt ấy.
-  • CHIỀU SÂU CON VẬT (đợt 33, lượt hai): con vật dời sang mặt phẳng người khác với tới (`set.depthLog`) — không khung nào nó đổi
+  • CHIỀU SÂU CON VẬT (đợt 33, lượt hai; đợt 49 A: lúc nó nằm trên tay người — host của nó trống — không tính): con vật dời sang mặt phẳng người khác với tới (`set.depthLog`) — không khung nào nó đổi
     chiều sâu khi đứng yên trong khung hình mà không có lần cắt cảnh (dời lúc cắt, hay trong bước đi của chính nó).
   • GÓC TRUNG (đợt 31): góc trung máy tự đặt hẹp hơn 85 % bề rộng góc toàn của cùng chủ thể (`set.shotLog`). Đợt 32: góc trung
     bị giữ thành góc toàn cũng là hỏng; dòng cuối đếm số góc như thế.
@@ -62,7 +62,7 @@ DEPTH_JS = """(tl) => { const set = window.__set; if (!set.depthLog) return null
   for (const move of set.depthLog) {
     const start = move.tween.startTime(), end = start + move.tween.duration(), rig = move.rig, host = rig.host || rig.svg.parentNode;
     const look = (t) => { tl.seek(t, false); set.update(); const r = rig.svg.getBoundingClientRect(), b = rig.el && rig.el.than ? rig.el.than.getBoundingClientRect() : r;
-      return { z: set.depthLog.length && move.tween.targets()[0].z, x: rig.s.x || 0, seen: host.style.display !== 'none' && b.right > 0 && b.left < W && b.bottom > 0 && b.top < H }; };
+      return { z: set.depthLog.length && move.tween.targets()[0].z, x: rig.s.x || 0, seen: host.contains(rig.svg) && host.style.display !== 'none' && b.right > 0 && b.left < W && b.bottom > 0 && b.top < H }; };
     let slid = 0, seenAny = false, prev = look(Math.max(0, start - step)), prevT = Math.max(0, start - step);
     for (let t = start; t <= end + step + 1e-6; t += step) {
       const now = look(t), cut = cuts.some((c) => c > prevT + 1e-4 && c <= t + 1e-4);
@@ -527,7 +527,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39', 'motion42d') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39', 'motion42d', 'cage49a') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -2794,6 +2794,61 @@ def check_floor(folder, c, frames):
 
 
 
+CAGE_HAND = 0.04       # đợt 49 A: bàn tay cách cửa chuồng (khung hình cửa) ≤ 4 % chiều cao người lúc mở / đóng cửa
+CAGE_IN = 0.02         # … con vật trong chuồng: thân + đầu nằm trong ô cửa (lấn ≤ 2 % chiều cao người mỗi bên)
+
+
+def check_cage49a(folder, c, shots, scales):
+    """ĐỢT 49 A — CHUỒNG: lúc mở cửa — bàn tay người trên cửa, cửa đang mở; lúc con vật trong chuồng — không ai bế nó, thân + đầu nó trong ô cửa,
+    nó vẽ SAU khung trước (song cửa đè lên nó); cửa đóng lại sau đó; bế ra — tay tới nó trong chuồng, nó trên tay sau khi đóng cửa."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} {pet_n} — {text}', 'ok': ok, 'note': note})
+
+    def cage(t):
+        cages = care(t).get('@cage49a') or []
+        who = frame(t).get(who_n) or {}
+        return min(cages, key=lambda k: abs((k['open']['x0'] + k['open']['x1']) / 2 - (who.get('x') or 0)), default=None)
+
+    def pet_box(t):
+        parts = ((frame(t).get(pet_n) or {}).get('parts') or {}).values()
+        return {'x0': min(p['x0'] for p in parts), 'x1': max(p['x1'] for p in parts), 'y0': min(p['y0'] for p in parts), 'y1': max(p['y1'] for p in parts)} if parts else None
+
+    for t in c.get('open') or []:
+        k, who = cage(t), frame(t).get(who_n)
+        opened = ((care(t).get(who_n) or {}).get('cage49a') or {}).get('door', 0)
+        if not k or not who or not who.get('tall') or not who.get('hands'): row('a hand opens the cage door', None, f'not in the frame at {t:g} s'); continue
+        gap = min(box_gap(h['box'], k['door']) for h in who['hands'] if h.get('box')) / who['tall']
+        row('a hand opens the cage door', gap <= CAGE_HAND and opened >= 0.2, f'hand {gap * 100:.1f} % of height from the door, door {opened * 100:.0f} % open at {t:g} s (limit {CAGE_HAND * 100:g} %, ≥ 20 % open)')
+    for t in c.get('inside') or []:
+        k, pet, who, b = cage(t), frame(t).get(pet_n), frame(t).get(who_n), pet_box(t)
+        if not k or not pet or not b or not who or not who.get('tall'): row('it is inside the cage', None, f'not in the frame at {t:g} s'); continue
+        o, tol = k['open'], CAGE_IN * who['tall']
+        within = b['x0'] >= o['x0'] - tol and b['x1'] <= o['x1'] + tol and b['y0'] >= o['y0'] - tol
+        behind = (pet.get('layer') or 0) < k['layer']
+        row('it is inside the cage, behind the bars', within and behind and not pet.get('carried'),
+            f'at {t:g} s: body {b["x0"]:.0f}–{b["x1"]:.0f} × top {b["y0"]:.0f} px, door opening {o["x0"]:.0f}–{o["x1"]:.0f} × top {o["y0"]:.0f} (±{tol:.0f}); layer {pet.get("layer")} vs cage front {k["layer"]}' + (' — still carried' if pet.get('carried') else ''))
+    for t in c.get('closed') or []:
+        k = cage(t)
+        if not k: row('the door is closed again', None, f'no cage in the frame at {t:g} s'); continue
+        share = (k['door']['x1'] - k['door']['x0']) / max(1, k['open']['x1'] - k['open']['x0'])
+        row('the door is closed again', share >= 0.95, f'the door covers {share * 100:.0f} % of the opening at {t:g} s (least 95 %)')
+    for t in c.get('lift') or []:
+        who, b = frame(t).get(who_n), pet_box(t)
+        if not who or not b or not who.get('tall') or not who.get('hands'): row('both hands reach it in the cage', None, f'not in the frame at {t:g} s'); continue
+        gaps = sorted(box_gap(h['box'], b) / who['tall'] for h in who['hands'] if h.get('box'))
+        row('a hand reaches it in the cage', bool(gaps) and gaps[0] <= REACH, f'hands {", ".join(f"{g * 100:.1f} %" for g in gaps)} of height from it at {t:g} s (limit {REACH * 100:g} %)')
+    for t in c.get('carried') or []:
+        pet = frame(t).get(pet_n)
+        if not pet: row('it is in the arms', None, f'not in the frame at {t:g} s'); continue
+        ok = bool(pet.get('carried')) if name == 'takeOutOfCage' else not pet.get('carried') or t < c['times'][0]
+        row('it is in the arms' if name == 'takeOutOfCage' else 'it is held before it goes in', bool(pet.get('carried')), f'{"carried" if pet.get("carried") else "not carried"} at {t:g} s')
+    return out
+
+
 def check_scene(folder):
     try: return check_one_scene(folder)
     finally: close_page()          # đợt 45: Chrome chung của cảnh (scene_page)
@@ -2807,6 +2862,7 @@ def check_one_scene(folder):
     when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     tool_times = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
+    tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift') for t in c.get(key) or []]      # đợt 49 A
     tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + tool_times + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
@@ -2839,6 +2895,9 @@ def check_one_scene(folder):
         if c.get('gaze'): results.extend(check_gaze_dir(folder, c, shots))
         if c['kind'] == 'care38':
             results.extend(check_care_tools(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'cage49a':          # đợt 49 A
+            results.extend(check_cage49a(folder, c, shots, scales))
             continue
         if c['kind'] == 'care42f':          # đợt 42 F
             results.extend(check_grooming(folder, c, shots, scales))

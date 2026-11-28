@@ -17,6 +17,8 @@ export default (RigSVG) => mix(RigSVG, class {
     // qua một `carry` / `takePet`), và đo ở đó thì "chỗ nhà" ghi nhầm thành ngăn bế của người ấy — con vật hiện trong tay
     // người này suốt cảnh (cảnh thử đợt 6). Lúc phát, mỗi khung tự đặt nó lại đúng chỗ theo trạng thái.
     RigSVG._homePet(pet);
+    // Đợt 49 A: con vật từng vào / ra chuồng — hình nó dời theo kênh của người khác (`dropX`): vẽ lại theo trạng thái lúc này trước khi đo.
+    if (pet.cagers49a) pet.apDung();
     // Con vật đang ở đâu, trong hệ SVG gốc của người (đo lúc DỰNG timeline, như `point`).
     const inv = this.svg.getScreenCTM().inverse(), r = pet.svg.getBoundingClientRect();
     const a = new DOMPoint(r.left, r.top).matrixTransform(inv), b = new DOMPoint(r.right, r.bottom).matrixTransform(inv);

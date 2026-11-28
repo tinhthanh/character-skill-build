@@ -819,6 +819,8 @@ export class RigThu {
   dropX() {
     let x = 0;
     if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
+    // đợt 49 A: người đưa nó vào / bế nó ra khỏi chuồng — mỗi lần dời là một ô của người ấy, bật theo kênh `cageMove49a` của chính họ.
+    if (this.cagers49a) for (const rig of this.cagers49a) { const n = Math.round(rig.s.cageMove49a || 0); (rig.cageMoves49a || []).slice(0, n).forEach((move) => { if (move && move.pet === this) x += move.dx; }); }
     return x;
   }
 

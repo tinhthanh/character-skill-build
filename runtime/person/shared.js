@@ -101,6 +101,9 @@ const NGHI = Object.freeze({
   // ĐỢT 38 C — HAI NGƯỜI: 1 = người này vẽ TRƯỚC người đang cùng diễn (`rig.pairWith`) trong bối cảnh 3D — miệng và bàn tay khum khi
   // thì thầm, bàn tay đặt lên vai khi vỗ vai không khuất sau đầu / tóc người kia.
   pairFront: 0, pairSlot: 0,    // `pairSlot`: người kia là mục nào của `rig.pairList` (như `omSlot`) — mỗi khung đúng người của lần ấy
+  // ĐỢT 49 A — CHUỒNG LƯU TRÚ (`putInCage`, `takeOutOfCage`): `cageDoor49a` 0 đóng … 1 mở cửa chuồng người này đang mở; `cageMove49a` số lần người này đã
+  // dời con vật vào / ra chuồng (lần thứ n đã dời khi `cageMove49a` > n − 0,5 — RigThu.dropX; GIỮ như `picked42e`); `free49aL/R` 1 = tay ấy rời con vật đang bế (mở cửa).
+  cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
 });
 
 const MAU_MAC_DINH = {

@@ -47,6 +47,8 @@ def write_page(st):
     drive_code, framing_code, height, lines, names, ride_code = st.take('drive_code', 'framing_code', 'height', 'lines', 'names', 'ride_code')
     scene, scene_id, settle_code, setup, sound_actions, style = st.take('scene', 'scene_id', 'settle_code', 'setup', 'sound_actions', 'style')
     t0_code, timeline_hook, view_code, voices, width = st.take('t0_code', 'timeline_hook', 'view_code', 'voices', 'width')
+    # Đợt 49 A: con vật vào / ra chuồng đổi chiều sâu lúc đang trên tay (tools/scenelib/cage.py).
+    cage_code = ('\n    // Pets put into / taken out of a cage move between its two layers while they are in the arms.\n' + '\n'.join(st.__dict__.get('cage_lines', [])) + '\n') if st.__dict__.get('cage_lines') else ''
     cast_list = ', '.join(names)                             # { vet, dog, … } — tên nhân vật của mỗi lượt (âm thanh theo động tác)
     cue_scripts = ''.join(f'\n  <script src="{voice["key"]}.cues.js"></script>' for voice in voices)
     html = f'''<!doctype html>
@@ -80,7 +82,7 @@ def write_page(st):
     const tl = gsap.timeline({{ paused: true{timeline_hook} }});
 {t0_code}
     talk.addTo(tl, T0);{ride_code}
-{depth_code}{view_code}{settle_code}{caption_code}{card_code}{drive_code}
+{depth_code}{cage_code}{view_code}{settle_code}{caption_code}{card_code}{drive_code}
 {framing_code}    window.__timelines = window.__timelines || {{}};
     window.__timelines[{js(scene_id)}] = tl;
     // Read by tools/scene.py to fill in the audio clips' data-start; harmless in a render.
@@ -89,7 +91,7 @@ def write_page(st):
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS) | {'putInCage', 'takeOutOfCage'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

@@ -1,5 +1,6 @@
 """Phases 5 and 6 of a build: props, then the page layers (background or 3D set, hosts, panels, captions, music)."""
 import json, os, re, shutil
+from . import cage as cage49a          # đợt 49 A
 from .assets import PRESETS, _svg, copy_asset, image_size
 from .camera import YAW_LIMIT
 from .schema import FLOOR_KINDS, PROP_KEYS, SCREEN_KINDS
@@ -151,6 +152,9 @@ def build_layers(st):
             start_x = dict(item, x=item['drive']['from']) if item.get('drive') else item
             where_ = ', '.join(f"{key}: {float(start_x[key]):g}" for key in ('x', 'z', 'y') if key in item) + f", height: {tall:g}" + (", shadow: false" if item.get('shadow') is False else '')
             spot = f"const cutout{n + 1}Spot = " if item.get('drive') or rider else ''
+            if item.get('kind') == 'cage':          # đợt 49 A: chuồng — hai host (lòng chuồng sau con vật, khung trước có cửa trước nó)
+                setup.append(cage49a.setup_code(n, item, tall))
+                continue
             if item.get('kind'):
                 options = {'color': item.get('color')}
                 if item['kind'] == 'paystand': options['on'] = 0            # đợt 39 A: đứng trên mặt quầy (`y` của cutout), không trên sàn khung

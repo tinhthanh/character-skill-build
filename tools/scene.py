@@ -141,6 +141,17 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                it, on its box or the floor — 3D sets): shower spray on its back, foam lathered in with both hands, rinsed; the person
                steps back and the pet shakes off water. ["towelDry", "@pet"] (wraps a towel round it, rubs — the fur turns fluffy),
                ["brushTeeth", "@pet"] (holds the muzzle, the mouth opens, short brush strokes, then it licks its lips).
+               PROPS BY NAME (wave 49 A): a step can name a 3D-set cutout as "@<its name>", like a character — the tool resolves it,
+               walks the person to stand beside it first, and refuses an unknown name, a character's name or a prop of the wrong kind.
+               Boarding: a set.cutouts { "kind": "cage", "name": "chuong", "x": -280, "z": -600, "size": [170, 140], "door": "left" }
+               (a cage on the floor: its inside drawn behind a pet in it, the front frame with a barred door in front; "size" in its
+               400 × 470 person-sized frame, "door" = the hinge side — left out, the side away from whoever opens it first).
+               ["putInCage", "@meo", "@chuong", { "hold": 0.5 }] — picks the pet up first if not carrying it (a "carry" turn is added),
+               steps beside the cage on the latch side, kneels, opens the door with one hand (the other arm holds the pet), lowers it
+               inside, closes the door. ["takeOutOfCage", "@meo", "@chuong"] — opens, lifts it out, closes, stands holding it (then
+               "putDown" sets it by the feet, away from the cage, or "handOverPet"). A pet can start inside: "inCage": "chuong" on it
+               (no x / z). The person must stand just in front of the cage: z 12–60 more than the cage's. Dogs, cats and rabbits; a pet
+               too big for the door opening is refused (give a bigger "size").
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).
