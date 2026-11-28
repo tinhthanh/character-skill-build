@@ -13212,11 +13212,28 @@ const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', '
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
+const PARTNERS = new WeakMap();
 const expandCombos = (stepList) => stepList.flatMap((step) => {
   if (typeof step === 'number') return [step];
   const [name, ...args] = Array.isArray(step) ? step : [step];
-  return isCombo(name) && typeof name === 'string' ? expandCombos(expandCombo(name, args)) : [step];
+  if (!(isCombo(name) && typeof name === 'string')) return [step];
+  return combo(null, name, ...args).flatMap((turn) => {
+    const [first, partners] = turn.together ? [turn.together[0], turn.together.slice(1)] : [turn, []];
+    const expanded = expandCombos([first[1]]);
+    if (partners.length && expanded.length && typeof expanded[0] !== 'number') {
+      if (!Array.isArray(expanded[0])) expanded[0] = [expanded[0]];
+      PARTNERS.set(expanded[0], partners);
+    }
+    return expanded;
+  });
 });
+function partnerLines(line) {
+  const out = [];
+  for (const entry of (line.data && line.data.steps) || []) {
+    for (const [rig, ...steps] of entry.with || []) out.push({ rig, line: sequence(rig, steps), start: entry.start });
+  }
+  return out;
+}
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   stepList = expandCombos(stepList);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -13252,6 +13269,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
     child.paused(false);
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    if (PARTNERS.has(step)) Object.defineProperty(entry, 'with', { value: PARTNERS.get(step), enumerable: false });
     if ((name === 'mood' || name === 'mark') && (args[0] === null || args[0] === undefined)) entry.off = true;
     if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0].live || args[0];
     if (SPEECH_STEPS.includes(name)) {
@@ -13626,7 +13644,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
 }
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, partnerLines, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

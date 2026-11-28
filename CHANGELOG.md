@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+**Combo partners run in the review sheet and the reels** (wave 48). A combo's `with` steps are what another character
+does at the same time: the nurse holds the pet during `inject`, the pet opens its mouth, the kid dances along, the
+customer scans the QR code. `sequence()` ran only the main character, so in `tools/actions.sh` and `tools/reel.py` the
+other character stood still.
+
+- `sequence()` now records them on the step (`line.data.steps[i].with`). The property is not enumerable, so the JSON
+  of the steps and the main character's motion are unchanged.
+- New `VGCharacter.partnerLines(line)` builds one sequence per other character, timed to its step.
+  `tools/actions.html` and `tools/reel.py` run them.
+- `tools/action-catalog.json`:
+  - The `danceWithKid` and `comfortOwner` rows had copied the partner's part by hand in `personSteps`, which would now
+    overlap it.
+  - Their `personSteps` keep only the last move (`highFive`, `hug`), and a new `personStart` key starts them on time.
+- New check-page unit `combo-with-partners`.
+- `references/actions.md` documents `partnerLines`.
+
 Catalog and docs catch up with the runtime.
 
 - **`tools/action-catalog.json`**: ten new demo rows, so `tools/actions.sh` and `tools/reel.py` now show them.

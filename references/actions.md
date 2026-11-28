@@ -258,8 +258,19 @@ injects with a held syringe (`items: { R: 'syringe' }`, `itemsHidden: true`), `c
 within reach. `tools/script.py` gives the items and the scale by itself.
 
 - **In `sequence()`** a combo expands in place into its own steps. A step done together with
-  another character (the pet opening its mouth for the teeth) is left out, because a sequence has
-  one character.
+  another character (the pet opening its mouth for the teeth) does not run, because a sequence has
+  one character. It is recorded on the step instead (`line.data.steps[i].with`), and
+  **`VGCharacter.partnerLines(line)`** builds it: one `{ rig, line, start }` per other character,
+  with `start` counted from the start of `line`.
+
+  ```js
+  const vet = VGCharacter.sequence(vetRig, [['assistedVaccination', cat, nurse]]);
+  tl.add(vet.paused(false), 0);
+  for (const p of VGCharacter.partnerLines(vet)) tl.add(p.line.paused(false), p.start);   // the nurse holds the cat
+  ```
+
+  Do not give those characters another sequence that overlaps these steps. `tools/actions.sh` and
+  `tools/reel.py` run the partner lines.
 - **`VGCharacter.combo(rig, name, ...args)`** returns the combo as `conversation()` turns, those
   steps included: `conversation([...combo(vet, 'fullCheckup', dog), [vet, ['explain', 'Bé khoẻ lắm!', 2]]])`.
 - **In a scene file** every step becomes a turn of its own, so the camera, the pet's answers,

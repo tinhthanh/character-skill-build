@@ -2610,6 +2610,27 @@ try {
       if (!moved.data.steps[1].target || moved.data.rig !== a) hong('sequence', 'data.rig / the face target are not recorded for tools/peek.sh');
       moved.kill(); hostA.remove(); hostB.remove();
     }
+    // Đợt 48: phần "with" của combo (người phụ / con vật làm cùng lúc) không bị sequence() bỏ mất — nó nằm ở
+    // data.steps[i].with (không lọt vào JSON) và partnerLines() dựng nó đúng giờ: y tá giữ con mèo lúc tiêm, bé nhảy cùng.
+    if (chay('combo-with-partners')) {
+      const vet = L.createCharacter(host, { id: 'vet', items: { R: 'syringe' }, itemsHidden: true }).rig;
+      const nurse = L.createCharacter(host, { id: 'nurse' }).rig, kid = L.createCharacter(host, { id: 'boy' }).rig;
+      const cat = L.createPet(host, { species: 'cat' }).rig;
+      const shot = L.sequence(vet, [['assistedVaccination', cat, nurse]]), inject = shot.data.steps.find((step) => step.name === 'inject');
+      const helpers = L.partnerLines(shot);
+      if (!inject || !inject.with) hong('combo with', 'assistedVaccination: the inject step does not record the nurse\'s restrain');
+      else if (JSON.stringify(shot.data.steps).includes('restrain')) hong('combo with', 'the with steps leak into the JSON of data.steps');
+      if (helpers.length !== 1 || helpers[0].rig !== nurse || !inject || helpers[0].start !== inject.start) hong('combo with', `partnerLines: ${helpers.length} lines, expected the nurse at the inject step`);
+      else {
+        const before = { ...nurse.s }; helpers[0].line.time(Math.min(1.2, helpers[0].line.duration()));
+        if (!Object.keys(nurse.NGHI).some((key) => typeof before[key] === 'number' && Math.abs(nurse.s[key] - before[key]) > 1)) hong('combo with', 'the nurse does not move during restrain');
+      }
+      const dance = L.partnerLines(L.sequence(vet, [['danceWithKid', kid]]));
+      if (dance.length !== 2 || dance.some((p) => p.rig !== kid)) hong('combo with', `danceWithKid: ${dance.length} partner lines for the kid, expected 2 (face, dance)`);
+      if (L.partnerLines(L.sequence(vet, ['wave', 'nod'])).length) hong('combo with', 'partner lines for steps that are not combos');
+      [...helpers, ...dance].forEach((p) => p.line.kill());
+      for (const rig of [vet, nurse, kid, cat]) rig.svg.remove();
+    }
   }
 
   // ── Thú: thế ngồi và hướng quay giữ nguyên qua các động tác ──
