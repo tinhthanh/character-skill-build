@@ -8,7 +8,7 @@
 #                                   words) and only the check-page units that test them — what CI runs on a pull request
 #   tools/check.sh --only a,b     → only these scene cases (names, globs, module names such as w44); no check page
 #   tools/check.sh --failed       → only the scene cases that failed last time; no check page
-#   tools/check.sh -j 4           → scene cases 4 at a time (default: CPU count − 2)
+#   tools/check.sh -j 4           → scene cases 4 at a time (default: $CHECK_JOBS, else CPU count − 2)
 #   tools/check.sh --page | --no-page   → run / skip the check page whatever the mode
 #   CHECK_PAGE_SHARDS=n           → split the check page into n headless Chromes (default 3; 1 = one unsharded run)
 #   CHECK_PAGE_TIMEOUT=s          → seconds each check-page shard may take (default 1200)

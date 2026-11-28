@@ -13,6 +13,8 @@ jobs:
     env:
       # Nhánh gốc để so (origin/<nhánh đích của PR>); push lên main thì trống = kiểm hết.
       SCOPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+      # Số trường hợp cảnh chạy song song. Mặc định (số nhân − 2) cho 2 trên runner 4 nhân: phần lớn thời gian chỉ 2 Chrome chạy.
+      CHECK_JOBS: 4
     steps:
       - uses: actions/checkout@v4
         with:

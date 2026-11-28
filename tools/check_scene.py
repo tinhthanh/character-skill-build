@@ -90,7 +90,7 @@ def estimate(c, times):
 
 def main():
     parser = argparse.ArgumentParser(description='Scene self-test: build example scenes, check generated compositions and refusals.')
-    parser.add_argument('-j', '--jobs', type=int, default=max(1, (os.cpu_count() or 3) - 2), help='parallel cases (default: CPU count − 2)')
+    parser.add_argument('-j', '--jobs', type=int, default=int(os.environ.get('CHECK_JOBS') or max(1, (os.cpu_count() or 3) - 2)), help='parallel cases (default: $CHECK_JOBS, else CPU count − 2)')
     parser.add_argument('--only', help='comma-separated case names, globs, module names or groups of split cases (e.g. pharm44a,w43,set3d_*,combo41)')
     parser.add_argument('--changed', nargs='?', const='main', metavar='BASE', help='cases touched by the changes vs BASE (default main) + the smoke set')
     parser.add_argument('--words', default='', help='with --changed: more words (comma-separated) that pick the cases using them')
