@@ -6018,6 +6018,37 @@ class RigSVG {
     this.shadeEl = attachShade(this.svg, this.el.goc);      // đổ bóng trên thân theo hướng sáng (shading.js; bối cảnh 3D đặt)
   }
   apDung() {
+    const f = {};
+    this._drawRoot(f);
+    this._drawLegs(f);
+    this._layerArms(f);
+    this._drawHeadTurn(f);
+    this._drawThighs(f);
+    this._drawTorso(f);
+    this._poseArms(f);
+    this._drawHeldItems(f);
+    this._drawHands(f);
+    this._drawFace(f);
+    const s = this.s, e = this.el;
+    const { goc42e, under42e } = f;
+    this._veMom();
+    this._drawLeash();
+    this._drawBall();
+    this._drawRope();
+    this._drawNote();
+    this._drawReadout();
+    this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
+    this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
+    this._drawScales();
+    for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
+      if (!el) continue;
+      el.style.display = on ? '' : 'none';
+      if (on) el.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
+    }
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
+    for (const pet of this.caring || []) if (pet.el) pet.apDung();
+  }
+  _drawRoot(f) {
     const s = this.s, e = this.el;
     const doiChan = this.hangChan();
     const seatDrop = this._lowered();
@@ -6029,6 +6060,10 @@ class RigSVG {
     e.bong.setAttribute('opacity', 0.28 - nhac * 0.12);
     const goc42e = this._floorGoc(seatDrop, doiChan);
     if (goc42e) { e.goc.setAttribute('transform', goc42e.transform); if (goc42e.blend) e.bong.setAttribute('opacity', ((0.28 - nhac * 0.12) * (1 - goc42e.blend)).toFixed(3)); }
+    Object.assign(f, { goc42e });
+  }
+  _drawLegs(f) {
+    const s = this.s, e = this.el;
     const h = s.huong, ah = Math.abs(h);
     const { daiDui, daiOng, dayChan, cachChan, coBanChan } = this.nv;
     const turnDetail = Math.sin(Math.PI * Math.min(1, ah) * 0.9), legShift = Math.sign(h) * turnDetail * 3;
@@ -6054,6 +6089,11 @@ class RigSVG {
       e['ban' + ben].setAttribute('transform', tf);
       e['banNg' + ben].setAttribute('transform', tf);
     }
+    Object.assign(f, { h, ah, daiDui, dayChan, cachChan, turnDetail, legShift, dauH, ride, legDui, legOng });
+  }
+  _layerArms(f) {
+    const s = this.s, e = this.el;
+    const { h, ah } = f;
     const xa = ah > 0.1 ? (h > 0 ? 'R' : 'L') : null;
     const restFar = xa ? this._restArm(xa) : [0, 0];
     const atRest = xa && !(this.holds[xa] && s['item' + xa] > 0.5) && ah < 0.8 ? clamp(2 - Math.max(Math.abs(s['bat' + xa] - restFar[0]), Math.abs(s['cang' + xa] - restFar[1])) / 10, 0, 1) : 0;
@@ -6112,6 +6152,11 @@ class RigSVG {
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
     if (e.chanG.lastElementChild !== gan && e.chanG.lastElementChild !== e.skirt) e.chanG.appendChild(gan);
     else if (e.skirt && e.skirt.previousElementSibling !== gan) e.chanG.insertBefore(gan, e.skirt);      // váy luôn nằm trên cả hai chân
+    Object.assign(f, { xa, atRest, clasp, carryFront, front });
+  }
+  _drawHeadTurn(f) {
+    const s = this.s, e = this.el;
+    const { h, ah } = f;
     const hd = clamp(h + (s.headTurn || 0), -1, 1), ahd = Math.abs(hd), pitch = clamp(s.headPitch || 0, -1, 1);
     const nv = this.nv, K = nv.khuon, k = mem(ahd), sg = h < 0 ? -1 : 1, sgd = hd < 0 ? -1 : 1;
     const co = 1 - ahd * 0.15, lech = hd * nv.netLech;
@@ -6158,6 +6203,11 @@ class RigSVG {
       e['tai' + ben].setAttribute('transform', `translate(${dau * x} ${(4 - pitch * RigSVG.PITCH_SHIFT * 0.45).toFixed(2)}) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
+    Object.assign(f, { hd, pitch, sg });
+  }
+  _drawThighs(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, daiDui, dayChan, cachChan, legShift, legDui, legOng } = f;
     const splay = RigSVG.SEAT_SPLAY * clamp(s.seat, 0, 1) * (1 - ah) * (1 - clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1)));
     const sideSit = clamp(s.seat, 0, 1) * clamp(ah / 0.2, 0, 1) * (1 - clamp(s.kneel || 0, 0, 1));
     const sitFold = -Math.sign(h) * 75 * sideSit;                                      // xoay dương = về bên trái màn hình
@@ -6193,6 +6243,10 @@ class RigSVG {
       const sag = Math.max(L[1], R[1]) + 3.5;
       e.skirt.setAttribute('d', `M ${top[0].toFixed(2)} -4 L ${top[1].toFixed(2)} -4 L ${R[0].toFixed(2)} ${R[1].toFixed(2)} Q ${((L[0] + R[0]) / 2).toFixed(2)} ${sag.toFixed(2)} ${L[0].toFixed(2)} ${L[1].toFixed(2)} Z`);
     }
+  }
+  _drawTorso(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, turnDetail, dauH, ride, pitch } = f;
     const stoop = clamp(this.nv.stoop || 0, 0, 1);
     const wide = clamp(this.nv.torsoWidth || 1, 0.7, 1.6);
     e.than.setAttribute('transform', `translate(${HONG.x} ${HONG.y}) rotate(${s.than + h * stoop * 10 + dauH * ride * RIDE_LEAN}) scale(${this.nv.coThan * wide} ${this.nv.coThan * (1 - stoop * 0.05)})`);
@@ -6225,6 +6279,11 @@ class RigSVG {
     e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7) + (s.headTurn || 0) * 2.5} ${-103 + this.nv.dauLech + s.dauY + stoop * 9 + pitch * 3}) rotate(${s.dau + onPhone * CALL_TILT + (s.headTilt || 0)}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
+    Object.assign(f, { nhacY });
+  }
+  _poseArms(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, dauH, ride, xa, atRest, clasp, carryFront, front, sg, nhacY } = f;
     const tayTheoSau = (bat, cang, v) => {
       const truoc = Math.max(0, v), sau = Math.max(0, -v);
       return {
@@ -6365,6 +6424,11 @@ class RigSVG {
     if (front) e.xaCang.setAttribute('transform', e['bat' + front].getAttribute('transform') + (front === carryFront ? ' ' + e['cang' + front].getAttribute('transform') : ''));
     else if (e.xaCang.hasAttribute('transform')) e.xaCang.removeAttribute('transform');
     if (!front && e.xaCang.style.filter) e.xaCang.style.filter = '';
+    Object.assign(f, { armAngle, rotation, rideGrip, under42e });
+  }
+  _drawHeldItems(f) {
+    const s = this.s, e = this.el;
+    const { rotation } = f;
     this._placeCarried();
     const armTurn = { L: rotation.batL + rotation.cangL, R: rotation.batR + rotation.cangR };
     for (const side of ['L', 'R']) if (e['tool' + side]) e['tool' + side].style.display = s['tool' + side] >= 0.5 ? '' : 'none';
@@ -6413,6 +6477,11 @@ class RigSVG {
       for (const group of groups) group.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = fingers ? clamp(s['item' + side], 0, 1) : 0;          // độ hiện của các ngón ôm món đồ (mờ theo món đồ)
     }
+    Object.assign(f, { armTurn, gripping });
+  }
+  _drawHands(f) {
+    const s = this.s, e = this.el;
+    const { h, clasp, armAngle, rideGrip, armTurn, gripping } = f;
     for (const ben of ['L', 'R']) {
       const grip = this.NGHI['tay' + ben] !== 'mo' ? this.NGHI['tay' + ben] : 'nam';
       const chon = this.holds[ben] && s['item' + ben] > 0.5 ? grip : s.omRise >= 0.5 || rideGrip[ben] >= 0.5 ? 'nam' : s['tay' + ben];
@@ -6445,6 +6514,10 @@ class RigSVG {
         `scale(${guong * lat} 1) rotate(${-12 * (1 - xoe)}) scale(${0.68 + 0.32 * xoe} 1)`);
       if (chon === 'chao') e.tayG[ben].setAttribute('transform', `scale(${(guong * lat * hz).toFixed(3)} ${hz.toFixed(3)})`);
     }
+  }
+  _drawFace(f) {
+    const s = this.s, e = this.el;
+    const { hd } = f;
     const mi = Math.max(0.05, 1 - Math.max(s.matY, clamp(s.nap42e || 0, 0, 1)));      // đợt 42 E: `nap42e` — nằm ngủ, mắt nhắm
     const mc = this.nv.matCo;
     e.matL.setAttribute('transform', `translate(${-this.nv.matX} ${this.nv.matY}) scale(${mc * (1 - Math.max(0, -hd) * 0.3)} ${mc * mi})`);
@@ -6463,22 +6536,6 @@ class RigSVG {
     const mx = this.nv.mayX ?? this.nv.matX;
     e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -hd) * 0.28} 1) rotate(${-s.mayL * 8})`);
     e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, hd) * 0.28} 1) rotate(${s.mayR * 8})`);
-    this._veMom();
-    this._drawLeash();
-    this._drawBall();
-    this._drawRope();
-    this._drawNote();
-    this._drawReadout();
-    this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
-    this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
-    this._drawScales();
-    for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
-      if (!el) continue;
-      el.style.display = on ? '' : 'none';
-      if (on) el.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
-    }
-    if (this.markEl && this.m) drawMark(this.markEl, this.m);
-    for (const pet of this.caring || []) if (pet.el) pet.apDung();
   }
   mark(kind = null) {
     if (kind !== null && !MARKS.includes(kind)) throw new Error(`[character] no mark "${kind}" (available: ${MARKS.join(', ')})`);

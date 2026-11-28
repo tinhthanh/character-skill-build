@@ -707,6 +707,43 @@ export class RigSVG {
   /* ------------------------------------------------------ đổ trạng thái */
 
   apDung() {
+    // Vẽ lại toàn bộ hình từ trạng thái `this.s`, theo từng bước dưới đây (mỗi bước một method). Các giá trị một bước tính ra mà
+    // bước sau còn dùng (hướng quay, tay xa, độ nhấc vai…) đi qua `f` — khung hình đang vẽ.
+    const f = {};
+    this._drawRoot(f);
+    this._drawLegs(f);
+    this._layerArms(f);
+    this._drawHeadTurn(f);
+    this._drawThighs(f);
+    this._drawTorso(f);
+    this._poseArms(f);
+    this._drawHeldItems(f);
+    this._drawHands(f);
+    this._drawFace(f);
+    const s = this.s, e = this.el;
+    const { goc42e, under42e } = f;
+    this._veMom();
+    this._drawLeash();
+    this._drawBall();
+    this._drawRope();
+    this._drawNote();
+    this._drawReadout();
+    this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
+    this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
+    this._drawScales();
+    for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
+      if (!el) continue;
+      el.style.display = on ? '' : 'none';
+      if (on) el.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
+    }
+    if (this.markEl && this.m) drawMark(this.markEl, this.m);
+    // Con vật đang được người này băng chân / đeo loa (đợt 35): nó đọc mức đeo từ trạng thái của người này — vẽ lại nó ngay,
+    // thứ tự vẽ lại của hai chuỗi lúc tua thế nào cũng ra đúng.
+    for (const pet of this.caring || []) if (pet.el) pet.apDung();
+  }
+
+  /** Gốc của cả người: chỗ đứng, độ co (xa / gần), hạ người khi ngồi, bay khỏi sàn; bóng dưới chân; ngồi xổm / nằm (đợt 42 E) (một bước của `apDung`) */
+  _drawRoot(f) {
     const s = this.s, e = this.el;
     // co dãn quanh điểm chạm đất (200,428) để thu nhỏ = lùi xa, phóng to = tiến gần
     const doiChan = this.hangChan();
@@ -731,7 +768,12 @@ export class RigSVG {
     // xuống / dời ngang cho chỗ thấp nhất nằm đúng trên mặt sàn (mặt sofa) và thân nằm giữa chỗ đứng. Bóng trong khung thì mờ đi (bóng dài vẽ riêng).
     const goc42e = this._floorGoc(seatDrop, doiChan);
     if (goc42e) { e.goc.setAttribute('transform', goc42e.transform); if (goc42e.blend) e.bong.setAttribute('opacity', ((0.28 - nhac * 0.12) * (1 - goc42e.blend)).toFixed(3)); }
+    Object.assign(f, { goc42e });
+  }
 
+  /** Hai hông, tỉ lệ đùi / ống / bàn chân, và bàn chân lăn theo góc khớp (cầm lái, ngồi bệt cộng thêm) (một bước của `apDung`) */
+  _drawLegs(f) {
+    const s = this.s, e = this.el;
     // nhacL/R: gối đưa về phía người xem → chân ngắn lại (rút gọn phối cảnh), hơi xoè ra
     // Xoay người sang bên (huong: 0 = nhìn thẳng, 1 = nghiêng phải khi đi ngang):
     // thân hẹp lại, hai chân/hai vai dồn vào một đường, nét mặt dịch theo hướng nhìn,
@@ -772,6 +814,13 @@ export class RigSVG {
       e['ban' + ben].setAttribute('transform', tf);
       e['banNg' + ben].setAttribute('transform', tf);
     }
+    Object.assign(f, { h, ah, daiDui, dayChan, cachChan, turnDetail, legShift, dauH, ride, legDui, legOng });
+  }
+
+  /** Xếp lớp hai tay theo hướng quay: tay xa sau thân / sau chân, đan tay, bưng đồ, bế con vật, gãi gáy; chân gần nằm trên (một bước của `apDung`) */
+  _layerArms(f) {
+    const s = this.s, e = this.el;
+    const { h, ah } = f;
     // Quay mặt sang phải màn hình thì vai bên TRÁI màn hình xoay về phía người xem, vai
     // bên phải lùi ra sau lưng — nên tay/chân XA là bên cùng phía với hướng quay. (Bản cũ
     // làm ngược: tay gần chui ra sau thân, nhìn như đang quay lưng lại.) Tay xa lùi ra sau
@@ -896,6 +945,13 @@ export class RigSVG {
     const gan = h > 0 ? e.hongL : e.hongR;                  // chân gần vẽ sau cùng (nằm trên)
     if (e.chanG.lastElementChild !== gan && e.chanG.lastElementChild !== e.skirt) e.chanG.appendChild(gan);
     else if (e.skirt && e.skirt.previousElementSibling !== gan) e.chanG.insertBefore(gan, e.skirt);      // váy luôn nằm trên cả hai chân
+    Object.assign(f, { xa, atRest, clasp, carryFront, front });
+  }
+
+  /** Đầu xoay nghiêng (3/4) và cúi / ngẩng: cụm nét mặt, má, nước mắt, mồ hôi, tóc, mũ, tóc gáy, tai (một bước của `apDung`) */
+  _drawHeadTurn(f) {
+    const s = this.s, e = this.el;
+    const { h, ah } = f;
     // ---- ĐẦU XOAY NGHIÊNG (3/4). Coi đầu là khối cầu bán kính `khuon.rong`:
     // xoay góc θ thì một điểm ở x0 trên mặt đi tới x0·cosθ + sâu·sinθ. Cả cụm nét mặt
     // vì thế chỉ cần MỘT phép dịch (netLech ≈ R·sinθ) và MỘT phép co ngang (cosθ).
@@ -968,6 +1024,13 @@ export class RigSVG {
       e['tai' + ben].setAttribute('transform', `translate(${dau * x} ${(4 - pitch * RigSVG.PITCH_SHIFT * 0.45).toFixed(2)}) scale(${1 - 0.15 * gan - 0.5 * xa} 1)`);
       e['taiNet' + ben].setAttribute('opacity', mem(gan));
     }
+    Object.assign(f, { hd, pitch, sg });
+  }
+
+  /** Đùi và ống chân: xoè khi ngồi, đùi nằm ngang khi ngồi quay 3/4, quỳ; váy / tạp dề bám theo hai đùi (một bước của `apDung`) */
+  _drawThighs(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, daiDui, dayChan, cachChan, legShift, legDui, legOng } = f;
     // NGỒI (`seat`): nhìn từ trước, đùi chĩa về phía người xem nên chỉ còn một khúc ngắn, còn
     // ống chân vẫn dài nguyên. Nhóm chân co theo chiều dọc để rút đùi; ống chân là con của nhóm
     // ấy nên nhận phép co NGƯỢC lại cho khỏi ngắn theo. (Khác `nhac`, vốn rút cả chân — dùng cho
@@ -1024,7 +1087,12 @@ export class RigSVG {
       const sag = Math.max(L[1], R[1]) + 3.5;
       e.skirt.setAttribute('d', `M ${top[0].toFixed(2)} -4 L ${top[1].toFixed(2)} -4 L ${R[0].toFixed(2)} ${R[1].toFixed(2)} Q ${((L[0] + R[0]) / 2).toFixed(2)} ${sag.toFixed(2)} ${L[0].toFixed(2)} ${L[1].toFixed(2)} Z`);
     }
+  }
 
+  /** Thân, nhóm chân, nhấc vai và hơi thở: thân áo, chi tiết ngực xoay theo thân, cổ áo, cổ, đầu; độ hiện của món đồ (một bước của `apDung`) */
+  _drawTorso(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, turnDetail, dauH, ride, pitch } = f;
     // ── DÁNG CÒNG: thân ngắn lại, và khi quay nghiêng thì ngả hẳn về trước (xoay theo hướng nhìn).
     const stoop = clamp(this.nv.stoop || 0, 0, 1);
     // `torsoWidth` kéo cả thân trên ra theo chiều ngang. Đầu nằm trong nhóm thân nên bị kéo theo —
@@ -1083,7 +1151,13 @@ export class RigSVG {
     e.dau.setAttribute('transform', `translate(${s.dauX + onPhone * CALL_TILT * 0.4 + h * (2.5 + stoop * 7) + (s.headTurn || 0) * 2.5} ${-103 + this.nv.dauLech + s.dauY + stoop * 9 + pitch * 3}) rotate(${s.dau + onPhone * CALL_TILT + (s.headTilt || 0)}) scale(${this.nv.coDau / wide} ${this.nv.coDau})`);
     e.itemL.setAttribute('opacity', clamp(s.itemL, 0, 1));
     e.itemR.setAttribute('opacity', clamp(s.itemR, 0, 1));
+    Object.assign(f, { nhacY });
+  }
 
+  /** Góc của hai cánh tay: đánh tay theo chiều sâu, pha dáng nhìn nghiêng, vai nhấc theo tay (chốt vai, đệm vai), aim, khuỷu không thẳng đuột, tay xa đan / khép, ov, điện thoại, bế, cầm lái, ngồi bệt; nắp vai, cẳng tay (một bước của `apDung`) */
+  _poseArms(f) {
+    const s = this.s, e = this.el;
+    const { h, ah, dauH, ride, xa, atRest, clasp, carryFront, front, sg, nhacY } = f;
     // Đánh tay theo chiều sâu (nhìn từ trước): tay ra trước thì rút ngắn (phối cảnh),
     // khuỷu gập nhiều và hơi khép vào thân; tay ra sau thì gần thẳng, hơi mở ra ngoài.
     const tayTheoSau = (bat, cang, v) => {
@@ -1324,6 +1398,13 @@ export class RigSVG {
     // nó), mang phép biến đổi của lần nó có tay gần nhất thì điểm ảnh quanh đó lệch 1–2 mức tuỳ những khung đã vẽ trước.
     else if (e.xaCang.hasAttribute('transform')) e.xaCang.removeAttribute('transform');
     if (!front && e.xaCang.style.filter) e.xaCang.style.filter = '';
+    Object.assign(f, { armAngle, rotation, rideGrip, under42e });
+  }
+
+  /** Món đồ trong tay và dụng cụ: luôn đứng thẳng, nghiêng / phóng, mặt trước / lưng, pít-tông, tờ giấy lật, các ngón ôm món đồ (một bước của `apDung`) */
+  _drawHeldItems(f) {
+    const s = this.s, e = this.el;
+    const { rotation } = f;
     this._placeCarried();
     // ĐỒ CẦM LUÔN ĐỨNG THẲNG. Đồ vật vẽ trong hệ cổ tay, đúng chiều khi cẳng tay nằm NGANG trước bụng (dáng bưng đồ:
     // bắp + cẳng ≈ ±90°). Cánh tay lệch khỏi dáng ấy bao nhiêu — nghỉ ở dáng gập hờ, hay quay nghiêng người khiến
@@ -1396,7 +1477,13 @@ export class RigSVG {
       for (const group of groups) group.setAttribute('transform', Math.cos(itemTurn * RAD) < 0 ? 'translate(0 20) scale(1 -1)' : '');      // SOI GƯƠNG qua lòng bàn tay, không xoay: ngón cái vẫn phải chĩa về phía miệng món đồ
       gripping[side] = fingers ? clamp(s['item' + side], 0, 1) : 0;          // độ hiện của các ngón ôm món đồ (mờ theo món đồ)
     }
+    Object.assign(f, { armTurn, gripping });
+  }
 
+  /** Bàn tay: chọn hình (nắm, xoè, chỉ…), lật ngón cái theo hướng cẳng tay, ngón cái giơ lên luôn chỉ lên trời (một bước của `apDung`) */
+  _drawHands(f) {
+    const s = this.s, e = this.el;
+    const { h, clasp, armAngle, rideGrip, armTurn, gripping } = f;
     for (const ben of ['L', 'R']) {
       // Tay ĐANG CẦM ĐỒ thì không buông: động tác nào đòi xoè tay hay chỉ trỏ bằng tay ấy, bàn tay
       // vẫn giữ dáng nắm của tư thế nghỉ — nếu không cái cốc sẽ dính lơ lửng vào lòng bàn tay xoè.
@@ -1470,7 +1557,12 @@ export class RigSVG {
       // ĐỢT 39 B: bàn tay duỗi thẳng 'chao' (chào, che trán) cũng phóng to theo `handZoom` — đọc được ở cảnh trung.
       if (chon === 'chao') e.tayG[ben].setAttribute('transform', `scale(${(guong * lat * hz).toFixed(3)} ${hz.toFixed(3)})`);
     }
+  }
 
+  /** Mắt (nhắm, nháy, liếc), mũi, con ngươi, chân mày theo hướng đầu (một bước của `apDung`) */
+  _drawFace(f) {
+    const s = this.s, e = this.el;
+    const { hd } = f;
     const mi = Math.max(0.05, 1 - Math.max(s.matY, clamp(s.nap42e || 0, 0, 1)));      // đợt 42 E: `nap42e` — nằm ngủ, mắt nhắm
     // `matCo` nhân vào CẢ HAI trục của phép co sẵn có (nheo theo góc xoay,
     // nhắm theo `matY`), nên nháy mắt và liếc mắt vẫn đúng ở mọi cỡ.
@@ -1496,25 +1588,6 @@ export class RigSVG {
     const mx = this.nv.mayX ?? this.nv.matX;
     e.mayL.setAttribute('transform', `translate(${-mx} ${this.nv.mayY - s.mayL * 5}) scale(${1 - Math.max(0, -hd) * 0.28} 1) rotate(${-s.mayL * 8})`);
     e.mayR.setAttribute('transform', `translate(${mx} ${this.nv.mayY - s.mayR * 5}) scale(${1 - Math.max(0, hd) * 0.28} 1) rotate(${s.mayR * 8})`);
-
-    this._veMom();
-    this._drawLeash();
-    this._drawBall();
-    this._drawRope();
-    this._drawNote();
-    this._drawReadout();
-    this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
-    this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
-    this._drawScales();
-    for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
-      if (!el) continue;
-      el.style.display = on ? '' : 'none';
-      if (on) el.setAttribute('transform', `translate(${(s.ringX + s.x).toFixed(2)} ${(s.ringY + s.y + DOI_Y).toFixed(2)}) scale(${(s.ringR / 40).toFixed(4)})`);
-    }
-    if (this.markEl && this.m) drawMark(this.markEl, this.m);
-    // Con vật đang được người này băng chân / đeo loa (đợt 35): nó đọc mức đeo từ trạng thái của người này — vẽ lại nó ngay,
-    // thứ tự vẽ lại của hai chuỗi lúc tua thế nào cũng ra đúng.
-    for (const pet of this.caring || []) if (pet.el) pet.apDung();
   }
 
   /**
