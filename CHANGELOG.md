@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+**Boarding, grooming and dog walks** (wave 49). Five new person actions, each with pet reactions, script steps,
+Vietnamese script words, catalog rows, `tools/acting_check.py` measurements and CI cases (`tools/ci/w49a.py`, `w49b.py`,
+`w49c.py`).
+
+- **Props by name in scripts** (49 A). A step can name a 3D-set cutout as `"@<name>"`, like a character.
+  - `tools/scene.py` resolves it, walks the person beside it first, and refuses an unknown name, a character's name or
+    a prop of the wrong kind.
+  - The table is `PROP_STEPS` in `tools/scenelib/cage.py`: one row per action.
+- **`putInCage(pet, cage)` / `takeOutOfCage(pet, cage)`** (49 A), for boarding check-in and check-out.
+  - The person picks the pet up if needed, kneels at the cage, opens the barred door one-handed, sets the pet inside
+    and closes the door. `takeOutOfCage` does the reverse and ends holding the pet.
+  - New props `cage` (the inside, drawn behind the pet) and `cageFront` (the front frame with the door, drawn in front).
+  - Script: a `set.cutouts` entry `{ "kind": "cage", "name": … }`, `["putInCage", "@meo", "@chuong"]`, and
+    `"inCage": "chuong"` for a pet that starts inside.
+- **`blowDry(pet, { hold })`** (49 B): a dryer nozzle with a visible air stream. The fur is blown about, the ears go
+  back and the eyes squint; the coat turns from wet to dry and fluffy, so it follows `bathPet` / `towelDry`.
+- **`trimFur(pet, { tool: 'scissors' | 'clipper', hold })`** (49 B): tufts fall as the tool passes along the back, and
+  the coat ends neater.
+  - The new hand tools (43–45) and the pet's tufts are created on first use, so the markup of every other character is
+    unchanged.
+- **`walkOnLeash(pet, steps, distance)`** (49 C): the person and the dog (or a cat on a harness) walk together.
+  - The leash runs from the hand to the collar with a real length and a natural sag.
+  - The dog trots ahead and sniffs once; the leash stays on, so `unleash` can follow.
+  - Script: `["walkOnLeash", "@cho", 4, 300]` gives the person a leash if needed, adds the pet's part and updates both
+    positions. Rabbits are refused.
+  - Fixed: the leash now follows the pet it is clipped to (a state channel), so one person walking two pets in a scene
+    draws the right leash.
+- Every existing action is unchanged: every character × every action, hashed at 9 progress points, is identical to
+  `main` for the sources and both bundles, with the new actions skipped (they shift the global id counters).
+
 **Combo partners run in the review sheet and the reels** (wave 48). A combo's `with` steps are what another character
 does at the same time: the nurse holds the pet during `inject`, the pet opens its mouth, the kid dances along, the
 customer scans the QR code. `sequence()` ran only the main character, so in `tools/actions.sh` and `tools/reel.py` the
