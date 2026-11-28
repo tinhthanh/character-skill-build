@@ -31,8 +31,9 @@ def git(*args):
     return done.stdout
 
 
-def changed_selection(cases, base):
-    """Pick the cases a change vs `base` touches. Returns {case name: [reasons]}."""
+def changed_selection(cases, base, extra=()):
+    """Pick the cases a change vs `base` touches. Returns {case name: [reasons]}. `extra`: more words to match against the
+    cases' `uses` — the actions, characters and examples tools/scope.py found (check.sh --scope)."""
     merge_base = git('merge-base', base, 'HEAD').strip()
     diff = git('diff', '-U0', '--no-color', merge_base)                # gồm cả thay đổi chưa commit
     untracked = [f for f in git('ls-files', '--others', '--exclude-standard').split('\n') if f]
@@ -56,6 +57,7 @@ def changed_selection(cases, base):
             try: words |= ci.words_of(open(os.path.join(ROOT, name), encoding='utf-8').read())
             except (OSError, UnicodeDecodeError): pass
     files = {f for f in files if not f.startswith('dist/')}
+    words |= set(extra)
     for name in files:
         words |= set(ci.FILE_USES.get(name, ()))
     picked = {}
@@ -91,6 +93,7 @@ def main():
     parser.add_argument('-j', '--jobs', type=int, default=max(1, (os.cpu_count() or 3) - 2), help='parallel cases (default: CPU count − 2)')
     parser.add_argument('--only', help='comma-separated case names, globs, module names or groups of split cases (e.g. pharm44a,w43,set3d_*,combo41)')
     parser.add_argument('--changed', nargs='?', const='main', metavar='BASE', help='cases touched by the changes vs BASE (default main) + the smoke set')
+    parser.add_argument('--words', default='', help='with --changed: more words (comma-separated) that pick the cases using them')
     parser.add_argument('--failed', action='store_true', help='rerun the cases that failed last time (.cache/ci-failed.txt)')
     parser.add_argument('--list', action='store_true', help='list the cases (name, module, tags, uses) and exit')
     args = parser.parse_args()
@@ -108,7 +111,7 @@ def main():
         selected = [c for c in selected if c.name in names]
         if not selected: print('scene: no failed cases recorded — nothing to rerun'); return 0
     if args.changed:
-        reasons, files = changed_selection(selected, args.changed)
+        reasons, files = changed_selection(selected, args.changed, [w for w in args.words.split(',') if w])
         selected = [c for c in selected if c.name in reasons]
         print(f'scene: --changed vs {args.changed}: {len(files)} files changed, {len(selected)} / {len(cases)} cases selected')
         for c in selected: print(f'  · {c.name:22} ← ' + '; '.join(reasons[c.name]))
