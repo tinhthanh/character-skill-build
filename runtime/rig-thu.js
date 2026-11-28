@@ -40,6 +40,7 @@ import basic from './pet/basic.js';
 import species from './pet/species.js';
 import tricks from './pet/tricks.js';
 import mood from './pet/mood.js';
+import leash49c from './pet/leash49c.js';
 
 // Các động tác nằm theo nhóm trong runtime/pet/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -58,6 +59,8 @@ export class RigThu {
     // đợt 40 B: mèo — rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn đồ chơi, cong lưng, chui hộp; thỏ — nhảy vui, nằm vật, đứng hai chân, giật mũi
     RigThu.DONG_TAC.cat.push('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox');
     RigThu.DONG_TAC.rabbit.push('binky', 'flop', 'periscope', 'noseTwitch');      // `flop` là thế giữ (như lieDown) nhưng chỉ của thỏ nên nằm trong danh sách thỏ, không trong STANCE chung
+    // đợt 49 C: được dắt đi dạo (`walkOnLeash` — người dắt làm cùng lúc); không có người thì kiệu tại chỗ. Thỏ không được dắt (nhảy cóc).
+    RigThu.DONG_TAC.dog.push('walkOnLeash'); RigThu.DONG_TAC.cat.push('walkOnLeash');
   }
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
@@ -660,6 +663,7 @@ export class RigThu {
     rollOver: 'Lăn ngửa', chaseTail: 'Đuổi đuôi', knead: 'Nhào', lick: 'Liếm', hide: 'Chạy nấp', eatCarrot: 'Gặm cà rốt',
     groomFace: 'Rửa mặt', loaf: 'Nằm ổ bánh mì', slowBlink: 'Chớp mắt chậm', batToy: 'Vờn đồ chơi', archBack: 'Cong lưng dựng lông', sitInBox: 'Chui hộp',   // đợt 40 B
     binky: 'Nhảy vui', flop: 'Nằm vật ra', periscope: 'Đứng hai chân', noseTwitch: 'Giật mũi',   // đợt 40 B
+    walkOnLeash: 'Được dắt đi dạo',   // đợt 49 C
   };
   // đợt 40 C — bốn động tác thú ở phòng khám, cho cả ba loài; `pawAtCone` cần đang đeo loa nên không chạy trơn (như WITH_ITEM của rig người)
   static WITH_WEAR = ['pawAtCone'];
@@ -1137,3 +1141,4 @@ export class RigThu {
 
 }
 for (const install of [poses, play, basic, species, tricks, mood]) install(RigThu);
+leash49c(RigThu);       // đợt 49 C

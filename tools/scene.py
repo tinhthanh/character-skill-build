@@ -102,6 +102,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                { "speed": 0.5…2 }), ["jump", 2, { "height": 1 }] (jump for joy), ["dance", "happy", 2, { "bpm": 120 }]
                ("gentle" for older people) — their turns get a full shot (feet in the frame, the head kept in at the top of a jump). Vet care: ["examine", "@pet", "teeth"] (with the pet's "openMouth" in "together"),
                ["giveTreat", "@pet"], ["leash", "@pet"] … "unleash" (needs "holds": "leash"; then walk both "together").
+               Walk a dog (đợt 49 C): ["walkOnLeash", "@dog", 4, 300] — its own turn, first step; clips the leash on if needed (a leash
+               handle is given if "holds" is empty), the dog walks with the person (added for you), trots ahead (behind when it starts on the
+               far side), sniffs, looks back; both "x" move; the leash stays on ("unleash" later). Cats too (harness); rabbits refused.
                Pets: "scratchItch", ["limp", 4, 120], ["tremble", 2], ["eat", 2], ["drink", 2], "cough", "openMouth",
                "shakeOff", "sneeze", ["pant", 2], "yawn". Do / don't: "thumbsDown", "stopSign", "fingerWag", "beckon",
                "fingerHeart", "vSign", everyday gestures "laugh", "wipeTears", "facepalm", "shush", "okSign", "salute"; grooming ["brush", "@pet"]; a pill ["giveTreat", "@pet", {"kind": "pill"}].

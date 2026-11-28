@@ -2435,6 +2435,42 @@ try {
         lean.kill(); dog.datNghi();
         dog.svg.remove(); boy.svg.remove(); kitten.svg.remove();
       }
+      // ĐỢT 49 C — dắt chó đi dạo (`walkOnLeash`, người + con vật cùng lúc): người không cầm gì thì tự có quai dây; dây nối tay với vòng cổ mọi khung, hai
+      // bên dừng cùng lúc, người tới đúng quãng, con vật đi trước họ; dây vẫn móc sau bước (`unleash` tháo); thỏ / không có con vật bị từ chối rõ.
+      {
+        const boy = L.createCharacter(spot('left:0;top:0;width:240px;height:282px'), { id: 'boy' }).rig;
+        const dog = L.createPet(spot('left:110px;top:160px;width:147px;height:121px'), { species: 'dog' }).rig;
+        const walkBoy = L.sequence(boy, [['walkOnLeash', dog, 4, 200], ['unleash']], { breathe: false }), walkDog = L.sequence(dog, [['walkOnLeash', boy, 4, 200]], { breathe: false });
+        const b0 = walkBoy.data.steps[0], d0 = walkDog.data.steps[0];
+        if (Math.abs(b0.duration - d0.duration) > 0.02) hong('walkOnLeash', `the person (${b0.duration.toFixed(2)} s) and the pet (${d0.duration.toFixed(2)} s) do not stop together`);
+        const mid = (el) => { const r = el.getBoundingClientRect(); return [(r.left + r.right) / 2, (r.top + r.bottom) / 2]; };
+        let worstEnd = 0, worstHand = 0, drawn = 0, n = 0;
+        for (let time = 0.45; time <= b0.duration; time += 0.1, n++) {
+          walkBoy.time(time); walkDog.time(time); boy.apDung(); dog.apDung();
+          if (boy.el.leash.style.display === 'none') continue;
+          drawn++;
+          const d = boy.el.leash.getAttribute('d').match(/-?[\d.]+/g).map(Number), m = boy.svg.getScreenCTM(), a = new DOMPoint(d[0], d[1]).matrixTransform(m), b = new DOMPoint(d[4], d[5]).matrixTransform(m);
+          const [cx, cy] = mid(dog.el.vong), hand = mid(boy.el['coTay' + boy.leashHand]);
+          worstEnd = Math.max(worstEnd, Math.hypot(b.x - cx, b.y - cy)); worstHand = Math.max(worstHand, Math.hypot(a.x - hand[0], a.y - hand[1]));
+        }
+        if (drawn < n) hong('walkOnLeash', `the leash is missing in ${n - drawn} of ${n} frames of the walk`);
+        if (worstEnd > 4) hong('walkOnLeash', `the leash does not end at the collar (${worstEnd.toFixed(1)} px off)`);
+        if (worstHand > 30) hong('walkOnLeash', `the leash does not start at the hand (${worstHand.toFixed(0)} px off)`);
+        walkBoy.time(b0.duration); walkDog.time(d0.duration); boy.apDung(); dog.apDung();
+        if (Math.abs(boy.s.x - 200) > 1) hong('walkOnLeash', `the person ends at x ${boy.s.x.toFixed(1)}, expected 200`);
+        if (!(dog.centerX() > boy.centerX() + 20)) hong('walkOnLeash', 'the dog does not end in front of the person');
+        if (boy.el.leash.style.display === 'none' || boy.s.leash < 0.5) hong('walkOnLeash', 'the leash is not on any more after the walk (it should stay until unleash)');
+        if (!(boy.holds.L || boy.holds.R)) hong('walkOnLeash', 'the person was not given a leash handle');
+        walkBoy.progress(1); boy.apDung(); if (boy.el.leash.style.display !== 'none') hong('walkOnLeash', 'unleash after walkOnLeash leaves the leash');
+        walkBoy.kill(); walkDog.kill();
+        const bun = L.createPet(spot('left:300px;top:160px;width:147px;height:121px'), { species: 'rabbit' }).rig;
+        for (const [label, fn, word] of [['rabbit (person side)', () => boy.walkOnLeash(bun, 4, 100), 'rabbit'], ['rabbit (pet side)', () => bun.walkOnLeash(boy, 4, 100), 'rabbit'],
+                                         ['no pet', () => boy.walkOnLeash(null, 4, 100), 'pet must be'], ['person is not a person', () => dog.walkOnLeash(bun, 4, 100), 'person must be']]) {
+          let said = ''; try { fn(); } catch (error) { said = error.message; }
+          if (!said.includes(word)) hong('walkOnLeash', `${label} should be refused with a clear message (got "${said}")`);
+        }
+        boy.svg.remove(); dog.svg.remove(); bun.svg.remove();
+      }
       // Đợt 9 — thông báo trên màn hình đạo cụ: thẻ hiện khi giữ, chữ nằm gọn trong thẻ, tắt khi xong; laptop quay lưng thì báo lỗi.
       {
         const deskHost = spot('left:0;top:0;width:200px;height:235px'), screenProp = L.createProp(deskHost, 'monitor', {});

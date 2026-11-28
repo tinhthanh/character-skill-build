@@ -4,6 +4,7 @@ from .actions import DESK_ACTIONS, DESK_OPTIONS, DESK_PAY
 from .schema import CHARACTER_KEYS, ITEM_KINDS, PERSON_WEARABLES, WEARABLES
 from .sets import ROOM_DEFAULTS
 from .util import PERSON, PET, fail, js, known, slug
+from . import leash49c          # đợt 49 C
 
 
 def place_cast(st):
@@ -96,6 +97,8 @@ def place_cast(st):
         if not pet and picks and 'holds' not in who:
             pick_options = next((a for a in (picks[0][1:] if isinstance(picks[0], list) else []) if isinstance(a, dict)), {})
             who['holds'], who['holdsHidden'] = pick_options.get('item', 'toy'), True
+        # ĐỢT 49 C: người dắt chó đi dạo (`walkOnLeash`) mà không cầm gì — có sẵn một quai dây (đang cất, lấy ra lúc bắt đầu).
+        if not pet: leash49c.give_leash(who, bag_turns)
         # `holds`: tên món đồ (cầm tay phải) hoặc { "L" | "R": tên }.
         if 'holds' in who or 'holdsHidden' in who:
             if pet: fail(f'character "{name}": a pet cannot hold an item')

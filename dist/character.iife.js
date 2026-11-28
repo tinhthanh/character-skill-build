@@ -591,6 +591,8 @@ const NGHI = Object.freeze({
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
+  leashPet49c: 0,               // đợt 49 C: con vật đang dắt = `leashPets49c[leashPet49c − 1]` (0: con của `leash`, `leashed`) — trạng thái, nên một người dắt lần lượt nhiều con
+  leashRope49c: 0,              // đợt 49 C: 0…1 dây dắt võng theo ĐỘ DÀI THẬT của nó (`walkOnLeash`) thay cho độ võng cố định — giữ tới `unleash`
   rope: 0,                      // đợt 40 A: 1 = đang KÉO CO (`pullToy`) — dây thừng căng từ tay tới mõm con chó
   watchL: 0, watchR: 0,
   heartL: 0, heartR: 0,         // trái tim bật ra trên bàn tay 'tim' (bắn tim): 0 = chưa có, 1 = đủ lớn
@@ -4551,10 +4553,12 @@ const __default = (RigSVG) => mix(RigSVG, class {
     if (!pet || !pet.el || !pet.el.vong || pet instanceof RigSVG) throw new Error('[character] leash(pet): pet must be a pet rig (createPet(...).rig)');
     const s = this.s, k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-leash]'));
     if (!k) throw new Error('[character] leash: the character is not holding a leash — give it one: createCharacter(host, { id, items: { R: "leash" } })');
-    if (this.leashed && this.leashed !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
+    const walking = this._leashNow49c() ? this._leashNow49c().pet : this.leashed;          // đợt 49 C
+    if (walking && walking !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
     this.leashed = pet; this.leashHand = k;
     pet.onDraw = () => this._drawLeash();
     const t = this.tl();
+    if (s.leashPet49c) t.set(s, { leashPet49c: 0 }, 0);          // đợt 49 C: dây của lần dắt này, không phải con đã dắt bằng `walkOnLeash`
     // Cúi nhìn con vật, móc dây vào cổ nó (dây hiện), rồi đứng thẳng lên — vẫn giữ dây.
     t.to(s, { dauY: 6, nhinY: 2.2, cuoi: 0.9, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 1 }, 0.35);
@@ -4568,7 +4572,7 @@ const __default = (RigSVG) => mix(RigSVG, class {
     const t = this.tl(), s = this.s;
     t.to(s, { dauY: 6, nhinY: 2.2, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 0 }, 0.35);
-    this._khep(t, 0.4, 0.55, { leash: 0 });
+    this._khep(t, 0.4, 0.55, { leash: 0, leashRope49c: 0, leashPet49c: 0 });       // đợt 49 C: lần móc dây sau lại võng như cũ
     return t;
   }
 
@@ -7936,6 +7940,123 @@ const __default = (RigSVG) => mix(RigSVG, class {
 return { default: __default };
 })();
 
+/* ───── runtime/person/leash49c.js ───── */
+__m['runtime/person/leash49c.js'] = (function () {
+// runtime/person/leash49c.js — đợt 49 C: walk a dog (or a cat on a harness) on a leash, in one step (`walkOnLeash`).
+// Methods of `RigSVG`, installed by runtime/rig-svg.js: `this` is the rig, `RigSVG` its class.
+//
+// Đi cặp với `walkOnLeash(person, steps, distance)` của rig con vật, CÙNG LÚC (tools/scene.py tự thêm phần của con vật):
+// hai bên tính nhịp theo cùng một kế hoạch (`leashPlan49c`) — con vật là một SVG khác, timeline riêng — nên bắt đầu bước,
+// dừng lại cùng lúc mà không bên nào phải đọc trạng thái của bên kia lúc dựng.
+
+const { clamp, mix } = __m['runtime/person/shared.js'];
+const { leash } = __m['runtime/parts.js'];
+
+const __default = (RigSVG) => mix(RigSVG, class {
+  static LEASH_LEAD_49C = 0.55;     // giây đầu bước: móc dây vào vòng cổ (chưa dắt) hay cúi nhìn con vật "đi nào" (đang dắt) — hai trường hợp dài như nhau
+  static LEASH_TURN_49C = 0.14;     // rồi quay ngang, chân bắt đầu bước sau chừng ấy giây (như `walk`)
+  static LEASH_STEP_49C = 0.46;     // giây một bước (như `walk`)
+  static LEASH_SETTLE_49C = 0.45;   // dừng: khép về dáng nghỉ (như `walk`)
+  static LEASH_FLOOR_49C = 450;     // y thấp nhất của dây trong khung 400 × 470 (sàn ở 458): dây chùng nằm sát đất
+  static LEASH_ROPE_49C = 0.55;     // dây dài chừng ấy × chiều cao người: con vật đi trước một quãng thì dây gần căng, lùi lại gần thì võng xuống
+
+  /**
+   * KẾ HOẠCH của một lần `walkOnLeash(pet, steps, distance)` — con vật (rig khác) đọc để bước cùng nhịp:
+   * `{ lead, start, walk, end, steps }` (giây tính từ đầu bước: chân bắt đầu bước ở `start`, bước trong `walk` giây, xong hẳn ở `end`).
+   * Chỉ phụ thuộc hình thể nhân vật và quãng đi (`_doBuoc`), không phụ thuộc trạng thái lúc dựng.
+   */
+  leashPlan49c(buoc = 4, quang = 0) {
+    const lead = RigSVG.LEASH_LEAD_49C, start = lead + RigSVG.LEASH_TURN_49C;
+    const steps = quang ? this._doBuoc(Math.abs(quang), true, true).buoc : Math.max(2, Math.round(+buoc || 4));
+    const walk = steps * RigSVG.LEASH_STEP_49C;
+    return { lead, start, walk, end: start + walk + RigSVG.LEASH_SETTLE_49C, steps };
+  }
+
+  /**
+   * DẮT CHÓ ĐI DẠO (đợt 49 C): người và con vật `pet` cùng đi `distance` đơn vị khung (âm = sang trái; 0 = bước tại chỗ, `steps` bước).
+   * Chưa móc dây thì cúi xuống móc dây vào vòng cổ nó (như `leash`); đã dắt thì cúi nhìn nó một nhịp. Rồi quay ngang, bước đi — tay
+   * cầm quai dây không đánh theo nhịp bước, mắt liếc xuống con vật đi phía trước; dây võng tự nhiên theo khoảng cách (gần căng khi
+   * nó đi trước một quãng). Dừng cùng lúc với nó, quay lại hướng cũ — DÂY VẪN MÓC (`unleash()` tháo sau).
+   * Cầm quai dây: `items: { R: 'leash' }` (đang cầm hay đang cất). Chưa có thì rig tự cho một quai dây (đang cất) ở tay rảnh phía con
+   * vật sẽ đi, lấy ra lúc bắt đầu. Con vật phải `walkOnLeash(person, steps, distance)` CÙNG LÚC (một `together`). Mèo: dây dắt yếm (có
+   * thật, ít gặp) — được. Thỏ: không (nó nhảy cóc).
+   */
+  walkOnLeash(pet, buoc = 4, quang = 0) {
+    const real = pet && pet.live ? pet.live : pet;
+    if (!real || typeof real !== 'object' || !real.el || !real.el.vong || real instanceof RigSVG) throw new Error('[character] walkOnLeash(pet, steps, distance): pet must be a dog or cat rig (createPet(...).rig) — it does walkOnLeash(person, steps, distance) at the same time');
+    if (real.nv && real.nv.loai === 'rabbit') throw new Error('[character] walkOnLeash: not for a rabbit — a rabbit hops and is not walked on a leash; walk a dog (or a cat on a harness)');
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] walkOnLeash(pet, steps, distance): distance must be a number of frame units (negative = to the left), got ${JSON.stringify(quang)}`);
+    const s = this.s;
+    if (s.om >= 0.5) throw new Error('[character] walkOnLeash: the character is carrying a pet — putDown() first');
+    if (s.seat > 0.5 || s.kneel > 0.5 || s.ride > 0.5 || s.floor42e > 0.5 || s.lie42e > 0.5) throw new Error('[character] walkOnLeash: stand up first (standUp / getOff) — the character walks the pet from standing');
+    const now = this._leashNow49c(), walking = now ? now.pet : this.leashed;
+    if (walking && walking !== real && s.leash >= 0.5) throw new Error('[character] walkOnLeash: already walking another pet — unleash() first');
+    const chieu = quang < 0 ? -1 : 1, near = chieu > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    // Tay CẦM QUAI DÂY (đang hiện trước, rồi đang cất). Không tay nào có: cho tay rảnh — tay GẦN máy quay khi quay về hướng đi (dây không vắt
+    // qua trước thân) — một quai dây đang cất, như `pickUp` tự cho món đồ (dựng lại SVG một lần, giữ nguyên dáng tay đang có).
+    const has = (k) => !!(this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-leash]'));
+    let k = [this.leashHand, 'R', 'L'].find((side) => side && has(side) && s['item' + side] > 0.5) || [near, far].find(has);
+    if (!k) {
+      k = [near, far].find((side) => !this.holds[side]);
+      if (!k) throw new Error('[character] walkOnLeash: both hands hold something — give the character a leash: createCharacter(host, { id, items: { R: "leash" } })');
+      const keepArms = Object.fromEntries(['batL', 'cangL', 'tayL', 'batR', 'cangR', 'tayR', 'itemL', 'itemR'].map((key) => [key, s[key]]));
+      this.setItem(k, (p, c) => leash(c), { shown: false });
+      Object.assign(this.s, keepArms); this.apDung();
+    }
+    const shown = s['item' + k] > 0.5, on = walking === real && s.leash >= 0.5 && (now ? now.hand : this.leashHand) === k;
+    // Con vật này vào sổ dắt của người (một lần mỗi con, mỗi tay); kênh `leashPet49c` chọn nó — tua tới đâu dây cũng tới đúng con.
+    const list = this.leashPets49c = this.leashPets49c || [];
+    let slot = list.findIndex((item) => item.pet === real && item.hand === k);
+    if (slot < 0) { list.push({ pet: real, hand: k }); slot = list.length - 1; }
+    this.leashed = real; this.leashHand = k;
+    real.onDraw = () => this._drawLeash();
+    const t = this.tl(), N = this.NGHI, plan = this.leashPlan49c(buoc, quang), x0 = s.x;
+    t.set(s, { leashPet49c: slot + 1 }, 0);
+    // 1. Lấy quai dây ra (đang cất), cúi nhìn con vật: móc dây vào cổ nó (dây hiện) — hay đã móc thì chỉ nhìn nó "đi nào".
+    if (!shown) {
+      t.set(s, { ['tay' + k]: 'nam' }, 0);
+      t.to(s, { ['item' + k]: 1, duration: 0.14 }, 0.04);
+    }
+    t.to(s, { dauY: on ? 4 : 6, nhinY: on ? 1.8 : 2.2, nhinX: chieu * 0.8, cuoi: 0.85, duration: 0.3, ease: 'sine.out' }, 0);
+    if (!on) t.set(s, { leash: 1 }, 0.35);
+    t.to(s, { leashRope49c: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3);          // dây theo độ dài thật của nó (võng theo khoảng cách)
+    t.to(s, { dauY: N.dauY, nhinY: 0.9, cuoi: 0.6, duration: 0.2, ease: 'sine.inOut' }, 0.35);
+    // 2. Quay ngang, bước đi cùng con vật — mắt liếc xuống nó (đi trước, phía hướng đi).
+    t.to(s, { huong: chieu, duration: 0.4, ease: 'power2.inOut' }, plan.lead);
+    t.to(s, { nhinX: chieu * 1.2, nhinY: 1, duration: 0.4, ease: 'sine.inOut' }, plan.lead + 0.2);
+    // Tay cầm quai dây: buông xuôi, chìa nhẹ ra trước về phía con vật (không đánh theo bước) — bàn tay ngang hông, dây đi xuống cổ nó.
+    // (`carry` 0: không giữ dáng bưng đồ — cẳng tay gập ngang bụng thì dây dốc ngược từ ngực xuống, như kéo ghì con vật.)
+    const arm = { ['vung' + k]: 0.4, ['bat' + k]: 5, ['cang' + k]: -8, ['carry' + k]: 0 };
+    let at;
+    if (quang) {
+      const d = this._doBuoc(Math.abs(quang), true, true);
+      at = this._di(t, plan.start, d.buoc, RigSVG.LEASH_STEP_49C, { kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b), arm49c: arm });
+    } else at = this._di(t, plan.start, plan.steps, RigSVG.LEASH_STEP_49C, { arm49c: arm });
+    // 3. Dừng (cùng lúc với con vật), quay lại hướng cũ — vẫn dắt.
+    this._khep(t, RigSVG.LEASH_SETTLE_49C, at, { ...(quang ? { x: x0 + quang } : {}), leash: 1, leashRope49c: 1, leashPet49c: slot + 1 });
+    return t;
+  }
+
+  // Con vật đang dắt và tay cầm dây theo TRẠNG THÁI (`leashPet49c`), hay null (dắt bằng `leash`: `leashed`, `leashHand`).
+  _leashNow49c() {
+    const n = Math.round(+this.s.leashPet49c || 0), list = this.leashPets49c;
+    return n > 0 && list && list[n - 1] ? list[n - 1] : null;
+  }
+
+  // Độ võng của dây (đợt 49 C, `leashRope49c` > 0): dây có ĐỘ DÀI THẬT `LEASH_ROPE_49C` × chiều cao người. Cung parabol dài L căng qua
+  // khoảng `span` thì võng giữa d với L ≈ span + 8d²/(3·span) — d = √(3·span·(L − span)/8); căng hết cỡ (span ≥ L) thì gần thẳng.
+  // Trả về điểm điều khiển (Bézier bậc hai: giữa cung lệch khỏi giữa dây cung đúng một nửa phần lệch của điểm điều khiển).
+  _leashControl49c(a, b, span) {
+    const L = RigSVG.LEASH_ROPE_49C * RigSVG.KHUNG.h * 0.96, d = Math.max(1.5, Math.sqrt(Math.max(0, 3 * span * (L - span) / 8)));
+    // Chỗ võng thấp nhất (giữa cung: (a + 2c + b) / 4) không xuống dưới mặt sàn (y 458 của khung) — dây chùng thì nằm sát đất, không lún.
+    const y = Math.min((a.y + b.y) / 2 + 2 * clamp(d, 0, 90), (4 * RigSVG.LEASH_FLOOR_49C - a.y - b.y) / 2);
+    return { x: (a.x + b.x) / 2, y: Math.max(y, (a.y + b.y) / 2) };
+  }
+});
+
+return { default: __default };
+})();
+
 /* ───── runtime/rig-svg.js ───── */
 __m['runtime/rig-svg.js'] = (function () {
 // rig-svg.js — Nhân vật 2D SVG thuần, điều khiển bằng GSAP (global `gsap`).
@@ -7974,6 +8095,7 @@ const pairs = __m['runtime/person/pairs.js'].default;
 const floor = __m['runtime/person/floor.js'].default;
 const stance = __m['runtime/person/stance.js'].default;
 const speech = __m['runtime/person/speech.js'].default;
+const leash49c = __m['runtime/person/leash49c.js'].default;
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -8017,6 +8139,7 @@ class RigSVG {
   static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   static { this.DONG_TAC.push('jump', 'dance'); this.DI_NGANG.push('run'); }       // đợt 42 D — nhảy lên, nhảy múa (tại chỗ); chạy (dời `x`, quay ngang)
   static { this.STANCE.push('sitOnFloor', 'lieDown'); this.EXCHANGE.push('pickUp'); }       // đợt 42 E — ngồi bệt / nằm (thế giữ tới `standUp`); nhặt đồ (kết thúc với món đồ trong tay)
+  static { this.WITH_ITEM.push('walkOnLeash'); }       // đợt 49 C — dắt chó đi dạo: cần con vật (nó `walkOnLeash` cùng lúc) — có bài kiểm riêng
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
@@ -9608,10 +9731,11 @@ class RigSVG {
   // (con vật là một SVG khác, đứng đâu cũng được) rồi đổi về hệ gốc của SVG này. Con vật tự gọi hàm này sau mỗi lần nó
   // vẽ (`onDraw`), nên dây bám theo cả khi chỉ con vật cử động.
   _drawLeash() {
-    const line = this.el && this.el.leash, pet = this.leashed;
+    const now49c = this._leashNow49c();          // đợt 49 C: dắt con nào, tay nào — theo trạng thái (`leashPet49c`), một người dắt lần lượt nhiều con
+    const line = this.el && this.el.leash, pet = now49c ? now49c.pet : this.leashed;
     if (!line) return;
     if (!pet || this.s.leash < 0.5 || !pet.el || !pet.el.vong || !this.svg.getScreenCTM) { line.style.display = 'none'; return; }
-    const k = this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
+    const k = now49c ? now49c.hand : this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
     const handCTM = hand && hand.getScreenCTM();
     if (!toRoot || !handCTM) { line.style.display = 'none'; return; }
     const inverse = toRoot.inverse();
@@ -9619,7 +9743,10 @@ class RigSVG {
     const collar = pet.el.vong.getBoundingClientRect();
     const b = new DOMPoint(collar.left + collar.width / 2, collar.top + collar.height / 2).matrixTransform(inverse);
     const span = Math.hypot(b.x - a.x, b.y - a.y), sag = Math.min(40, span * 0.16);
-    const mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    let mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    // đợt 49 C — `walkOnLeash`: dây có độ dài thật, võng theo khoảng cách hai đầu (`_leashControl49c`); `leashRope49c` 0…1 chuyển dần sang.
+    const rope49c = clamp(+this.s.leashRope49c || 0, 0, 1);
+    if (rope49c > 0) { const c = this._leashControl49c(a, b, span); mx += (c.x - mx) * rope49c; my += (c.y - my) * rope49c; }
     line.setAttribute('d', `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
     line.style.display = '';
   }
@@ -9956,6 +10083,8 @@ class RigSVG {
     so.omSlot = this.s.omSlot;                                 // … và vẫn là lần bế ấy (đợt 37)
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
+    so.leashRope49c = this.s.leashRope49c;                     // đợt 49 C: … và dây vẫn võng theo độ dài thật của nó
+    so.leashPet49c = this.s.leashPet49c;                       // … và vẫn là con vật ấy
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
@@ -10071,7 +10200,7 @@ class RigSVG {
   // `chieu` −1 = đi sang TRÁI: lấy đúng tư thế đi sang phải rồi soi gương — đổi dấu
   // mọi góc xoay trong mặt phẳng màn hình và ĐỔI VAI hai bên (chân/tay gần người
   // xem khi quay trái là bên R, khi quay phải là bên L).
-  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1 } = {}) {
+  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1, arm49c = null } = {}) {
     const s = this.s, bao = this._baoDi(buoc, vao, ra);
     const dat = (b) => {
       const o = this._tuTheDi(0.75 + b / 2, bao(b), kA).o;
@@ -10084,6 +10213,8 @@ class RigSVG {
       }
       // Tay đang CẦM ĐỒ không đánh theo nhịp bước: cái cốc gắn vào bàn tay, tay vung là cốc lắc như con lắc.
       for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) o['vung' + side] *= 0.15;
+      // đợt 49 C — `walkOnLeash`: tay cầm quai dây giữ một dáng riêng (`arm49c`: kênh → giá trị lúc đang bước), vào / ra theo nhịp bước.
+      if (arm49c) { const w = bao(b); for (const key in arm49c) { const from = key in o ? o[key] : this.NGHI[key]; o[key] = from + (arm49c[key] - from) * w; } }      // kênh dáng đi không ghi (`carry`): từ dáng nghỉ
       Object.assign(s, o);
       if (x) s.x = x(b);
     };
@@ -10107,6 +10238,7 @@ class RigSVG {
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech]) install(RigSVG);
+leash49c(RigSVG);       // đợt 49 C
 
 return { RigSVG, veKhuonMat, beRongTaiY, veChanMay };
 })();
@@ -12220,6 +12352,106 @@ const __default = (RigThu) => mix(RigThu, class {
 return { default: __default };
 })();
 
+/* ───── runtime/pet/leash49c.js ───── */
+__m['runtime/pet/leash49c.js'] = (function () {
+// runtime/pet/leash49c.js — đợt 49 C: walked on a leash (`walkOnLeash`) beside the person holding it.
+// Methods of `RigThu`, installed by runtime/rig-thu.js: `this` is the rig, `RigThu` its class.
+
+const { clamp, mem, mix } = __m['runtime/pet/shared.js'];
+
+const __default = (RigThu) => mix(RigThu, class {
+  static LEASH_AHEAD_49C = 0.4;     // dừng lại với TÂM con vật đi trước giữa người chừng ấy × chiều cao người (dây gần căng, không chạm chân người)
+  static LEASH_TRAIL_49C = 0.32;     // … hay THEO SAU chừng ấy, khi lúc bắt đầu nó ở phía sau hướng đi quá LEASH_TRAIL_FROM_49C × chiều cao người (người quay đầu đi ngược lại)
+  static LEASH_TRAIL_FROM_49C = 0.12;
+  static LEASH_BEAT_49C = 0.36;      // giây một nhịp chân kiệu (chừng ấy — số nhịp tròn cho vừa thời gian bước của người)
+  static LEASH_PLAN_49C = { lead: 0.55, start: 0.69, step: 0.46, settle: 0.45 };   // nhịp của người khi không có người (như RigSVG.LEASH_*_49C)
+
+  /**
+   * ĐƯỢC DẮT ĐI DẠO (đợt 49 C) bởi người `person` — người ấy `walkOnLeash(pet, steps, distance)` CÙNG LÚC, cùng `steps` và `distance`
+   * (đơn vị khung của NGƯỜI; tools/scene.py tự thêm phần này). Nó quay về hướng đi, vẫy đuôi háo hức trong lúc người móc dây, rồi KIỆU đi
+   * cùng nhịp người, đi trước một quãng (dừng với tâm cách giữa người `LEASH_AHEAD_49C` × chiều cao người, về phía hướng đi — hay
+   * THEO SAU `LEASH_TRAIL_49C` nếu lúc bắt đầu nó ở phía sau hướng đi: người quay đầu đi ngược lại thì nó không băng qua chân người); chó cúi
+   * xuống ĐÁNH HƠI mặt đường một lúc giữa đường, rồi gần cuối NGOÁI NHÌN LẠI người dắt. Dừng cùng lúc với người, vẫn quay về hướng đi.
+   * `{ distance }`: quãng của CHÍNH NÓ (đơn vị khung của nó) — tools/scene.py đưa sẵn; bỏ trống thì đo từ chỗ người đứng trên màn hình.
+   * Không có người: kiệu tại chỗ (hay `distance` đơn vị) theo nhịp mặc định. Mèo đi dây yếm: được (không đánh hơi, đuôi dựng); thỏ: không.
+   */
+  walkOnLeash(person = null, buoc = 4, quang = 0, { distance = null } = {}) {
+    this._only('walkOnLeash', ['dog', 'cat']);
+    const real = person && person.live ? person.live : person;
+    if (person !== null && (typeof person !== 'object' || !real || typeof real.leashPlan49c !== 'function')) throw new Error('[character] walkOnLeash(person, steps, distance): person must be the person walking this pet (createCharacter(...).rig) — they walkOnLeash(pet, steps, distance) at the same time');
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] walkOnLeash(person, steps, distance): distance must be a number (the person's frame units, negative = to the left), got ${JSON.stringify(quang)}`);
+    if (distance !== null && (typeof distance !== 'number' || !isFinite(distance))) throw new Error(`[character] walkOnLeash: { distance } must be a number of the pet's frame units, got ${JSON.stringify(distance)}`);
+    const t = this.tl(), s = this.s, x0 = s.x, P = RigThu.LEASH_PLAN_49C, dog = this.nv.loai === 'dog';
+    const plan = real ? real.leashPlan49c(buoc, quang) : (() => { const steps = Math.max(2, Math.round(+buoc || 4)); return { lead: P.lead, start: P.start, walk: steps * P.step }; })();
+    const held = s.huong < 0 ? -1 : 1;
+    // Quãng CỦA NÓ (đơn vị khung của nó): đưa sẵn, hay tới chỗ trước người (sau khi người đi `quang`) đo trên màn hình.
+    let dx = 0, along = null;          // `along`: quãng NGƯỜI đi, đổi ra đơn vị khung của nó (null = không biết)
+    const metrics = real ? this._personMetrics(person, 'walkOnLeash') : null;
+    if (metrics) along = quang * (metrics.H / (470 * 0.96)) / metrics.scale;
+    if (distance !== null) dx = distance;
+    else if (metrics) {
+      const { cx, H, scale } = metrics, dir = quang < 0 ? -1 : quang > 0 ? 1 : held, me = this.centerX();
+      // Đang ở PHÍA SAU hướng đi (người quay đầu đi ngược lại): theo sau người, không băng qua chân người để lên trước.
+      const lead = (me - cx) * dir < -RigThu.LEASH_TRAIL_FROM_49C * H ? -RigThu.LEASH_TRAIL_49C : RigThu.LEASH_AHEAD_49C;
+      dx = quang ? (cx + quang * H / (470 * 0.96) + dir * lead * H - me) / scale : 0;
+    } else dx = quang;
+    if (Math.abs(dx) < 3) dx = 0;
+    const dir = dx < 0 ? -1 : dx > 0 ? 1 : quang < 0 ? -1 : quang > 0 ? 1 : held;
+    let at = this._dung(t, 0);
+    // 1. Người móc dây: quay về hướng đi, tai vểnh, đuôi vẫy háo hức, ngước nhìn người.
+    at = this._quayVe(t, Math.max(at, 0.1), dir);
+    t.to(s, { taiL: 0.6, taiR: 0.6, cuoi: 0.85, mieng: dog ? 0.25 : 0, luoi: dog ? 0.5 : 0, nhinY: -0.8, duration: 0.25 }, at);
+    if (dog) this._vay(t, at, Math.max(2, Math.floor((plan.start - at) / 0.1)), 30, 0.1, 18);
+    // 2. Kiệu đi cùng nhịp người: số nhịp tròn cho vừa thời gian bước, sải chân tính cho đúng quãng (chân trụ không trượt).
+    const walk = plan.walk, start = Math.max(at, plan.start);
+    const cycles = Math.max(2, Math.round(walk / RigThu.LEASH_BEAT_49C)), h = walk / cycles;
+    // Quãng HƠN / KÉM người (đi lên trước, hay lùi lại cho đúng chỗ): dồn vào NỬA ĐẦU quãng bước — sải dài hơn ở đầu (`boost`), nên nó lên
+    // trước người sớm rồi đi đều cùng người, chân trụ vẫn không trượt. Muốn nửa đầu đi được phần `f` của cả quãng: sải nửa đầu ×(1 + b/2)
+    // ⇒ f = (1 + b/2) / (2 + b/2) ⇒ b = 2(2f − 1) / (1 − f).
+    let boost = 0;
+    if (dx && along !== null && Math.sign(along) !== -Math.sign(dx)) {
+      const total = Math.abs(dx), extra = total - Math.abs(along), f = clamp((Math.abs(along) / 2 + 0.85 * extra) / total, 0.3, 0.8);
+      boost = clamp(2 * (2 * f - 1) / (1 - f), -0.6, 1.5);
+    }
+    const stride = (c) => 1 + boost * Math.max(0, 1 - c / (0.5 * cycles));
+    const unitTable = (A) => { const M = 60, n = Math.round(cycles * M), bao = (c) => mem(c / 0.5) * mem((cycles - c) / 0.5); let X = 0; for (let i = 1; i <= n; i++) X += (2 * A * stride(i / M) / 0.6) * bao(i / M) / M; return X; };
+    const A = dx ? clamp(Math.abs(dx) / unitTable(1), 6, 24 / (1 + Math.max(0, boost))) : 13, lift = clamp(A * 0.7, 7, 13);
+    // Đánh hơi (chó, bước ≥ 1,4 s): cúi mõm xuống mặt đường từ 22 % tới 50 % quãng bước. Ngoái nhìn lại: 66 % → 94 %.
+    const sniff = dog && walk >= 1.4 ? [0.22, 0.5] : null, back = walk >= 1.4 ? [0.66, 0.94] : null;
+    const bump = (u, [a, b]) => { const k = (u - a) / (b - a); return k <= 0 || k >= 1 ? 0 : mem(k / 0.25) * mem((1 - k) / 0.25); };
+    const add = (c) => {
+      const u = c / cycles, w = sniff ? bump(u, sniff) : 0, r = back ? bump(u, back) : 0;
+      return { dauY: 24 * w, dauX: 12 * w, dau: 14 * w - 9 * r, truocY: 4 * w, taiL: 0.6 - 0.9 * w, taiR: 0.6 - 0.9 * w, duoi: dog ? 0 : 26,
+               nhinX: -dir * 1.8 * r, nhinY: 1.2 * w - 1 * r, mieng: dog ? 0.25 * (1 - w) : 0, luoi: dog ? 0.5 * (1 - w) : 0 };
+    };
+    this._diLeash49c(t, start, cycles, h, { quang: dx, x0, A, cao: lift, stride }, add);
+    // 3. Dừng cùng lúc với người — vẫn quay về hướng đi, đứng đợi.
+    this._khep(t, 0.45, start + walk, { ...(dx ? { x: x0 + dx } : {}), huong: dir });
+    return t;
+  }
+
+  // Như `_diThem` (play.js) nhưng phần cộng thêm là HÀM CỦA NHỊP (`add(c)` → kênh: lượng) — cúi đánh hơi, ngoái lại giữa lúc đang kiệu. Kênh
+  // `_buoc` không ghi (`dau`, tai, mắt) thì đặt thẳng; kênh nó ghi (`dauY`, `truocY`, `duoi`) thì cộng vào.
+  _diLeash49c(t, at, chuKy, h, { quang = 0, x0 = 0, A = 13, cao = 9, stride = () => 1 } = {}, add = () => ({})) {
+    const s = this.s, bao = (c) => mem(c / 0.5) * mem((chuKy - c) / 0.5);
+    const M = 60, n = Math.round(chuKy * M), X = [0];
+    for (let i = 1; i <= n; i++) X.push(X[i - 1] + (2 * A * stride(i / M) / 0.6) * bao(i / M) / M);
+    const tiLe = quang ? Math.abs(quang) / X[n] : 0, dau = quang < 0 ? -1 : 1, rest = this.NGHI, owner = this;
+    const pr = { _c: 0, get c() { return this._c; }, set c(v) {
+      this._c = v;
+      const a = bao(v), step = owner._buoc(v, a, A * stride(v) * (tiLe ? clamp(tiLe, 0.5, 1.35) : 1), cao), more = add(v), on = Math.min(1, a * 3);
+      for (const k of Object.keys(more)) step[k] = k in step ? step[k] + more[k] * on : (rest[k] || 0) + more[k];
+      Object.assign(s, step);
+      if (quang) { const q = clamp(v, 0, chuKy) * M, i = Math.min(n - 1, Math.floor(q)); s.x = x0 + dau * tiLe * (X[i] + (X[i + 1] - X[i]) * (q - i)); }
+    } };
+    t.to(pr, { c: chuKy, duration: chuKy * h, ease: 'none' }, at);
+    return at + chuKy * h;
+  }
+});
+
+return { default: __default };
+})();
+
 /* ───── runtime/rig-thu.js ───── */
 __m['runtime/rig-thu.js'] = (function () {
 // rig-thu.js — THÚ BỐN CHÂN (chó, mèo) bằng SVG thuần, điều khiển bằng GSAP (global `gsap`).
@@ -12264,6 +12496,7 @@ const basic = __m['runtime/pet/basic.js'].default;
 const species = __m['runtime/pet/species.js'].default;
 const tricks = __m['runtime/pet/tricks.js'].default;
 const mood = __m['runtime/pet/mood.js'].default;
+const leash49c = __m['runtime/pet/leash49c.js'].default;
 
 // Các động tác nằm theo nhóm trong runtime/pet/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -12282,6 +12515,8 @@ class RigThu {
     // đợt 40 B: mèo — rửa mặt, nằm ổ bánh mì, chớp mắt chậm, vờn đồ chơi, cong lưng, chui hộp; thỏ — nhảy vui, nằm vật, đứng hai chân, giật mũi
     RigThu.DONG_TAC.cat.push('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox');
     RigThu.DONG_TAC.rabbit.push('binky', 'flop', 'periscope', 'noseTwitch');      // `flop` là thế giữ (như lieDown) nhưng chỉ của thỏ nên nằm trong danh sách thỏ, không trong STANCE chung
+    // đợt 49 C: được dắt đi dạo (`walkOnLeash` — người dắt làm cùng lúc); không có người thì kiệu tại chỗ. Thỏ không được dắt (nhảy cóc).
+    RigThu.DONG_TAC.dog.push('walkOnLeash'); RigThu.DONG_TAC.cat.push('walkOnLeash');
   }
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
@@ -12884,6 +13119,7 @@ class RigThu {
     rollOver: 'Lăn ngửa', chaseTail: 'Đuổi đuôi', knead: 'Nhào', lick: 'Liếm', hide: 'Chạy nấp', eatCarrot: 'Gặm cà rốt',
     groomFace: 'Rửa mặt', loaf: 'Nằm ổ bánh mì', slowBlink: 'Chớp mắt chậm', batToy: 'Vờn đồ chơi', archBack: 'Cong lưng dựng lông', sitInBox: 'Chui hộp',   // đợt 40 B
     binky: 'Nhảy vui', flop: 'Nằm vật ra', periscope: 'Đứng hai chân', noseTwitch: 'Giật mũi',   // đợt 40 B
+    walkOnLeash: 'Được dắt đi dạo',   // đợt 49 C
   };
   // đợt 40 C — bốn động tác thú ở phòng khám, cho cả ba loài; `pawAtCone` cần đang đeo loa nên không chạy trơn (như WITH_ITEM của rig người)
   static WITH_WEAR = ['pawAtCone'];
@@ -13361,6 +13597,7 @@ class RigThu {
 
 }
 for (const install of [poses, play, basic, species, tricks, mood]) install(RigThu);
+leash49c(RigThu);       // đợt 49 C
 
 return { RigThu };
 })();
@@ -17216,7 +17453,17 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!rs.length) return null; const r = rect({ left: Math.min(...rs.map((q) => q.left)), right: Math.max(...rs.map((q) => q.right)), top: Math.min(...rs.map((q) => q.top)), bottom: Math.max(...rs.map((q) => q.bottom)) });
               return { side, y: r.y1, x: (r.x0 + r.x1) / 2, wx: at.scale ? actor.where + ((r.x0 + r.x1) / 2 - at.x) / at.scale : null }; }).filter(Boolean),
             wtall: actor.height || 0, lift42d: +(rig.s.lift42d || 0).toFixed(2),
-            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}) };
+            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}),
+          // ĐỢT 49 C — DÂY DẮT (`leash`, `walkOnLeash`): hai đầu và điểm điều khiển của dây trên màn hình, vòng cổ con vật đang dắt, độ dài
+          // dây (`leashRope49c` > 0: độ dài thật, px) — acting_check `leash49c` đo dây nối tay với vòng cổ, con vật trong tầm dây.
+          ...(person && e.leash ? { leash49c: (() => {
+            const shown = e.leash.style.display !== 'none', d = (e.leash.getAttribute('d') || '').match(/-?[\d.]+/g), now = typeof rig._leashNow49c === 'function' ? rig._leashNow49c() : null, pet = now ? now.pet : rig.leashed;
+            const ends = shown && d && d.length >= 6 ? [0, 2, 4].map((n) => point(rig.svg, +d[n], +d[n + 1])) : null;
+            const collar = pet && pet.el && pet.el.vong ? rect(pet.el.vong.getBoundingClientRect()) : null;
+            const unit = point(rig.svg, 0, 0), unit1 = point(rig.svg, 0, 100), scale = unit && unit1 ? Math.hypot(unit1.x - unit.x, unit1.y - unit.y) / 100 : 0;
+            return { shown, a: ends && ends[0], c: ends && ends[1], b: ends && ends[2], collar: collar && { x: (collar.x0 + collar.x1) / 2, y: (collar.y0 + collar.y1) / 2 },
+                     hand: (now ? now.hand : rig.leashHand) || null, rope: +(rig.s.leashRope49c || 0).toFixed(2), ropeLength: rig.constructor.LEASH_ROPE_49C ? rig.constructor.LEASH_ROPE_49C * 470 * 0.96 * scale : null };
+          })() } : {}) };
       });
     },
 
@@ -18768,6 +19015,7 @@ const SPEECH_SETTLE = 0.55;
 const PAIR_39A = ['giveChange', 'takeChange', 'stampCard', 'takeCard'];      // đợt 39 A: đưa tiền thối / đóng dấu rồi đưa thẻ — cả nhóm `together` bắt đầu cùng lúc, đích là mỏ neo
 const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
+PAIR_SYNC.push('walkOnLeash');       // đợt 49 C: người dắt và con vật bước cùng nhịp — cả nhóm bắt đầu cùng lúc
 // Kênh của thế NHÌN THEO (`lookAt`, đợt 36) và các bước KHÔNG thả nó ra.
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
@@ -19298,6 +19546,8 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       // ĐỢT 39 A: thối tiền / đóng dấu rồi đưa thẻ — đích cũng là mỏ neo (chỗ người kia đứng LÚC NÀY, không phải lúc đầu cảnh).
       steps.forEach((step, n) => { if (Array.isArray(step) && PAIR_39A.includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
+      // ĐỢT 49 C: con vật được dắt (`walkOnLeash(person, …)`) đo chỗ người dắt LÚC NÀY để đi trước họ một quãng.
+      steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'walkOnLeash' && typeof rig.follow === 'function' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
@@ -19359,7 +19609,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       // cận cảnh của người khác mà có một cái đầu lướt ngang mép khung thì rất khó hiểu.
       // `walk` cũng tính: nhân vật đi sang chỗ khác thì cận cảnh đang ghì vào chỗ cũ sẽ cắt ngang người rồi còn lại khung trống.
       const crossing = turn.steps.find((step) => ['enter', 'exit', 'walk', 'walkForward', 'walkAway',
-        'run'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác
+        'run', 'walkOnLeash'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác; đợt 49 C — dắt chó đi dạo
       const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
       // Bước đi diễn ra TRƯỚC lời của lượt (bước vào rồi mới nói): lùi ngay bây giờ. Bước đi SAU lời (nói xong rồi bước
       // ra) thì lùi sau khi đã đặt cảnh cận cho câu nói — xem cuối vòng lặp. Bản trước chỉ có nhánh đầu, và bỏ qua nó

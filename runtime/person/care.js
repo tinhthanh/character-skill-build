@@ -334,10 +334,12 @@ export default (RigSVG) => mix(RigSVG, class {
     if (!pet || !pet.el || !pet.el.vong || pet instanceof RigSVG) throw new Error('[character] leash(pet): pet must be a pet rig (createPet(...).rig)');
     const s = this.s, k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-leash]'));
     if (!k) throw new Error('[character] leash: the character is not holding a leash — give it one: createCharacter(host, { id, items: { R: "leash" } })');
-    if (this.leashed && this.leashed !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
+    const walking = this._leashNow49c() ? this._leashNow49c().pet : this.leashed;          // đợt 49 C
+    if (walking && walking !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
     this.leashed = pet; this.leashHand = k;
     pet.onDraw = () => this._drawLeash();
     const t = this.tl();
+    if (s.leashPet49c) t.set(s, { leashPet49c: 0 }, 0);          // đợt 49 C: dây của lần dắt này, không phải con đã dắt bằng `walkOnLeash`
     // Cúi nhìn con vật, móc dây vào cổ nó (dây hiện), rồi đứng thẳng lên — vẫn giữ dây.
     t.to(s, { dauY: 6, nhinY: 2.2, cuoi: 0.9, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 1 }, 0.35);
@@ -351,7 +353,7 @@ export default (RigSVG) => mix(RigSVG, class {
     const t = this.tl(), s = this.s;
     t.to(s, { dauY: 6, nhinY: 2.2, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 0 }, 0.35);
-    this._khep(t, 0.4, 0.55, { leash: 0 });
+    this._khep(t, 0.4, 0.55, { leash: 0, leashRope49c: 0, leashPet49c: 0 });       // đợt 49 C: lần móc dây sau lại võng như cũ
     return t;
   }
 
