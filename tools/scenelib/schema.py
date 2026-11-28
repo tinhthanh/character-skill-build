@@ -40,6 +40,7 @@ ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
 # kia nhận (`takeChange` / `takeCard`) cùng lúc, có sẵn món đồ đang cất.
 ITEM_KINDS = ITEM_KINDS + ('card', 'stampcard', 'cash')
 ITEM_KINDS = ITEM_KINDS + ('toy', 'bowl')            # đợt 42 E: quả bóng đồ chơi, bát ăn — `pickUp` nhặt lên, người kia `take` (holds + holdsHidden)
+ITEM_KINDS = ITEM_KINDS + ('foodBag', 'treatBox', 'can')      # đợt 50 B: món hàng của cửa hàng thú cưng (takeFromShelf, scanBarcode)
 CUTOUT_KINDS = CUTOUT_KINDS + ('paystand',)
 CUTOUT_KINDS = CUTOUT_KINDS + ('tub',)                     # đợt 42 F: chậu tắm (con vật trong chậu: "inTub" trên con vật — chậu tự thêm vừa cỡ nó)
 CUTOUT_KINDS = CUTOUT_KINDS + ('cage',)                    # đợt 49 A: chuồng lưu trú (hai lớp: lòng chuồng + khung trước có cửa) — tools/scenelib/cage.py

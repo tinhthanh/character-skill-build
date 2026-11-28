@@ -58,7 +58,7 @@ for (const entry of entries) {
         const personHost = document.createElement('div');
         personHost.style.cssText = `position:absolute;left:${70 * zoom + gap - tall * 200 / 470}px;top:${floor - tall}px;width:${tall * 400 / 470}px;height:${tall}px`;
         cell.insertBefore(personHost, entry.personFront ? null : host);
-        person = createCharacter(personHost, { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig;
+        person = createCharacter(personHost, { id: entry.person, items: entry.personItems || null, itemsHidden: Array.isArray(entry.personItemsHidden) ? entry.personItemsHidden : !!entry.personItemsHidden }).rig;      // đợt 50 B: ["L"] — chỉ tay ấy đang cất
       }
       if (isPet && entry.person) {
         const tall = 225 * zoom, petTall = tall * 0.43, floor = 10 * zoom + tall * 458 / 470;
@@ -69,7 +69,7 @@ for (const entry of entries) {
         person = createCharacter(personHost, { id: entry.person }).rig;
       }
       const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
-        : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
+        : createCharacter(host, { id, items: entry.items || null, itemsHidden: Array.isArray(entry.itemsHidden) ? entry.itemsHidden : !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
       // "scale": một cái cân trên sàn, bên trái người (phía không có con vật) — `@scale` trong các bước (đợt 35: `weigh`).
       let scale = null;

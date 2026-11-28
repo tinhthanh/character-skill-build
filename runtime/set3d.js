@@ -2150,6 +2150,13 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
       }
+      // đợt 50 B: lấy hàng / quét mã vạch (`rig.shop50bProbe()` — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.shop50bProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c50b = Object.fromEntries(Object.entries(rig.shop50bProbe()).map(([key, v]) => [key, one(v)]));
+      }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
       // ĐỢT 49 A — chuồng: khung trước (`cageFront`) — ô cửa (px trong `view`), cửa đang vẽ (khung hình của nó), lớp vẽ của host khung trước; người: độ mở cửa…
       out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {

@@ -442,6 +442,7 @@ const NGHI = Object.freeze({
   foam: 0, gloveL: 0, gloveR: 0,
   pairFront: 0, pairSlot: 0,    // `pairSlot`: người kia là mục nào của `rig.pairList` (như `omSlot`) — mỗi khung đúng người của lần ấy
   cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
+  spin50bL: 0, spin50bR: 0, beam50bL: 0, beam50bR: 0, scanT50b: 0, beep50b: 0, tiptoe50b: 0,
 });
 const MAU_MAC_DINH = {
   da: '#f1c3a0', daToi: '#d9a583', toc: '#2c2a33', ao: '#4a8ed6', aoToi: '#3a74b3',
@@ -6246,6 +6247,371 @@ const __default = (RigSVG) => mix(RigSVG, class {
 });
 return { default: __default };
 })();
+__m['runtime/shop50b-items.js'] = (function () {
+const SIZE50B = 1.4;                   // món hàng to hơn đồ cầm thường (đọc được ở cảnh trung)
+const lineOf = (c) => c.lineStroke || c.topShadow || '#3a3f4a';
+const thumb50b = (c, { reach = 12, from = -5, x = 0, far = null } = {}) => {
+  const line = lineOf(c);
+  const tips = far == null ? '' : [-4.6, 0, 4.6].map((dx) => `<circle cx="${x + dx}" cy="${far}" r="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`).join('');
+  return `<g data-grip="1">${tips}<rect x="${x - 2.9}" y="${from}" width="5.8" height="${reach}" rx="2.9" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(-14 ${x} ${from})"/></g>`;
+};
+const fingers50b = (c, { reach = 13, from = -9 } = {}) => {
+  const line = lineOf(c), band = (x, len) => `<rect x="${x - 2.3}" y="${from}" width="4.6" height="${len}" rx="2.3" fill="${c.skin}" stroke="${line}" stroke-width=".9"/>`;
+  return `<g data-grip="1"><rect x="8" y="${from + 0.4}" width="13" height="5.4" rx="2.7" fill="${c.skin}" stroke="${line}" stroke-width=".9" transform="rotate(24 8 ${from + 3})"/>${band(-6.9, reach - 2)}${band(-2.3, reach)}${band(2.3, reach - 0.5)}${band(6.9, reach - 3)}</g>`;
+};
+const barcode50b = (x, y, w = 14, h = 7) => {
+  const bars = [0, 1.6, 2.6, 4.4, 5.3, 6.9, 8.1, 9.2, 10.9, 12.2].map((dx, n) => `<rect x="${(x + 1 + dx * (w - 2) / 13).toFixed(2)}" y="${y + 1}" width="${n % 3 ? 0.7 : 1.2}" height="${h - 2}" fill="#1d2128"/>`).join('');
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.8" fill="#ffffff" stroke="#9aa3ad" stroke-width=".4"/>${bars}<circle data-code50b="1" cx="${x + w / 2}" cy="${y + h / 2}" r="0.5" fill="none"/>`;
+};
+const text50b = (x, y, size, words, fill = '#16303a', weight = 700) => `<text x="${x}" y="${y}" font-family="Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="middle" data-layout-ignore="">${words}</text>`;
+const paw50b = (x, y, r, fill) => `<g fill="${fill}"><ellipse cx="${x}" cy="${y + r * 0.35}" rx="${r * 0.62}" ry="${r * 0.5}"/>${[[-0.62, -0.32], [-0.22, -0.7], [0.22, -0.7], [0.62, -0.32]].map(([dx, dy]) => `<circle cx="${(x + dx * r).toFixed(2)}" cy="${(y + dy * r).toFixed(2)}" r="${(r * 0.24).toFixed(2)}"/>`).join('')}</g>`;
+function foodBag50b(c, { color = '#e0773a', band = '#f6d36b', label = 'Hạt cho chó', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-shop50b="foodBag" transform="translate(0 10) rotate(90) scale(${SIZE50B})">
+          <path d="M -12 -2 H 12 V 5 H -12 Z" fill="${band}" stroke="${line}" stroke-width="1"/>
+          <path d="M -12 5 L 12 5 L 15 44 Q 0 46.5 -15 44 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <g data-side50b="front"><rect x="-11" y="14" width="22" height="20" rx="3" fill="#fffaf0" stroke="${line}" stroke-width=".6"/>
+            ${paw50b(0, 21.5, 4.6, color)}${text50b(0, 31.5, 4.6, label)}
+            <path d="M -14 39 Q 0 41 14 39" stroke="${band}" stroke-width="2.4" fill="none"/></g>
+          <g data-side50b="back" style="display:none"><path d="M -9 12 h 18 M -9 16 h 14 M -9 20 h 16 M -9 24 h 11" stroke="#fffaf0" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>${barcode50b(-7, 31, 14, 8)}</g>
+        </g>${grip ? fingers50b(c, { reach: 13, from: -9 }) : ''}`;
+}
+function treatBox50b(c, { color = '#3f8fd6', band = '#ffffff', label = 'Bánh thưởng', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-shop50b="treatBox" transform="translate(0 10) rotate(90) scale(${SIZE50B})">
+          <path d="M -13 -30 L 13 -30 L 13 2 L -13 2 Z" fill="${color}" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M -13 -30 L -10 -34 L 16 -34 L 13 -30 Z M 13 -30 L 16 -34 L 16 -2 L 13 2 Z" fill="${color}" stroke="${line}" stroke-width=".9" stroke-linejoin="round" opacity=".8"/>
+          <g data-side50b="front"><rect x="-10" y="-25" width="20" height="17" rx="2.6" fill="${band}" stroke="${line}" stroke-width=".6"/>
+            <path d="M -6 -19.5 a 2.4 2.4 0 1 1 3 -2.6 h 6 a 2.4 2.4 0 1 1 3 2.6 a 2.4 2.4 0 1 1 -3 2.6 h -6 a 2.4 2.4 0 1 1 -3 -2.6 z" fill="#e8b87a" stroke="${line}" stroke-width=".5"/>
+            ${text50b(0, -10.6, 4.2, label)}</g>
+          <g data-side50b="back" style="display:none"><path d="M -9 -26 h 18 M -9 -22 h 13 M -9 -18 h 16" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity=".75"/>${barcode50b(-7, -13, 14, 8)}</g>
+        </g>${grip ? thumb50b(c, { reach: 10, x: 1, far: -2 }) : ''}`;
+}
+function can50b(c, { color = '#d94f6a', band = '#fff4f0', label = 'Pate cho mèo', grip = true } = {}) {
+  const line = lineOf(c);
+  return `
+        <g data-shop50b="can" transform="translate(0 10) rotate(90) scale(${SIZE50B})">
+          <path d="M -10 -18 L 10 -18 L 10 6 Q 0 9 -10 6 Z" fill="#c9ced6" stroke="${line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <ellipse cx="0" cy="-18" rx="10" ry="2.6" fill="#e3e7ec" stroke="${line}" stroke-width=".9"/><path d="M -3 -18.5 h 6" stroke="#8a929e" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M -10 -14 L 10 -14 L 10 3 Q 0 5.6 -10 3 Z" fill="${color}"/>
+          <g data-side50b="front"><rect x="-8" y="-12" width="16" height="12" rx="2" fill="${band}" stroke="${line}" stroke-width=".5"/>
+            ${paw50b(0, -8.4, 2.8, color)}${text50b(0, -2.4, 3.4, label)}</g>
+          <g data-side50b="back" style="display:none">${barcode50b(-6, -11, 12, 7)}<path d="M -7 -1.5 h 14" stroke="${band}" stroke-width="1.2" stroke-linecap="round" opacity=".8"/></g>
+        </g>${grip ? thumb50b(c, { reach: 10, x: 1, far: 9 }) : ''}`;
+}
+const SHOP50B = {
+  foodBag: { draw: foodBag50b, label: 'Hạt cho chó', price: '125.000đ' },
+  treatBox: { draw: treatBox50b, label: 'Bánh thưởng', price: '45.000đ' },
+  can: { draw: can50b, label: 'Pate cho mèo', price: '28.000đ' },
+};
+return { foodBag50b, treatBox50b, can50b, SHOP50B };
+})();
+__m['runtime/person/shop50b.js'] = (function () {
+const { HONG, DOI_Y, DAI, KHUNG, SQUAT42E, clamp, chuanHoaGoc, RAD, mix } = __m['runtime/person/shared.js'];
+const { SHOP50B } = __m['runtime/shop50b-items.js'];
+const SCANNER_WINDOW50B = 32;          // ô kính đầu máy quét cách cổ tay chừng ấy theo bàn tay (gadget 50): tia đỏ bắt đầu ở đây
+const SCAN_FAN50B = 6.5;               // tia loe ra tới nửa bề ngang chừng ấy ở cuối (đơn vị khung bàn tay) — vạch quét nằm ngang trên món hàng
+const TIPTOE_LIFT50B = 9;              // kiễng chân: người nhấc lên chừng ấy đơn vị khung
+const ITEM_DY50B = { foodBag: 35, treatBox: -20, can: -8 };      // tâm món hàng dưới (+) / trên (−) lòng bàn tay chừng ấy đơn vị bàn tay khi cầm thẳng
+const LEVELS50B = ['high', 'middle', 'low'];
+const PUTS50B = ['down', 'keep', 'bag'];
+const SCANNER50B = `<g data-gadget="50"><rect x="-4.6" y="-7" width="9.2" height="22" rx="3.2" fill="#2b2f36" stroke="#15181d" stroke-width="1.1"/>
+        <path d="M -7.5 13 L 7.5 13 L 10 ${SCANNER_WINDOW50B - 1} L -10 ${SCANNER_WINDOW50B - 1} Z" fill="#f2b134" stroke="#7a5512" stroke-width="1.2" stroke-linejoin="round"/>
+        <rect x="-3.4" y="16" width="6.8" height="4.4" rx="1.2" fill="#2b2f36"/>
+        <rect x="-9.4" y="${SCANNER_WINDOW50B - 2}" width="18.8" height="3.4" rx="1.4" fill="#d83a3a" stroke="#7a1d1d" stroke-width=".8"/>
+        <rect data-flash50b="1" x="-9.4" y="${SCANNER_WINDOW50B - 2}" width="18.8" height="3.4" rx="1.4" fill="#5cf08a" style="display:none"/>
+        <g data-beam50b="1" style="display:none"><path data-fan50b="1" fill="#ff3b3b" fill-opacity=".22" stroke="none"/><path data-ray50b="1" stroke="#ff3b3b" stroke-width="1" stroke-opacity=".7" fill="none"/>
+          <path data-line50b="1" stroke="#ff2020" stroke-width="2" stroke-linecap="round" fill="none"/><path data-glow50b="1" stroke="#ff9a9a" stroke-width="4.4" stroke-linecap="round" stroke-opacity=".45" fill="none"/></g>
+        <g data-beep50b="1" style="display:none" stroke="#38c172" stroke-width="2.2" fill="none" stroke-linecap="round"><path d="M 14 16 q 5 8 0 16 M 19 12 q 8 12 0 24"/><path d="M -14 16 q -5 8 0 16 M -19 12 q -8 12 0 24"/></g></g>`;
+const __default = (RigSVG) => mix(RigSVG, class {
+  static SCAN_BEEP50B = 0.55;        // giây "bíp" sau khi tia đỏ bật (tối đa — `hold` ngắn thì sớm hơn)
+  static HANDOFF50B = 0.62;          // giây món hàng sang tay thu ngân khi nhận từ khách — như `take` / `handOver` (cùng nhịp)
+  _drawShopTools50b(f) {
+    const e = this.el, s = this.s, n2 = (v) => v.toFixed(2);
+    for (const side of ['L', 'R']) {
+      const box = e['gadget' + side], kind = Math.round(s['gadget' + side]);
+      if (box && kind === 50) {
+        let tool = [...box.children].find((child) => +child.getAttribute('data-gadget') === 50);
+        if (!tool) { box.insertAdjacentHTML('beforeend', SCANNER50B); tool = box.lastElementChild; }
+        tool.style.display = '';
+        const L = Math.max(0, +s['beam50b' + side] || 0), beam = tool.querySelector('[data-beam50b]');
+        beam.style.display = L > 0.5 ? '' : 'none';
+        if (L > 0.5) {
+          const y0 = SCANNER_WINDOW50B + 1.4, y1 = y0 + L, w = SCAN_FAN50B, wob = 0.8 * Math.sin((+s.scanT50b || 0) * 31);
+          tool.querySelector('[data-fan50b]').setAttribute('d', `M -2.4 ${n2(y0)} L ${n2(-w)} ${n2(y1 + wob)} L ${n2(w)} ${n2(y1 - wob)} L 2.4 ${n2(y0)} Z`);
+          tool.querySelector('[data-ray50b]').setAttribute('d', `M 0 ${n2(y0)} L 0 ${n2(y1)}`);
+          for (const key of ['line50b', 'glow50b']) tool.querySelector(`[data-${key}]`).setAttribute('d', `M ${n2(-w)} ${n2(y1 + wob)} L ${n2(w)} ${n2(y1 - wob)}`);
+        }
+        const beep = clamp(+s.beep50b || 0, 0, 1);
+        tool.querySelector('[data-beep50b]').style.display = beep > 0.3 ? '' : 'none';
+        tool.querySelector('[data-flash50b]').style.display = beep > 0.3 ? '' : 'none';
+      }
+      const goods = this.holds[side] && e['item' + side] && e['item' + side].querySelector('[data-shop50b]');
+      if (goods) {
+        const back = (+s['spin50b' + side] || 0) >= 0.5;
+        for (const face of goods.querySelectorAll('[data-side50b]')) {
+          const hide = (face.getAttribute('data-side50b') === 'front') === back;
+          if ((face.style.display === 'none') !== hide) face.style.display = hide ? 'none' : '';
+        }
+      }
+    }
+    const toe = clamp(+s.tiptoe50b || 0, 0, 1);
+    if (toe > 0.001) {
+      const lift = TIPTOE_LIFT50B * toe, ankle = { x: 2, y: DAI.ong - 2 }, tip = { x: 26 - ankle.x, y: DAI.ong + 10 - ankle.y };
+      const r = Math.hypot(tip.x, tip.y), base = Math.atan2(tip.y, tip.x), want = clamp((tip.y + lift / (this.nv.coBanChan || 1)) / r, -1, 1);
+      const turn = (Math.asin(want) - base) / RAD;
+      for (const ben of ['L', 'R']) {
+        const side = e['banNg' + ben], front = e['ban' + ben];
+        if (side) side.setAttribute('transform', `${side.getAttribute('transform') || ''} rotate(${n2(turn)} ${ankle.x} ${ankle.y})`);
+        if (front) front.setAttribute('transform', `${front.getAttribute('transform') || ''} translate(0 ${n2(lift * 0.8)})`);
+      }
+    }
+  }
+  shop50bProbe() {
+    const e = this.el, s = this.s;
+    const scanSide = ['L', 'R'].find((k) => Math.round(s['gadget' + k]) === 50) || null;
+    const tool = scanSide ? [...e['gadget' + scanSide].children].find((child) => +child.getAttribute('data-gadget') === 50) || null : null;
+    const goodsSide = ['L', 'R'].find((k) => this.holds[k] && s['item' + k] > 0.5 && e['item' + k].querySelector('[data-shop50b]')) || null;
+    const goods = goodsSide ? e['item' + goodsSide].querySelector('[data-shop50b]') : null;
+    const L = scanSide ? Math.max(0, +s['beam50b' + scanSide] || 0) : 0, beam = tool && L > 0.5 ? tool.querySelector('[data-line50b]') : null;
+    const at = (el, x, y) => { const m = el && el.getScreenCTM(); if (!m) return null; const q = new DOMPoint(x, y).matrixTransform(m); return { x: q.x, y: q.y, px: true }; };
+    return { scanner: tool, scanSide, beam: L > 0.5, beamLine: beam, beamEnd: tool && L > 0.5 ? at(tool, 0, SCANNER_WINDOW50B + 1.4 + L) : null, window: tool ? at(tool, 0, SCANNER_WINDOW50B) : null,
+             goods, goodsSide, goodsKind: goods ? goods.getAttribute('data-shop50b') : null, label: goods ? !((+s['spin50b' + goodsSide] || 0) >= 0.5) : null,
+             beep: +clamp(+s.beep50b || 0, 0, 1).toFixed(3), tiptoe: +clamp(+s.tiptoe50b || 0, 0, 1).toFixed(3), squat: +clamp(+s.squat42e || 0, 0, 1).toFixed(3),
+             hand: goodsSide ? at(e['coTay' + goodsSide], 0, 10) : null, handR: at(e.coTayR, 0, 10), handL: at(e.coTayL, 0, 10), shelf: this.shelf50b || null, readout: +clamp(+s.readout || 0, 0, 1).toFixed(3) };
+  }
+  _goods50b(k) {
+    const el = this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-shop50b]');
+    return el ? el.getAttribute('data-shop50b') : null;
+  }
+  _autoGoods50b(k) { return !!(this.autoItem50b && this.autoItem50b[k] && this._goods50b(k) === this.autoItem50b[k]); }
+  _handScale50b(k) {
+    const m = this.el['coTay' + k] && this.el['coTay' + k].getScreenCTM && this.el['coTay' + k].getScreenCTM(), r = this.svg.getScreenCTM && this.svg.getScreenCTM();
+    const ratio = m && r && Math.hypot(r.a, r.b) ? Math.hypot(m.a, m.b) / Math.hypot(r.a, r.b) / (this.s['handZoom' + k] || 1) : this.nv.coThan;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : this.nv.coThan || 1;
+  }
+  _giveGoods50b(k, draw, kind) {
+    const s = this.s, keepArms = Object.fromEntries(['batL', 'cangL', 'tayL', 'batR', 'cangR', 'tayR', 'itemL', 'itemR'].map((key) => [key, s[key]]));
+    this.setItem(k, draw, { shown: false });
+    Object.assign(this.s, keepArms); this.apDung();
+    this.autoItem50b = { ...(this.autoItem50b || {}), [k]: kind };
+  }
+  _shelfSpot50b(shelf, level) {
+    const s = this.s, c = this.nv.coThan || 1, toFrame = (p) => ({ x: p.x - (s.x || 0), y: p.y - (s.y || 0) - DOI_Y });
+    const sy = this._shoulderY(), floor = KHUNG.h - 42;
+    const heights = { high: sy - 104 * c, middle: sy + 26 * c, low: floor - 54 * c };
+    if (shelf === null || shelf === undefined || shelf === 'left' || shelf === 'right') {
+      const dir = shelf === 'left' ? -1 : shelf === 'right' ? 1 : Math.sign(s.huong) || 1;
+      if (level === 'high') {          // tầng cao: tay gần duỗi thẳng, chếch 58° lên trên — đầu chibi to, ngang đỉnh đầu là quá tầm tay
+        const reach = (DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay) * c * 0.94, a = 58 * RAD;
+        return { x: HONG.x + dir * (22 * c + Math.cos(a) * reach), y: sy - TIPTOE_LIFT50B - Math.sin(a) * reach, el: null };
+      }
+      return { x: HONG.x + dir * 74 * c, y: heights[level], el: null };
+    }
+    if (shelf && shelf.at && typeof shelf.at.x === 'number' && typeof shelf.at.y === 'number') return { ...toFrame(shelf.at), el: shelf.shelf || null };
+    if (typeof shelf.x === 'number' && typeof shelf.y === 'number' && !shelf.getBoundingClientRect) return { ...toFrame(shelf), el: null };
+    const el = shelf && (shelf.svg || shelf);
+    if (el && el.getBoundingClientRect) {
+      const r = el.getBoundingClientRect(), inv = this.svg.getScreenCTM().inverse(), mine = this.centerX();
+      const fr = { high: 0.8, middle: 0.5, low: 0.18 }[level], near = mine < r.left + r.width / 2 ? r.left + r.width * 0.1 : r.right - r.width * 0.1;
+      const p = new DOMPoint(near, r.bottom - r.height * fr).matrixTransform(inv);
+      return { ...toFrame(p), el };
+    }
+    throw new Error('[character] takeFromShelf(shelf): shelf must be null (a shelf beside the character), "left" / "right", { x, y } (the spot in the SVG root frame — set.targetPoint(rig, [x, y, z])), { at, shelf } or an element (the shelf)');
+  }
+  _shelfPose50b(k, p, dir, huong, mode) {
+    const s = this.s, saved = { huong: s.huong, squat42e: s.squat42e, seat: s.seat, kneel: s.kneel };
+    const arm = (DAI.canhTay * this.nv.daiCanhTay + DAI.cangTay * this.nv.daiCangTay) * (this.nv.coThan || 1) * 0.97;
+    let pose = null, lean = 0, shift = 0;
+    try {
+      if (mode === 'low') {
+        Object.assign(s, { huong: dir, squat42e: 1, seat: 0, kneel: 0 });
+        const g = this._floorLegGeo(), near = dir > 0 ? 'L' : 'R', back = g[near].ankle.x - g[near].hip.x;
+        const fits = (deg, extra) => { const geo = this._poseGeo({ huong: dir, lean: dir * deg, step: -back + dir * extra }), sh = geo[k]; pose = this._palmTo(k, p, geo, true); return Math.hypot(p.x - sh.x, p.y - sh.y) <= arm; };
+        let done = false;
+        for (lean = SQUAT42E.lean * 0.6; lean <= 45 && !(done = fits(lean, 0)); lean += 3);
+        if (!done) for (lean = 42, shift = 5; shift <= 60 && !fits(lean, shift); shift += 5);
+        lean = Math.min(lean, 45); shift = Math.min(shift, 60);
+      } else {
+        Object.assign(s, { huong, squat42e: 0, seat: 0, kneel: 0 });
+        const lift = mode === 'high' ? TIPTOE_LIFT50B : 0, q = { x: p.x, y: p.y + lift };
+        const fits = (deg, extra) => { const geo = this._poseGeo({ huong, lean: dir * deg, step: dir * extra }), sh = geo[k]; pose = this._palmTo(k, q, geo, true); return Math.hypot(q.x - sh.x, q.y - sh.y) <= arm; };
+        let done = false;
+        for (lean = mode === 'high' ? 0 : 3; lean <= (mode === 'high' ? 6 : 12) && !(done = fits(lean, 0)); lean += 3);
+        if (!done) for (lean = mode === 'high' ? 4 : 10, shift = 5; shift <= 60 && !fits(lean, shift); shift += 5);
+        shift = Math.min(shift, 60);
+        if (mode === 'high') {
+          const geo = this._poseGeo({ huong, lean: dir * lean, step: dir * shift }), sh = geo[k];
+          if (Math.hypot(q.x - sh.x, q.y - sh.y) >= arm * 0.85) {
+            const phi = Math.atan2(q.y - sh.y, q.x - sh.x) / RAD;
+            pose = { bat: (k === 'R' ? 90 - phi : phi - 90) + (k === 'R' ? 1 : -1) * dir * lean, cang: k === 'R' ? 6 : -6 };
+          }
+        }
+      }
+    } finally { Object.assign(s, saved); }
+    return { pose, lean, shift, mode };
+  }
+  takeFromShelf(shelf = null, { item = 'foodBag', level = 'middle', side = 'auto', label = null } = {}) {
+    if (!SHOP50B[item]) throw new Error(`[character] takeFromShelf: item must be one of ${Object.keys(SHOP50B).map((k) => `'${k}'`).join(', ')}, got ${JSON.stringify(item)}`);
+    if (!LEVELS50B.includes(level)) throw new Error(`[character] takeFromShelf: level must be 'high', 'middle' or 'low', got ${JSON.stringify(level)}`);
+    if (side !== 'auto' && side !== 'L' && side !== 'R') throw new Error(`[character] takeFromShelf: side must be 'auto', 'L' or 'R', got ${JSON.stringify(side)}`);
+    if (label !== null && !(typeof label === 'string' && label.trim() && label.length <= 18)) throw new Error(`[character] takeFromShelf: label must be a short text (up to 18 characters), got ${JSON.stringify(label)}`);
+    const s = this.s, N = this.NGHI;
+    if (s.lie42e > 0.5 || s.floor42e > 0.5 || s.seat > 0.5 || s.ride > 0.5) throw new Error('[character] takeFromShelf: stand up first (standUp / getOff) — the character takes things off a shelf standing');
+    if (s.om >= 0.5) throw new Error('[character] takeFromShelf: the character is carrying a pet — putDown() first');
+    const spot = this._shelfSpot50b(shelf, level), dir = spot.x >= HONG.x ? 1 : -1, near = (dir > 0) === (level !== 'high') ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    const fits = (k) => !this.holds[k] || (this._goods50b(k) === item && (s['item' + k] <= 0.5 || this._autoGoods50b(k)));
+    const k = side !== 'auto' ? side : fits(near) ? near : fits(far) ? far : null;
+    if (!k) throw new Error('[character] takeFromShelf: both hands already hold something — put an item away (hideItem) or hand it over first');
+    if (!fits(k)) throw new Error(`[character] takeFromShelf: hand ${k} already holds ${this._goods50b(k) ? `a ${this._goods50b(k)}` : 'another item'} — use the other hand or put it away first`);
+    const o = k === 'L' ? 'R' : 'L';
+    const want = label ? (c) => SHOP50B[item].draw(c, { label }) : (c) => SHOP50B[item].draw(c);
+    if (!this.holds[k]) this._giveGoods50b(k, (p, colours) => want(colours), item);
+    const auto = this._autoGoods50b(k);
+    this.shelf50b = spot.el;
+    const t = this.tl(), was = s.huong, c = this.nv.coThan || 1;
+    if (auto && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);          // món rig tự cho, trạng thái đầu ghi nó "đang hiện": cất đi
+    const sy = this._shoulderY(), mode = spot.y < sy - 22 * c ? 'high' : spot.y > HONG.y + this.hangChan() + 36 * c ? 'low' : 'middle';
+    const turn = dir * (mode === 'low' ? 1 : mode === 'high' ? 0.45 : 0.72);
+    const reach = this._shelfPose50b(k, spot, dir, turn, mode);
+    const ready = this._shelfPose50b(k, { x: spot.x - dir * 16 * c, y: spot.y + (mode === 'high' ? 10 : 6) * c }, dir, turn, mode);
+    const free = !(this.holds[o] && s['item' + o] > 0.5);
+    t.to(s, { huong: turn, ['carry' + k]: 0, cuoi: 0.6, mayL: 0.35, mayR: 0.35, duration: 0.4, ease: 'power2.inOut' }, 0);
+    this._lookTo(t, spot, 0.05, { d: 0.45, huong: turn, up: 1.2 });
+    t.to(s, { ['aim' + k]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.2);
+    t.set(s, { ['tay' + k]: 'xoe', ['spin50b' + k]: 1 }, 0.3);
+    if (reach.shift) t.to(s, { x: s.x + dir * reach.shift, duration: 0.45, ease: 'sine.inOut' }, 0.05);
+    const body = mode === 'high' ? { tiptoe50b: 1, lift42d: TIPTOE_LIFT50B, than: N.than + dir * reach.lean } : mode === 'low' ? { squat42e: 1, than: N.than + dir * reach.lean, dau: N.dau - dir * reach.lean * 0.45, dauY: 6 } : { than: N.than + dir * reach.lean };
+    if (mode === 'low' && free) { t.to(s, { ['aim' + o]: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3); t.set(s, { ['tay' + o]: 'mo' }, 0.32); }
+    const hang = -dir * (18 + reach.lean), otherArm = mode === 'low' && free ? { ['bat' + o]: o === 'L' ? hang : -hang, ['cang' + o]: o === 'L' ? -12 * dir : 12 * dir } : {};
+    t.to(s, { ...body, ...otherArm, ['bat' + k]: ready.pose.bat, ['cang' + k]: ready.pose.cang, duration: 0.55, ease: 'power2.inOut' }, 0.3);
+    t.to(s, { ['bat' + k]: reach.pose.bat, ['cang' + k]: reach.pose.cang, duration: 0.25, ease: 'power2.out' }, 0.85);
+    const G = 1.12;
+    t.set(s, { ['tay' + k]: 'nam' }, G - 0.02);
+    t.to(s, { ['item' + k]: 1, duration: 0.08 }, G);
+    t.to(s, { ['bat' + k]: ready.pose.bat, ['cang' + k]: ready.pose.cang, duration: 0.3, ease: 'power2.inOut' }, G + 0.12);
+    const B = G + 0.42, hold = { x: HONG.x + dir * 30 * c, y: sy + 36 * c - (ITEM_DY50B[item] > 0 ? 12 : 0) * c };
+    const front = dir * 0.3, rd = this._palmTo(k, hold, this._poseGeo({ huong: front }), true);
+    t.to(s, { tiptoe50b: 0, lift42d: 0, squat42e: 0, than: N.than, dau: N.dau, dauY: 0, huong: front, ['bat' + k]: rd.bat, ['cang' + k]: rd.cang, ['itemZoom' + k]: 1.35, ['itemTilt' + k]: -24,
+              ...(mode === 'low' && free ? { ['aim' + o]: 0, ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o] } : {}), duration: 0.6, ease: 'power2.inOut' }, B);
+    const look = { x: hold.x, y: hold.y + ITEM_DY50B[item] * 0.6 * c };
+    this._lookTo(t, look, B + 0.15, { d: 0.45, huong: front });
+    const R = B + 0.65;
+    t.to(s, { ['itemTilt' + k]: 0, duration: 0.4, ease: 'sine.inOut' }, R);
+    t.to(s, { ['spin50b' + k]: 0, duration: 0.02 }, R + 0.18);
+    t.to(s, { mayL: 0.6, mayR: 0.6, cuoi: 0.85, duration: 0.3 }, R + 0.3);
+    t.to(s, { headPitch: s.headPitch + 0.35, duration: 0.2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, R + 0.75);
+    this._khep(t, 0.5, R + 1.3, { ['item' + k]: 1, huong: was });
+    return t;
+  }
+  scanBarcode(item = null, { hold = 1.2, put = 'down', price = null, side = 'auto' } = {}) {
+    if (!(Number.isFinite(hold) && hold >= 0.4 && hold <= 4)) throw new Error(`[character] scanBarcode: hold must be 0.4…4 seconds, got ${JSON.stringify(hold)}`);
+    if (!PUTS50B.includes(put)) throw new Error(`[character] scanBarcode: put must be 'down', 'keep' or 'bag', got ${JSON.stringify(put)}`);
+    if (price !== null && !(typeof price === 'string' && price.trim() && price.length <= 14)) throw new Error(`[character] scanBarcode: price must be a short text (up to 14 characters) such as '125.000đ', got ${JSON.stringify(price)}`);
+    if (side !== 'auto' && side !== 'L' && side !== 'R') throw new Error(`[character] scanBarcode: side must be 'auto', 'L' or 'R' (the hand with the product), got ${JSON.stringify(side)}`);
+    const s = this.s, N = this.NGHI, c = this.nv.coThan || 1;
+    if (s.om >= 0.5) throw new Error('[character] scanBarcode: the character is carrying a pet — putDown() first (one hand holds the scanner, the other the product)');
+    const other = item && item.live ? item.live : item, person = other instanceof RigSVG && other !== this ? other : null;
+    if (other === this) throw new Error('[character] scanBarcode(item): item must be another person (a customer handing the product over), not the same character');
+    const showing = (k) => this.holds[k] && s['item' + k] > 0.5 && !this._autoGoods50b(k);
+    let k, kind, dir, lying = null;
+    if (person) {
+      const theirs = ['R', 'L'].filter((q) => person.holds[q] && person._goods50b && person._goods50b(q));
+      const q = theirs.find((h) => person.s['item' + h] > 0.5) || theirs[0];
+      if (!q) throw new Error('[character] scanBarcode(customer): the customer holds no product — they take one first (takeFromShelf), or give them items: { R: "foodBag" }');
+      kind = person._goods50b(q); dir = this._towards(item, 'R');
+      const own = dir > 0 ? 'R' : 'L', fits = (h) => !this.holds[h] || (this._goods50b(h) === kind && !showing(h));
+      k = side !== 'auto' ? side : fits(own) ? own : fits(own === 'R' ? 'L' : 'R') ? (own === 'R' ? 'L' : 'R') : null;
+      if (!k || !fits(k)) throw new Error('[character] scanBarcode(customer): no free hand to take the product with — put the other item away (hideItem) first');
+      if (!this.holds[k]) this._giveGoods50b(k, person.nv['heldItem' + q], kind);
+    } else if (item === null || item === undefined) {
+      const mine = ['R', 'L'].filter((h) => this.holds[h] && s['item' + h] > 0.5 && this._goods50b(h));
+      k = side !== 'auto' ? side : mine[0];
+      if (!k || !mine.includes(k)) throw new Error('[character] scanBarcode: the character holds no product' + (side === 'auto' ? '' : ` in hand ${side}`) + ' — take one first (takeFromShelf), pass the customer who hands it over, or the spot of a product on the counter');
+      kind = this._goods50b(k); dir = k === 'R' ? 1 : -1;
+    } else {
+      const toFrame = (p) => ({ x: p.x - (s.x || 0), y: p.y - (s.y || 0) - DOI_Y });
+      if (typeof item.x === 'number' && typeof item.y === 'number' && !item.getBoundingClientRect) lying = toFrame(item);
+      else if (item.getBoundingClientRect) { const r = item.getBoundingClientRect(), p = new DOMPoint(r.left + r.width / 2, r.top + r.height * 0.45).matrixTransform(this.svg.getScreenCTM().inverse()); lying = toFrame(p); }
+      else throw new Error('[character] scanBarcode(item): item must be null (the product in the other hand), a person (the customer hands it over), { x, y } or an element (a product on the counter)');
+      if (put === 'bag') throw new Error("[character] scanBarcode: put 'bag' needs the product in hand — a product lying on the counter stays there");
+      dir = lying.x >= HONG.x ? 1 : -1; kind = null;
+    }
+    const o = lying ? (side !== 'auto' ? side : dir > 0 ? 'R' : 'L') : k === 'L' ? 'R' : 'L';
+    const stash = put !== 'bag' && this.holds[o] && s['item' + o] > 0.5 && !this._autoGoods50b(o);
+    const bag = put === 'bag' ? this.holds[o] && this.el['item' + o].querySelector('[data-bag]') : null;
+    if (put === 'bag' && !bag) throw new Error(`[character] scanBarcode: put 'bag' needs a put-away bag in hand ${o} (the scanner hand) — createCharacter(host, { id, items: { ${o}: "bag" }, itemsHidden: ["${o}"] })`);
+    const t = this.tl(), was = s.huong, auto = k && this._autoGoods50b(k);
+    if (stash) t.to(s, { ['item' + o]: 0, ['carry' + o]: 0, duration: 0.15 }, 0);
+    if (auto && s['item' + k] > 0.5) t.to(s, { ['item' + k]: 0, duration: 0.01 }, 0);
+    if (this._autoGoods50b(o) && s['item' + o] > 0.5) t.to(s, { ['item' + o]: 0, duration: 0.01 }, 0);
+    let A = 0.1;
+    if (person) {
+      this._stage(t, [k]);
+      t.set(s, { ['tay' + k]: 'mo', ['carry' + k]: 0, ['spin50b' + k]: 1 }, 0);
+      this._reach(t, k, dir, 0.12, item);
+      t.set(s, { ['tay' + k]: 'nam' }, RigSVG.HANDOFF50B);
+      t.to(s, { ['item' + k]: 1, duration: 0.15 }, RigSVG.HANDOFF50B);
+      A = 0.88;
+    }
+    const front = clamp(dir * 0.08, -0.08, 0.08), geo = this._poseGeo({ huong: front }), hs = (h) => this._handScale50b(h);
+    const sy = this._shoulderY(), dy = kind ? ITEM_DY50B[kind] : 0;
+    const target = lying || { x: HONG.x + dir * 34 * c, y: sy + 30 * c };            // tâm món hàng: ngang ngực trên — cao hơn mặt quầy và máy tính tiền
+    const palmK = lying ? null : { x: target.x, y: target.y - dy * hs(k) };
+    const palmO = { x: target.x - dir * 48 * c, y: target.y + 10 * c };
+    const pk = palmK && this._palmTo(k, palmK, geo, true), po = this._palmTo(o, palmO, geo, true);
+    const arm = this._armTo(o, palmO.x, palmO.y, geo[o].x, geo[o].y), aimDeg = Math.atan2(target.y - palmO.y, target.x - palmO.x) / RAD;
+    const spin = chuanHoaGoc(aimDeg - arm.dir), beam = Math.max(4, Math.hypot(target.x - palmO.x, target.y - palmO.y) / hs(o) - (SCANNER_WINDOW50B + 1.4 - 10));
+    if (!person) this._stage(t, [o, ...(k && !lying ? [k] : [])], A - 0.1);
+    else this._stage(t, [o], A - 0.1);
+    t.to(s, { huong: front, ['carry' + o]: 0, ...(pk ? { ['carry' + k]: 0, ['bat' + k]: pk.bat, ['cang' + k]: pk.cang, ['itemTilt' + k]: dir * 8, ['spin50b' + k]: 1 } : {}),
+              ['bat' + o]: po.bat, ['cang' + o]: po.cang, ['gadgetTurn' + o]: spin, cuoi: 0.6, duration: 0.5, ease: 'power2.inOut' }, A);
+    t.set(s, { ['gadget' + o]: 50, ['tay' + o]: 'nam' }, A + 0.05);
+    this._lookTo(t, target, A + 0.05, { d: 0.45, huong: front });
+    const S0 = A + 0.55, beep = S0 + Math.min(RigSVG.SCAN_BEEP50B, hold * 0.6), off = S0 + hold;
+    t.to(s, { ['beam50b' + o]: beam, duration: 0.08 }, S0);
+    t.fromTo(s, { scanT50b: 0 }, { scanT50b: hold + 0.6, duration: hold + 0.6, ease: 'none' }, S0);
+    for (let a = S0 + 0.1; a + 0.24 <= off; a += 0.24) t.to(s, { ['gadgetTurn' + o]: spin + (Math.round((a - S0) / 0.24) % 2 ? -2.5 : 2.5), duration: 0.12, ease: 'sine.inOut', yoyo: true, repeat: 1 }, a);
+    t.to(s, { beep50b: 1, duration: 0.06 }, beep);
+    t.to(s, { beep50b: 0, duration: 0.08 }, beep + 0.6);
+    const text = price || (kind ? SHOP50B[kind].price : '35.000đ'), w = Math.max(116, Math.round(text.length * 13 + 26));
+    const card = { x: HONG.x - dir * 86 * c, y: sy + 4 * c };          // thẻ giá phía KIA người (phía máy quét), ngang vai: không che mặt khách, không che món hàng
+    t.to(s, { readoutN: this._reading({ text, x: card.x + (s.x || 0), y: card.y + (s.y || 0) + DOI_Y, w }), duration: 0.02 }, beep - 0.04);
+    t.to(s, { readout: 1, duration: 0.3, ease: 'back.out(1.8)' }, beep);
+    t.to(s, { cuoi: 1, mayL: 0.55, mayR: 0.55, duration: 0.25 }, beep + 0.1);
+    t.to(s, { ['beam50b' + o]: 0, duration: 0.06 }, off);
+    t.to(s, { readout: 0, duration: 0.25, ease: 'power2.in' }, Math.max(off, beep + 1.1));
+    const P = off + 0.12;
+    t.to(s, { ['bat' + o]: N['bat' + o], ['cang' + o]: N['cang' + o], ['aim' + o]: 0, duration: 0.4, ease: 'power2.inOut' }, P);
+    t.set(s, { ['gadget' + o]: 0, ['gadgetTurn' + o]: 0, ['tay' + o]: 'mo' }, P + 0.2);
+    const keep = {};
+    let end = P + 0.45;
+    if (k && put === 'down') {
+      const down = this._palmTo(k, { x: target.x + dir * 6 * c, y: target.y + 40 * c - Math.max(0, dy) * hs(k) * 0.5 }, geo, true);
+      t.to(s, { ['bat' + k]: down.bat, ['cang' + k]: down.cang, ['itemTilt' + k]: 0, dauY: 4, duration: 0.45, ease: 'power2.inOut' }, P);
+      t.to(s, { ['item' + k]: 0, duration: 0.12 }, P + 0.45);
+      t.set(s, { ['tay' + k]: 'mo' }, P + 0.5);
+      keep['item' + k] = 0; end = P + 0.6;
+    } else if (k && put === 'bag') {
+      const mouth = { x: HONG.x - dir * 6 * c, y: sy + 70 * c }, holdBag = this._palmTo(o, { x: mouth.x - dir * 4 * c, y: mouth.y - 6 * c }, geo, true);
+      t.set(s, { ['tay' + o]: 'nam' }, P + 0.2);
+      t.to(s, { ['item' + o]: 1, duration: 0.15 }, P + 0.25);
+      t.to(s, { ['aim' + o]: 1, ['bat' + o]: holdBag.bat, ['cang' + o]: holdBag.cang, duration: 0.35, ease: 'power2.out' }, P + 0.25);
+      const drop = this._palmTo(k, { x: mouth.x, y: mouth.y - 16 * c - Math.max(0, dy) * hs(k) * 0.4 }, geo, true);
+      t.to(s, { ['bat' + k]: drop.bat, ['cang' + k]: drop.cang, ['itemTilt' + k]: 0, dauY: 5, duration: 0.45, ease: 'power2.inOut' }, P + 0.3);
+      t.to(s, { ['item' + k]: 0, duration: 0.12 }, P + 0.78);
+      t.set(s, { ['tay' + k]: 'mo' }, P + 0.82);
+      keep['item' + k] = 0; keep['item' + o] = 1; end = P + 0.95;
+    } else if (k) keep['item' + k] = 1;
+    if (stash) { keep['item' + o] = 1; t.set(s, { ['tay' + o]: 'nam' }, end); }
+    this._khep(t, 0.5, end, { ...keep, huong: was, spin50bL: 0, spin50bR: 0 });
+    return t;
+  }
+});
+return { default: __default };
+})();
 __m['runtime/rig-svg.js'] = (function () {
 const { KHUNG, DOI_Y, NGHI, MAU_MAC_DINH, veKhuonMat, beRongTaiY, veChanMay, HONG, VAI, DAI, CHOT_VAI, UC_DON, GOC_VAI_MAX, CALL_POSE, CALL_TILT, RIDE_THIGH, RIDE_KNEE, RIDE_LEAN, RIDE_ARM, CONE_GRIP, KNEEL_SHIN, UPRIGHT_HANDS, HANDS_39, CRADLE, CAP_RADIUS, CAP_DROP, CAP_SOLID, GLOVE, GLOVE_RIM, GLOVE_LINE, SPRAY_LEN42F, FOAM_BUBBLES, clamp, chuanHoaGoc, gieoHat, RAD, mem, pha, napTayAo, gauTayAo, veDemVai, veTayAo, veGauTayAo, veDuongMayVai, nhacChotVai, chinhSang, tron, assertColors, NV_MAC_DINH, rongGau, NV_BAC_SI_THU_Y, luuHat, traHat, mix } = __m['runtime/person/shared.js'];
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
@@ -6266,6 +6632,7 @@ const speech = __m['runtime/person/speech.js'].default;
 const cage = __m['runtime/person/cage.js'].default;
 const grooming = __m['runtime/person/grooming.js'].default;
 const leash49c = __m['runtime/person/leash49c.js'].default;
+const shop50b = __m['runtime/person/shop50b.js'].default;
 class RigSVG {
   static KHUNG = KHUNG;
   static NGHI = NGHI;
@@ -7250,6 +7617,7 @@ class RigSVG {
     this._drawCareTools();                     // đợt 38 A: kìm khép, giọt thuốc rơi, vạch "bíp" của máy quét chip
     this._drawBathTools();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
     this._drawGroomTools49b();                // đợt 49 B: máy sấy (luồng gió), kéo tỉa, tông-đơ — hình dựng lần đầu dùng
+    this._drawShopTools50b(f);                // đợt 50 B: máy quét mã vạch (tia đỏ, bíp), mặt món hàng, kiễng chân — hình dựng lần đầu dùng
     this._drawDeskTools();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this._veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -7680,9 +8048,11 @@ class RigSVG {
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
   static { this.EXCHANGE.push('putInCage', 'takeOutOfCage'); }      // đợt 49 A
   static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
+  static { this.EXCHANGE.push('takeFromShelf', 'scanBarcode'); }      // đợt 50 B
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
 leash49c(RigSVG);       // đợt 49 C
+shop50b(RigSVG);       // đợt 50 B
 return { RigSVG, veKhuonMat, beRongTaiY, veChanMay };
 })();
 __m['runtime/pet/shared.js'] = (function () {
@@ -12778,6 +13148,12 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
       }
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.shop50bProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c50b = Object.fromEntries(Object.entries(rig.shop50bProbe()).map(([key, v]) => [key, one(v)]));
+      }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
       out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {
         const door = svg.querySelector('[data-cage-door49a]'), ctm = svg.getScreenCTM(), host = svg.parentNode;
@@ -13351,6 +13727,17 @@ const COMBOS = {
       "sợ chạy trốn",
       "sợ nấp sau"
     ]
+  },
+  "shopCheckout": {
+    "params": ["customer"],
+    "about": "ring up a product at the till: take it from the customer (they hand it over at the same time) and scan its barcode — red scan line, bíp, the price shows —, the customer pays by QR, hand the product back, wave (the customer took it off a shelf first — takeFromShelf — and has a phone put away)",
+    "steps": [
+      { "step": ["scanBarcode", "$customer", { "put": "keep" }], "with": { "$customer": [["handOver", "$self"]] } },
+      { "step": ["idle", 2.6], "with": { "$customer": [["payByQR"]] } },
+      { "step": ["handOver", "$customer"], "with": { "$customer": [["take", "$self"]] } },
+      "wave"
+    ],
+    "vi": ["tính tiền món hàng", "quét mã tính tiền", "thanh toán món hàng"]
   }
 };
 const isPlaceholder = (value) => typeof value === 'string' && /^\$[A-Za-z_]\w*$/.test(value);
@@ -13387,6 +13774,7 @@ function expandCombo(name, args = []) {
 function combo(rig, name, ...args) {
   if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
   const values = bind(name, args);
+  if (!COMBOS[name].params.includes('self')) values.self = rig;
   return COMBOS[name].steps.map((raw) => {
     if (raw && !Array.isArray(raw) && typeof raw === 'object') {
       const together = [[rig, fill(raw.step, values)]];
@@ -13727,6 +14115,7 @@ const { crop, sidePart, bob, long, ponytail, bun, pigtails, curly, spiky, tufts,
 const { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard, phone, syringe, pills, leash, bag } = __m['runtime/parts.js'];
 const { card, stampcard, cash } = __m['runtime/parts.js'];
 const { toy42e, bowl42e } = __m['runtime/parts.js'];
+const { foodBag50b, treatBox50b, can50b } = __m['runtime/shop50b-items.js'];
 const { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS, definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } = __m['runtime/schema.js'];
 const { createSet, OVERVIEW, CAMERA_LIMITS } = __m['runtime/set3d.js'];
 const { COMBOS, isCombo, expandCombo, combo } = __m['runtime/combos.js'];
@@ -13883,6 +14272,7 @@ const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
 Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
+Object.assign(ITEMS, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b }); Object.assign(kit.parts, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b });       // đợt 50 B: `items: { R: 'foodBag' }` — món hàng lấy trên kệ, quét mã
 function createCharacter(host, { id = 'vet', config, items = null, itemsHidden = false, wear = [] } = {}) {
   if (!RigSVG.NHAN_VAT[id]) throw new Error(`[character] no character "${id}" (available: ${Object.keys(RigSVG.NHAN_VAT).join(', ')})`);
   if (config === undefined) config = bakedConfigs[id] || null;
@@ -13940,16 +14330,17 @@ const PAIR_39A = ['giveChange', 'takeChange', 'stampCard', 'takeCard'];      // 
 const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
 PAIR_SYNC.push('walkOnLeash');       // đợt 49 C: người dắt và con vật bước cùng nhịp — cả nhóm bắt đầu cùng lúc
+PAIR_SYNC.push('scanBarcode');       // đợt 50 B: thu ngân nhận món hàng khách đưa (`handOver` của khách cùng lúc) — cả nhóm bắt đầu cùng lúc
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
 const PARTNERS = new WeakMap();
-const expandCombos = (stepList) => stepList.flatMap((step) => {
+const expandCombos = (stepList, rig = null) => stepList.flatMap((step) => {      // đợt 50 B: `rig` — "$self" của phần "with"
   if (typeof step === 'number') return [step];
   const [name, ...args] = Array.isArray(step) ? step : [step];
   if (!(isCombo(name) && typeof name === 'string')) return [step];
-  return combo(null, name, ...args).flatMap((turn) => {
+  return combo(rig, name, ...args).flatMap((turn) => {
     const [first, partners] = turn.together ? [turn.together[0], turn.together.slice(1)] : [turn, []];
-    const expanded = expandCombos([first[1]]);
+    const expanded = expandCombos([first[1]], rig);
     if (partners.length && expanded.length && typeof expanded[0] !== 'number') {
       if (!Array.isArray(expanded[0])) expanded[0] = [expanded[0]];
       PARTNERS.set(expanded[0], partners);
@@ -13965,7 +14356,7 @@ function partnerLines(line) {
   return out;
 }
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
-  stepList = expandCombos(stepList);
+  stepList = expandCombos(stepList, rig);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   const marked = !!(rig.m && typeof rig.m === 'object'), K = keys.length;
@@ -14291,6 +14682,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       steps.forEach((step, n) => { if (Array.isArray(step) && PAIR_39A.includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'walkOnLeash' && typeof rig.follow === 'function' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
+      steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'scanBarcode' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && step[1].el && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
       if (wait < 0) wait = 0;

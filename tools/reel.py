@@ -124,14 +124,14 @@ def main():
             petHost.parentNode.insertBefore(tub, petHost); VGCharacter.createProp(tub, 'tub', {{ width: fit.length, height: fit.rim }}); pet.inTub42f(fit.rim); parts.push(tub); }}
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
-        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
+        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: Array.isArray(entry.itemsHidden) ? entry.itemsHidden : !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
         if (turned && !entry.person) rig.state.facing = 0.55;
         parts.unshift(host);
         // HAI NGƯỜI (đợt 38 C): người `entry.person` đứng bên phải, cách tâm `personGap` (đơn vị ô 235 px của bản duyệt), cỡ `personScale`.
         if (entry.person) {{
           const h = personH * (entry.personScale || 1), w = h * 400 / 470, cx = personX + personW / 2 + (entry.personGap || 84) * personH / 235;
           const personHost = add('host', `left:${{cx - w / 2}}px;top:${{personY + personH - h}}px;width:${{w}}px;height:${{h}}px`);
-          person = VGCharacter.createCharacter(personHost, {{ id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }}).rig; parts.push(personHost);
+          person = VGCharacter.createCharacter(personHost, {{ id: entry.person, items: entry.personItems || null, itemsHidden: Array.isArray(entry.personItemsHidden) ? entry.personItemsHidden : !!entry.personItemsHidden }}).rig; parts.push(personHost);
         }}
         // "scale" (đợt 35, `weigh`): một cái cân trên sàn bên trái người — `@scale` trong các bước.
         if (entry.scale) {{

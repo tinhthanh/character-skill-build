@@ -3052,6 +3052,7 @@ def check_one_scene(folder):
     tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift') for t in c.get(key) or []]      # đợt 49 A
     tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
     tool_times += [t for c in checks if c.get('kind') == 'groom49b' for key in ('air', 'ripple', 'before', 'after', 'happy', 'cut', 'shag', 'fall', 'neat') for t in c.get(key) or []]      # đợt 49 B
+    tool_times += [t for c in checks if c.get('kind') == 'shop50b' for key in ('grab', 'read', 'held', 'beam', 'beep', 'taken') for t in c.get(key) or []]      # đợt 50 B
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + tool_times + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -3092,6 +3093,9 @@ def check_one_scene(folder):
             continue
         if c['kind'] == 'care42f':          # đợt 42 F
             results.extend(check_grooming(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'shop50b':          # đợt 50 B
+            results.extend(check_shop50b(folder, c, shots, scales))
             continue
         if c['kind'] == 'groom49b':         # đợt 49 B
             results.extend(check_groom49b(folder, c, shots, scales))
@@ -3270,6 +3274,75 @@ def check_one_scene(folder):
                 results.append({'scene': folder, 'what': f'{name} seated on the seat during {c["kind"]}', 'ok': abs(off) <= FEET,
                                 'note': f'seat line {off * 100:+.1f} % of height ' + ('below' if off > 0 else 'above') + f' the top of the seat at {best[0]:g} s (limit ±{FEET * 100:g} %; above = floating, below = sunk in)'})
     return results
+
+
+# ĐỢT 50 B — CỬA HÀNG & QUẦY THU NGÂN (`shop50b`, set3d `careProbe` → `c50b`): lấy hàng trên kệ, quét mã vạch. Mọi độ dài theo chiều cao người trên màn hình.
+SHOP_SHELF = 0.04          # lòng bàn tay cách khung ảnh kệ ≤ chừng ấy lúc nắm lấy món hàng
+SHOP_HOLD = 0.06           # tâm món hàng cách lòng bàn tay cầm nó ≤ chừng ấy (món hàng treo dưới / nằm trên nắm tay)
+SHOP_BEAM = 0.015          # cuối tia đỏ (vạch quét) cách khung món hàng ≤ chừng ấy
+SHOP_BEAM_SHARE = 0.8      # … ở ít nhất chừng ấy phần các lúc đo trong khi tia bật
+SHOP_AIM = 60              # hướng máy quét (ô kính → cuối tia) lệch hướng ô kính → tâm món hàng ≤ chừng ấy độ (máy sát món hàng to: lệch nhỏ thành góc lớn) — và ô kính NGOÀI món hàng
+
+
+def check_shop50b(folder, c, shots, scales):
+    """ĐỢT 50 B: lấy hàng — lúc nắm, bàn tay ở kệ (có kệ) và món hàng trong tay; lúc đọc — món hàng trước người, mặt nhãn; cuối bước vẫn cầm.
+    Quét mã — món hàng trong tay thu ngân (nhận từ khách), máy quét chĩa vào nó, vạch quét đỏ chạm món hàng, "bíp" và thẻ giá."""
+    name, who_n = c['name'], c['who']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    me = lambda t: (care(t).get(who_n) or {}).get('c50b') or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} — {text}', 'ok': ok, 'note': note})
+
+    def bx(b): return {'x0': b['x'] - b['w'] / 2, 'x1': b['x'] + b['w'] / 2, 'y0': b['y'] - b['h'] / 2, 'y1': b['y'] + b['h'] / 2}
+
+    def pgap(p, b): return (max(0, b['x0'] - p['x'], p['x'] - b['x1']) ** 2 + max(0, b['y0'] - p['y'], p['y'] - b['y1']) ** 2) ** 0.5
+
+    def held(t):
+        q = me(t)
+        if not q.get('goods') or not q.get('hand') or not tall(t): return None
+        g = q['goods']
+        return ((g['x'] - q['hand']['x']) ** 2 + (g['y'] - q['hand']['y']) ** 2) ** 0.5 / tall(t) - 0.5 * max(g['w'], g['h']) / tall(t)
+    if name == 'takeFromShelf':
+        for t in c.get('grab') or []:
+            q = me(t)
+            if not tall(t): row('a hand takes the product off the shelf', None, f'not in the frame at {t:g} s'); continue
+            d = held(t)
+            if c.get('target'):
+                shelf = q.get('shelf')
+                gap = pgap(q['hand'], bx(shelf)) / tall(t) if shelf and q.get('hand') else None
+                row('the hand is at the shelf', gap is not None and gap <= SHOP_SHELF, f'palm {gap * 100:.1f} % of height from the shelf at {t:g} s (limit {SHOP_SHELF * 100:g} %)' if gap is not None else f'no hand / shelf measured at {t:g} s')
+            row('the product is in the hand', d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s (limit {SHOP_HOLD * 100:g} %)' if d is not None else f'no product in hand at {t:g} s')
+        for t in c.get('read') or []:
+            q = me(t)
+            row('reads the label (product held up, label side out)', bool(q.get('goods')) and q.get('label') is True, f'product {"in hand" if q.get("goods") else "missing"}, {"label" if q.get("label") else "back"} side at {t:g} s')
+        for t in c.get('held') or []:
+            d = held(t)
+            row('keeps holding the product', d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s' if d is not None else f'no product in hand at {t:g} s')
+        return out
+    for t in c.get('taken') or []:
+        d = held(t)
+        row("the product is in the cashier's hand (taken from the customer)", d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s' if d is not None else f'no product in hand at {t:g} s')
+    hits, aims, notes = 0, [], []
+    for t in c.get('beam') or []:
+        q = me(t)
+        if not q.get('beam') or not q.get('beamEnd') or not q.get('goods') or not q.get('window') or not tall(t): notes.append(f'{t:g} s: no beam / product'); continue
+        g, e, w = bx(q['goods']), q['beamEnd'], q['window']
+        gap = pgap(e, g) / tall(t)
+        hits += gap <= SHOP_BEAM
+        import math
+        a1, a2 = math.atan2(e['y'] - w['y'], e['x'] - w['x']), math.atan2(q['goods']['y'] - w['y'], q['goods']['x'] - w['x'])
+        aims.append(abs((math.degrees(a1 - a2) + 180) % 360 - 180) if pgap(w, g) > 0 else 180.0)          # ô kính trong món hàng: không phải "chĩa vào" 
+        notes.append(f'{t:g} s: {gap * 100:.1f} %')
+    n = len(c.get('beam') or [])
+    row('the red scan line touches the product', n > 0 and hits >= SHOP_BEAM_SHARE * n, f'{hits}/{n} moments with the end of the beam ≤ {SHOP_BEAM * 100:g} % of height from the product ({", ".join(notes[:6])})')
+    row('the scanner is aimed at the product', bool(aims) and max(aims) <= SHOP_AIM, (f'beam off the product centre by at most {max(aims):.0f}°' if aims else 'no beam measured') + f' (limit {SHOP_AIM}°, the scanner outside the product)')
+    for t in c.get('beep') or []:
+        q = me(t)
+        row('bíp: a green flash and the price card', q.get('beep', 0) > 0.5 and q.get('readout', 0) > 0.5, f'beep {q.get("beep", 0)}, price card {q.get("readout", 0)} at {t:g} s')
+    return out
 
 
 if __name__ == '__main__':

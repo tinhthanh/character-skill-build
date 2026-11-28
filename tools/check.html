@@ -1724,12 +1724,12 @@ try {
         const pet = entry.pet ? L.createPet(spot(`left:${left + 110}px;top:108px;width:100px;height:82px`), { species: entry.pet, wear: entry.wear || [] }).rig : null;
         const host = spot(`left:${left}px;top:0;width:200px;height:235px`);
         const rig = id in RigThu.LOAI ? L.createPet(host, { species: id, wear: entry.wear || [] }).rig
-          : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden }).rig;
+          : L.createCharacter(host, { id, items: entry.items || null, itemsHidden: Array.isArray(entry.itemsHidden) ? entry.itemsHidden : !!entry.itemsHidden }).rig;
         // "scale" (đợt 35, `weigh`): một cái cân bên trái người — `@scale` trong các bước, như tools/actions.html.
         const scale = entry.scale ? L.createProp(spot(`left:${left - 62}px;top:0;width:200px;height:235px`), 'scale', { reading: String(entry.scale) }) : null;
         // HAI NGƯỜI (đợt 38 C): hàng người có `person` — đặt người ấy bên phải, như tools/actions.html (ô cao 235 px).
         const tall = 235 * (entry.personScale || 1), partner = entry.person && !(id in RigThu.LOAI)
-          ? L.createCharacter(spot(`left:${left + 100 + (entry.personGap || 84) - tall * 200 / 470}px;top:${235 - tall}px;width:${tall * 400 / 470}px;height:${tall}px`), { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig : null;
+          ? L.createCharacter(spot(`left:${left + 100 + (entry.personGap || 84) - tall * 200 / 470}px;top:${235 - tall}px;width:${tall * 400 / 470}px;height:${tall}px`), { id: entry.person, items: entry.personItems || null, itemsHidden: Array.isArray(entry.personItemsHidden) ? entry.personItemsHidden : !!entry.personItemsHidden }).rig : null;
         // ĐỢT 39 A — đế thanh toán (`entry.stand`: lệch `dx` đơn vị khung, mặt quầy cao `on`): `@qr` / `@reader` là mã QR / máy quẹt thẻ của nó, như tools/actions.html.
         const stand = entry.stand ? L.createProp(spot(`left:${left + entry.stand.dx * 0.5}px;top:0;width:200px;height:235px`), 'paystand', { on: entry.stand.on }) : null;
         // ĐỢT 49 A — "cage": chuồng trên sàn bên trái người (người đứng phía chốt), con vật dưới sàn bên phải / trong chuồng ("in") — `@cage`, như tools/actions.html.
@@ -2165,6 +2165,41 @@ try {
           if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
         }
         groomer.svg.remove();
+      }
+      // ĐỢT 50 B — lấy hàng trên kệ (kiễng chân / ngồi xổm, món hàng trong tay, đọc nhãn, cầm tiếp) và quét mã vạch (nhận từ khách, máy quét chỉ trong tay,
+      // tia đỏ, bíp, thẻ giá; máy quét không có sẵn trong markup); đối số sai bị từ chối.
+      {
+        const clerk = L.createCharacter(spot('left:900px;top:0;width:200px;height:235px'), { id: 'vet' }).rig;
+        if (clerk.svg.querySelector('[data-gadget="50"]')) hong('scanBarcode', 'the barcode scanner is built before it is used (the SVG of every character would change)');
+        for (const [level, item, pose] of [['high', 'treatBox', 'tiptoe'], ['low', 'can', 'squat']]) {
+          const shopper = L.createCharacter(spot('left:600px;top:0;width:200px;height:235px'), { id: 'granny' }).rig;
+          const line = L.sequence(shopper, [['takeFromShelf', 'right', { item, level }]]);
+          line.time(1.16);
+          const q1 = shopper.shop50bProbe();
+          if (!(q1[pose] > 0.5) || q1.goodsKind !== item) hong('takeFromShelf', `${level}: no ${pose} or no ${item} in hand when grabbing it (${pose} ${q1[pose]}, ${q1.goodsKind})`);
+          line.time(line.duration());
+          const q2 = shopper.shop50bProbe();
+          if (q2.goodsKind !== item || q2.label !== true || q2.tiptoe || q2.squat) hong('takeFromShelf', `${level}: the ${item} is not held label side out afterwards (${JSON.stringify({ kind: q2.goodsKind, label: q2.label, tiptoe: q2.tiptoe, squat: q2.squat })})`);
+          line.kill(); shopper.svg.remove();
+        }
+        const buyer = L.createCharacter(spot('left:1010px;top:0;width:200px;height:235px'), { id: 'granny', items: { R: 'foodBag' } }).rig;
+        const scan = L.sequence(clerk, [['scanBarcode', buyer, { put: 'keep' }]]);
+        scan.time(0.88 + 0.55 + 0.3);
+        const s1 = clerk.shop50bProbe();
+        if (!s1.scanner || !s1.beam || s1.goodsKind !== 'foodBag') hong('scanBarcode', `no scanner with a red beam, or no product taken from the customer (scanner ${!!s1.scanner}, beam ${s1.beam}, ${s1.goodsKind})`);
+        scan.time(0.88 + 0.55 + 0.55 + 0.2);
+        if (!(clerk.shop50bProbe().beep > 0.5 && clerk.s.readout > 0.5)) hong('scanBarcode', 'no bíp / price card after the scan');
+        scan.time(scan.duration());
+        const s2 = clerk.shop50bProbe();
+        if (s2.scanner || s2.goodsKind !== 'foodBag') hong('scanBarcode', `put 'keep': the scanner stays, or the product is not kept (${!!s2.scanner}, ${s2.goodsKind})`);
+        scan.kill();
+        for (const [label, fn, needle] of [['takeFromShelf', () => clerk.takeFromShelf(null, { item: 'fish' }), "'foodBag'"], ['takeFromShelf', () => clerk.takeFromShelf(null, { level: 'top' }), "'high', 'middle' or 'low'"],
+                                           ['scanBarcode', () => L.createCharacter(spot('left:600px;top:0;width:200px;height:235px'), { id: 'vet' }).rig.scanBarcode(), 'holds no product'],
+                                           ['scanBarcode', () => clerk.scanBarcode(null, { put: 'away' }), "'down', 'keep' or 'bag'"], ['scanBarcode', () => clerk.scanBarcode(null, { hold: 9 }), 'hold must be']]) {
+          let why = ''; try { fn(); } catch (error) { why = error.message; }
+          if (!why.includes(needle)) hong(label, `wrong arguments should be refused with a clear message (got: ${why || 'no error'})`);
+        }
+        clerk.svg.remove(); buyer.svg.remove();
       }
       // Phụ kiện thú: loa và băng hiện ngay khi đeo, băng nằm trên ống chân trước, tháo thì mất; tên lạ bị từ chối.
       const patient = L.createPet(spot('left:0;top:0;width:300px;height:248px'), { species: 'dog', wear: ['cone'] }).rig;

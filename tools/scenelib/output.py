@@ -1,6 +1,7 @@
 """Last phases of a build: copy the runtime files, write index.html, time it in Chrome, place the audio, print the notes."""
 import json, os, re, shutil, subprocess, sys
 from .actions import CHART_ACTIONS, FLOOR_ACTIONS, GESTURES, WHOLE_BODY, PAIR_PARTNER, PET_ACTS, PREP_ACTIONS, REACH_ACTIONS
+from . import shop50b          # đợt 50 B
 from .audio import place_sounds
 from .lighting import light_moments
 from .notes import fingerprint, framing_notes, quiet_notes, shot_notes
@@ -91,7 +92,7 @@ def write_page(st):
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS) | {'putInCage', 'takeOutOfCage', 'walkOnLeash'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS) | {'putInCage', 'takeOutOfCage', 'walkOnLeash'} | set(shop50b.ACTIONS)))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>
