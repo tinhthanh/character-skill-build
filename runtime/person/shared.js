@@ -45,6 +45,8 @@ const NGHI = Object.freeze({
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
+  leashPet49c: 0,               // đợt 49 C: con vật đang dắt = `leashPets49c[leashPet49c − 1]` (0: con của `leash`, `leashed`) — trạng thái, nên một người dắt lần lượt nhiều con
+  leashRope49c: 0,              // đợt 49 C: 0…1 dây dắt võng theo ĐỘ DÀI THẬT của nó (`walkOnLeash`) thay cho độ võng cố định — giữ tới `unleash`
   rope: 0,                      // đợt 40 A: 1 = đang KÉO CO (`pullToy`) — dây thừng căng từ tay tới mõm con chó
   watchL: 0, watchR: 0,
   heartL: 0, heartR: 0,         // trái tim bật ra trên bàn tay 'tim' (bắn tim): 0 = chưa có, 1 = đủ lớn

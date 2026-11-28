@@ -2066,7 +2066,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!rs.length) return null; const r = rect({ left: Math.min(...rs.map((q) => q.left)), right: Math.max(...rs.map((q) => q.right)), top: Math.min(...rs.map((q) => q.top)), bottom: Math.max(...rs.map((q) => q.bottom)) });
               return { side, y: r.y1, x: (r.x0 + r.x1) / 2, wx: at.scale ? actor.where + ((r.x0 + r.x1) / 2 - at.x) / at.scale : null }; }).filter(Boolean),
             wtall: actor.height || 0, lift42d: +(rig.s.lift42d || 0).toFixed(2),
-            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}) };
+            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}),
+          // ĐỢT 49 C — DÂY DẮT (`leash`, `walkOnLeash`): hai đầu và điểm điều khiển của dây trên màn hình, vòng cổ con vật đang dắt, độ dài
+          // dây (`leashRope49c` > 0: độ dài thật, px) — acting_check `leash49c` đo dây nối tay với vòng cổ, con vật trong tầm dây.
+          ...(person && e.leash ? { leash49c: (() => {
+            const shown = e.leash.style.display !== 'none', d = (e.leash.getAttribute('d') || '').match(/-?[\d.]+/g), now = typeof rig._leashNow49c === 'function' ? rig._leashNow49c() : null, pet = now ? now.pet : rig.leashed;
+            const ends = shown && d && d.length >= 6 ? [0, 2, 4].map((n) => point(rig.svg, +d[n], +d[n + 1])) : null;
+            const collar = pet && pet.el && pet.el.vong ? rect(pet.el.vong.getBoundingClientRect()) : null;
+            const unit = point(rig.svg, 0, 0), unit1 = point(rig.svg, 0, 100), scale = unit && unit1 ? Math.hypot(unit1.x - unit.x, unit1.y - unit.y) / 100 : 0;
+            return { shown, a: ends && ends[0], c: ends && ends[1], b: ends && ends[2], collar: collar && { x: (collar.x0 + collar.x1) / 2, y: (collar.y0 + collar.y1) / 2 },
+                     hand: (now ? now.hand : rig.leashHand) || null, rope: +(rig.s.leashRope49c || 0).toFixed(2), ropeLength: rig.constructor.LEASH_ROPE_49C ? rig.constructor.LEASH_ROPE_49C * 470 * 0.96 * scale : null };
+          })() } : {}) };
       });
     },
 

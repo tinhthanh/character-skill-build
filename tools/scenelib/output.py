@@ -91,7 +91,7 @@ def write_page(st):
       actions: talk.turns.flatMap((turn) => turn.steps.filter((step) => !step.off && {js(sound_actions)}.includes(step.name)).map((step) => ({{ who: (Object.entries({{ {cast_list} }}).find(([, rig]) => rig === turn.rig) || [''])[0], name: step.name, start: T0 + step.start }}))),
       // Giờ THẬT của các động tác chạm, theo từng lượt — moments.json đo / hỏi trong chính động tác, không theo cả lượt (lượt có
       // quãng chờ máy quay lia trước khi tay đưa ra; con vật chỉ nằm trong vòng tay ở cuối bước `carry` — đợt 29).
-      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS) | {'putInCage', 'takeOutOfCage'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
+      reaches: talk.turns.map((turn) => turn.steps.filter((step) => {js(sorted(set(REACH_ACTIONS) | {'putDown', 'weigh'} | set(GESTURES) | set(CHART_ACTIONS) | set(PET_ACTS) | set(PREP_ACTIONS) | set(PAIR_PARTNER) | set(WHOLE_BODY) | set(FLOOR_ACTIONS) | {'putInCage', 'takeOutOfCage', 'walkOnLeash'}))}.includes(step.name)).map((step) => ({{ name: step.name, start: T0 + step.start, duration: step.duration }}))) }};
   </script>
 </div>
 </body>

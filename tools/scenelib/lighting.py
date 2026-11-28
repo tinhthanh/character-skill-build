@@ -304,6 +304,20 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             moments.append({'t': times[1], 'what': f'{op["who"]} {op["name"]}' + (f' to {op["target"]}' if op.get('target') else ''), 'ask': [ask],
                             'check': {'kind': 'motion42d', 'name': op['name'], 'who': op['who'], 'target': None, 'to42d': op.get('target'), 'times': times, 'samples': samples, 'after': [after]}})
             continue
+        if op['kind'] == 'leash49c':
+            # ĐỢT 49 C — DẮT CHÓ ĐI DẠO: mỗi 1/15 s từ lúc dây đã móc (0,45 s) tới hết bước — dây nối tay với vòng cổ, con vật trong tầm dây, cả hai
+            # đi, cả hai trong khung (acting_check `leash49c`).
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            t0, t1 = float(step['start']), float(step['start']) + float(step['duration'])
+            samples = [round(t0 + 0.45 + n / 15, 3) for n in range(int((t1 - t0 - 0.45) * 15) + 1)]
+            times = [round(t0 + (t1 - t0) * f, 2) for f in (0.3, 0.5, 0.7)]
+            moments.append({'t': times[1], 'what': f'{op["who"]} walks {op["target"]} on a leash', 'ask': [
+                f'Is {op["who"]} walking {op["target"]} on a leash — a red leash line from {op["who"]}\'s hand to the collar of {op["target"]}, who trots a little ahead?',
+                'Are both of them (the whole person and the whole animal) inside the frame?'],
+                'check': {'kind': 'leash49c', 'name': op['name'], 'who': op['who'], 'target': op['target'], 'times': times, 'samples': samples, 'moves': bool(op.get('moves')), 'to': 'hands'}})
+            continue
         if op['kind'] == 'gesture':
             # ĐỘNG TÁC TAY (đợt 33): ở 40 / 55 / 70 % bước, bàn tay của người làm nằm trong khung — góc trung khung dọc lấy bề ngang
             # theo đầu + thân áo (`core`) thì tay đang vẫy / chỉ ra ngoài mép.

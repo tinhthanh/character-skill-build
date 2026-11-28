@@ -36,6 +36,7 @@ import stance from './person/stance.js';
 import speech from './person/speech.js';
 import cage from './person/cage.js';
 import grooming from './person/grooming.js';
+import leash49c from './person/leash49c.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -79,6 +80,7 @@ export class RigSVG {
   static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   static { this.DONG_TAC.push('jump', 'dance'); this.DI_NGANG.push('run'); }       // đợt 42 D — nhảy lên, nhảy múa (tại chỗ); chạy (dời `x`, quay ngang)
   static { this.STANCE.push('sitOnFloor', 'lieDown'); this.EXCHANGE.push('pickUp'); }       // đợt 42 E — ngồi bệt / nằm (thế giữ tới `standUp`); nhặt đồ (kết thúc với món đồ trong tay)
+  static { this.WITH_ITEM.push('walkOnLeash'); }       // đợt 49 C — dắt chó đi dạo: cần con vật (nó `walkOnLeash` cùng lúc) — có bài kiểm riêng
   /** Gieo hạt cho mọi thứ ngẫu nhiên (chớp mắt, khẩu hình, cử chỉ). `null` = trả về `Math.random`. */
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
@@ -1673,10 +1675,11 @@ export class RigSVG {
   // (con vật là một SVG khác, đứng đâu cũng được) rồi đổi về hệ gốc của SVG này. Con vật tự gọi hàm này sau mỗi lần nó
   // vẽ (`onDraw`), nên dây bám theo cả khi chỉ con vật cử động.
   _drawLeash() {
-    const line = this.el && this.el.leash, pet = this.leashed;
+    const now49c = this._leashNow49c();          // đợt 49 C: dắt con nào, tay nào — theo trạng thái (`leashPet49c`), một người dắt lần lượt nhiều con
+    const line = this.el && this.el.leash, pet = now49c ? now49c.pet : this.leashed;
     if (!line) return;
     if (!pet || this.s.leash < 0.5 || !pet.el || !pet.el.vong || !this.svg.getScreenCTM) { line.style.display = 'none'; return; }
-    const k = this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
+    const k = now49c ? now49c.hand : this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
     const handCTM = hand && hand.getScreenCTM();
     if (!toRoot || !handCTM) { line.style.display = 'none'; return; }
     const inverse = toRoot.inverse();
@@ -1684,7 +1687,10 @@ export class RigSVG {
     const collar = pet.el.vong.getBoundingClientRect();
     const b = new DOMPoint(collar.left + collar.width / 2, collar.top + collar.height / 2).matrixTransform(inverse);
     const span = Math.hypot(b.x - a.x, b.y - a.y), sag = Math.min(40, span * 0.16);
-    const mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    let mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    // đợt 49 C — `walkOnLeash`: dây có độ dài thật, võng theo khoảng cách hai đầu (`_leashControl49c`); `leashRope49c` 0…1 chuyển dần sang.
+    const rope49c = clamp(+this.s.leashRope49c || 0, 0, 1);
+    if (rope49c > 0) { const c = this._leashControl49c(a, b, span); mx += (c.x - mx) * rope49c; my += (c.y - my) * rope49c; }
     line.setAttribute('d', `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
     line.style.display = '';
   }
@@ -2021,6 +2027,8 @@ export class RigSVG {
     so.omSlot = this.s.omSlot;                                 // … và vẫn là lần bế ấy (đợt 37)
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
+    so.leashRope49c = this.s.leashRope49c;                     // đợt 49 C: … và dây vẫn võng theo độ dài thật của nó
+    so.leashPet49c = this.s.leashPet49c;                       // … và vẫn là con vật ấy
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
@@ -2138,7 +2146,7 @@ export class RigSVG {
   // `chieu` −1 = đi sang TRÁI: lấy đúng tư thế đi sang phải rồi soi gương — đổi dấu
   // mọi góc xoay trong mặt phẳng màn hình và ĐỔI VAI hai bên (chân/tay gần người
   // xem khi quay trái là bên R, khi quay phải là bên L).
-  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1 } = {}) {
+  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1, arm49c = null } = {}) {
     const s = this.s, bao = this._baoDi(buoc, vao, ra);
     const dat = (b) => {
       const o = this._tuTheDi(0.75 + b / 2, bao(b), kA).o;
@@ -2151,6 +2159,8 @@ export class RigSVG {
       }
       // Tay đang CẦM ĐỒ không đánh theo nhịp bước: cái cốc gắn vào bàn tay, tay vung là cốc lắc như con lắc.
       for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) o['vung' + side] *= 0.15;
+      // đợt 49 C — `walkOnLeash`: tay cầm quai dây giữ một dáng riêng (`arm49c`: kênh → giá trị lúc đang bước), vào / ra theo nhịp bước.
+      if (arm49c) { const w = bao(b); for (const key in arm49c) { const from = key in o ? o[key] : this.NGHI[key]; o[key] = from + (arm49c[key] - from) * w; } }      // kênh dáng đi không ghi (`carry`): từ dáng nghỉ
       Object.assign(s, o);
       if (x) s.x = x(b);
     };
@@ -2179,4 +2189,5 @@ export class RigSVG {
   static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
+leash49c(RigSVG);       // đợt 49 C
 export { veKhuonMat, beRongTaiY, veChanMay };

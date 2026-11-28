@@ -2985,6 +2985,57 @@ def check_cage49a(folder, c, shots, scales):
     return out
 
 
+# ĐỢT 49 C — DẮT CHÓ ĐI DẠO (`leash49c`, set3d `actingProbe` → `leash49c`): mỗi 1/15 s từ lúc dây đã móc tới hết bước. Mọi độ dài theo chiều cao người
+# trên màn hình (`tall`).
+LEASH_END = 0.015          # đầu dây cách giữa vòng cổ con vật ≤ chừng ấy
+LEASH_HAND = 0.04          # đầu dây cách cổ tay cầm quai dây ≤ chừng ấy (quai dây nằm trong lòng bàn tay, dưới cổ tay)
+LEASH_SLACK = 1.06         # khoảng tay — vòng cổ ≤ chừng ấy × độ dài dây (con vật trong tầm dây; dây căng hết cỡ thì gần thẳng)
+LEASH_MOVE = 0.15          # có `distance`: người và con vật cùng dời ≥ chừng ấy giữa mốc đầu và mốc cuối
+
+
+def check_leash(folder, c, shots):
+    """ĐỢT 49 C: dây hiện và nối lòng bàn tay với vòng cổ ở mọi mốc, con vật trong tầm dây, cả hai cùng đi, cả hai trọn trong khung."""
+    W, H = frame_size(folder)
+    who, pet = c['who'], c['target']
+    what = lambda text: f'{who} walks {pet} on a leash — {text}'
+    track = [(t, {a['name']: a for a in shots.get(float(t), [])}) for t in c.get('samples', [])]
+    track = [(t, f[who], f.get(pet)) for t, f in track if f.get(who) and f[who].get('tall') and f[who].get('leash49c')]
+    if len(track) < 4: return [{'scene': folder, 'what': what('measured'), 'ok': None, 'note': f'{who} not seen during the walk'}]
+    out = []
+    hidden = [t for t, a, _ in track if not a['leash49c']['shown'] or not a['leash49c'].get('b')]
+    out.append({'scene': folder, 'what': what('leash drawn every frame'), 'ok': not hidden, 'note': f'{len(track) - len(hidden)} of {len(track)} frames' + (f' (missing at {hidden[0]:g} s)' if hidden else '')})
+    rows = [(t, a, q, a['leash49c']) for t, a, q, in track if a['leash49c']['shown'] and a['leash49c'].get('b')]
+    if not rows: return out
+    dist = lambda p, q: ((p['x'] - q['x']) ** 2 + (p['y'] - q['y']) ** 2) ** 0.5
+    end = max(((t, dist(L['b'], L['collar']) / a['tall']) for t, a, _, L in rows if L.get('collar')), key=lambda x: x[1], default=None)
+    if end: out.append({'scene': folder, 'what': what('the leash ends at the collar'), 'ok': end[1] <= LEASH_END, 'note': f'at most {end[1] * 100:.1f} % of height off the collar (at {end[0]:g} s; limit {LEASH_END * 100:g} %)'})
+    def hand_gap(a, L):
+        hand = next((h for h in a.get('hands') or [] if h['side'] == L.get('hand')), None)
+        return dist(L['a'], hand) / a['tall'] if hand and L.get('a') else None
+    grip = max(((t, hand_gap(a, L)) for t, a, _, L in rows if hand_gap(a, L) is not None), key=lambda x: x[1], default=None)
+    if grip: out.append({'scene': folder, 'what': what('the leash starts in the hand'), 'ok': grip[1] <= LEASH_HAND, 'note': f'at most {grip[1] * 100:.1f} % of height from the wrist (at {grip[0]:g} s; limit {LEASH_HAND * 100:g} %)'})
+    reach = [(t, dist(L['a'], L['b']) / L['ropeLength']) for t, a, _, L in rows if L.get('ropeLength') and L.get('rope', 0) >= 0.99 and L.get('a')]
+    if reach:
+        far = max(reach, key=lambda x: x[1])
+        out.append({'scene': folder, 'what': what('the pet stays within the leash'), 'ok': far[1] <= LEASH_SLACK,
+                    'note': f'hand to collar at most {far[1] * 100:.0f} % of the leash length (at {far[0]:g} s; limit {LEASH_SLACK * 100:g} %); least {min(r for _, r in reach) * 100:.0f} %'})
+    if c.get('moves'):
+        (t0, a0, q0, _), (t1, a1, q1, _) = rows[0], rows[-1]
+        moved = abs(a1['x'] - a0['x']) / a0['tall']
+        body = lambda q: (q['body']['x0'] + q['body']['x1']) / 2 if q and q.get('body') else None
+        pm = abs(body(q1) - body(q0)) / a0['tall'] if body(q0) is not None and body(q1) is not None else 0
+        out.append({'scene': folder, 'what': what('both walk'), 'ok': moved >= LEASH_MOVE and pm >= LEASH_MOVE,
+                    'note': f'{who} moves {moved * 100:.0f} %, {pet} {pm * 100:.0f} % of {who}\'s height (least {LEASH_MOVE * 100:g} % each)'})
+    bad = None
+    for t, a, q, _ in rows:
+        for name, b in ((who, a.get('body')), (pet, q and q.get('body'))):
+            if not b: bad = bad or (t, name, 'not seen'); continue
+            cut = max(0, -b['x0'], b['x1'] - W) / max(1, b['x1'] - b['x0'])
+            if cut > 0.05: bad = bad or (t, name, f'{cut * 100:.0f} % cut off')
+    out.append({'scene': folder, 'what': what('both in the frame'), 'ok': bad is None, 'note': f'{len(rows)} frames, both inside' if bad is None else f'{bad[1]}: {bad[2]} at {bad[0]:g} s'})
+    return out
+
+
 def check_scene(folder):
     try: return check_one_scene(folder)
     finally: close_page()          # đợt 45: Chrome chung của cảnh (scene_page)
@@ -3014,6 +3065,9 @@ def check_one_scene(folder):
     if TORSO_CHECK: results += check_torso(folder, moments, shots)
     for c in checks:
         frames = [{a['name']: a for a in shots.get(float(t), [])} for t in c['times']]
+        if c['kind'] == 'leash49c':        # đợt 49 C
+            results.extend(check_leash(folder, c, shots))
+            continue
         if c['kind'] == 'motion42d':       # đợt 42 D
             results.extend(check_whole_body(folder, c, shots))
             continue

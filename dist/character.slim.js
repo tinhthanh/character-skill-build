@@ -400,6 +400,8 @@ const NGHI = Object.freeze({
   note: 0,                      // 0…1 THẺ THÔNG BÁO bật ra trên điện thoại (`notify`): độ lớn / độ hiện
   ball: 0,                      // quả bóng ném đi (`throwBall`): 0 = không có, 0…1 đang bay, 1 = đã chạm đất ở xa
   leash: 0,                     // 1 = đang DẮT một con vật: vẽ dây từ tay cầm quai dây (`items: { R: 'leash' }`) tới vòng cổ nó
+  leashPet49c: 0,               // đợt 49 C: con vật đang dắt = `leashPets49c[leashPet49c − 1]` (0: con của `leash`, `leashed`) — trạng thái, nên một người dắt lần lượt nhiều con
+  leashRope49c: 0,              // đợt 49 C: 0…1 dây dắt võng theo ĐỘ DÀI THẬT của nó (`walkOnLeash`) thay cho độ võng cố định — giữ tới `unleash`
   rope: 0,                      // đợt 40 A: 1 = đang KÉO CO (`pullToy`) — dây thừng căng từ tay tới mõm con chó
   watchL: 0, watchR: 0,
   heartL: 0, heartR: 0,         // trái tim bật ra trên bàn tay 'tim' (bắn tim): 0 = chưa có, 1 = đủ lớn
@@ -439,6 +441,7 @@ const NGHI = Object.freeze({
   dropL: 0, dropR: 0,           // 0…1 giọt thuốc rơi từ đầu lọ nhỏ mắt (gadget 11) tới mắt con vật; 0 = chưa / không có giọt
   foam: 0, gloveL: 0, gloveR: 0,
   pairFront: 0, pairSlot: 0,    // `pairSlot`: người kia là mục nào của `rig.pairList` (như `omSlot`) — mỗi khung đúng người của lần ấy
+  cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
 });
 const MAU_MAC_DINH = {
   da: '#f1c3a0', daToi: '#d9a583', toc: '#2c2a33', ao: '#4a8ed6', aoToi: '#3a74b3',
@@ -3179,10 +3182,12 @@ const __default = (RigSVG) => mix(RigSVG, class {
     if (!pet || !pet.el || !pet.el.vong || pet instanceof RigSVG) throw new Error('[character] leash(pet): pet must be a pet rig (createPet(...).rig)');
     const s = this.s, k = ['R', 'L'].find((side) => this.holds[side] && s['item' + side] > 0.5 && this.el['item' + side].querySelector('[data-leash]'));
     if (!k) throw new Error('[character] leash: the character is not holding a leash — give it one: createCharacter(host, { id, items: { R: "leash" } })');
-    if (this.leashed && this.leashed !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
+    const walking = this._leashNow49c() ? this._leashNow49c().pet : this.leashed;          // đợt 49 C
+    if (walking && walking !== pet && s.leash >= 0.5) throw new Error('[character] leash: already walking another pet — unleash() first');
     this.leashed = pet; this.leashHand = k;
     pet.onDraw = () => this._drawLeash();
     const t = this.tl();
+    if (s.leashPet49c) t.set(s, { leashPet49c: 0 }, 0);          // đợt 49 C: dây của lần dắt này, không phải con đã dắt bằng `walkOnLeash`
     t.to(s, { dauY: 6, nhinY: 2.2, cuoi: 0.9, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 1 }, 0.35);
     this._khep(t, 0.4, 0.55, { leash: 1 });
@@ -3193,7 +3198,7 @@ const __default = (RigSVG) => mix(RigSVG, class {
     const t = this.tl(), s = this.s;
     t.to(s, { dauY: 6, nhinY: 2.2, duration: 0.3, ease: 'sine.out' }, 0);
     t.set(s, { leash: 0 }, 0.35);
-    this._khep(t, 0.4, 0.55, { leash: 0 });
+    this._khep(t, 0.4, 0.55, { leash: 0, leashRope49c: 0, leashPet49c: 0 });       // đợt 49 C: lần móc dây sau lại võng như cũ
     return t;
   }
   listen(target = null, hold = 1.6) {
@@ -5075,6 +5080,7 @@ const __default = (RigSVG) => mix(RigSVG, class {
     if (this.carried && this.carried.pet !== pet && this.s.om >= 0.5) throw new Error('[character] carry: already carrying another pet — putDown() first');
     const t = this.tl(), s = this.s, N = this.NGHI;
     RigSVG._homePet(pet);
+    if (pet.cagers49a) pet.apDung();
     const inv = this.svg.getScreenCTM().inverse(), r = pet.svg.getBoundingClientRect();
     const a = new DOMPoint(r.left, r.top).matrixTransform(inv), b = new DOMPoint(r.right, r.bottom).matrixTransform(inv);
     const reach = this._reachLow(pet, null, 'body');
@@ -5447,6 +5453,525 @@ const __default = (RigSVG) => mix(RigSVG, class {
 });
 return { default: __default };
 })();
+__m['runtime/props.js'] = (function () {
+const PROP_FRAME = { w: 400, h: 470, floor: 458, centre: 200 };
+const SEAT_DEFAULT = 372;                      // cao độ mặt ghế khớp nhân vật có sẵn khi không đưa `for`
+const shade = (hex, amount) => {               // tối đi (amount < 0) hoặc sáng lên một màu #rrggbb
+  const n = parseInt(hex.slice(1), 16), mix = (v) => Math.max(0, Math.min(255, Math.round(v + (amount < 0 ? v : 255 - v) * amount)));
+  return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => mix(v).toString(16).padStart(2, '0')).join('');
+};
+const DRAW = {
+  stool: ({ seat, w = 84, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <path d="M ${x0 + 12} ${seat + 8} L ${x0 + 2} ${F} M ${x1 - 12} ${seat + 8} L ${x1 - 2} ${F}" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
+    <path d="M ${x0 + 9} ${seat + (F - seat) * 0.6} H ${x1 - 9}" stroke="${dark}" stroke-width="4.500" stroke-linecap="round"/>
+    <rect x="${x0}" y="${seat}" width="${w}" height="13" rx="6.500" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  chair: ({ seat, w = 108, back = 92, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <rect x="${x0 + 4}" y="${seat - back}" width="${w - 8}" height="${back + 6}" rx="12" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
+    <path d="M ${x0 + 9} ${seat + 10} V ${F} M ${x1 - 9} ${seat + 10} V ${F}" stroke="${dark}" stroke-width="8" stroke-linecap="round"/>
+    <rect x="${x0}" y="${seat}" width="${w}" height="15" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  table: ({ w = 230, height = 150, color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    return `
+    <path d="M ${x0 + 18} ${top + 10} V ${F} M ${x1 - 18} ${top + 10} V ${F}" stroke="${dark}" stroke-width="10" stroke-linecap="round"/>
+    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  counter: ({ w = 300, height = 150, color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2;
+    return `
+    <rect x="${x0 + 6}" y="${top + 8}" width="${w - 12}" height="${height - 8}" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
+    <path d="M ${x0 + 6 + (w - 12) / 3} ${top + 16} V ${F - 6} M ${x0 + 6 + (w - 12) * 2 / 3} ${top + 16} V ${F - 6}" stroke="${line}" stroke-width="1.200" opacity=".45"/>
+    <rect x="${x0}" y="${top}" width="${w}" height="13" rx="4" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  plant: ({ w = 120, color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, rim = F - 92;
+    const leaf = (angle, length, tone) => `<path d="M 200 ${rim + 4} q ${Math.sin(angle) * length * 0.55 - 14} ${-Math.cos(angle) * length * 0.5} ${Math.sin(angle) * length} ${-Math.cos(angle) * length} q ${-Math.sin(angle) * length * 0.25 + 16} ${Math.cos(angle) * length * 0.55} ${-Math.sin(angle) * length} ${Math.cos(angle) * length} z" fill="${tone}" stroke="#2f5a3a" stroke-width="1.400" stroke-linejoin="round"/>`;
+    return `
+    ${leaf(-1.05, 170, '#5f9a68')}${leaf(1.0, 180, '#5f9a68')}${leaf(-0.45, 250, '#4f8a5b')}${leaf(0.5, 240, '#4f8a5b')}${leaf(0.02, 290, '#6aa873')}
+    <path d="M ${x0} ${rim} H ${x1} L ${x1 - 14} ${F} H ${x0 + 14} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
+    <rect x="${x0 - 6}" y="${rim - 6}" width="${w + 12}" height="18" rx="6" fill="${dark}" stroke="${line}" stroke-width="1.400"/>`;
+  },
+  laptop: ({ w = 96, on = 150, facing = 'away', image, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.58;       // nắp thấp vừa đủ che bàn tay, để lộ vai và đầu đang cúi
+    const base = `<rect x="${x0 - 6}" y="${top - 5}" width="${w + 12}" height="6" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1.200"/>`;
+    if (facing === 'viewer') return `
+    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="#22262e" stroke="${line}" stroke-width="1.400"/>
+    ${screen(x0 + 5, top - h, w - 10, h - 10, image)}${noteCard(x0 + 5, top - h, w - 10, h - 10)}${base}`;
+    return `
+    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <circle cx="200" cy="${top - 5 - h / 2}" r="${w * 0.07}" fill="${shade(color, 0.45)}"/>${base}`;
+  },
+  monitor: ({ w = 150, on = 150, image, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.62, y0 = top - 26 - h;
+    return `
+    <path d="M 192 ${top - 28} h 16 l 5 24 h -26 z" fill="${dark}" stroke="${line}" stroke-width="1.200" stroke-linejoin="round"/>
+    <rect x="172" y="${top - 6}" width="56" height="6" rx="3" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
+    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}${noteCard(x0 + 6, y0 + 6, w - 12, h - 12)}`;
+  },
+  bowl: ({ w = 46, fill = 'food', color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, h = w * 0.36;
+    const inside = fill === 'water' ? `<ellipse cx="200" cy="${F - h + 2}" rx="${w * 0.4}" ry="${w * 0.09}" fill="#8fd0f0"/>`
+      : fill === 'food' ? [-12, -5, 2, 9, -8, 5].map((dx, n) => `<circle cx="${200 + dx * w / 46}" cy="${F - h + (n > 3 ? -1 : 1)}" r="${w * 0.07}" fill="#a0612f" stroke="#6e3e1b" stroke-width=".6"/>`).join('') : '';
+    return `
+    <path d="M ${x0} ${F - h} L ${x0 + w * 0.12} ${F} H ${x1 - w * 0.12} L ${x1} ${F - h} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
+    <ellipse cx="200" cy="${F - h}" rx="${w / 2}" ry="${w * 0.12}" fill="${dark}" stroke="${line}" stroke-width="1.200"/>${inside}`;
+  },
+  scale: ({ w = 210, reading = '', color, dark, line }) => {
+    const F = PROP_FRAME.floor, x0 = 200 - w / 2, top = F - 14;
+    const text = String(reading).replace(/[<&"]/g, '');
+    return `
+    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <rect x="${x0 + 8}" y="${top - 3}" width="${w - 16}" height="5" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
+    ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
+  },
+  tub: ({ w = 240, height = 40, color, dark, line }) => {
+    const F = PROP_FRAME.floor, h = height, ry = Math.max(6, Math.min(12, w * 0.04)), cy = F - h - ry + 3, x0 = 200 - w / 2, x1 = 200 + w / 2;
+    const front = `M ${x1} ${cy} A ${w / 2} ${ry} 0 0 1 ${x0} ${cy}`, back = `M ${x0} ${cy} A ${w / 2} ${ry} 0 0 1 ${x1} ${cy}`;
+    return `
+    <ellipse cx="200" cy="${cy}" rx="${w / 2}" ry="${ry}" fill="#cfe6ee"/>
+    <ellipse cx="200" cy="${cy + ry * 0.35}" rx="${w / 2 - 6}" ry="${ry * 0.6}" fill="#8fd0f0" opacity=".75"/>
+    <path d="${back}" fill="none" stroke="#6f97a8" stroke-width="7.400" stroke-linecap="round"/><path d="${back}" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    <rect x="${x0 + 16}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/><rect x="${x1 - 30}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/>
+    <path d="M ${x1} ${cy} L ${x1 - 12} ${F - 9} Q ${x1 - 14} ${F - 3} ${x1 - 22} ${F - 3} L ${x0 + 22} ${F - 3} Q ${x0 + 14} ${F - 3} ${x0 + 12} ${F - 9} L ${x0} ${cy} A ${w / 2} ${ry} 0 0 0 ${x1} ${cy} Z" fill="#eaf6fb" stroke="${line}" stroke-width="1.600" stroke-linejoin="round"/>
+    <path d="M ${x0 + 9} ${F - h * 0.42} q ${w / 8} -7 ${w / 4} 0 t ${w / 4} 0 t ${w / 4} 0 t ${w / 4 - 18} 0" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+    <path d="M ${x0 + 14} ${cy + ry + 6} Q ${x0 + 18} ${F - h * 0.3} ${x0 + 22} ${F - 10}" fill="none" stroke="#ffffff" stroke-width="3.400" stroke-linecap="round" opacity=".85"/>
+    <path d="${front}" fill="none" stroke="#6f97a8" stroke-width="8.400" stroke-linecap="round"/><path data-tub-rim42f="" d="${front}" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>`;
+  },
+  tree: ({ w = 300, color, dark, line }) => {
+    const F = PROP_FRAME.floor, r = w * 0.36;
+    return `
+    <path d="M ${200 - w * 0.06} ${F} L ${200 - w * 0.045} ${F - 260} L ${200 + w * 0.045} ${F - 260} L ${200 + w * 0.06} ${F} Z" fill="#8a6245" stroke="#5e4130" stroke-width="1.6"/>
+    <circle cx="${200 - r * 0.7}" cy="${F - 330}" r="${r}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="${200 + r * 0.7}" cy="${F - 340}" r="${r * 0.95}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="200" cy="${F - 430}" r="${r * 1.05}" fill="${color}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="${200 - r * 0.35}" cy="${F - 455}" r="${r * 0.3}" fill="#ffffff" opacity=".18"/>`;
+  },
+  floorlamp: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, top = F - 400;
+    return `
+    <ellipse cx="200" cy="${F - 6}" rx="34" ry="8" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="197" y="${top + 60}" width="6" height="${400 - 66}" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <path d="M 168 ${top} H 232 L 252 ${top + 66} H 148 Z" fill="${color}" stroke="${line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
+    <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
+  },
+  tv: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor, cab = F - 54, y0 = cab - 12 - 96;
+    return `
+    <rect x="118" y="${cab}" width="164" height="50" rx="4" fill="#a47551" stroke="#6e4a30" stroke-width="1.4"/>
+    <path d="M 200 ${cab} V ${cab + 50}" stroke="${line}" stroke-width="1" opacity=".35"/>
+    <rect x="124" y="${F - 6}" width="10" height="6" fill="${dark}"/><rect x="266" y="${F - 6}" width="10" height="6" fill="${dark}"/>
+    <rect x="186" y="${cab - 12}" width="28" height="12" fill="${dark}" stroke="${line}" stroke-width="1"/>
+    <rect x="112" y="${y0}" width="176" height="100" rx="5" fill="${color}" stroke="${line}" stroke-width="1.4"/>
+    <defs><linearGradient id="tvglow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8f0ff"/><stop offset=".55" stop-color="#8cc4ee"/><stop offset="1" stop-color="#5a8fc4"/></linearGradient></defs>
+    <rect x="118" y="${y0 + 6}" width="164" height="88" rx="2" fill="url(#tvglow)"/>
+    <path d="M 118 ${y0 + 70} L 160 ${y0 + 46} L 190 ${y0 + 64} L 226 ${y0 + 36} L 282 ${y0 + 72} V ${y0 + 94} H 118 Z" fill="#ffffff" opacity=".22"/>`;
+  },
+  lamp: ({ color, dark, line }) => {
+    const F = PROP_FRAME.floor;
+    return `
+    <path d="M 192 ${F} L 196 ${F - 560} L 204 ${F - 560} L 208 ${F} Z" fill="${color}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="182" y="${F - 22}" width="36" height="22" rx="4" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <path d="M 176 ${F - 560} H 224 L 214 ${F - 600} H 186 Z" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
+    <rect x="188" y="${F - 562}" width="24" height="16" rx="3" fill="#fff3b0" stroke="${line}" stroke-width="1"/>`;
+  },
+  carrier: ({ w = 150, door = 'right', color, dark, line }) => {
+    const F = PROP_FRAME.floor, h = w * 0.66, x0 = 200 - w / 2, top = F - h, d = door === 'left' ? -1 : 1;
+    const dx = d > 0 ? 200 + w / 2 - 6 : x0 + 6, gate = Array.from({ length: 6 }, (_, n) => `M ${dx - d * (n + 1) * 1.6} ${top + 14 + n * 0} L ${dx - d * (n + 1) * 1.6} ${F - 10}`).join(' ');
+    const doorX = d > 0 ? 200 + w / 2 - w * 0.34 : x0;
+    return `
+    <path d="M ${x0 + 10} ${top} H ${x0 + w - 10} Q ${x0 + w} ${top} ${x0 + w} ${top + 10} V ${F - 6} Q ${x0 + w} ${F} ${x0 + w - 6} ${F} H ${x0 + 6} Q ${x0} ${F} ${x0} ${F - 6} V ${top + 10} Q ${x0} ${top} ${x0 + 10} ${top} Z
+             M ${doorX + 8} ${top + 12} V ${F - 10} H ${doorX + w * 0.34 - 8} V ${top + 12} Z" fill="${color}" fill-rule="evenodd" stroke="${line}" stroke-width="1.6"/>
+    <path d="${Array.from({ length: 5 }, (_, n) => `M ${doorX + 8 + (n + 1) * (w * 0.34 - 16) / 6} ${top + 12} V ${F - 10}`).join(' ')} M ${doorX + 8} ${top + 12 + (h - 22) / 2} H ${doorX + w * 0.34 - 8}" stroke="${dark}" stroke-width="2.2"/>
+    <path d="M ${x0 + 6} ${top + h * 0.55} H ${doorX + (d > 0 ? 0 : w * 0.34)}" stroke="${dark}" stroke-width="2" opacity=".6"/>
+    <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
+  },
+  scooter: ({ facing = 'right', color, dark, line }) => {
+    const k = SCOOTER_K, d = facing === 'left' ? -1 : 1, w = (v) => (v / k).toFixed(2), tyre = '#2b2f36', rim = '#c9d1d9';
+    const wheel = ([cx, cy]) => `<g data-wheel="1" data-cx="${cx}" data-cy="${cy}" transform="rotate(0 ${cx} ${cy})">
+      <circle cx="${cx}" cy="${cy}" r="40" fill="${tyre}" stroke="#16191e" stroke-width="${w(1.6)}"/>
+      <circle cx="${cx}" cy="${cy}" r="24.8" fill="${rim}" stroke="#16191e" stroke-width="${w(1.2)}"/>
+      <path d="${[0, 72, 144, 216, 288].map((a) => `M ${cx} ${cy} L ${(cx + Math.sin(a * Math.PI / 180) * 24).toFixed(1)} ${(cy - Math.cos(a * Math.PI / 180) * 24).toFixed(1)}`).join(' ')}" stroke="#8a95a3" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="${tyre}"/></g>`;
+    return `
+    <g transform="translate(200 ${PROP_FRAME.floor}) scale(${(d * k).toFixed(4)} ${k.toFixed(4)}) translate(-150 -270)">
+      ${SCOOTER_WHEELS.map(wheel).join('')}
+      <path d="M 50 210 Q 40 156 100 152 H 206 L 222 200 L 258 124 L 272 124 L 246 210 Z" fill="${color}" stroke="${line}" stroke-width="${w(1.6)}" stroke-linejoin="round"/>
+      <path d="M 52 194 Q 56 204 64 210 H 246 L 251 194 Z" fill="${dark}" opacity=".55"/>
+      <path d="M 90 152 Q 96 ${SCOOTER_SEAT_TOP} 130 ${SCOOTER_SEAT_TOP} H 196 Q 214 ${SCOOTER_SEAT_TOP + 2} 210 152 Z" fill="#3b4450" stroke="#1f242b" stroke-width="${w(1.4)}" stroke-linejoin="round"/>
+      <rect x="110" y="168" width="60" height="9" rx="4" fill="${rim}" stroke="${line}" stroke-width="${w(1)}"/>
+      <path d="M 262 124 L 246 78" stroke="#3b4450" stroke-width="7" stroke-linecap="round"/>
+      <path d="M 230 76 H 272" stroke="#2b2f36" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
+    </g>`;
+  },
+  paystand: ({ on = 150, color, dark, line }) => {
+    const top = PROP_FRAME.floor - on, q = PAY_QR(top), cell = 30 / 9;
+    const bits = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      const finder = (r < 3 && c < 3) || (r < 3 && c > 5) || (r > 5 && c < 3);
+      if (!finder && ((r * 7 + c * 3 + r * c) % 3 === 0)) bits.push(`<rect x="${(q.x - 15 + c * cell).toFixed(2)}" y="${(q.y - 15 + r * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}"/>`);
+    }
+    const finder = (x, y) => `<rect x="${x}" y="${y}" width="${cell * 3}" height="${cell * 3}" fill="none" stroke="#16232b" stroke-width="${cell * 0.8}"/><rect x="${x + cell}" y="${y + cell}" width="${cell}" height="${cell}"/>`;
+    const r = PAY_READER(top);
+    return `
+    <rect x="148" y="${top - 6}" width="54" height="6" rx="2" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
+    <rect x="152" y="${top - 72}" width="46" height="66" rx="4" fill="#ffffff" stroke="${line}" stroke-width="1.400"/>
+    <rect x="152" y="${top - 72}" width="46" height="12" rx="4" fill="${color}"/><path d="M 160 ${top - 66} h 22" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#16232b">${bits.join('')}${finder(q.x - 15, q.y - 15)}${finder(q.x + 15 - cell * 3, q.y - 15)}${finder(q.x - 15, q.y + 15 - cell * 3)}</g>
+    <circle data-pay-qr="1" cx="${q.x}" cy="${q.y}" r="0.6" fill="none"/>
+    <path d="M ${r.x - 17} ${top} L ${r.x - 15} ${top - 58} Q ${r.x - 15} ${top - 62} ${r.x - 11} ${top - 62} H ${r.x + 11} Q ${r.x + 15} ${top - 62} ${r.x + 15} ${top - 58} L ${r.x + 17} ${top} Z" fill="#2f3440" stroke="#15181e" stroke-width="1.300"/>
+    <rect x="${r.x - 11}" y="${top - 57}" width="22" height="20" rx="2" fill="#bfe8d0"/>
+    <path d="M ${r.x - 3} ${top - 51} q 3 3 0 7 M ${r.x + 1} ${top - 53} q 5 5 0 11 M ${r.x + 5} ${top - 55} q 7 7 0 15" stroke="#1f7a4d" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    ${[0, 1, 2].map((row) => [-6, 0, 6].map((dx) => `<circle cx="${r.x + dx}" cy="${top - 29 + row * 7}" r="2" fill="#8a929e"/>`).join('')).join('')}
+    <circle data-pay-reader="1" cx="${r.x}" cy="${r.y}" r="0.6" fill="none"/>`;
+  },
+  xray: ({ w = XRAY_W, image, spot = XRAY_SPOT, color, dark, line }) => {
+    const F = PROP_FRAME.floor, g = xrayFrame(w), { x0, y0, h, fx, fy, fw, fh } = g, px = (u) => (fx + u * fw).toFixed(1), py = (v) => (fy + v * fh).toFixed(1);
+    const bone = (d, wide = 3.4) => `<path d="${d}" stroke="#9fb6cc" stroke-width="${(wide * 2.2).toFixed(1)}" fill="none" stroke-linecap="round" opacity=".28"/><path d="${d}" stroke="#e9f2fa" stroke-width="${wide}" fill="none" stroke-linecap="round"/>`;
+    const sx = fx + spot[0] * fw, sy = fy + spot[1] * fh;
+    const film = image ? `<clipPath id="vgXray${xrayCount}"><rect x="${fx}" y="${fy}" width="${fw}" height="${fh}"/></clipPath>
+      <image href="${String(image).replace(/"/g, '&quot;')}" x="${fx}" y="${fy}" width="${fw}" height="${fh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#vgXray${xrayCount++})"/>` : `
+      <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="#0d1f33"/>
+      <ellipse cx="${px(0.45)}" cy="${py(0.5)}" rx="${(fw * 0.46).toFixed(1)}" ry="${(fh * 0.38).toFixed(1)}" fill="#1d3854" opacity=".75"/>
+      ${bone(`M ${px(0.1)} ${py(0.34)} Q ${px(0.42)} ${py(0.22)} ${px(0.74)} ${py(0.3)}`, 4)}
+      ${[0.16, 0.24, 0.32, 0.4, 0.48, 0.56, 0.64].map((u) => `<rect x="${(fx + u * fw - 3).toFixed(1)}" y="${(fy + (0.27 - 0.06 * Math.sin(u * 4)) * fh - 4).toFixed(1)}" width="6" height="8" rx="2" fill="#f4f8fc"/>`).join('')}
+      <ellipse cx="${px(0.85)}" cy="${py(0.3)}" rx="${(fw * 0.1).toFixed(1)}" ry="${(fh * 0.12).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
+      ${bone(`M ${px(0.79)} ${py(0.4)} L ${px(0.95)} ${py(0.42)}`, 2.6)}
+      ${[0.36, 0.42, 0.48, 0.54, 0.6].map((u) => bone(`M ${px(u)} ${py(0.3)} Q ${px(u + 0.05)} ${py(0.48)} ${px(u - 0.01)} ${py(0.62)}`, 2)).join('')}
+      <ellipse cx="${px(0.13)}" cy="${py(0.4)}" rx="${(fw * 0.07).toFixed(1)}" ry="${(fh * 0.08).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
+      ${bone(`M ${px(0.14)} ${py(0.46)} L ${px(0.2)} ${py(0.66)} L ${px(0.14)} ${py(0.9)}`)}
+      ${bone(`M ${px(0.66)} ${py(0.38)} L ${px(0.67)} ${py(0.64)}`)}${bone(`M ${px(0.67)} ${py(0.66)} L ${px(0.69)} ${py(0.92)}`)}
+      <path d="M ${(sx - 5).toFixed(1)} ${(sy - 2).toFixed(1)} l 3 2.5 l 2.5 -2 l 2.5 2.5 l 2.5 -2" stroke="#0d1f33" stroke-width="1.8" fill="none" stroke-linejoin="round"/>`;
+    return `
+    <path d="M 200 ${y0 + h} V ${F - 12} M 160 ${F - 10} H 240" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="164" cy="${F - 5}" r="5" fill="#3b4450"/><circle cx="236" cy="${F - 5}" r="5" fill="#3b4450"/>
+    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
+    <rect x="${fx - 3}" y="${fy - 3}" width="${fw + 6}" height="${fh + 6}" rx="2" fill="#f4fbff"/>
+    ${film}
+    <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="none" stroke="#f4fbff" stroke-width="1.2" opacity=".6"/>
+    <rect x="${fx + 6}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/><rect x="${fx + fw - 24}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/>
+    <circle data-xray-spot="1" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="0.6" fill="none"/>`;
+  },
+};
+const XRAY_W = 176, XRAY_SPOT = [0.675, 0.74];
+const PAY_QR = (top) => ({ x: 175, y: top - 33 }), PAY_READER = (top) => ({ x: 226, y: top - 47 });
+let xrayCount = 0;
+function xrayFrame(w) {
+  const h = Math.round(w * 0.7), x0 = 200 - w / 2, y0 = 118;
+  return { x0, y0, h, fx: x0 + 9, fy: y0 + 9, fw: w - 18, fh: h - 18 };
+}
+const SCOOTER_WHEELS = [[76, 228], [276, 228]];
+const SCOOTER_SEAT_TOP = 130, SCOOTER_K = 1.22, SCOOTER_WHEEL_R = 40;
+const SCOOTER_SEAT = PROP_FRAME.floor - (270 - SCOOTER_SEAT_TOP) * SCOOTER_K;   // y khung của mặt yên
+function noteCard(x, y, w, h) {
+  const cw = w * 0.9, ch = Math.min(h * 0.46, cw * 0.32), cx = x + (w - cw) / 2, cy = y + h - ch - h * 0.06, f = ch * 0.3, icon = ch * 0.56;
+  const room = cw - ch * 0.55 - icon, fitTitle = Math.floor(room / (f * 0.58)), fitText = Math.floor(room / (f * 0.88 * 0.52));
+  return `<g data-note="1" style="display:none" data-ox="${(cx + cw / 2).toFixed(1)}" data-oy="${(cy + ch / 2).toFixed(1)}" data-fit="${fitTitle},${fitText}">
+      <rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="${(ch * 0.18).toFixed(1)}" fill="#ffffff" stroke="#c8d3da" stroke-width="1"/>
+      <rect x="${cx + ch * 0.2}" y="${cy + (ch - icon) / 2}" width="${icon}" height="${icon}" rx="${(icon * 0.25).toFixed(1)}" fill="#2f9e8f"/>
+      <circle cx="${cx + ch * 0.2 + icon / 2}" cy="${cy + ch / 2}" r="${(icon * 0.22).toFixed(1)}" fill="none" stroke="#ffffff" stroke-width="${(icon * 0.09).toFixed(2)}"/>
+      <text data-note-title="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.44}" font-family="Arial, sans-serif" font-size="${f.toFixed(1)}" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
+      <text data-note-text="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.8}" font-family="Arial, sans-serif" font-size="${(f * 0.88).toFixed(1)}" fill="#3b5560" data-layout-ignore=""></text>
+    </g>`;
+}
+let screenCount = 0;
+function screen(x, y, w, h, image) {
+  if (!image) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#8fd3ff"/><path d="M ${x + 8} ${y + 10} h ${w * 0.5} M ${x + 8} ${y + 20} h ${w * 0.35}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>`;
+  const id = 'vgScreen' + (screenCount++);
+  return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
+    <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+}
+const DEFAULT_COLOR = { paystand: '#2f9e8f', xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
+DEFAULT_COLOR.tub = '#5fb8e8';                 // đợt 42 F: sọc xanh nước trên thành chậu tắm
+const CAGE49A = { w: 170, h: 140, bar: 10, top: 20, rail: 16, line: '#5e4130', steel: '#eef3f6', wall: '#f6efe2', shade: '#dccfbb', mat: '#f3b6a0' };
+function cageShape49a({ w = CAGE49A.w, height = CAGE49A.h, door = 'left' } = {}) {
+  const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, top = F - height, c = CAGE49A;
+  const open = { x0: x0 + c.bar, x1: x1 - c.bar, y0: top + c.top, y1: F - c.rail };
+  const hinge = door === 'right' ? open.x1 : open.x0, latch = door === 'right' ? open.x0 + 7 : open.x1 - 7;
+  return { x0, x1, top, floor: F, open, door, hinge, latch: { x: latch, y: (open.y0 + open.y1) / 2 }, inside: { x: 200, y: F } };
+}
+DRAW.cage = ({ w, height, door = 'left', dark }) => {
+  const g = cageShape49a({ w, height, door }), c = CAGE49A, d = 14;
+  return `
+    <rect x="${g.x0}" y="${g.top}" width="${g.x1 - g.x0}" height="${g.floor - g.top}" rx="6" fill="${c.shade}" stroke="${c.line}" stroke-width="1.6"/>
+    <path d="M ${g.x0 + d} ${g.top + d} H ${g.x1 - d} V ${g.floor - 8} H ${g.x0 + d} Z" fill="${c.wall}" stroke="${c.line}" stroke-width="1" stroke-opacity=".45"/>
+    <path d="M ${g.x0 + 2} ${g.top + 2} L ${g.x0 + d} ${g.top + d} M ${g.x1 - 2} ${g.top + 2} L ${g.x1 - d} ${g.top + d}" stroke="${c.line}" stroke-width="1" stroke-opacity=".45"/>
+    <rect x="${g.x0 + d + 6}" y="${g.floor - 22}" width="${g.x1 - g.x0 - 2 * d - 12}" height="14" rx="7" fill="${c.mat}" stroke="${c.line}" stroke-width="1.2"/>
+    <rect x="${g.x0}" y="${g.floor - 6}" width="${g.x1 - g.x0}" height="6" rx="2" fill="${dark}"/>`;
+};
+DRAW.cageFront = ({ w, height, door = 'left', color, dark }) => {
+  const g = cageShape49a({ w, height, door }), c = CAGE49A, o = g.open, ow = o.x1 - o.x0, n = Math.max(4, Math.round(ow / 15));
+  const bars = Array.from({ length: n - 1 }, (_, i) => o.x0 + ow * (i + 1) / n);
+  const side = door === 'right' ? -1 : 1, hx = g.hinge - side * 1;
+  return `
+    <path d="M ${g.x0 + 6} ${g.top} H ${g.x1 - 6} Q ${g.x1} ${g.top} ${g.x1} ${g.top + 6} V ${g.floor} H ${g.x0} V ${g.top + 6} Q ${g.x0} ${g.top} ${g.x0 + 6} ${g.top} Z
+             M ${o.x0} ${o.y0} V ${o.y1} H ${o.x1} V ${o.y0} Z" fill="${color}" fill-rule="evenodd" stroke="${c.line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M ${g.x0 + 3} ${g.floor - 5} H ${g.x1 - 3}" stroke="${dark}" stroke-width="4" stroke-linecap="round"/>
+    <rect x="${200 - 22}" y="${g.top + 4}" width="44" height="12" rx="2" fill="#ffffff" stroke="${c.line}" stroke-width="1"/>
+    <path d="M ${200 - 16} ${g.top + 8.5} H ${200 + 12} M ${200 - 16} ${g.top + 12} H ${200 + 4}" stroke="#9aa5ad" stroke-width="1.4" stroke-linecap="round"/>
+    <g data-cage-door49a="" data-hinge="${g.hinge}" data-door="${door}" data-x0="${o.x0}" data-x1="${o.x1}" data-y0="${o.y0}" data-y1="${o.y1}">
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${ow - 2}" height="${o.y1 - o.y0 - 2}" rx="2" fill="none" stroke="${c.line}" stroke-width="5.4"/>
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${ow - 2}" height="${o.y1 - o.y0 - 2}" rx="2" fill="none" stroke="${c.steel}" stroke-width="3"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')} M ${o.x0 + 2} ${(o.y0 + o.y1) / 2} H ${o.x1 - 2}" stroke="${c.line}" stroke-width="4.2" stroke-linecap="round"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')} M ${o.x0 + 2} ${(o.y0 + o.y1) / 2} H ${o.x1 - 2}" stroke="${c.steel}" stroke-width="2" stroke-linecap="round"/>
+      <rect x="${g.latch.x - 4}" y="${g.latch.y - 9}" width="8" height="18" rx="3" fill="${dark}" stroke="${c.line}" stroke-width="1.2"/>
+    </g>
+    <rect x="${hx - 3}" y="${o.y0 + 8}" width="6" height="12" rx="2" fill="${dark}" stroke="${c.line}" stroke-width="1"/>
+    <rect x="${hx - 3}" y="${o.y1 - 20}" width="6" height="12" rx="2" fill="${dark}" stroke="${c.line}" stroke-width="1"/>`;
+};
+DEFAULT_COLOR.cage = '#6fb6d9'; DEFAULT_COLOR.cageFront = '#6fb6d9';      // khung sơn tĩnh điện xanh trời; song cửa inox sáng
+const PROP_KINDS = Object.keys(DRAW);
+function createProp(host, kind, options = {}) {
+  if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
+  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading, door, spot } = options;
+  if (spot !== undefined && !(kind === 'xray' && Array.isArray(spot) && spot.length === 2 && spot.every((v) => typeof v === 'number' && v >= 0 && v <= 1)))
+    throw new Error(`[character] prop "${kind}": spot is for the "xray" viewer, [x, y] with both between 0 and 1 (a point on the film), got ${JSON.stringify(spot)}`);
+  if (door !== undefined && door !== 'left' && door !== 'right') throw new Error(`[character] prop "${kind}": door must be 'left' or 'right', got ${JSON.stringify(door)}`);
+  if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
+  if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
+  if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
+  if (kind === 'scooter') {
+    if (facing !== undefined && facing !== 'right' && facing !== 'left') throw new Error(`[character] prop "scooter": facing must be 'right' or 'left', got ${JSON.stringify(facing)}`);
+  } else if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
+  if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
+  if (on !== undefined && !(typeof on === 'number' && on >= 0)) throw new Error(`[character] prop "${kind}": on must be a number ≥ 0 (frame units above the floor), got ${JSON.stringify(on)}`);
+  for (const [name, value] of Object.entries({ width, height, back }))
+    if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
+  const sitter = options.for;
+  if (sitter !== undefined && typeof (sitter && sitter.seatY) !== 'function') throw new Error(`[character] prop "${kind}": \`for\` must be a person rig (createCharacter(...).rig)`);
+  const seat = kind === 'scooter' ? SCOOTER_SEAT : sitter ? sitter.seatY() : SEAT_DEFAULT;
+  const o = { seat, color, dark: shade(color, -0.28), line: shade(color, -0.55) };
+  if (width !== undefined) o.w = width;
+  if (height !== undefined) o.height = height;
+  if (back !== undefined) o.back = back;
+  if (on !== undefined) o.on = on;
+  if (image !== undefined) o.image = image;
+  if (facing !== undefined) o.facing = facing;
+  if (fill !== undefined) o.fill = fill;
+  if (reading !== undefined) o.reading = reading;
+  if (door !== undefined) o.door = door;
+  if (spot !== undefined) o.spot = spot;
+  host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
+  host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
+  </svg>`;
+  const svg = host.firstElementChild;
+  const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
+  if (kind === 'cage' || kind === 'cageFront') prop.cage = cageShape49a({ w: o.w, height: o.height, door: o.door });
+  if (kind === 'xray') {
+    const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;
+    prop.spot = { x: +(g.fx + at[0] * g.fw).toFixed(1), y: +(g.fy + at[1] * g.fh).toFixed(1) };
+  }
+  if (kind === 'paystand') {
+    const top = PROP_FRAME.floor - (o.on === undefined ? 150 : o.on);
+    prop.qr = PAY_QR(top); prop.reader = PAY_READER(top);
+  }
+  if (kind === 'scooter') {
+    prop.rideLift = (rig) => {
+      if (typeof (rig && rig.rideSeatY) !== 'function') throw new Error('[character] prop "scooter": rideLift(rig) needs a person rig');
+      return Math.max(0, rig.rideSeatY() - SCOOTER_SEAT);
+    };
+    prop.roll = (distance, duration, ease = 'power2.out') => {
+      const turn = distance / (SCOOTER_WHEEL_R * SCOOTER_K) * 180 / Math.PI, t = gsap.timeline();
+      svg.querySelectorAll('[data-wheel]').forEach((g) => {
+        const c = `${g.dataset.cx} ${g.dataset.cy}`;
+        t.fromTo(g, { attr: { transform: `rotate(0 ${c})` } }, { attr: { transform: `rotate(${turn.toFixed(2)} ${c})` }, duration, ease }, 0);
+      });
+      return t;
+    };
+  }
+  return prop;
+}
+function notifyOn(svg, kind, message, { hold = 2.5 } = {}) {
+  const card = svg.querySelector('[data-note]');
+  if (!card) throw new Error(`[character] notify: the "${kind}" prop has no screen showing — a monitor, or a laptop with facing: 'viewer'`);
+  const note = typeof message === 'string' ? { title: message, text: '' } : (message || {});
+  const [fitTitle, fitText] = card.getAttribute('data-fit').split(',').map(Number);
+  const fit = (text, n) => (text.length <= n ? text : text.slice(0, Math.max(1, n - 1)).trimEnd() + '…');
+  card.querySelector('[data-note-title]').textContent = fit(String(note.title || ''), fitTitle);
+  card.querySelector('[data-note-text]').textContent = fit(String(note.text || ''), fitText);
+  const ox = card.getAttribute('data-ox'), oy = card.getAttribute('data-oy');
+  const show = (k) => {
+    card.style.display = k > 0.01 ? '' : 'none';
+    card.setAttribute('transform', `translate(${ox} ${oy}) scale(${(0.6 + 0.4 * k).toFixed(3)}) translate(${-ox} ${-oy})`);      // k vượt 1 một chút (back.out): thẻ nảy lên
+    card.style.opacity = Math.min(1, k).toFixed(3);
+  };
+  const state = { _k: 0, get k() { return this._k; }, set k(v) { this._k = v; show(v); } };
+  const tl = gsap.timeline({ paused: true });
+  tl.to(state, { k: 1, duration: 0.35, ease: 'back.out(1.8)' }, 0).to(state, { k: 0, duration: 0.3, ease: 'power2.in' }, 0.35 + hold);
+  return tl;
+}
+return { PROP_FRAME, cageShape49a, PROP_KINDS, createProp };
+})();
+__m['runtime/person/cage.js'] = (function () {
+const { HONG, clamp, mix } = __m['runtime/person/shared.js'];
+const { PROP_FRAME } = __m['runtime/props.js'];
+const OPEN49A = 0.62;                    // cửa mở hết còn 38 % bề ngang (xoay về phía người xem quanh bản lề) — chốt vẫn trong tầm tay người quỳ cạnh chuồng
+const FIT49A = 1.04;                     // con vật rộng / cao hơn ô cửa (× chừng này) thì không vừa chuồng — báo lỗi
+const LEVEL49A = 24;                     // sàn chuồng lệch sàn chỗ con vật đứng quá chừng này (đơn vị khung người) — báo lỗi (chuồng phải đặt trên sàn)
+const __default = (RigSVG) => mix(RigSVG, class {
+  _cage49a(cage, name) {
+    const svgOf = (v) => v && (v.svg || (v.querySelector ? (v.matches && v.matches('svg[data-prop]') ? v : v.querySelector('svg[data-prop]')) : null));
+    const usage = `${name}(pet, cage): cage must be a "cageFront" prop (createProp(host, 'cageFront') — the front of the cage, with its door), the element holding it, or { at: { x, y }, scale, door } (a 3D set: at = set.targetPoint(rig, [x, 0, z]) — the middle of the cage floor —, scale = person frame units per prop frame unit, door = the "cageFront" prop)`;
+    let at, k, front;
+    if (cage && cage.at && typeof cage.at.x === 'number' && typeof cage.at.y === 'number') {
+      if (!(typeof cage.scale === 'number' && cage.scale > 0)) throw new Error(`[character] ${usage}`);
+      at = { x: cage.at.x, y: cage.at.y }; k = cage.scale; front = svgOf(cage.door);
+    } else {
+      front = svgOf(cage);
+      if (!front) throw new Error(`[character] ${usage}`);
+      if (front.getAttribute('data-prop') === 'cage') throw new Error(`[character] ${name}: pass the "cageFront" prop (the door is on it), not the "cage" (the inside)`);
+      const r = front.getBoundingClientRect(), inv = this.svg.getScreenCTM().inverse();
+      const a = new DOMPoint(r.left, r.top).matrixTransform(inv), b = new DOMPoint(r.right, r.bottom).matrixTransform(inv);
+      k = (b.x - a.x) / PROP_FRAME.w; at = { x: a.x + PROP_FRAME.centre * k, y: a.y + PROP_FRAME.floor * k };
+    }
+    const door = front && front.getAttribute('data-prop') === 'cageFront' ? front.querySelector('[data-cage-door49a]') : null;
+    if (!door) throw new Error(`[character] ${usage}`);
+    const num = (key) => +door.getAttribute('data-' + key);
+    const open = { x0: num('x0'), x1: num('x1'), y0: num('y0'), y1: num('y1') }, hinge = num('hinge'), latch = door.getAttribute('data-door') === 'right' ? open.x0 + 7 : open.x1 - 7;
+    const p = (x, y) => ({ x: at.x + (x - PROP_FRAME.centre) * k, y: at.y + (y - PROP_FRAME.floor) * k });
+    const latchAt = (o) => p(hinge + (latch - hinge) * (1 - OPEN49A * o), (open.y0 + open.y1) / 2);
+    return { at, k, p, open, hinge, latch, latchAt, door, side: latch > hinge ? 1 : -1 };
+  }
+  _petAt49a(pet) {
+    RigSVG._homePet(pet);
+    pet.apDung();                        // hình nó theo trạng thái lúc dựng (phần dời của các người khác)
+    const inv = this.svg.getScreenCTM().inverse(), root = (x, y) => new DOMPoint(x, y).matrixTransform(inv);
+    const box = (el) => { const q = el.getBoundingClientRect(), a = root(q.left, q.top), b = root(q.right, q.bottom); return { x0: a.x, y0: a.y, x1: b.x, y1: b.y }; };
+    const r = box(pet.svg), vb = pet.svg.viewBox && pet.svg.viewBox.baseVal, unit = (r.x1 - r.x0) / ((vb && vb.width) || 400);
+    const parts = [pet.el.dau, pet.el.than, ...['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => pet.el[key])].filter((el) => el && el.getBoundingClientRect().height > 0).map(box);
+    const body = { x0: Math.min(...parts.map((q) => q.x0)), x1: Math.max(...parts.map((q) => q.x1)), y0: Math.min(...parts.map((q) => q.y0)), y1: Math.max(...parts.map((q) => q.y1)) };
+    const paws = ['tnBan', 'txBan', 'snBan', 'sxBan'].map((key) => pet.el[key]).filter((el) => el && el.getBoundingClientRect().height > 0).map(box);
+    const feet = paws.length ? Math.max(...paws.map((q) => q.y1)) : body.y1, head = box(pet.el.dau);
+    const shift = ((pet.s.x || 0) + (typeof pet.dropX === 'function' ? pet.dropX() : 0)) * unit, centre = (r.x0 + r.x1) / 2;
+    const middle = clamp(((head.x0 + head.x1) / 2 - shift - r.x0) / (r.x1 - r.x0), 0.1, 0.9);
+    return { r, unit, shift, centre, body, feet, middle, bodyOff: (body.x0 + body.x1) / 2 - shift - centre, width: body.x1 - body.x0, height: feet - body.y0 };
+  }
+  _cageMove49a(pet, n, dx) {
+    (this.cageMoves49a || (this.cageMoves49a = []))[n] = { pet, dx };
+    (pet.cagers49a || (pet.cagers49a = new Set())).add(this);
+    (this.cagePets49a || (this.cagePets49a = new Set())).add(pet);
+  }
+  _cageDoor49a(geo) {
+    const list = this.cageDoors49a || (this.cageDoors49a = []);
+    if (!list.some((item) => item.el === geo.door)) list.push({ el: geo.door, hinge: geo.hinge });
+  }
+  _drawCages49a() {
+    if (this.cageDoors49a) for (const item of this.cageDoors49a) {
+      const el = item.el, opens = el.__open49a || (el.__open49a = new Map());
+      opens.set(this, clamp(this.s.cageDoor49a || 0, 0, 1));
+      const o = Math.max(...opens.values()), key = o.toFixed(4);
+      if (el.__drawn49a === key) continue;
+      el.__drawn49a = key;
+      if (o < 1e-4) el.removeAttribute('transform');
+      else el.setAttribute('transform', `translate(${item.hinge} 0) scale(${(1 - OPEN49A * o).toFixed(4)} 1) translate(${-item.hinge} 0)`);
+    }
+    if (this.cagePets49a) {
+      const n = Math.round(this.s.cageMove49a || 0);
+      if (this._cageSeen49a !== n) { this._cageSeen49a = n; for (const pet of this.cagePets49a) if (!pet.isCarried()) pet.apDung(); }
+    }
+  }
+  _twoHands49a(body, width, near) {
+    const other = near === 'L' ? 'R' : 'L', dir = near === 'L' ? -1 : 1;      // tay trái ở phía trái màn hình: nửa xa của con vật ở phía ấy
+    const a = this._kneelReach49a({ x: body.x + dir * width * 0.18, y: body.y }, near), b = this._kneelReach49a({ x: body.x - dir * width * 0.22, y: body.y + width * 0.05 }, other);
+    return { ['bat' + near]: a.upper, ['cang' + near]: a.fore, ['aim' + near]: 1, ['bat' + other]: b.upper, ['cang' + other]: b.fore, ['aim' + other]: 1 };
+  }
+  _kneelReach49a(point, hand = null) {
+    const s = this.s, was = { seat: s.seat, kneel: s.kneel };
+    s.seat = 1; s.kneel = 1;
+    const reach = this._reachLow(point, hand, 'body'), look = this._lookAngles({ x: reach.tx, y: reach.ty });
+    s.seat = was.seat; s.kneel = was.kneel;
+    return { ...reach, look };
+  }
+  _swingDoor49a(t, at, geo, k, from, to, d = 0.6) {
+    const s = this.s, start = this._kneelReach49a(geo.latchAt(from), k), end = this._kneelReach49a(geo.latchAt(to), k);
+    t.to(s, { ['bat' + k]: start.upper, ['cang' + k]: start.fore, ['aim' + k]: 1, ...start.look, duration: 0.45, ease: 'power2.out' }, at);
+    t.set(s, { ['tay' + k]: 'nam' }, at + 0.4);
+    t.to(s, { cageDoor49a: to, ['bat' + k]: end.upper, ['cang' + k]: end.fore, ...end.look, duration: d, ease: 'sine.inOut' }, at + 0.5);
+    t.set(s, { ['tay' + k]: 'mo' }, at + 0.5 + d);
+    return at + 0.5 + d;
+  }
+  putInCage(pet, cage = null, { hold = 0.5 } = {}) {
+    if (!pet || !pet.svg || typeof pet.apDung !== 'function' || !pet.el || !pet.el.dau || pet instanceof RigSVG) throw new Error('[character] putInCage(pet, cage): pet must be a pet rig (createPet(...).rig)');
+    if (!(typeof hold === 'number' && hold >= 0 && hold <= 6)) throw new Error(`[character] putInCage: hold must be 0…6 seconds, got ${JSON.stringify(hold)}`);
+    const geo = this._cage49a(cage, 'putInCage'), s = this.s, N = this.NGHI;
+    const me = HONG.x + (s.x || 0);
+    if (Math.sign(me - geo.at.x) !== geo.side) throw new Error(`[character] putInCage: stand on the latch side of the cage (the ${geo.side > 0 ? 'right' : 'left'}) — its door is hinged on the other side`);
+    const carrying = s.om >= 0.5 && this._carriedNow() && this._carriedNow().pet === pet;
+    if (s.om >= 0.5 && !carrying) throw new Error('[character] putInCage: already carrying another pet — putDown() first');
+    const home = this._petAt49a(pet);
+    const room = { w: (geo.open.x1 - geo.open.x0) * geo.k, h: (PROP_FRAME.floor - geo.open.y0) * geo.k };
+    if (home.width > room.w * FIT49A || home.height > room.h * FIT49A) throw new Error(`[character] putInCage: the pet is too big for this cage (${home.width.toFixed(0)} × ${home.height.toFixed(0)} frame units, the door opening is ${room.w.toFixed(0)} × ${room.h.toFixed(0)}) — make the cage wider / taller`);
+    if (Math.abs(home.feet - geo.at.y) > LEVEL49A) throw new Error('[character] putInCage: the cage floor must be level with where the pet stands (both on the floor) — the pet is set down inside the cage on that same floor');
+    const t = carrying ? this.tl() : this.carry(pet), B = carrying ? 0 : t.duration(), n = Math.round(s.cageMove49a || 0);
+    this._cageMove49a(pet, n, (geo.at.x - (home.centre + home.shift)) / home.unit);
+    this._cageDoor49a(geo);
+    const k = me > geo.at.x ? 'L' : 'R', other = k === 'L' ? 'R' : 'L';      // tay phía chuồng mở / đóng cửa
+    const inside = this._kneelReach49a({ x: geo.at.x + home.bodyOff, y: geo.at.y - home.height * 0.45 }), down = { seat: 1, kneel: 1, than: N.than - inside.lean * 0.6, dau: N.dau + inside.lean * 0.5, dauY: 6, cuoi: 0.8 };
+    t.to(s, { ...down, duration: 0.6, ease: 'power2.inOut' }, B);
+    t.to(s, { ['free49a' + k]: 1, duration: 0.3, ease: 'power2.out' }, B + 0.45);
+    const opened = this._swingDoor49a(t, B + 0.5, geo, k, 0, 1);
+    t.to(s, { ['free49a' + k]: 0, ['aim' + k]: 0, duration: 0.35, ease: 'power2.inOut' }, opened + 0.05);
+    const L0 = opened + 0.45;
+    t.to(s, { cageMove49a: n + 1, duration: 0.02 }, L0 - 0.05);
+    t.to(s, { ...this._twoHands49a({ x: geo.at.x + home.bodyOff, y: geo.at.y - home.height * 0.45 }, home.width, k), duration: 0.02 }, L0);
+    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, L0 + 0.02);
+    t.to(s, { ...inside.look, than: N.than - inside.lean, dau: N.dau + inside.lean * 0.8, dauY: 7, duration: 0.6, ease: 'power2.inOut' }, L0);
+    t.to(s, { omRise: 0, duration: 0.7, ease: 'sine.inOut' }, L0);
+    t.set(s, { om: 0 }, L0 + 0.72);
+    const R0 = L0 + 0.75;
+    t.to(s, { ['bat' + other]: N['bat' + other], ['cang' + other]: N['cang' + other], ['aim' + other]: 0, ...down, duration: 0.45, ease: 'power2.inOut' }, R0);
+    t.set(s, { tayL: 'mo', tayR: 'mo' }, R0 + 0.2);
+    const closed = this._swingDoor49a(t, R0 + 0.05, geo, k, 1, 0, 0.55);
+    t.to(s, { dauY: 11, cuoi: 1, duration: 0.18, ease: 'sine.out', yoyo: true, repeat: 1 }, closed + 0.1);
+    this._lookTo(t, null, closed + 0.15, { d: 0.5 });
+    this._khep(t, 0.55, closed + 0.5 + hold, { om: 0, omRise: 0, kneel: 0, seat: N.seat, cageMove49a: n + 1 });
+    return t;
+  }
+  takeOutOfCage(pet, cage = null) {
+    if (!pet || !pet.svg || typeof pet.apDung !== 'function' || !pet.el || !pet.el.dau || pet instanceof RigSVG) throw new Error('[character] takeOutOfCage(pet, cage): pet must be a pet rig (createPet(...).rig)');
+    if (this.s.om >= 0.5) throw new Error('[character] takeOutOfCage: already carrying a pet — putDown() first (both hands go into the cage)');
+    const geo = this._cage49a(cage, 'takeOutOfCage'), s = this.s, N = this.NGHI;
+    const me = HONG.x + (s.x || 0);
+    if (Math.sign(me - geo.at.x) !== geo.side) throw new Error(`[character] takeOutOfCage: stand on the latch side of the cage (the ${geo.side > 0 ? 'right' : 'left'}) — its door is hinged on the other side`);
+    const pt = this._petAt49a(pet), t = this.tl(), n = Math.round(s.cageMove49a || 0);
+    const body = { x: geo.at.x + pt.bodyOff, y: geo.at.y - pt.height * 0.45 };
+    const away = geo.side, want = me + away * (60 + pt.width * 0.5), drop = { x: want + pt.bodyOff, y: geo.at.y - pt.height * 0.45 };
+    this._cageMove49a(pet, n, (want - geo.at.x) / pt.unit);
+    this._cageDoor49a(geo);
+    const k = me > geo.at.x ? 'L' : 'R', inside = this._kneelReach49a(body), other = inside.k === 'L' ? 'R' : 'L';
+    const down = { seat: 1, kneel: 1, than: N.than - inside.lean * 0.6, dau: N.dau + inside.lean * 0.5, dauY: 6, cuoi: 0.8 };
+    this._holdEntry(t, { pet, host: pet.host || pet.svg.parentNode, attrs: pet.homeAttrs || ['x', 'y', 'width', 'height'].map((key) => [key, pet.svg.getAttribute(key)]),
+                     from: { x: pt.r.x0, y: pt.r.y0, w: pt.r.x1 - pt.r.x0, h: pt.r.y1 - pt.r.y0 }, reach: this._reachLow(drop, null, 'body'), at: s.x, middle: pt.middle, facing: s.huong });
+    t.to(s, { ...down, duration: 0.6, ease: 'power2.inOut' }, 0);
+    const opened = this._swingDoor49a(t, 0.4, geo, k, 0, 1);
+    const P = opened + 0.1;
+    t.to(s, { ...this._twoHands49a(body, pt.width, k), ...inside.look, than: N.than - inside.lean, dau: N.dau + inside.lean * 0.8, dauY: 7, duration: 0.5, ease: 'power2.out' }, P);
+    t.set(s, { tayL: 'xoe', tayR: 'xoe' }, P + 0.3);
+    t.set(s, { om: 1, omRise: 0 }, P + 0.5);
+    t.to(s, { omRise: 1, ...down, dauY: 3, nhinX: 0, nhinY: 1.8, headTurn: 0, headPitch: 0, cuoi: 1, duration: 0.65, ease: 'sine.inOut' }, P + 0.55);
+    t.to(s, { cageMove49a: n + 1, duration: 0.02 }, P + 1.25);
+    t.to(s, { ['free49a' + k]: 1, duration: 0.3, ease: 'power2.out' }, P + 1.25);
+    const closed = this._swingDoor49a(t, P + 1.3, geo, k, 1, 0, 0.55);
+    t.to(s, { ['free49a' + k]: 0, ['aim' + k]: 0, duration: 0.35, ease: 'power2.inOut' }, closed + 0.05);
+    this._lookTo(t, null, closed + 0.1, { d: 0.5 });
+    this._khep(t, 0.55, closed + 0.45, { om: 1, omRise: 1, huong: 0, kneel: 0, seat: N.seat, cageMove49a: n + 1 });
+    return t;
+  }
+  cage49aProbe() {
+    const s = this.s;
+    return { door: +(s.cageDoor49a || 0).toFixed(3), freeL: +(s.free49aL || 0).toFixed(3), freeR: +(s.free49aR || 0).toFixed(3), moves: Math.round(s.cageMove49a || 0) };
+  }
+});
+return { default: __default };
+})();
 __m['runtime/person/grooming.js'] = (function () {
 const { clamp, chuanHoaGoc, mix } = __m['runtime/person/shared.js'];
 const AIR_LEN49B = 36;                 // luồng gió dài chừng ấy (đơn vị khung bàn tay) từ miệng vòi sấy
@@ -5646,6 +6171,81 @@ const __default = (RigSVG) => mix(RigSVG, class {
 });
 return { default: __default };
 })();
+__m['runtime/person/leash49c.js'] = (function () {
+const { clamp, mix } = __m['runtime/person/shared.js'];
+const { leash } = __m['runtime/parts.js'];
+const __default = (RigSVG) => mix(RigSVG, class {
+  static LEASH_LEAD_49C = 0.55;     // giây đầu bước: móc dây vào vòng cổ (chưa dắt) hay cúi nhìn con vật "đi nào" (đang dắt) — hai trường hợp dài như nhau
+  static LEASH_TURN_49C = 0.14;     // rồi quay ngang, chân bắt đầu bước sau chừng ấy giây (như `walk`)
+  static LEASH_STEP_49C = 0.46;     // giây một bước (như `walk`)
+  static LEASH_SETTLE_49C = 0.45;   // dừng: khép về dáng nghỉ (như `walk`)
+  static LEASH_FLOOR_49C = 450;     // y thấp nhất của dây trong khung 400 × 470 (sàn ở 458): dây chùng nằm sát đất
+  static LEASH_ROPE_49C = 0.55;     // dây dài chừng ấy × chiều cao người: con vật đi trước một quãng thì dây gần căng, lùi lại gần thì võng xuống
+  leashPlan49c(buoc = 4, quang = 0) {
+    const lead = RigSVG.LEASH_LEAD_49C, start = lead + RigSVG.LEASH_TURN_49C;
+    const steps = quang ? this._doBuoc(Math.abs(quang), true, true).buoc : Math.max(2, Math.round(+buoc || 4));
+    const walk = steps * RigSVG.LEASH_STEP_49C;
+    return { lead, start, walk, end: start + walk + RigSVG.LEASH_SETTLE_49C, steps };
+  }
+  walkOnLeash(pet, buoc = 4, quang = 0) {
+    const real = pet && pet.live ? pet.live : pet;
+    if (!real || typeof real !== 'object' || !real.el || !real.el.vong || real instanceof RigSVG) throw new Error('[character] walkOnLeash(pet, steps, distance): pet must be a dog or cat rig (createPet(...).rig) — it does walkOnLeash(person, steps, distance) at the same time');
+    if (real.nv && real.nv.loai === 'rabbit') throw new Error('[character] walkOnLeash: not for a rabbit — a rabbit hops and is not walked on a leash; walk a dog (or a cat on a harness)');
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] walkOnLeash(pet, steps, distance): distance must be a number of frame units (negative = to the left), got ${JSON.stringify(quang)}`);
+    const s = this.s;
+    if (s.om >= 0.5) throw new Error('[character] walkOnLeash: the character is carrying a pet — putDown() first');
+    if (s.seat > 0.5 || s.kneel > 0.5 || s.ride > 0.5 || s.floor42e > 0.5 || s.lie42e > 0.5) throw new Error('[character] walkOnLeash: stand up first (standUp / getOff) — the character walks the pet from standing');
+    const now = this._leashNow49c(), walking = now ? now.pet : this.leashed;
+    if (walking && walking !== real && s.leash >= 0.5) throw new Error('[character] walkOnLeash: already walking another pet — unleash() first');
+    const chieu = quang < 0 ? -1 : 1, near = chieu > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    const has = (k) => !!(this.holds[k] && this.el['item' + k] && this.el['item' + k].querySelector('[data-leash]'));
+    let k = [this.leashHand, 'R', 'L'].find((side) => side && has(side) && s['item' + side] > 0.5) || [near, far].find(has);
+    if (!k) {
+      k = [near, far].find((side) => !this.holds[side]);
+      if (!k) throw new Error('[character] walkOnLeash: both hands hold something — give the character a leash: createCharacter(host, { id, items: { R: "leash" } })');
+      const keepArms = Object.fromEntries(['batL', 'cangL', 'tayL', 'batR', 'cangR', 'tayR', 'itemL', 'itemR'].map((key) => [key, s[key]]));
+      this.setItem(k, (p, c) => leash(c), { shown: false });
+      Object.assign(this.s, keepArms); this.apDung();
+    }
+    const shown = s['item' + k] > 0.5, on = walking === real && s.leash >= 0.5 && (now ? now.hand : this.leashHand) === k;
+    const list = this.leashPets49c = this.leashPets49c || [];
+    let slot = list.findIndex((item) => item.pet === real && item.hand === k);
+    if (slot < 0) { list.push({ pet: real, hand: k }); slot = list.length - 1; }
+    this.leashed = real; this.leashHand = k;
+    real.onDraw = () => this._drawLeash();
+    const t = this.tl(), N = this.NGHI, plan = this.leashPlan49c(buoc, quang), x0 = s.x;
+    t.set(s, { leashPet49c: slot + 1 }, 0);
+    if (!shown) {
+      t.set(s, { ['tay' + k]: 'nam' }, 0);
+      t.to(s, { ['item' + k]: 1, duration: 0.14 }, 0.04);
+    }
+    t.to(s, { dauY: on ? 4 : 6, nhinY: on ? 1.8 : 2.2, nhinX: chieu * 0.8, cuoi: 0.85, duration: 0.3, ease: 'sine.out' }, 0);
+    if (!on) t.set(s, { leash: 1 }, 0.35);
+    t.to(s, { leashRope49c: 1, duration: 0.3, ease: 'sine.inOut' }, 0.3);          // dây theo độ dài thật của nó (võng theo khoảng cách)
+    t.to(s, { dauY: N.dauY, nhinY: 0.9, cuoi: 0.6, duration: 0.2, ease: 'sine.inOut' }, 0.35);
+    t.to(s, { huong: chieu, duration: 0.4, ease: 'power2.inOut' }, plan.lead);
+    t.to(s, { nhinX: chieu * 1.2, nhinY: 1, duration: 0.4, ease: 'sine.inOut' }, plan.lead + 0.2);
+    const arm = { ['vung' + k]: 0.4, ['bat' + k]: 5, ['cang' + k]: -8, ['carry' + k]: 0 };
+    let at;
+    if (quang) {
+      const d = this._doBuoc(Math.abs(quang), true, true);
+      at = this._di(t, plan.start, d.buoc, RigSVG.LEASH_STEP_49C, { kA: d.kA, chieu, x: (b) => x0 + chieu * d.x(b), arm49c: arm });
+    } else at = this._di(t, plan.start, plan.steps, RigSVG.LEASH_STEP_49C, { arm49c: arm });
+    this._khep(t, RigSVG.LEASH_SETTLE_49C, at, { ...(quang ? { x: x0 + quang } : {}), leash: 1, leashRope49c: 1, leashPet49c: slot + 1 });
+    return t;
+  }
+  _leashNow49c() {
+    const n = Math.round(+this.s.leashPet49c || 0), list = this.leashPets49c;
+    return n > 0 && list && list[n - 1] ? list[n - 1] : null;
+  }
+  _leashControl49c(a, b, span) {
+    const L = RigSVG.LEASH_ROPE_49C * RigSVG.KHUNG.h * 0.96, d = Math.max(1.5, Math.sqrt(Math.max(0, 3 * span * (L - span) / 8)));
+    const y = Math.min((a.y + b.y) / 2 + 2 * clamp(d, 0, 90), (4 * RigSVG.LEASH_FLOOR_49C - a.y - b.y) / 2);
+    return { x: (a.x + b.x) / 2, y: Math.max(y, (a.y + b.y) / 2) };
+  }
+});
+return { default: __default };
+})();
 __m['runtime/rig-svg.js'] = (function () {
 const { KHUNG, DOI_Y, NGHI, MAU_MAC_DINH, veKhuonMat, beRongTaiY, veChanMay, HONG, VAI, DAI, CHOT_VAI, UC_DON, GOC_VAI_MAX, CALL_POSE, CALL_TILT, RIDE_THIGH, RIDE_KNEE, RIDE_LEAN, RIDE_ARM, CONE_GRIP, KNEEL_SHIN, UPRIGHT_HANDS, HANDS_39, CRADLE, CAP_RADIUS, CAP_DROP, CAP_SOLID, GLOVE, GLOVE_RIM, GLOVE_LINE, SPRAY_LEN42F, FOAM_BUBBLES, clamp, chuanHoaGoc, gieoHat, RAD, mem, pha, napTayAo, gauTayAo, veDemVai, veTayAo, veGauTayAo, veDuongMayVai, nhacChotVai, chinhSang, tron, assertColors, NV_MAC_DINH, rongGau, NV_BAC_SI_THU_Y, luuHat, traHat, mix } = __m['runtime/person/shared.js'];
 const { MARKS, freshMark, attachMark, drawMark, markTweens, markOff } = __m['runtime/marks.js'];
@@ -5663,7 +6263,9 @@ const pairs = __m['runtime/person/pairs.js'].default;
 const floor = __m['runtime/person/floor.js'].default;
 const stance = __m['runtime/person/stance.js'].default;
 const speech = __m['runtime/person/speech.js'].default;
+const cage = __m['runtime/person/cage.js'].default;
 const grooming = __m['runtime/person/grooming.js'].default;
+const leash49c = __m['runtime/person/leash49c.js'].default;
 class RigSVG {
   static KHUNG = KHUNG;
   static NGHI = NGHI;
@@ -5689,6 +6291,7 @@ class RigSVG {
   static { this.EXCHANGE.push('pullToy'); }       // đợt 40 A — kéo co: cần con chó (`tugOfWar` cùng lúc)
   static { this.DONG_TAC.push('jump', 'dance'); this.DI_NGANG.push('run'); }       // đợt 42 D — nhảy lên, nhảy múa (tại chỗ); chạy (dời `x`, quay ngang)
   static { this.STANCE.push('sitOnFloor', 'lieDown'); this.EXCHANGE.push('pickUp'); }       // đợt 42 E — ngồi bệt / nằm (thế giữ tới `standUp`); nhặt đồ (kết thúc với món đồ trong tay)
+  static { this.WITH_ITEM.push('walkOnLeash'); }       // đợt 49 C — dắt chó đi dạo: cần con vật (nó `walkOnLeash` cùng lúc) — có bài kiểm riêng
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
   static traNgau(state) { traHat(state); }
@@ -6241,6 +6844,7 @@ class RigSVG {
     this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
     this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
     this._drawScales();
+    this._drawCages49a();                   // đợt 49 A: cửa chuồng xoay theo `cageDoor49a`, con vật vừa vào / ra chuồng vẽ lại
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
       el.style.display = on ? '' : 'none';
@@ -6591,8 +7195,9 @@ class RigSVG {
     }
     const cradle = clamp(s.omRise, 0, 1) * (1 - clamp(s.omGive || 0, 0, 1));
     if (cradle) for (const [side, sign] of [['L', 1], ['R', -1]]) {
-      rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * cradle;
-      rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * cradle;
+      const hug = cradle * (1 - clamp(s['free49a' + side] || 0, 0, 1));          // đợt 49 A: tay ấy rời con vật (mở cửa chuồng), tay kia vẫn ôm
+      rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * hug;
+      rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * hug;
     }
     const held40 = cradle ? this._carriedNow() : null, squirm = held40 && held40.pet && held40.pet.s ? clamp(+held40.pet.s.vung || 0, -1, 1) : 0;
     if (squirm) for (const [side, sign] of [['L', 1], ['R', -1]]) {
@@ -6797,10 +7402,11 @@ class RigSVG {
     e.ball.style.display = '';
   }
   _drawLeash() {
-    const line = this.el && this.el.leash, pet = this.leashed;
+    const now49c = this._leashNow49c();          // đợt 49 C: dắt con nào, tay nào — theo trạng thái (`leashPet49c`), một người dắt lần lượt nhiều con
+    const line = this.el && this.el.leash, pet = now49c ? now49c.pet : this.leashed;
     if (!line) return;
     if (!pet || this.s.leash < 0.5 || !pet.el || !pet.el.vong || !this.svg.getScreenCTM) { line.style.display = 'none'; return; }
-    const k = this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
+    const k = now49c ? now49c.hand : this.leashHand, hand = this.el['coTay' + k], toRoot = this.svg.getScreenCTM();
     const handCTM = hand && hand.getScreenCTM();
     if (!toRoot || !handCTM) { line.style.display = 'none'; return; }
     const inverse = toRoot.inverse();
@@ -6808,7 +7414,9 @@ class RigSVG {
     const collar = pet.el.vong.getBoundingClientRect();
     const b = new DOMPoint(collar.left + collar.width / 2, collar.top + collar.height / 2).matrixTransform(inverse);
     const span = Math.hypot(b.x - a.x, b.y - a.y), sag = Math.min(40, span * 0.16);
-    const mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    let mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + sag;
+    const rope49c = clamp(+this.s.leashRope49c || 0, 0, 1);
+    if (rope49c > 0) { const c = this._leashControl49c(a, b, span); mx += (c.x - mx) * rope49c; my += (c.y - my) * rope49c; }
     line.setAttribute('d', `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
     line.style.display = '';
   }
@@ -6974,9 +7582,12 @@ class RigSVG {
     so.omSlot = this.s.omSlot;                                 // … và vẫn là lần bế ấy (đợt 37)
     so.petDrop = this.s.petDrop;                               // con vật đã nhận thì đặt xuống ở chỗ mới (`takePet`, đợt 30)
     so.leash = this.s.leash;                                   // đang dắt thú thì vẫn dắt
+    so.leashRope49c = this.s.leashRope49c;                     // đợt 49 C: … và dây vẫn võng theo độ dài thật của nó
+    so.leashPet49c = this.s.leashPet49c;                       // … và vẫn là con vật ấy
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
+    so.cageMove49a = this.s.cageMove49a;                       // đợt 49 A: con vật đã đưa vào / ra chuồng thì ở chỗ mới
     so.petShag49b = this.s.petShag49b; so.petCutT49b = this.s.petCutT49b; so.petCutDur49b = this.s.petCutDur49b; so.petTrimStart49b = this.s.petTrimStart49b; so.petTrimEnd49b = this.s.petTrimEnd49b;      // đợt 49 B: lông đã tỉa thì còn gọn
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
     for (const side of ['L', 'R']) {
@@ -7047,7 +7658,7 @@ class RigSVG {
     for (let i = 0; i < 4; i++) { kA *= quang / b.tong; b = this._bangDi(buoc, vao, ra, kA); }
     return { buoc, kA, x: (v) => b.x(v) * (quang / b.tong) };
   }
-  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1 } = {}) {
+  _di(t, at, buoc, h, { vao = true, ra = true, kA = 1, x = null, chieu = 1, arm49c = null } = {}) {
     const s = this.s, bao = this._baoDi(buoc, vao, ra);
     const dat = (b) => {
       const o = this._tuTheDi(0.75 + b / 2, bao(b), kA).o;
@@ -7058,6 +7669,7 @@ class RigSVG {
         o.than = N.than - (a.than - N.than); o.dau = N.dau - (a.dau - N.dau);
       }
       for (const side of ['L', 'R']) if (this.holds[side] && s['item' + side] > 0.5) o['vung' + side] *= 0.15;
+      if (arm49c) { const w = bao(b); for (const key in arm49c) { const from = key in o ? o[key] : this.NGHI[key]; o[key] = from + (arm49c[key] - from) * w; } }      // kênh dáng đi không ghi (`carry`): từ dáng nghỉ
       Object.assign(s, o);
       if (x) s.x = x(b);
     };
@@ -7066,9 +7678,11 @@ class RigSVG {
     return at + buoc * h;
   }
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
+  static { this.EXCHANGE.push('putInCage', 'takeOutOfCage'); }      // đợt 49 A
   static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
 }
-for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, grooming]) install(RigSVG);
+for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
+leash49c(RigSVG);       // đợt 49 C
 return { RigSVG, veKhuonMat, beRongTaiY, veChanMay };
 })();
 __m['runtime/pet/shared.js'] = (function () {
@@ -8744,6 +9358,77 @@ const __default = (RigThu) => mix(RigThu, class {
 });
 return { default: __default };
 })();
+__m['runtime/pet/leash49c.js'] = (function () {
+const { clamp, mem, mix } = __m['runtime/pet/shared.js'];
+const __default = (RigThu) => mix(RigThu, class {
+  static LEASH_AHEAD_49C = 0.4;     // dừng lại với TÂM con vật đi trước giữa người chừng ấy × chiều cao người (dây gần căng, không chạm chân người)
+  static LEASH_TRAIL_49C = 0.32;     // … hay THEO SAU chừng ấy, khi lúc bắt đầu nó ở phía sau hướng đi quá LEASH_TRAIL_FROM_49C × chiều cao người (người quay đầu đi ngược lại)
+  static LEASH_TRAIL_FROM_49C = 0.12;
+  static LEASH_BEAT_49C = 0.36;      // giây một nhịp chân kiệu (chừng ấy — số nhịp tròn cho vừa thời gian bước của người)
+  static LEASH_PLAN_49C = { lead: 0.55, start: 0.69, step: 0.46, settle: 0.45 };   // nhịp của người khi không có người (như RigSVG.LEASH_*_49C)
+  walkOnLeash(person = null, buoc = 4, quang = 0, { distance = null } = {}) {
+    this._only('walkOnLeash', ['dog', 'cat']);
+    const real = person && person.live ? person.live : person;
+    if (person !== null && (typeof person !== 'object' || !real || typeof real.leashPlan49c !== 'function')) throw new Error('[character] walkOnLeash(person, steps, distance): person must be the person walking this pet (createCharacter(...).rig) — they walkOnLeash(pet, steps, distance) at the same time');
+    if (typeof quang !== 'number' || !isFinite(quang)) throw new Error(`[character] walkOnLeash(person, steps, distance): distance must be a number (the person's frame units, negative = to the left), got ${JSON.stringify(quang)}`);
+    if (distance !== null && (typeof distance !== 'number' || !isFinite(distance))) throw new Error(`[character] walkOnLeash: { distance } must be a number of the pet's frame units, got ${JSON.stringify(distance)}`);
+    const t = this.tl(), s = this.s, x0 = s.x, P = RigThu.LEASH_PLAN_49C, dog = this.nv.loai === 'dog';
+    const plan = real ? real.leashPlan49c(buoc, quang) : (() => { const steps = Math.max(2, Math.round(+buoc || 4)); return { lead: P.lead, start: P.start, walk: steps * P.step }; })();
+    const held = s.huong < 0 ? -1 : 1;
+    let dx = 0, along = null;          // `along`: quãng NGƯỜI đi, đổi ra đơn vị khung của nó (null = không biết)
+    const metrics = real ? this._personMetrics(person, 'walkOnLeash') : null;
+    if (metrics) along = quang * (metrics.H / (470 * 0.96)) / metrics.scale;
+    if (distance !== null) dx = distance;
+    else if (metrics) {
+      const { cx, H, scale } = metrics, dir = quang < 0 ? -1 : quang > 0 ? 1 : held, me = this.centerX();
+      const lead = (me - cx) * dir < -RigThu.LEASH_TRAIL_FROM_49C * H ? -RigThu.LEASH_TRAIL_49C : RigThu.LEASH_AHEAD_49C;
+      dx = quang ? (cx + quang * H / (470 * 0.96) + dir * lead * H - me) / scale : 0;
+    } else dx = quang;
+    if (Math.abs(dx) < 3) dx = 0;
+    const dir = dx < 0 ? -1 : dx > 0 ? 1 : quang < 0 ? -1 : quang > 0 ? 1 : held;
+    let at = this._dung(t, 0);
+    at = this._quayVe(t, Math.max(at, 0.1), dir);
+    t.to(s, { taiL: 0.6, taiR: 0.6, cuoi: 0.85, mieng: dog ? 0.25 : 0, luoi: dog ? 0.5 : 0, nhinY: -0.8, duration: 0.25 }, at);
+    if (dog) this._vay(t, at, Math.max(2, Math.floor((plan.start - at) / 0.1)), 30, 0.1, 18);
+    const walk = plan.walk, start = Math.max(at, plan.start);
+    const cycles = Math.max(2, Math.round(walk / RigThu.LEASH_BEAT_49C)), h = walk / cycles;
+    let boost = 0;
+    if (dx && along !== null && Math.sign(along) !== -Math.sign(dx)) {
+      const total = Math.abs(dx), extra = total - Math.abs(along), f = clamp((Math.abs(along) / 2 + 0.85 * extra) / total, 0.3, 0.8);
+      boost = clamp(2 * (2 * f - 1) / (1 - f), -0.6, 1.5);
+    }
+    const stride = (c) => 1 + boost * Math.max(0, 1 - c / (0.5 * cycles));
+    const unitTable = (A) => { const M = 60, n = Math.round(cycles * M), bao = (c) => mem(c / 0.5) * mem((cycles - c) / 0.5); let X = 0; for (let i = 1; i <= n; i++) X += (2 * A * stride(i / M) / 0.6) * bao(i / M) / M; return X; };
+    const A = dx ? clamp(Math.abs(dx) / unitTable(1), 6, 24 / (1 + Math.max(0, boost))) : 13, lift = clamp(A * 0.7, 7, 13);
+    const sniff = dog && walk >= 1.4 ? [0.22, 0.5] : null, back = walk >= 1.4 ? [0.66, 0.94] : null;
+    const bump = (u, [a, b]) => { const k = (u - a) / (b - a); return k <= 0 || k >= 1 ? 0 : mem(k / 0.25) * mem((1 - k) / 0.25); };
+    const add = (c) => {
+      const u = c / cycles, w = sniff ? bump(u, sniff) : 0, r = back ? bump(u, back) : 0;
+      return { dauY: 24 * w, dauX: 12 * w, dau: 14 * w - 9 * r, truocY: 4 * w, taiL: 0.6 - 0.9 * w, taiR: 0.6 - 0.9 * w, duoi: dog ? 0 : 26,
+               nhinX: -dir * 1.8 * r, nhinY: 1.2 * w - 1 * r, mieng: dog ? 0.25 * (1 - w) : 0, luoi: dog ? 0.5 * (1 - w) : 0 };
+    };
+    this._diLeash49c(t, start, cycles, h, { quang: dx, x0, A, cao: lift, stride }, add);
+    this._khep(t, 0.45, start + walk, { ...(dx ? { x: x0 + dx } : {}), huong: dir });
+    return t;
+  }
+  _diLeash49c(t, at, chuKy, h, { quang = 0, x0 = 0, A = 13, cao = 9, stride = () => 1 } = {}, add = () => ({})) {
+    const s = this.s, bao = (c) => mem(c / 0.5) * mem((chuKy - c) / 0.5);
+    const M = 60, n = Math.round(chuKy * M), X = [0];
+    for (let i = 1; i <= n; i++) X.push(X[i - 1] + (2 * A * stride(i / M) / 0.6) * bao(i / M) / M);
+    const tiLe = quang ? Math.abs(quang) / X[n] : 0, dau = quang < 0 ? -1 : 1, rest = this.NGHI, owner = this;
+    const pr = { _c: 0, get c() { return this._c; }, set c(v) {
+      this._c = v;
+      const a = bao(v), step = owner._buoc(v, a, A * stride(v) * (tiLe ? clamp(tiLe, 0.5, 1.35) : 1), cao), more = add(v), on = Math.min(1, a * 3);
+      for (const k of Object.keys(more)) step[k] = k in step ? step[k] + more[k] * on : (rest[k] || 0) + more[k];
+      Object.assign(s, step);
+      if (quang) { const q = clamp(v, 0, chuKy) * M, i = Math.min(n - 1, Math.floor(q)); s.x = x0 + dau * tiLe * (X[i] + (X[i + 1] - X[i]) * (q - i)); }
+    } };
+    t.to(pr, { c: chuKy, duration: chuKy * h, ease: 'none' }, at);
+    return at + chuKy * h;
+  }
+});
+return { default: __default };
+})();
 __m['runtime/rig-thu.js'] = (function () {
 const { KHUNG, LIE, HELD, DAT, clamp, RAD, mem, pha, gieoHat, chinhSang, assertColors, NGHI, carrotSVG, toyShapeSVG, toyMouthSVG, LOAI, SHAPE_RANGE, DEFAULT_SHAPE, shapedSpecies, khop, SYMPTOMS, WEARABLES, luuHat, traHat, mix } = __m['runtime/pet/shared.js'];
 const { freshMark, attachMark, drawMark } = __m['runtime/marks.js'];
@@ -8755,6 +9440,7 @@ const species = __m['runtime/pet/species.js'].default;
 const tricks = __m['runtime/pet/tricks.js'].default;
 const mood = __m['runtime/pet/mood.js'].default;
 const grooming = __m['runtime/pet/grooming.js'].default;
+const leash49c = __m['runtime/pet/leash49c.js'].default;
 class RigThu {
   static KHUNG = KHUNG;
   static NGHI = NGHI;
@@ -8768,6 +9454,7 @@ class RigThu {
   static {
     RigThu.DONG_TAC.cat.push('groomFace', 'loaf', 'slowBlink', 'batToy', 'archBack', 'sitInBox');
     RigThu.DONG_TAC.rabbit.push('binky', 'flop', 'periscope', 'noseTwitch');      // `flop` là thế giữ (như lieDown) nhưng chỉ của thỏ nên nằm trong danh sách thỏ, không trong STANCE chung
+    RigThu.DONG_TAC.dog.push('walkOnLeash'); RigThu.DONG_TAC.cat.push('walkOnLeash');
   }
   static gieo(hat) { gieoHat(hat); }
   static luuNgau() { return luuHat(); }
@@ -9256,6 +9943,7 @@ class RigThu {
     rollOver: 'Lăn ngửa', chaseTail: 'Đuổi đuôi', knead: 'Nhào', lick: 'Liếm', hide: 'Chạy nấp', eatCarrot: 'Gặm cà rốt',
     groomFace: 'Rửa mặt', loaf: 'Nằm ổ bánh mì', slowBlink: 'Chớp mắt chậm', batToy: 'Vờn đồ chơi', archBack: 'Cong lưng dựng lông', sitInBox: 'Chui hộp',   // đợt 40 B
     binky: 'Nhảy vui', flop: 'Nằm vật ra', periscope: 'Đứng hai chân', noseTwitch: 'Giật mũi',   // đợt 40 B
+    walkOnLeash: 'Được dắt đi dạo',   // đợt 49 C
   };
   static WITH_WEAR = ['pawAtCone'];
   static { for (const kind of Object.keys(this.DONG_TAC)) this.DONG_TAC[kind].push('shiverAtVet', 'struggle', 'groggy', 'pawAtCone'); Object.assign(this.TEN_DONG_TAC, { shiverAtVet: 'Sợ run ở phòng khám', struggle: 'Vùng vẫy', groggy: 'Lừ đừ sau thuốc mê', pawAtCone: 'Cào loa' }); }
@@ -9356,6 +10044,7 @@ class RigThu {
   dropX() {
     let x = 0;
     if (this.drops) for (const [rig, amount] of this.drops) x += (rig.s.petDrop || 0) * amount;
+    if (this.cagers49a) for (const rig of this.cagers49a) { const n = Math.round(rig.s.cageMove49a || 0); (rig.cageMoves49a || []).slice(0, n).forEach((move) => { if (move && move.pet === this) x += move.dx; }); }
     return x;
   }
   headPose() {
@@ -9596,6 +10285,7 @@ class RigThu {
   }
 }
 for (const install of [poses, play, basic, species, tricks, mood, grooming]) install(RigThu);
+leash49c(RigThu);       // đợt 49 C
 return { RigThu };
 })();
 __m['runtime/characters.js'] = (function () {
@@ -9918,325 +10608,6 @@ function dangKyDau(RigSVG, gocTen = 'vet') {
   return Object.keys(ds);
 }
 return { KIT, dungDau, dangKyDau };
-})();
-__m['runtime/props.js'] = (function () {
-const PROP_FRAME = { w: 400, h: 470, floor: 458, centre: 200 };
-const SEAT_DEFAULT = 372;                      // cao độ mặt ghế khớp nhân vật có sẵn khi không đưa `for`
-const shade = (hex, amount) => {               // tối đi (amount < 0) hoặc sáng lên một màu #rrggbb
-  const n = parseInt(hex.slice(1), 16), mix = (v) => Math.max(0, Math.min(255, Math.round(v + (amount < 0 ? v : 255 - v) * amount)));
-  return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => mix(v).toString(16).padStart(2, '0')).join('');
-};
-const DRAW = {
-  stool: ({ seat, w = 84, color, dark, line }) => {
-    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
-    return `
-    <path d="M ${x0 + 12} ${seat + 8} L ${x0 + 2} ${F} M ${x1 - 12} ${seat + 8} L ${x1 - 2} ${F}" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
-    <path d="M ${x0 + 9} ${seat + (F - seat) * 0.6} H ${x1 - 9}" stroke="${dark}" stroke-width="4.500" stroke-linecap="round"/>
-    <rect x="${x0}" y="${seat}" width="${w}" height="13" rx="6.500" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
-  },
-  chair: ({ seat, w = 108, back = 92, color, dark, line }) => {
-    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2;
-    return `
-    <rect x="${x0 + 4}" y="${seat - back}" width="${w - 8}" height="${back + 6}" rx="12" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
-    <path d="M ${x0 + 9} ${seat + 10} V ${F} M ${x1 - 9} ${seat + 10} V ${F}" stroke="${dark}" stroke-width="8" stroke-linecap="round"/>
-    <rect x="${x0}" y="${seat}" width="${w}" height="15" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
-  },
-  table: ({ w = 230, height = 150, color, dark, line }) => {
-    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2, x1 = 200 + w / 2;
-    return `
-    <path d="M ${x0 + 18} ${top + 10} V ${F} M ${x1 - 18} ${top + 10} V ${F}" stroke="${dark}" stroke-width="10" stroke-linecap="round"/>
-    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
-  },
-  counter: ({ w = 300, height = 150, color, dark, line }) => {
-    const F = PROP_FRAME.floor, top = F - height, x0 = 200 - w / 2;
-    return `
-    <rect x="${x0 + 6}" y="${top + 8}" width="${w - 12}" height="${height - 8}" fill="${dark}" stroke="${line}" stroke-width="1.400"/>
-    <path d="M ${x0 + 6 + (w - 12) / 3} ${top + 16} V ${F - 6} M ${x0 + 6 + (w - 12) * 2 / 3} ${top + 16} V ${F - 6}" stroke="${line}" stroke-width="1.200" opacity=".45"/>
-    <rect x="${x0}" y="${top}" width="${w}" height="13" rx="4" fill="${color}" stroke="${line}" stroke-width="1.400"/>`;
-  },
-  plant: ({ w = 120, color, dark, line }) => {
-    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, rim = F - 92;
-    const leaf = (angle, length, tone) => `<path d="M 200 ${rim + 4} q ${Math.sin(angle) * length * 0.55 - 14} ${-Math.cos(angle) * length * 0.5} ${Math.sin(angle) * length} ${-Math.cos(angle) * length} q ${-Math.sin(angle) * length * 0.25 + 16} ${Math.cos(angle) * length * 0.55} ${-Math.sin(angle) * length} ${Math.cos(angle) * length} z" fill="${tone}" stroke="#2f5a3a" stroke-width="1.400" stroke-linejoin="round"/>`;
-    return `
-    ${leaf(-1.05, 170, '#5f9a68')}${leaf(1.0, 180, '#5f9a68')}${leaf(-0.45, 250, '#4f8a5b')}${leaf(0.5, 240, '#4f8a5b')}${leaf(0.02, 290, '#6aa873')}
-    <path d="M ${x0} ${rim} H ${x1} L ${x1 - 14} ${F} H ${x0 + 14} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
-    <rect x="${x0 - 6}" y="${rim - 6}" width="${w + 12}" height="18" rx="6" fill="${dark}" stroke="${line}" stroke-width="1.400"/>`;
-  },
-  laptop: ({ w = 96, on = 150, facing = 'away', image, color, dark, line }) => {
-    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.58;       // nắp thấp vừa đủ che bàn tay, để lộ vai và đầu đang cúi
-    const base = `<rect x="${x0 - 6}" y="${top - 5}" width="${w + 12}" height="6" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1.200"/>`;
-    if (facing === 'viewer') return `
-    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="#22262e" stroke="${line}" stroke-width="1.400"/>
-    ${screen(x0 + 5, top - h, w - 10, h - 10, image)}${noteCard(x0 + 5, top - h, w - 10, h - 10)}${base}`;
-    return `
-    <rect x="${x0}" y="${top - 5 - h}" width="${w}" height="${h}" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
-    <circle cx="200" cy="${top - 5 - h / 2}" r="${w * 0.07}" fill="${shade(color, 0.45)}"/>${base}`;
-  },
-  monitor: ({ w = 150, on = 150, image, color, dark, line }) => {
-    const top = PROP_FRAME.floor - on, x0 = 200 - w / 2, h = w * 0.62, y0 = top - 26 - h;
-    return `
-    <path d="M 192 ${top - 28} h 16 l 5 24 h -26 z" fill="${dark}" stroke="${line}" stroke-width="1.200" stroke-linejoin="round"/>
-    <rect x="172" y="${top - 6}" width="56" height="6" rx="3" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
-    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
-    ${screen(x0 + 6, y0 + 6, w - 12, h - 12, image)}${noteCard(x0 + 6, y0 + 6, w - 12, h - 12)}`;
-  },
-  bowl: ({ w = 46, fill = 'food', color, dark, line }) => {
-    const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, h = w * 0.36;
-    const inside = fill === 'water' ? `<ellipse cx="200" cy="${F - h + 2}" rx="${w * 0.4}" ry="${w * 0.09}" fill="#8fd0f0"/>`
-      : fill === 'food' ? [-12, -5, 2, 9, -8, 5].map((dx, n) => `<circle cx="${200 + dx * w / 46}" cy="${F - h + (n > 3 ? -1 : 1)}" r="${w * 0.07}" fill="#a0612f" stroke="#6e3e1b" stroke-width=".6"/>`).join('') : '';
-    return `
-    <path d="M ${x0} ${F - h} L ${x0 + w * 0.12} ${F} H ${x1 - w * 0.12} L ${x1} ${F - h} Z" fill="${color}" stroke="${line}" stroke-width="1.400" stroke-linejoin="round"/>
-    <ellipse cx="200" cy="${F - h}" rx="${w / 2}" ry="${w * 0.12}" fill="${dark}" stroke="${line}" stroke-width="1.200"/>${inside}`;
-  },
-  scale: ({ w = 210, reading = '', color, dark, line }) => {
-    const F = PROP_FRAME.floor, x0 = 200 - w / 2, top = F - 14;
-    const text = String(reading).replace(/[<&"]/g, '');
-    return `
-    <rect x="${x0}" y="${top}" width="${w}" height="14" rx="5" fill="${color}" stroke="${line}" stroke-width="1.400"/>
-    <rect x="${x0 + 8}" y="${top - 3}" width="${w - 16}" height="5" rx="2.500" fill="${dark}" stroke="${line}" stroke-width="1"/>
-    <rect x="${200 - 30}" y="${top + 2}" width="60" height="10" rx="2" fill="#18222b"/>
-    ${text ? `<text x="200" y="${top + 10.5}" font-family="Arial, sans-serif" font-size="9" font-weight="700" fill="#7dffb0" text-anchor="middle" data-layout-ignore="">${text}</text>` : ''}`;
-  },
-  tub: ({ w = 240, height = 40, color, dark, line }) => {
-    const F = PROP_FRAME.floor, h = height, ry = Math.max(6, Math.min(12, w * 0.04)), cy = F - h - ry + 3, x0 = 200 - w / 2, x1 = 200 + w / 2;
-    const front = `M ${x1} ${cy} A ${w / 2} ${ry} 0 0 1 ${x0} ${cy}`, back = `M ${x0} ${cy} A ${w / 2} ${ry} 0 0 1 ${x1} ${cy}`;
-    return `
-    <ellipse cx="200" cy="${cy}" rx="${w / 2}" ry="${ry}" fill="#cfe6ee"/>
-    <ellipse cx="200" cy="${cy + ry * 0.35}" rx="${w / 2 - 6}" ry="${ry * 0.6}" fill="#8fd0f0" opacity=".75"/>
-    <path d="${back}" fill="none" stroke="#6f97a8" stroke-width="7.400" stroke-linecap="round"/><path d="${back}" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
-    <rect x="${x0 + 16}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/><rect x="${x1 - 30}" y="${F - 5}" width="14" height="5" rx="2" fill="${dark}"/>
-    <path d="M ${x1} ${cy} L ${x1 - 12} ${F - 9} Q ${x1 - 14} ${F - 3} ${x1 - 22} ${F - 3} L ${x0 + 22} ${F - 3} Q ${x0 + 14} ${F - 3} ${x0 + 12} ${F - 9} L ${x0} ${cy} A ${w / 2} ${ry} 0 0 0 ${x1} ${cy} Z" fill="#eaf6fb" stroke="${line}" stroke-width="1.600" stroke-linejoin="round"/>
-    <path d="M ${x0 + 9} ${F - h * 0.42} q ${w / 8} -7 ${w / 4} 0 t ${w / 4} 0 t ${w / 4} 0 t ${w / 4 - 18} 0" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".8"/>
-    <path d="M ${x0 + 14} ${cy + ry + 6} Q ${x0 + 18} ${F - h * 0.3} ${x0 + 22} ${F - 10}" fill="none" stroke="#ffffff" stroke-width="3.400" stroke-linecap="round" opacity=".85"/>
-    <path d="${front}" fill="none" stroke="#6f97a8" stroke-width="8.400" stroke-linecap="round"/><path data-tub-rim42f="" d="${front}" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>`;
-  },
-  tree: ({ w = 300, color, dark, line }) => {
-    const F = PROP_FRAME.floor, r = w * 0.36;
-    return `
-    <path d="M ${200 - w * 0.06} ${F} L ${200 - w * 0.045} ${F - 260} L ${200 + w * 0.045} ${F - 260} L ${200 + w * 0.06} ${F} Z" fill="#8a6245" stroke="#5e4130" stroke-width="1.6"/>
-    <circle cx="${200 - r * 0.7}" cy="${F - 330}" r="${r}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
-    <circle cx="${200 + r * 0.7}" cy="${F - 340}" r="${r * 0.95}" fill="${dark}" stroke="${line}" stroke-width="1.6"/>
-    <circle cx="200" cy="${F - 430}" r="${r * 1.05}" fill="${color}" stroke="${line}" stroke-width="1.6"/>
-    <circle cx="${200 - r * 0.35}" cy="${F - 455}" r="${r * 0.3}" fill="#ffffff" opacity=".18"/>`;
-  },
-  floorlamp: ({ color, dark, line }) => {
-    const F = PROP_FRAME.floor, top = F - 400;
-    return `
-    <ellipse cx="200" cy="${F - 6}" rx="34" ry="8" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
-    <rect x="197" y="${top + 60}" width="6" height="${400 - 66}" fill="${dark}" stroke="${line}" stroke-width="1"/>
-    <path d="M 168 ${top} H 232 L 252 ${top + 66} H 148 Z" fill="${color}" stroke="${line}" stroke-width="1.6" stroke-linejoin="round"/>
-    <path d="M 172 ${top + 14} H 228" stroke="${line}" stroke-width="1" opacity=".25"/>
-    <ellipse cx="200" cy="${top + 64}" rx="46" ry="6" fill="#fff3c4" opacity=".9"/>`;
-  },
-  tv: ({ color, dark, line }) => {
-    const F = PROP_FRAME.floor, cab = F - 54, y0 = cab - 12 - 96;
-    return `
-    <rect x="118" y="${cab}" width="164" height="50" rx="4" fill="#a47551" stroke="#6e4a30" stroke-width="1.4"/>
-    <path d="M 200 ${cab} V ${cab + 50}" stroke="${line}" stroke-width="1" opacity=".35"/>
-    <rect x="124" y="${F - 6}" width="10" height="6" fill="${dark}"/><rect x="266" y="${F - 6}" width="10" height="6" fill="${dark}"/>
-    <rect x="186" y="${cab - 12}" width="28" height="12" fill="${dark}" stroke="${line}" stroke-width="1"/>
-    <rect x="112" y="${y0}" width="176" height="100" rx="5" fill="${color}" stroke="${line}" stroke-width="1.4"/>
-    <defs><linearGradient id="tvglow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8f0ff"/><stop offset=".55" stop-color="#8cc4ee"/><stop offset="1" stop-color="#5a8fc4"/></linearGradient></defs>
-    <rect x="118" y="${y0 + 6}" width="164" height="88" rx="2" fill="url(#tvglow)"/>
-    <path d="M 118 ${y0 + 70} L 160 ${y0 + 46} L 190 ${y0 + 64} L 226 ${y0 + 36} L 282 ${y0 + 72} V ${y0 + 94} H 118 Z" fill="#ffffff" opacity=".22"/>`;
-  },
-  lamp: ({ color, dark, line }) => {
-    const F = PROP_FRAME.floor;
-    return `
-    <path d="M 192 ${F} L 196 ${F - 560} L 204 ${F - 560} L 208 ${F} Z" fill="${color}" stroke="${line}" stroke-width="1.4"/>
-    <rect x="182" y="${F - 22}" width="36" height="22" rx="4" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
-    <path d="M 176 ${F - 560} H 224 L 214 ${F - 600} H 186 Z" fill="${dark}" stroke="${line}" stroke-width="1.4"/>
-    <rect x="188" y="${F - 562}" width="24" height="16" rx="3" fill="#fff3b0" stroke="${line}" stroke-width="1"/>`;
-  },
-  carrier: ({ w = 150, door = 'right', color, dark, line }) => {
-    const F = PROP_FRAME.floor, h = w * 0.66, x0 = 200 - w / 2, top = F - h, d = door === 'left' ? -1 : 1;
-    const dx = d > 0 ? 200 + w / 2 - 6 : x0 + 6, gate = Array.from({ length: 6 }, (_, n) => `M ${dx - d * (n + 1) * 1.6} ${top + 14 + n * 0} L ${dx - d * (n + 1) * 1.6} ${F - 10}`).join(' ');
-    const doorX = d > 0 ? 200 + w / 2 - w * 0.34 : x0;
-    return `
-    <path d="M ${x0 + 10} ${top} H ${x0 + w - 10} Q ${x0 + w} ${top} ${x0 + w} ${top + 10} V ${F - 6} Q ${x0 + w} ${F} ${x0 + w - 6} ${F} H ${x0 + 6} Q ${x0} ${F} ${x0} ${F - 6} V ${top + 10} Q ${x0} ${top} ${x0 + 10} ${top} Z
-             M ${doorX + 8} ${top + 12} V ${F - 10} H ${doorX + w * 0.34 - 8} V ${top + 12} Z" fill="${color}" fill-rule="evenodd" stroke="${line}" stroke-width="1.6"/>
-    <path d="${Array.from({ length: 5 }, (_, n) => `M ${doorX + 8 + (n + 1) * (w * 0.34 - 16) / 6} ${top + 12} V ${F - 10}`).join(' ')} M ${doorX + 8} ${top + 12 + (h - 22) / 2} H ${doorX + w * 0.34 - 8}" stroke="${dark}" stroke-width="2.2"/>
-    <path d="M ${x0 + 6} ${top + h * 0.55} H ${doorX + (d > 0 ? 0 : w * 0.34)}" stroke="${dark}" stroke-width="2" opacity=".6"/>
-    <path d="M ${200 - w * 0.22} ${top} Q ${200} ${top - 30} ${200 + w * 0.22} ${top}" fill="none" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>`;
-  },
-  scooter: ({ facing = 'right', color, dark, line }) => {
-    const k = SCOOTER_K, d = facing === 'left' ? -1 : 1, w = (v) => (v / k).toFixed(2), tyre = '#2b2f36', rim = '#c9d1d9';
-    const wheel = ([cx, cy]) => `<g data-wheel="1" data-cx="${cx}" data-cy="${cy}" transform="rotate(0 ${cx} ${cy})">
-      <circle cx="${cx}" cy="${cy}" r="40" fill="${tyre}" stroke="#16191e" stroke-width="${w(1.6)}"/>
-      <circle cx="${cx}" cy="${cy}" r="24.8" fill="${rim}" stroke="#16191e" stroke-width="${w(1.2)}"/>
-      <path d="${[0, 72, 144, 216, 288].map((a) => `M ${cx} ${cy} L ${(cx + Math.sin(a * Math.PI / 180) * 24).toFixed(1)} ${(cy - Math.cos(a * Math.PI / 180) * 24).toFixed(1)}`).join(' ')}" stroke="#8a95a3" stroke-width="3.2" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="7" fill="${tyre}"/></g>`;
-    return `
-    <g transform="translate(200 ${PROP_FRAME.floor}) scale(${(d * k).toFixed(4)} ${k.toFixed(4)}) translate(-150 -270)">
-      ${SCOOTER_WHEELS.map(wheel).join('')}
-      <path d="M 50 210 Q 40 156 100 152 H 206 L 222 200 L 258 124 L 272 124 L 246 210 Z" fill="${color}" stroke="${line}" stroke-width="${w(1.6)}" stroke-linejoin="round"/>
-      <path d="M 52 194 Q 56 204 64 210 H 246 L 251 194 Z" fill="${dark}" opacity=".55"/>
-      <path d="M 90 152 Q 96 ${SCOOTER_SEAT_TOP} 130 ${SCOOTER_SEAT_TOP} H 196 Q 214 ${SCOOTER_SEAT_TOP + 2} 210 152 Z" fill="#3b4450" stroke="#1f242b" stroke-width="${w(1.4)}" stroke-linejoin="round"/>
-      <rect x="110" y="168" width="60" height="9" rx="4" fill="${rim}" stroke="${line}" stroke-width="${w(1)}"/>
-      <path d="M 262 124 L 246 78" stroke="#3b4450" stroke-width="7" stroke-linecap="round"/>
-      <path d="M 230 76 H 272" stroke="#2b2f36" stroke-width="7" stroke-linecap="round"/>
-      <circle cx="272" cy="106" r="10" fill="#fff3b0" stroke="${line}" stroke-width="${w(1.2)}"/>
-    </g>`;
-  },
-  paystand: ({ on = 150, color, dark, line }) => {
-    const top = PROP_FRAME.floor - on, q = PAY_QR(top), cell = 30 / 9;
-    const bits = [];
-    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
-      const finder = (r < 3 && c < 3) || (r < 3 && c > 5) || (r > 5 && c < 3);
-      if (!finder && ((r * 7 + c * 3 + r * c) % 3 === 0)) bits.push(`<rect x="${(q.x - 15 + c * cell).toFixed(2)}" y="${(q.y - 15 + r * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}"/>`);
-    }
-    const finder = (x, y) => `<rect x="${x}" y="${y}" width="${cell * 3}" height="${cell * 3}" fill="none" stroke="#16232b" stroke-width="${cell * 0.8}"/><rect x="${x + cell}" y="${y + cell}" width="${cell}" height="${cell}"/>`;
-    const r = PAY_READER(top);
-    return `
-    <rect x="148" y="${top - 6}" width="54" height="6" rx="2" fill="${dark}" stroke="${line}" stroke-width="1.200"/>
-    <rect x="152" y="${top - 72}" width="46" height="66" rx="4" fill="#ffffff" stroke="${line}" stroke-width="1.400"/>
-    <rect x="152" y="${top - 72}" width="46" height="12" rx="4" fill="${color}"/><path d="M 160 ${top - 66} h 22" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-    <g fill="#16232b">${bits.join('')}${finder(q.x - 15, q.y - 15)}${finder(q.x + 15 - cell * 3, q.y - 15)}${finder(q.x - 15, q.y + 15 - cell * 3)}</g>
-    <circle data-pay-qr="1" cx="${q.x}" cy="${q.y}" r="0.6" fill="none"/>
-    <path d="M ${r.x - 17} ${top} L ${r.x - 15} ${top - 58} Q ${r.x - 15} ${top - 62} ${r.x - 11} ${top - 62} H ${r.x + 11} Q ${r.x + 15} ${top - 62} ${r.x + 15} ${top - 58} L ${r.x + 17} ${top} Z" fill="#2f3440" stroke="#15181e" stroke-width="1.300"/>
-    <rect x="${r.x - 11}" y="${top - 57}" width="22" height="20" rx="2" fill="#bfe8d0"/>
-    <path d="M ${r.x - 3} ${top - 51} q 3 3 0 7 M ${r.x + 1} ${top - 53} q 5 5 0 11 M ${r.x + 5} ${top - 55} q 7 7 0 15" stroke="#1f7a4d" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-    ${[0, 1, 2].map((row) => [-6, 0, 6].map((dx) => `<circle cx="${r.x + dx}" cy="${top - 29 + row * 7}" r="2" fill="#8a929e"/>`).join('')).join('')}
-    <circle data-pay-reader="1" cx="${r.x}" cy="${r.y}" r="0.6" fill="none"/>`;
-  },
-  xray: ({ w = XRAY_W, image, spot = XRAY_SPOT, color, dark, line }) => {
-    const F = PROP_FRAME.floor, g = xrayFrame(w), { x0, y0, h, fx, fy, fw, fh } = g, px = (u) => (fx + u * fw).toFixed(1), py = (v) => (fy + v * fh).toFixed(1);
-    const bone = (d, wide = 3.4) => `<path d="${d}" stroke="#9fb6cc" stroke-width="${(wide * 2.2).toFixed(1)}" fill="none" stroke-linecap="round" opacity=".28"/><path d="${d}" stroke="#e9f2fa" stroke-width="${wide}" fill="none" stroke-linecap="round"/>`;
-    const sx = fx + spot[0] * fw, sy = fy + spot[1] * fh;
-    const film = image ? `<clipPath id="vgXray${xrayCount}"><rect x="${fx}" y="${fy}" width="${fw}" height="${fh}"/></clipPath>
-      <image href="${String(image).replace(/"/g, '&quot;')}" x="${fx}" y="${fy}" width="${fw}" height="${fh}" preserveAspectRatio="xMidYMid slice" clip-path="url(#vgXray${xrayCount++})"/>` : `
-      <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="#0d1f33"/>
-      <ellipse cx="${px(0.45)}" cy="${py(0.5)}" rx="${(fw * 0.46).toFixed(1)}" ry="${(fh * 0.38).toFixed(1)}" fill="#1d3854" opacity=".75"/>
-      ${bone(`M ${px(0.1)} ${py(0.34)} Q ${px(0.42)} ${py(0.22)} ${px(0.74)} ${py(0.3)}`, 4)}
-      ${[0.16, 0.24, 0.32, 0.4, 0.48, 0.56, 0.64].map((u) => `<rect x="${(fx + u * fw - 3).toFixed(1)}" y="${(fy + (0.27 - 0.06 * Math.sin(u * 4)) * fh - 4).toFixed(1)}" width="6" height="8" rx="2" fill="#f4f8fc"/>`).join('')}
-      <ellipse cx="${px(0.85)}" cy="${py(0.3)}" rx="${(fw * 0.1).toFixed(1)}" ry="${(fh * 0.12).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
-      ${bone(`M ${px(0.79)} ${py(0.4)} L ${px(0.95)} ${py(0.42)}`, 2.6)}
-      ${[0.36, 0.42, 0.48, 0.54, 0.6].map((u) => bone(`M ${px(u)} ${py(0.3)} Q ${px(u + 0.05)} ${py(0.48)} ${px(u - 0.01)} ${py(0.62)}`, 2)).join('')}
-      <ellipse cx="${px(0.13)}" cy="${py(0.4)}" rx="${(fw * 0.07).toFixed(1)}" ry="${(fh * 0.08).toFixed(1)}" fill="none" stroke="#e9f2fa" stroke-width="3"/>
-      ${bone(`M ${px(0.14)} ${py(0.46)} L ${px(0.2)} ${py(0.66)} L ${px(0.14)} ${py(0.9)}`)}
-      ${bone(`M ${px(0.66)} ${py(0.38)} L ${px(0.67)} ${py(0.64)}`)}${bone(`M ${px(0.67)} ${py(0.66)} L ${px(0.69)} ${py(0.92)}`)}
-      <path d="M ${(sx - 5).toFixed(1)} ${(sy - 2).toFixed(1)} l 3 2.5 l 2.5 -2 l 2.5 2.5 l 2.5 -2" stroke="#0d1f33" stroke-width="1.8" fill="none" stroke-linejoin="round"/>`;
-    return `
-    <path d="M 200 ${y0 + h} V ${F - 12} M 160 ${F - 10} H 240" stroke="${dark}" stroke-width="7" stroke-linecap="round"/>
-    <circle cx="164" cy="${F - 5}" r="5" fill="#3b4450"/><circle cx="236" cy="${F - 5}" r="5" fill="#3b4450"/>
-    <rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="6" fill="${color}" stroke="${line}" stroke-width="1.400"/>
-    <rect x="${fx - 3}" y="${fy - 3}" width="${fw + 6}" height="${fh + 6}" rx="2" fill="#f4fbff"/>
-    ${film}
-    <rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="none" stroke="#f4fbff" stroke-width="1.2" opacity=".6"/>
-    <rect x="${fx + 6}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/><rect x="${fx + fw - 24}" y="${fy - 6}" width="18" height="5" rx="1.5" fill="#aeb6c0"/>
-    <circle data-xray-spot="1" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="0.6" fill="none"/>`;
-  },
-};
-const XRAY_W = 176, XRAY_SPOT = [0.675, 0.74];
-const PAY_QR = (top) => ({ x: 175, y: top - 33 }), PAY_READER = (top) => ({ x: 226, y: top - 47 });
-let xrayCount = 0;
-function xrayFrame(w) {
-  const h = Math.round(w * 0.7), x0 = 200 - w / 2, y0 = 118;
-  return { x0, y0, h, fx: x0 + 9, fy: y0 + 9, fw: w - 18, fh: h - 18 };
-}
-const SCOOTER_WHEELS = [[76, 228], [276, 228]];
-const SCOOTER_SEAT_TOP = 130, SCOOTER_K = 1.22, SCOOTER_WHEEL_R = 40;
-const SCOOTER_SEAT = PROP_FRAME.floor - (270 - SCOOTER_SEAT_TOP) * SCOOTER_K;   // y khung của mặt yên
-function noteCard(x, y, w, h) {
-  const cw = w * 0.9, ch = Math.min(h * 0.46, cw * 0.32), cx = x + (w - cw) / 2, cy = y + h - ch - h * 0.06, f = ch * 0.3, icon = ch * 0.56;
-  const room = cw - ch * 0.55 - icon, fitTitle = Math.floor(room / (f * 0.58)), fitText = Math.floor(room / (f * 0.88 * 0.52));
-  return `<g data-note="1" style="display:none" data-ox="${(cx + cw / 2).toFixed(1)}" data-oy="${(cy + ch / 2).toFixed(1)}" data-fit="${fitTitle},${fitText}">
-      <rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="${(ch * 0.18).toFixed(1)}" fill="#ffffff" stroke="#c8d3da" stroke-width="1"/>
-      <rect x="${cx + ch * 0.2}" y="${cy + (ch - icon) / 2}" width="${icon}" height="${icon}" rx="${(icon * 0.25).toFixed(1)}" fill="#2f9e8f"/>
-      <circle cx="${cx + ch * 0.2 + icon / 2}" cy="${cy + ch / 2}" r="${(icon * 0.22).toFixed(1)}" fill="none" stroke="#ffffff" stroke-width="${(icon * 0.09).toFixed(2)}"/>
-      <text data-note-title="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.44}" font-family="Arial, sans-serif" font-size="${f.toFixed(1)}" font-weight="700" fill="#16303a" data-layout-ignore=""></text>
-      <text data-note-text="1" x="${cx + ch * 0.35 + icon}" y="${cy + ch * 0.8}" font-family="Arial, sans-serif" font-size="${(f * 0.88).toFixed(1)}" fill="#3b5560" data-layout-ignore=""></text>
-    </g>`;
-}
-let screenCount = 0;
-function screen(x, y, w, h, image) {
-  if (!image) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#8fd3ff"/><path d="M ${x + 8} ${y + 10} h ${w * 0.5} M ${x + 8} ${y + 20} h ${w * 0.35}" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>`;
-  const id = 'vgScreen' + (screenCount++);
-  return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#fff"/>
-    <image href="${String(image).replace(/"/g, '&quot;')}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
-}
-const DEFAULT_COLOR = { paystand: '#2f9e8f', xray: '#e9eef1', scooter: '#2f9e8f', laptop: '#b8bfc8', monitor: '#2b2f36', bowl: '#d9534f', scale: '#c9d1d9', carrier: '#4fa3c7', tree: '#6aa873', lamp: '#3b4450', floorlamp: '#f1dfbd', tv: '#23262d' };
-DEFAULT_COLOR.tub = '#5fb8e8';                 // đợt 42 F: sọc xanh nước trên thành chậu tắm
-const PROP_KINDS = Object.keys(DRAW);
-function createProp(host, kind, options = {}) {
-  if (!DRAW[kind]) throw new Error(`[character] no prop "${kind}" (available: ${PROP_KINDS.join(', ')})`);
-  const { color = DEFAULT_COLOR[kind] || '#8a6245', width, height, back, on, image, facing, fill, reading, door, spot } = options;
-  if (spot !== undefined && !(kind === 'xray' && Array.isArray(spot) && spot.length === 2 && spot.every((v) => typeof v === 'number' && v >= 0 && v <= 1)))
-    throw new Error(`[character] prop "${kind}": spot is for the "xray" viewer, [x, y] with both between 0 and 1 (a point on the film), got ${JSON.stringify(spot)}`);
-  if (door !== undefined && door !== 'left' && door !== 'right') throw new Error(`[character] prop "${kind}": door must be 'left' or 'right', got ${JSON.stringify(door)}`);
-  if (fill !== undefined && !['food', 'water', 'empty'].includes(fill)) throw new Error(`[character] prop "${kind}": fill must be 'food', 'water' or 'empty', got ${JSON.stringify(fill)}`);
-  if (reading !== undefined && typeof reading !== 'string') throw new Error(`[character] prop "${kind}": reading must be a string such as '4.2 kg'`);
-  if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`[character] prop "${kind}": color must be #rrggbb, got ${JSON.stringify(color)}`);
-  if (kind === 'scooter') {
-    if (facing !== undefined && facing !== 'right' && facing !== 'left') throw new Error(`[character] prop "scooter": facing must be 'right' or 'left', got ${JSON.stringify(facing)}`);
-  } else if (facing !== undefined && facing !== 'away' && facing !== 'viewer') throw new Error(`[character] prop "${kind}": facing must be 'away' or 'viewer', got ${JSON.stringify(facing)}`);
-  if (image !== undefined && typeof image !== 'string') throw new Error(`[character] prop "${kind}": image must be a path or URL string`);
-  if (on !== undefined && !(typeof on === 'number' && on >= 0)) throw new Error(`[character] prop "${kind}": on must be a number ≥ 0 (frame units above the floor), got ${JSON.stringify(on)}`);
-  for (const [name, value] of Object.entries({ width, height, back }))
-    if (value !== undefined && !(typeof value === 'number' && value > 0)) throw new Error(`[character] prop "${kind}": ${name} must be a positive number (frame units), got ${JSON.stringify(value)}`);
-  const sitter = options.for;
-  if (sitter !== undefined && typeof (sitter && sitter.seatY) !== 'function') throw new Error(`[character] prop "${kind}": \`for\` must be a person rig (createCharacter(...).rig)`);
-  const seat = kind === 'scooter' ? SCOOTER_SEAT : sitter ? sitter.seatY() : SEAT_DEFAULT;
-  const o = { seat, color, dark: shade(color, -0.28), line: shade(color, -0.55) };
-  if (width !== undefined) o.w = width;
-  if (height !== undefined) o.height = height;
-  if (back !== undefined) o.back = back;
-  if (on !== undefined) o.on = on;
-  if (image !== undefined) o.image = image;
-  if (facing !== undefined) o.facing = facing;
-  if (fill !== undefined) o.fill = fill;
-  if (reading !== undefined) o.reading = reading;
-  if (door !== undefined) o.door = door;
-  if (spot !== undefined) o.spot = spot;
-  host.style.aspectRatio = `${PROP_FRAME.w}/${PROP_FRAME.h}`;
-  host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROP_FRAME.w} ${PROP_FRAME.h}" width="100%" height="100%" style="display:block;overflow:visible" data-prop="${kind}">${DRAW[kind](o)}
-  </svg>`;
-  const svg = host.firstElementChild;
-  const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
-  if (kind === 'xray') {
-    const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;
-    prop.spot = { x: +(g.fx + at[0] * g.fw).toFixed(1), y: +(g.fy + at[1] * g.fh).toFixed(1) };
-  }
-  if (kind === 'paystand') {
-    const top = PROP_FRAME.floor - (o.on === undefined ? 150 : o.on);
-    prop.qr = PAY_QR(top); prop.reader = PAY_READER(top);
-  }
-  if (kind === 'scooter') {
-    prop.rideLift = (rig) => {
-      if (typeof (rig && rig.rideSeatY) !== 'function') throw new Error('[character] prop "scooter": rideLift(rig) needs a person rig');
-      return Math.max(0, rig.rideSeatY() - SCOOTER_SEAT);
-    };
-    prop.roll = (distance, duration, ease = 'power2.out') => {
-      const turn = distance / (SCOOTER_WHEEL_R * SCOOTER_K) * 180 / Math.PI, t = gsap.timeline();
-      svg.querySelectorAll('[data-wheel]').forEach((g) => {
-        const c = `${g.dataset.cx} ${g.dataset.cy}`;
-        t.fromTo(g, { attr: { transform: `rotate(0 ${c})` } }, { attr: { transform: `rotate(${turn.toFixed(2)} ${c})` }, duration, ease }, 0);
-      });
-      return t;
-    };
-  }
-  return prop;
-}
-function notifyOn(svg, kind, message, { hold = 2.5 } = {}) {
-  const card = svg.querySelector('[data-note]');
-  if (!card) throw new Error(`[character] notify: the "${kind}" prop has no screen showing — a monitor, or a laptop with facing: 'viewer'`);
-  const note = typeof message === 'string' ? { title: message, text: '' } : (message || {});
-  const [fitTitle, fitText] = card.getAttribute('data-fit').split(',').map(Number);
-  const fit = (text, n) => (text.length <= n ? text : text.slice(0, Math.max(1, n - 1)).trimEnd() + '…');
-  card.querySelector('[data-note-title]').textContent = fit(String(note.title || ''), fitTitle);
-  card.querySelector('[data-note-text]').textContent = fit(String(note.text || ''), fitText);
-  const ox = card.getAttribute('data-ox'), oy = card.getAttribute('data-oy');
-  const show = (k) => {
-    card.style.display = k > 0.01 ? '' : 'none';
-    card.setAttribute('transform', `translate(${ox} ${oy}) scale(${(0.6 + 0.4 * k).toFixed(3)}) translate(${-ox} ${-oy})`);      // k vượt 1 một chút (back.out): thẻ nảy lên
-    card.style.opacity = Math.min(1, k).toFixed(3);
-  };
-  const state = { _k: 0, get k() { return this._k; }, set k(v) { this._k = v; show(v); } };
-  const tl = gsap.timeline({ paused: true });
-  tl.to(state, { k: 1, duration: 0.35, ease: 'back.out(1.8)' }, 0).to(state, { k: 0, duration: 0.3, ease: 'power2.in' }, 0.35 + hold);
-  return tl;
-}
-return { PROP_FRAME, PROP_KINDS, createProp };
 })();
 __m['runtime/bodies.js'] = (function () {
 const child = {
@@ -12341,7 +12712,15 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
               if (!rs.length) return null; const r = rect({ left: Math.min(...rs.map((q) => q.left)), right: Math.max(...rs.map((q) => q.right)), top: Math.min(...rs.map((q) => q.top)), bottom: Math.max(...rs.map((q) => q.bottom)) });
               return { side, y: r.y1, x: (r.x0 + r.x1) / 2, wx: at.scale ? actor.where + ((r.x0 + r.x1) / 2 - at.x) / at.scale : null }; }).filter(Boolean),
             wtall: actor.height || 0, lift42d: +(rig.s.lift42d || 0).toFixed(2),
-            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}) };
+            shadow42d: actor.shadow && actor.shadow.isConnected ? (() => { const r = actor.shadow.getBoundingClientRect(); return { w: r.width * sx, y: (r.top + r.height / 2 - box.top) * sy, seen: +actor.shadow.style.opacity || 0 }; })() : null } : {}),
+          ...(person && e.leash ? { leash49c: (() => {
+            const shown = e.leash.style.display !== 'none', d = (e.leash.getAttribute('d') || '').match(/-?[\d.]+/g), now = typeof rig._leashNow49c === 'function' ? rig._leashNow49c() : null, pet = now ? now.pet : rig.leashed;
+            const ends = shown && d && d.length >= 6 ? [0, 2, 4].map((n) => point(rig.svg, +d[n], +d[n + 1])) : null;
+            const collar = pet && pet.el && pet.el.vong ? rect(pet.el.vong.getBoundingClientRect()) : null;
+            const unit = point(rig.svg, 0, 0), unit1 = point(rig.svg, 0, 100), scale = unit && unit1 ? Math.hypot(unit1.x - unit.x, unit1.y - unit.y) / 100 : 0;
+            return { shown, a: ends && ends[0], c: ends && ends[1], b: ends && ends[2], collar: collar && { x: (collar.x0 + collar.x1) / 2, y: (collar.y0 + collar.y1) / 2 },
+                     hand: (now ? now.hand : rig.leashHand) || null, rope: +(rig.s.leashRope49c || 0).toFixed(2), ropeLength: rig.constructor.LEASH_ROPE_49C ? rig.constructor.LEASH_ROPE_49C * 470 * 0.96 * scale : null };
+          })() } : {}) };
       });
     },
     careProbe() {
@@ -12400,6 +12779,16 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
       }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
+      out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {
+        const door = svg.querySelector('[data-cage-door49a]'), ctm = svg.getScreenCTM(), host = svg.parentNode;
+        if (!door || !ctm || (host && host.style.display === 'none')) return null;
+        const at = (x, y) => { const q = new DOMPoint(x, y).matrixTransform(ctm); return { x: (q.x - box.left) * sx, y: (q.y - box.top) * sy }; }, a = at(+door.dataset.x0, +door.dataset.y0), b = at(+door.dataset.x1, +door.dataset.y1), d = door.getBoundingClientRect();
+        return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: { x0: (d.left - box.left) * sx, y0: (d.top - box.top) * sy, x1: (d.right - box.left) * sx, y1: (d.bottom - box.top) * sy }, layer: +((host && host.style.zIndex) || 0) };
+      }).filter(Boolean);
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (rig && typeof rig.cage49aProbe === 'function' && out[name]) out[name].cage49a = rig.cage49aProbe();
+      }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;
@@ -13550,13 +13939,31 @@ const SPEECH_SETTLE = 0.55;
 const PAIR_39A = ['giveChange', 'takeChange', 'stampCard', 'takeCard'];      // đợt 39 A: đưa tiền thối / đóng dấu rồi đưa thẻ — cả nhóm `together` bắt đầu cùng lúc, đích là mỏ neo
 const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
+PAIR_SYNC.push('walkOnLeash');       // đợt 49 C: người dắt và con vật bước cùng nhịp — cả nhóm bắt đầu cùng lúc
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
+const PARTNERS = new WeakMap();
 const expandCombos = (stepList) => stepList.flatMap((step) => {
   if (typeof step === 'number') return [step];
   const [name, ...args] = Array.isArray(step) ? step : [step];
-  return isCombo(name) && typeof name === 'string' ? expandCombos(expandCombo(name, args)) : [step];
+  if (!(isCombo(name) && typeof name === 'string')) return [step];
+  return combo(null, name, ...args).flatMap((turn) => {
+    const [first, partners] = turn.together ? [turn.together[0], turn.together.slice(1)] : [turn, []];
+    const expanded = expandCombos([first[1]]);
+    if (partners.length && expanded.length && typeof expanded[0] !== 'number') {
+      if (!Array.isArray(expanded[0])) expanded[0] = [expanded[0]];
+      PARTNERS.set(expanded[0], partners);
+    }
+    return expanded;
+  });
 });
+function partnerLines(line) {
+  const out = [];
+  for (const entry of (line.data && line.data.steps) || []) {
+    for (const [rig, ...steps] of entry.with || []) out.push({ rig, line: sequence(rig, steps), start: entry.start });
+  }
+  return out;
+}
 function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
   stepList = expandCombos(stepList);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
@@ -13592,6 +13999,7 @@ function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } 
     child.paused(false);
     source.add(child, at);
     const entry = { name, start: +at.toFixed(3), duration: +child.duration().toFixed(3) };
+    if (PARTNERS.has(step)) Object.defineProperty(entry, 'with', { value: PARTNERS.get(step), enumerable: false });
     if ((name === 'mood' || name === 'mark') && (args[0] === null || args[0] === undefined)) entry.off = true;
     if (name === 'face' && args[0] && typeof args[0] === 'object') entry.target = args[0].live || args[0];
     if (SPEECH_STEPS.includes(name)) {
@@ -13882,6 +14290,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const steps = written.map((step) => (Array.isArray(step) && ['face', 'handOver', 'take', 'stroke', 'handshake', 'handOverPet', 'takePet', 'highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'].includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       steps.forEach((step, n) => { if (Array.isArray(step) && PAIR_39A.includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
+      steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'walkOnLeash' && typeof rig.follow === 'function' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
       if (wait < 0) wait = 0;
@@ -13925,7 +14334,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
       const from = spoken.length ? spoken[0].start : turn.start, until = spoken.length ? spoken[spoken.length - 1].start + spoken[spoken.length - 1].speech : turn.end;
       if (spoken.length) lastWords = Math.max(lastWords, until);
       const crossing = turn.steps.find((step) => ['enter', 'exit', 'walk', 'walkForward', 'walkAway',
-        'run'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác
+        'run', 'walkOnLeash'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác; đợt 49 C — dắt chó đi dạo
       const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
       const walksFirst = crossing && (!spoken.length || crossing.start <= from);
       if (walksFirst && turn.shot === undefined && aimed && aimed !== 'wide') goWide(crossing.start);
@@ -13966,7 +14375,7 @@ function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0.1, cam
 }
 dangKyDau(RigSVG, 'vet');
 for (const character of CUSTOM_CHARACTERS) registerCharacter(character);
-return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
+return { VERSION, GLOBAL_NAME, kit, validateConfig, registerCharacter, __setBakedConfigs, applyConfig, createCharacter, createPet, seed, list, partnerLines, sequence, shot, captions, conversation, RigSVG, RigThu, createProp, createSet, OVERVIEW, CAMERA_LIMITS, COMBOS, combo, expandCombo };
 })();
 __m['runtime/index.js'].__setBakedConfigs({});
 return __m['runtime/index.js'];

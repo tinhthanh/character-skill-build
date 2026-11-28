@@ -6,6 +6,7 @@ from .schema import CAT_BREEDS
 from .steps import step_code, turn_code
 from .util import fail, js, known
 from .views import view_of
+from . import leash49c          # đợt 49 C
 
 
 def emit_together(emitted, entry, st, turns, where):
@@ -179,5 +180,6 @@ def emit_turn(arms, emitted, entry, gear_ops, names, reach_notes, st, stage_set,
         hold = tugged[0][2] if len(tugged[0]) > 2 and isinstance(tugged[0][2], (int, float)) and not isinstance(tugged[0][2], bool) else 2.4
         code = '{ together: [' + code + f", [{person['name']}, ['pullToy', {names[entry['who']]['name']}, {js(hold)}]]] }}"
         emitted[0] += 1
+    code = leash49c.pet_part(code, entry, names, emitted)          # đợt 49 C: con vật được dắt bước cùng lúc
     turns.append((None, code))
     emitted[0] += 1

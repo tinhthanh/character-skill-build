@@ -49,6 +49,8 @@ Một tệp kịch bản:
                                        sấy lông / sấy khô (vòi máy sấy, lông khô bông), tỉa lông / cắt tỉa (kéo, túm lông rụng), cạo lông / tông đơ (tông-đơ)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
+    tên → con vật: dắt đi dạo           dắt chó (hay mèo đeo yếm) đi dạo — tự móc dây, chó kiệu trước, đánh hơi, ngoái lại; "dắt chó đi dạo",
+                                       "dắt đi", "dắt đi dạo sang trái", "dắt đi dạo 200" (quãng, đơn vị khung); dây vẫn móc ("tháo dây" sau)
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
@@ -168,6 +170,7 @@ from scene import COMBOS, expand_combos       # noqa: E402
 # ĐỢT 38 B — phối hợp và chuẩn bị ở phòng khám: giữ con vật cho người khác làm ("cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm"),
 # rửa tay, đeo / tháo găng tay ("bác sĩ: [rửa tay, đeo găng]").
 TARGETED.update({'giữ': ('restrain', None), 'giữ con vật': ('restrain', None), 'giữ chặt': ('restrain', None)})
+ACTIONS.update({'tháo dây': 'unleash', 'tháo dây dắt': 'unleash', 'tháo xích': 'unleash'})          # đợt 49 C — sau "dắt đi dạo" (dây vẫn móc)
 ACTIONS.update({'rửa tay': 'washHands', 'đeo găng': 'putOnGloves', 'đeo găng tay': 'putOnGloves', 'tháo găng': 'takeOffGloves', 'tháo găng tay': 'takeOffGloves'})
 COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
 SCALE_NAME = 'can'                                       # tên cái cân tự thêm vào bối cảnh khi có lượt "cân"
@@ -198,6 +201,9 @@ PRESENTER_WORDS = {'to cỡ này': ['showSize', 'big'], 'to thế này': ['showS
               'cỡ này': ['showSize', 'medium'], 'ra dấu kích thước': ['showSize', 'medium'], 'ra dấu to cỡ này': ['showSize', 'big'],
               'chụp ảnh tự sướng': ['takeSelfie'], 'chụp ảnh': ['takeSelfie'], 'selfie': ['takeSelfie'], 'chụp hình': ['takeSelfie'], 'tự sướng': ['takeSelfie'],
               'ngáp': ['yawnStretch'], 'vươn vai': ['yawnStretch'], 'ngáp vươn vai': ['yawnStretch']}
+# ĐỢT 49 C — DẮT CHÓ ĐI DẠO: "bé → chó: dắt đi dạo" / "dắt chó đi dạo" / "dắt đi" / "dắt cún đi dạo sang trái 250" → ["walkOnLeash", "@chó", 4, ±quãng]
+# (mặc định 300 đơn vị khung sang phải). Dây tự móc nếu chưa móc, quai dây tự giao (tools/scene.py). "dắt" một mình vẫn là móc dây (`leash`).
+WALK_49C = re.compile(r'^dắt(?: [^\s\d]+)? đi(?: dạo)?(?: (sang trái|sang phải|về bên trái|về bên phải))?(?: (\d+))?$')
 TARGETED_PRESENTER = {'selfie': 'takeSelfie', 'chụp ảnh tự sướng': 'takeSelfie', 'chụp hình': 'takeSelfie', 'chụp ảnh': 'takeSelfie', 'tự sướng': 'takeSelfie'}
 SIGN_TEXT = re.compile(r'(' + '|'.join(SIGN_WORDS) + r')\s*:\s*("[^"]*"|[^,\]]*)', re.IGNORECASE)
 
@@ -396,6 +402,10 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
                 if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người — thú không cầm điện thoại')
                 if target == who: raise ScriptError(f'{where}: "{verb}" cùng một người khác — "bác sĩ → bé trai: {verb}"')
                 return {'who': who, 'do': [[TARGETED_PRESENTER[verb], 1.6, {'with': f'@{target}'}]]}
+            walk49c = WALK_49C.match(verb)          # ĐỢT 49 C: "bé → chó: dắt đi dạo" (sang trái / phải, quãng tuỳ chọn)
+            if walk49c:
+                if is_pet(who): raise ScriptError(f'{where}: "{verb}" là việc của người cầm dây — "bé → chó: dắt đi dạo"')
+                return {'who': who, 'do': [['walkOnLeash', f'@{target}', 4, (-1 if walk49c.group(1) and 'trái' in walk49c.group(1) else 1) * int(walk49c.group(2) or 300)]]}
             if verb not in TARGETED: raise ScriptError(f'{where}: không biết "{verb}" — dùng: {", ".join(TARGETED)}')
             action, extra = TARGETED[verb]
             step = [action, f'@{target}'] + ([extra] if extra else [])

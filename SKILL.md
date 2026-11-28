@@ -12,7 +12,7 @@ cheer, drink, write, stroke a pet, hand an item to someone, talk on the phone, s
 the phone, type on a laptop, examine a pet with a stethoscope, give an injection, pick a pet up,
 clap, count on fingers, check the time, bow, greet with a wai, shake hands, ponder, fold the arms, call out,
 startle, hurry, give a thumbs-down, a stop sign, a finger heart or a V sign, shine a penlight in a pet's ears
-or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash, kneel to it,
+or mouth, give it a treat or a pill, hold out a hand for it to lick, brush it, bandage its leg, put a recovery cone on it, walk it on a leash (`walkOnLeash`: the dog trots ahead, sniffs, looks back), kneel to it,
 sit cross-legged on the floor or lie down (on the floor or a sofa) with a pet beside or on the lap, pick something up off the floor,
 hand it to someone, throw it a ball, weigh it on a scale, take its temperature, give it a pill by hand (one hand on its chin),
 read a patient chart (flipping a page), point at an X-ray film, trim its nails (holding the paw up), put drops in its eye,

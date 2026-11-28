@@ -346,6 +346,7 @@ const SPEECH_SETTLE = 0.55;
 const PAIR_39A = ['giveChange', 'takeChange', 'stampCard', 'takeCard'];      // đợt 39 A: đưa tiền thối / đóng dấu rồi đưa thẻ — cả nhóm `together` bắt đầu cùng lúc, đích là mỏ neo
 const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
+PAIR_SYNC.push('walkOnLeash');       // đợt 49 C: người dắt và con vật bước cùng nhịp — cả nhóm bắt đầu cùng lúc
 // Kênh của thế NHÌN THEO (`lookAt`, đợt 36) và các bước KHÔNG thả nó ra.
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
@@ -906,6 +907,8 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
         ? [step[0], anchor(step[1]), ...step.slice(2)] : step));
       // ĐỢT 39 A: thối tiền / đóng dấu rồi đưa thẻ — đích cũng là mỏ neo (chỗ người kia đứng LÚC NÀY, không phải lúc đầu cảnh).
       steps.forEach((step, n) => { if (Array.isArray(step) && PAIR_39A.includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
+      // ĐỢT 49 C: con vật được dắt (`walkOnLeash(person, …)`) đo chỗ người dắt LÚC NÀY để đi trước họ một quãng.
+      steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'walkOnLeash' && typeof rig.follow === 'function' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;
@@ -967,7 +970,7 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       // cận cảnh của người khác mà có một cái đầu lướt ngang mép khung thì rất khó hiểu.
       // `walk` cũng tính: nhân vật đi sang chỗ khác thì cận cảnh đang ghì vào chỗ cũ sẽ cắt ngang người rồi còn lại khung trống.
       const crossing = turn.steps.find((step) => ['enter', 'exit', 'walk', 'walkForward', 'walkAway',
-        'run'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác
+        'run', 'walkOnLeash'].includes(step.name));          // đợt 42 D — chạy cũng sang chỗ khác; đợt 49 C — dắt chó đi dạo
       const goWide = (at) => { cameraTimeline.add(shot(scene, null, 'wide', { duration: move }).paused(false), Math.max(0, at - lead)); aimed = 'wide'; inFrame = []; };
       // Bước đi diễn ra TRƯỚC lời của lượt (bước vào rồi mới nói): lùi ngay bây giờ. Bước đi SAU lời (nói xong rồi bước
       // ra) thì lùi sau khi đã đặt cảnh cận cho câu nói — xem cuối vòng lặp. Bản trước chỉ có nhánh đầu, và bỏ qua nó
