@@ -48,6 +48,9 @@ And what a scene can do with them:
   installed onto the rig class; module-level constants and helpers are in `person/shared.js` / `pet/shared.js`.
   A new action goes in the group file it belongs to (or a new group file added to the install list at the end of the
   rig file); `mix` refuses a name that is already defined.
+  Drawing a person (`apDung`) runs one method per step, in order — `_drawRoot`, `_drawLegs`, `_layerArms`,
+  `_drawHeadTurn`, `_drawThighs`, `_drawTorso`, `_poseArms`, `_drawHeldItems`, `_drawHands`, `_drawFace` — and what a
+  step works out for a later one (turn, far arm, shoulder lift, arm angles) travels in the frame object `f`.
 - **`dist/character.slim.js`** — the same library as one plain-script file for HyperFrames,
   with the tuned configs baked in.
 - **`studio/`** — a visual editor: presets, sliders, colour palettes, undo, per-character save.
