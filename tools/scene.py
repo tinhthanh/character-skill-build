@@ -155,9 +155,35 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "putDown" sets it by the feet, away from the cage, or "handOverPet"). A pet can start inside: "inCage": "chuong" on it
                (no x / z). The person must stand just in front of the cage: z 12–60 more than the cage's. Dogs, cats and rabbits; a pet
                too big for the door opening is refused (give a bigger "size").
+               Pet shop (wave 50 B): ["takeFromShelf", "@ke_hang", { "item": "foodBag" | "treatBox" | "can", "level": "high" | "middle" | "low" }]
+               — "@ke_hang" names a set.cutouts picture of the sets repo (gondola_shelf: rows middle / low, pet_food_shelf: high / middle /
+               low, medicine_wall_shelf: high / middle) with a "name"; the person walks beside its nearer edge (stand z 10–160 in front of
+               it), reaches the row (tiptoe / reach / squat), takes the product, turns it to read the label and keeps it (put away in that
+               hand from the start). Without a shelf (["takeFromShelf", { … }] or "left" / "right") it is mimed beside the person.
+               ["scanBarcode", "@khach", { "hold": 1.2, "put": "down" | "keep" | "bag", "price": "125.000đ" }] — the cashier takes the
+               product the customer holds (they hand it over at the same time, added for you), aims a hand-held scanner at it: red scan
+               line, bíp, a price card; then sets it down / keeps it (for "handOver" back) / drops it into a put-away "bag" held in the
+               scanner hand. ["scanBarcode"] alone scans the product already in the other hand. Combo ["shopCheckout", "@khach"]:
+               scan (kept) → the customer pays by QR (needs a "paystand") → hand it back → wave.
                Grooming 2 (wave 49 B): ["blowDry", "@pet", { "hold": 2.4 }] (dryer nozzle aimed at its back, a visible air stream, the
                fur blown about, ears back, eyes squinting — the fur turns dry and fluffy), ["trimFur", "@pet", { "tool": "scissors" |
                "clipper", "hold": 2.4 }] (tufts fall as the tool passes along the back; the coat ends neater). A sitting pet stands up.
+               Exam room (wave 50 A): ["palpate", "@pet", { "part": "belly" | "flank", "hold": 2 }] (both hands on its belly / flanks,
+               pressing gently), ["useUltrasound", "@pet", "@<cart>", { "hold": 2.6 }] (the pet lies on its side on the table, gel, a probe
+               on its belly, a generic scan picture; "@<cart>" — a picture cutout of the set with a "name", optional: the person glances at
+               its screen), ["lookMicroscope", "@<microscope>", { "hold": 2 }] (walks up beside a microscope picture cutout, eye to the
+               eyepiece, turns the knob; without a name: the set's only microscope picture, or mimed). The pet turns its tail to the person
+               first (hands never cross its face). Pet pose: "lieOnSide".
+               FEEDING (wave 50 C): ["serveBowl", "@cho", { "food": "kibble" | "water", "hold": 0.6, "gap": 44 }] — walks to the side the
+               pet faces, squats, sets a bowl down in front of its muzzle, pours kibble / water (the bowl fills), steps back; the pet walks to
+               the bowl and eats / drinks (its part is added). The bowl stays; ["pickUp", "@cho", { "item": "bowl" }] picks it up.
+               PET CARRIER (wave 50 C): a set.cutouts { "kind": "carrier", "name": "long", "x", "z", "door": "right", "size": [150, 112] }
+               (two layers; sized to the pet if "size" is left out; the door end faces whoever first reaches it). ["putInCarrier", "@meo",
+               "@long", { "carry": true }] (picks the pet up first if needed; "carry": also takes the carrier by its handle), ["takeOutOfCarrier",
+               "@meo", "@long"] (opens it, the pet walks out — its part is added), ["pickUpCarrier", "@long"], ["putDownCarrier", "@long"].
+               "inCarrier": "chu" on a pet: "chu" carries it in a carrier from the start ("holds": "carrier" is given); "inCarrier": "long":
+               it starts in that carrier. Carrying, the place may be left out: ["putDownCarrier"] / ["takeOutOfCarrier", "@meo"] set the
+               carrier down on the floor just in front. The person stands just in front of the carrier (z 12–60 more), at its door end.
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).

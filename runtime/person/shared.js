@@ -73,6 +73,10 @@ const NGHI = Object.freeze({
   // (gadget 44), `buzz49bL/R` 0…1 tông-đơ chạy (gadget 45), `groomT49b` đồng hồ của động tác (gió chảy, lông gợn); con vật đọc `petBlow49b` gió vào lông,
   // `petStand49b` 0…1 con vật đứng dậy (mèo / thỏ đang ngồi), `petShag49b` lông dài chưa tỉa (GIỮ), `petCutT49b` / `petCutDur49b` giây đã tỉa / giây tỉa hết lưng, `petTrimStart49b` / `petTrimEnd49b` chỗ đầu / cuối đường tỉa (GIỮ) — runtime/pet/grooming.js.
   air49bL: 0, air49bR: 0, snip49bL: 0, snip49bR: 0, buzz49bL: 0, buzz49bR: 0, groomT49b: 0, petStand49b: 0, petBlow49b: 0, petShag49b: 0, petCutT49b: 0, petCutDur49b: 0, petTrimStart49b: 0, petTrimEnd49b: 0,
+  // ĐỢT 50 A — phòng khám (runtime/person/exam50a.js): con vật đọc `petSide50a` nằm nghiêng, `petPress50a` bị ấn, `petFlinch50a` giật mình khẽ, `petCalm50a`
+  // lim dim, `petGel50a` / `petGelU50a` lớp gel trên bụng (runtime/pet/exam50a.js); `gelDrop50a` 0…1 giọt gel rơi từ lọ (gadget 47), `scan50a` 0…1 thẻ ảnh
+  // siêu âm, `scanT50a` đồng hồ vạch quét, `scanDir50a` ±1 thẻ lệch về phía ấy; `micro50a` 0…1 đang cúi vào kính hiển vi, `knob50a` số nấc đã vặn núm.
+  petSide50a: 0, petPress50a: 0, petFlinch50a: 0, petCalm50a: 0, petGel50a: 0, petGelU50a: 0, gelDrop50a: 0, scan50a: 0, scanT50a: 0, scanDir50a: 0, micro50a: 0, knob50a: 0,
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
   ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,
@@ -110,6 +114,15 @@ const NGHI = Object.freeze({
   // ĐỢT 49 A — CHUỒNG LƯU TRÚ (`putInCage`, `takeOutOfCage`): `cageDoor49a` 0 đóng … 1 mở cửa chuồng người này đang mở; `cageMove49a` số lần người này đã
   // dời con vật vào / ra chuồng (lần thứ n đã dời khi `cageMove49a` > n − 0,5 — RigThu.dropX; GIỮ như `picked42e`); `free49aL/R` 1 = tay ấy rời con vật đang bế (mở cửa).
   cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
+  // ĐỢT 50 B — CỬA HÀNG & QUẦY THU NGÂN (runtime/person/shop50b.js): `spin50bL/R` 1 = món hàng trong tay ấy đang quay MẶT SAU (mã vạch), 0 = mặt nhãn;
+  // `beam50bL/R` độ dài tia đỏ của máy quét mã vạch (gadget 50) trong tay ấy (đơn vị khung bàn tay, 0 = tắt), `scanT50b` đồng hồ của tia (rung nhẹ);
+  // `beep50b` 0…1 "bíp" (ô kính loé xanh, hai cung âm thanh); `tiptoe50b` 0…1 kiễng chân (bàn chân xoay, người nhấc lên bằng `lift42d`).
+  spin50bL: 0, spin50bR: 0, beam50bL: 0, beam50bR: 0, scanT50b: 0, beep50b: 0, tiptoe50b: 0,
+  // ĐỢT 50 C — BÁT ĂN (`serveBowl`): `bowl50c` số bát người này đã đặt xuống (GIỮ), `bowlFill50c` 0…1 độ đầy của bát mới nhất (GIỮ), `pour50c` 0…1 dòng
+  // đổ đang chảy, `feedT50c` giây (hạt rơi, nước gợn). LỒNG VẬN CHUYỂN: `carrier50c` số mục nhật ký lồng đã xảy ra (GIỮ — `carrierLog50c`), `carrierDoor50c`
+  // 0 đóng … 1 mở cửa lưới của đạo cụ thứ `carrierDoorN50c` − 1 trong `carrierProps50c`.
+  bowl50c: 0, bowlFill50c: 0, pour50c: 0, feedT50c: 0, carrier50c: 0, carrierDoor50c: 0, carrierDoorN50c: 0,
+  omFront50c: 0,          // 1 = con vật đang bế vẽ trước hai cánh tay (lúc hạ nó vào lồng — `putInCarrier`)
 });
 
 const MAU_MAC_DINH = {

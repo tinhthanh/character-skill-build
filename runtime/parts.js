@@ -1,3 +1,5 @@
+// đợt 50 C: lồng vận chuyển cầm tay — cùng hình với đạo cụ
+import { carrierShape50c, carrierBackSvg50c, carrierFrontSvg50c } from './props.js';
 // parts.js — vài BỘ PHẬN vẽ sẵn cho nhân vật tuỳ chỉnh: kính, râu, ria, nếp nhăn, yếm tạp dề,
 // và đồ vật cầm tay (cốc, bìa kẹp hồ sơ, điện thoại).
 //
@@ -286,4 +288,17 @@ export function toy42e(c, { color = '#f2b134', band = '#e0533d', grip = true } =
 export function bowl42e(c, { color = '#d9534f', food = '#a0643a', grip = true } = {}) {
   return `
         <g data-bowl42e="1" transform="translate(0 4) rotate(90) translate(26 12)">${bowlShape42e(color, food)}</g>${grip ? gripThumb(c, { reach: 10, x: 1 }) : ''}`;
+}
+
+/**
+ * ĐỢT 50 C — LỒNG VẬN CHUYỂN xách ở quai (`items: { L: 'carrier' }`; `pickUpCarrier` / `putInCarrier(…, { carry: true })` cho cầm): cùng hình với đạo cụ
+ * `carrierBack` + `carrierFront` (runtime/props.js), cỡ `width` × `height` trong khung 400 × 470 của nó. Nhóm `data-carrier50c` vẽ theo hệ GỐC của SVG
+ * người (rig đặt phép biến đổi mỗi lần vẽ: quai ở lòng bàn tay, lồng luôn thẳng đứng, thõng dưới tay — `RigSVG._drawFeed50c`); `data-carrier-slot50c`
+ * là ngăn giữa lòng lồng và vỏ: con vật trong lồng nằm ở đó khi lồng ở trên tay. Bốn ngón nắm quanh quai.
+ */
+export function carrier50c(c, { color = '#5bb5a2', width, height, door = 'right', grip = true } = {}) {
+  const n = parseInt(color.slice(1), 16), dark = '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * 0.72).toString(16).padStart(2, '0')).join('');
+  const g = carrierShape50c({ w: width, height, door });
+  return `
+        <g data-carrier-item50c=""><g data-carrier50c="1" data-w="${g.w}" data-h="${g.h}" data-door="${g.door}"><g data-carrier-back50c="">${carrierBackSvg50c(g, { dark })}</g><g data-carrier-slot50c=""></g><g data-carrier-front50c="">${carrierFrontSvg50c(g, { color, dark })}</g></g>${grip ? gripFingers(c, { reach: 13, from: -7 }) : ''}</g>`;
 }

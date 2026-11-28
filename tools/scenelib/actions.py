@@ -67,6 +67,17 @@ TRIM_TOOLS = ('scissors', 'clipper')                     # rig-svg.js `trimFur({
 TRIM_FALL = 1.25                                         # rig-svg.js `TRIM_FALL49B`: giây sau nhát cuối, túm lông cuối cùng rơi hết
 
 
+# ĐỢT 50 A — PHÒNG KHÁM: sờ nắn bụng / sườn (`palpate`), siêu âm (`useUltrasound`: con vật nằm nghiêng, gel, đầu dò; xe đẩy siêu âm "@tên" tuỳ chọn) — như
+# đợt 49 B (đứng ở phía đầu con vật, con vật đọc kênh tay người); soi kính hiển vi (`lookMicroscope`) đi riêng — tools/scenelib/exam50a.py.
+from .exam50a import EXAM_50A, HOLD as EXAM_HOLD_50A, OPTIONS as EXAM_OPTIONS_50A
+HANDS_ON_CARE = HANDS_ON_CARE + EXAM_50A
+CARE_REACH = CARE_REACH + EXAM_50A
+REACH_ACTIONS.update({'palpate': 'body', 'useUltrasound': 'body'})
+HANDS_ON_OPTIONS.update({name: EXAM_OPTIONS_50A[name] for name in EXAM_50A})
+HANDS_ON_HOLD.update({name: EXAM_HOLD_50A[name] for name in EXAM_50A})
+HANDS_ON_GAP.update({'palpate': 0.13, 'useUltrasound': 0.13})
+
+
 def bath_shake_at(hold):
     """Giây (từ đầu bước `bathPet`) con vật bắt đầu rũ nước — như `RigSVG.bathShakeAt42f`."""
     return round(0.55 + BATH_SPRAY + 0.55 + 0.35 + hold + 0.75 + BATH_RINSE + 1.2, 2)
@@ -200,3 +211,7 @@ RESTRAIN_TAIL = 0.85          # giây sau lúc giữ: vuốt dỗ + buông (rig:
 
 
 RESTRAIN_PAIRS = {}           # id(bước restrain) → (người làm cùng lúc, động tác của họ) — `step_code` biết đầu con vật quay về đâu
+
+# ĐỢT 50 C — sửa đợt 49 B: sấy / tỉa lông con thỏ dưới sàn — người quỳ ở PHÍA ĐUÔI nó (tools/scenelib/approach.py): đuôi cách giữa thân chừng ấy ×
+# chiều cao host của nó.
+GROOM_TAIL_50C = {'blowDry': 0.2, 'trimFur': 0.2}

@@ -9,10 +9,10 @@ export default (RigThu) => mix(RigThu, class {
   sitDown() { return this._khep(this.tl(), 0.4, 0, { ngoi: 1 }); }
 
   /** ĐỨNG DẬY và ở yên trong dáng đứng (mèo vốn nghỉ ở dáng ngồi). Đang nằm thì cũng đứng dậy. */
-  standUp() { return this._khep(this.tl(), this.s.nam > 0.5 ? 0.55 : 0.35, 0, { ngoi: 0, nam: 0, flop: 0 }); }
+  standUp() { return this._khep(this.tl(), this.s.nam > 0.5 ? 0.55 : 0.35, 0, { ngoi: 0, nam: 0, flop: 0, ...(this.s.side50a ? { side50a: 0 } : {}) }); }      // đợt 50 A: cả khi đang nằm nghiêng
 
   /** NẰM XUỐNG và ở yên trong dáng nằm: các động tác sau (vẫy đuôi, gừ gừ, nghiêng đầu…) diễn khi đang nằm. `standUp` để dậy. */
-  lieDown() { return this._khep(this.tl(), 0.6, 0, { nam: 1, ngoi: 0, flop: 0 }); }
+  lieDown() { return this._khep(this.tl(), 0.6, 0, { nam: 1, ngoi: 0, flop: 0, ...(this.s.side50a ? { side50a: 0 } : {}) }); }
 
   /**
    * NGỦ `dur` giây: nằm xuống (nếu chưa nằm), gục đầu, nhắm mắt, tai thả, thở chậm và sâu, đuôi cuộn vào thân. Xong thì
@@ -26,7 +26,7 @@ export default (RigThu) => mix(RigThu, class {
     for (let a = 0.9; a + 1.6 <= 0.9 + dur; a += 1.6) {
       t.to(s, { tho: 1, dauY: 17.5, duration: 0.8, ease: 'sine.inOut' }, a).to(s, { tho: 0, dauY: 16, duration: 0.8, ease: 'sine.inOut' }, a + 0.8);
     }
-    this._khep(t, 0.5, 0.9 + dur, { nam: 1, flop: 0 });
+    this._khep(t, 0.5, 0.9 + dur, { nam: 1, flop: 0, ...(s.side50a ? { side50a: 0 } : {}) });
     return t;
   }
 

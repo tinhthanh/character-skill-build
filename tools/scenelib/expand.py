@@ -58,6 +58,7 @@ def combo_turns(who, name, args, where):
     combo = COMBOS[name]
     if len(args) > len(combo['params']): fail(f'{where}: combo "{name}" takes {len(combo["params"])} argument(s) ({", ".join(combo["params"]) or "none"}), got {len(args)}')
     values = dict(zip(combo['params'], args))
+    if 'self' not in combo['params'] and isinstance(who, str): values['self'] = '@' + who          # đợt 50 B: "$self" — chính người làm combo (phần "with" của người kia nhắm vào họ)
     turns = []
     for raw in combo['steps']:
         own = raw['step'] if isinstance(raw, dict) else raw

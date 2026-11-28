@@ -1,5 +1,7 @@
 """Measurement plans of the care and desk actions: the moments (seconds into the step) moments.json measures."""
 from .actions import BATH_RINSE, BATH_SPRAY, HANDS_ON_HOLD, GROOMING, GROOMING_49B, TRIM_FALL, DESK_PAY, bath_shake_at
+from .exam50a import EXAM_50A          # đợt 50 A
+from . import exam50a
 
 
 def care_plan_tools(op, t0):
@@ -9,6 +11,7 @@ def care_plan_tools(op, t0):
     và thẻ mã chip."""
     if op['kind'] in GROOMING: return care_plan_grooming(op, t0)          # đợt 42 F
     if op['kind'] in GROOMING_49B: return care_plan_49b(op, t0)          # đợt 49 B
+    if op['kind'] in EXAM_50A: return exam50a.care_plan(op, t0)          # đợt 50 A
     kind, hold = op['kind'], float(op.get('hold') or HANDS_ON_HOLD[op['kind']][2])
     r = lambda a: round(t0 + a, 2)
     every = lambda a, b, d=0.1: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]

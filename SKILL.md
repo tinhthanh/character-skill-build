@@ -20,7 +20,9 @@ clean its ear with a cotton pad, scan its microchip (the number shows on a card)
 hold a pet still while someone else examines or injects it, wash the hands (soap foam), put exam gloves on and take them off,
 bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
 blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
-get a notification on the phone (138 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
+feel its belly or flanks, scan it with ultrasound (it lies on its side, gel, a probe, a generic scan picture), look into a microscope at the lab bench,
+take a product off a shop shelf (on tiptoe, reaching, squatting — then reads its label), scan its barcode at the till (a red scan line, bíp, the price),
+get a notification on the phone (148 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase
@@ -187,10 +189,29 @@ clips for every voice file.
    (two layers — inside behind the pet, barred front with a door in front), `["putInCage", "@meo", "@chuong"]` (picks the pet up if needed, walks beside
    the cage, opens the door one-handed, sets it in, closes), `["takeOutOfCage", "@meo", "@chuong"]` (ends holding it); `"inCage": "chuong"` starts a pet
    inside. The person stands just in front of the cage (z 12–60 more). Rig: `putInCage(pet, cageFrontProp | { at, scale, door })`, props `cage` + `cageFront`.
+   Feeding (đợt 50 C): `["serveBowl", "@cho", { "food": "kibble" | "water", "hold": 0.6 }]` — walks to the side the pet faces, squats, sets a bowl down in
+   front of its muzzle, pours kibble / water from a scoop / jug (the bowl fills), steps back; the pet walks to the bowl and eats / drinks by itself. The
+   bowl stays (`["pickUp", "@cho", { "item": "bowl" }]` picks it up). Pet carrier: a cutout `{ "kind": "carrier", "name": "long", "x", "z" }` (two layers,
+   door end `"door"`, sized to the pet), `["putInCarrier", "@meo", "@long", { "carry": true }]`, `["takeOutOfCarrier", "@meo", "@long"]` (the pet walks out),
+   `["pickUpCarrier", "@long"]`, `["putDownCarrier"]`; `"inCarrier": "chu"` on a pet = the person carries it in a carrier from the start (enters with it,
+   then `["takeOutOfCarrier", "@meo"]` sets it down in front and opens it), `"inCarrier": "long"` = it starts in that carrier. Dogs, cats, rabbits.
+   Scripts: "cho ăn", "đặt bát", "cho uống nước", "cho vào lồng" (… "rồi xách"), "thả ra khỏi lồng", "[xách lồng]", "[đặt lồng xuống]".
    Grooming 2 (đợt 49 B): `["blowDry", "@pet", { "hold": 2.4 }]` (dryer nozzle aimed down at its back, air stream, the other hand fluffs the fur —
    fur ripples, ears back, eyes squint; wet → dry and fluffy, so it follows `bathPet` / `towelDry`), `["trimFur", "@pet", { "tool": "clipper" }]`
    (`"scissors"` by default — long tufts trimmed along the back fall to the floor / table, the other hand steadies it, the coat ends neater).
    A sitting cat / rabbit stands up for both. Scripts: "sấy lông" / "sấy khô", "tỉa lông" / "cắt tỉa" (scissors), "cạo lông" / "tông đơ" (clipper).
+   Exam room (đợt 50 A): `["palpate", "@pet", { "part": "belly" | "flank" }]` (both hands, fingers spread, pressing gently; a small flinch, then calm),
+   `["useUltrasound", "@pet", "@cart"]` (the pet lies on its side, gel, a probe slid on its belly, a generic scan picture; the person glances at the cart's
+   screen — a picture cutout named "cart"; optional; the pet must be on a table), `["lookMicroscope", "@kinh"]` (walks up beside a microscope picture cutout,
+   leans in, eye at the eyepiece, turns the knob). The pet turns its tail to the person first. Pet pose `lieOnSide`. Scripts: "sờ bụng", "sờ nắn", "khám bụng",
+   "sờ sườn", "siêu âm", "[soi kính hiển vi]", pet "[nằm phơi bụng]".
+   Pet shop / till (đợt 50 B): `["takeFromShelf", "@ke_hang", { "item": "foodBag" | "treatBox" | "can", "level": "high" | "middle" | "low" }]` — the shelf is
+   a sets-repo picture (`gondola_shelf`, `pet_food_shelf`, `medicine_wall_shelf`) with a "name"; the person walks beside it (stand z 10–160 in front),
+   reaches the row, turns the product to read the label and keeps it (no shelf: `["takeFromShelf", { … }]` mimes it). `["scanBarcode", "@khach",
+   { "put": "down" | "keep" | "bag" }]` — the cashier takes the product the customer hands over (added for you), a hand-held scanner, red scan line,
+   bíp and a price card; `["scanBarcode"]` scans the product already in the other hand. Combo `["shopCheckout", "@khach"]` (scan → QR pay → hand it
+   back → wave; the customer needs a put-away phone and a pay stand). Scripts: "[lấy túi hạt trên kệ cao]", "[lấy hàng]", "[quét mã vạch]",
+   "thu ngân → khách: quét mã", "→ khách: tính tiền món hàng". Items `foodBag`, `treatBox`, `can` for `holds` too.
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

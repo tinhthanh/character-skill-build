@@ -124,14 +124,14 @@ def main():
             petHost.parentNode.insertBefore(tub, petHost); VGCharacter.createProp(tub, 'tub', {{ width: fit.length, height: fit.rim }}); pet.inTub42f(fit.rim); parts.push(tub); }}
         }}
         const host = add('host', `left:${{personX}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`);
-        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
+        rig = VGCharacter.createCharacter(host, {{ id, items: entry.items || null, itemsHidden: Array.isArray(entry.itemsHidden) ? entry.itemsHidden : !!entry.itemsHidden, wear: entry.wearPerson || [] }}).rig;
         if (turned && !entry.person) rig.state.facing = 0.55;
         parts.unshift(host);
         // HAI NGƯỜI (đợt 38 C): người `entry.person` đứng bên phải, cách tâm `personGap` (đơn vị ô 235 px của bản duyệt), cỡ `personScale`.
         if (entry.person) {{
           const h = personH * (entry.personScale || 1), w = h * 400 / 470, cx = personX + personW / 2 + (entry.personGap || 84) * personH / 235;
           const personHost = add('host', `left:${{cx - w / 2}}px;top:${{personY + personH - h}}px;width:${{w}}px;height:${{h}}px`);
-          person = VGCharacter.createCharacter(personHost, {{ id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }}).rig; parts.push(personHost);
+          person = VGCharacter.createCharacter(personHost, {{ id: entry.person, items: entry.personItems || null, itemsHidden: Array.isArray(entry.personItemsHidden) ? entry.personItemsHidden : !!entry.personItemsHidden }}).rig; parts.push(personHost);
         }}
         // "scale" (đợt 35, `weigh`): một cái cân trên sàn bên trái người — `@scale` trong các bước.
         if (entry.scale) {{
@@ -149,6 +149,24 @@ def main():
           petHost.style.left = `${{personX + personW * (entry.cage === 'in' ? -0.135 : 0.5)}}px`; petHost.style.top = `${{personY + personH * 458 / 470 - petHost.offsetHeight * 292 / 330}}px`; pet.apDung();
         }}
       }}
+      // ĐỢT 50 C — "feed": con vật dưới sàn bên trái người, quay mặt sang phải, người vẽ trước nó; nó tự tới bát rồi ăn / uống. "carrier": lồng vận chuyển
+      // bên trái người (đầu có cửa phía người) — "floor": con vật dưới sàn bên phải người; "held": người xách sẵn con vật trong lồng, chỗ đặt là đạo cụ đang
+      // ẩn. Như tools/actions.html (lồng lệch −0,325 bề ngang host người). `@carrier` trong các bước.
+      let carrier = null, petPart = null;
+      if (!isPet && pet && (entry.feed || entry.carrier)) {{
+        const table = parts.find((el) => el.className === 'table'); if (table) table.style.display = 'none';
+        const petHost = pet.host, floorTop = personY + personH * 458 / 470 - petHost.offsetHeight * 292 / 330;
+        pet.state.facing = 1;
+        if (entry.feed) {{ petHost.style.left = `${{personX - personW * 0.44}}px`; petHost.style.top = `${{floorTop}}px`; rig.host.parentNode.appendChild(rig.host); }}
+        else {{
+          const box = `left:${{personX - personW * 0.325}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`, back = add('host', box), front = add('host', box);
+          petHost.parentNode.insertBefore(back, petHost); petHost.parentNode.insertBefore(front, petHost.nextSibling); rig.host.parentNode.appendChild(rig.host);
+          VGCharacter.createProp(back, 'carrierBack'); carrier = VGCharacter.createProp(front, 'carrierFront'); parts.push(back, front);
+          petHost.style.left = `${{entry.carrier === 'floor' ? personX + personW * 0.68 : personX - personW * 0.385}}px`; petHost.style.top = `${{floorTop}}px`;
+          if (entry.carrier === 'held') {{ carrier.svg.setAttribute('data-carrier-spot50c', ''); rig.loadCarrier(pet, {{ hand: 'L' }}); }}
+        }}
+        pet.apDung();
+      }}
       const label = add('label', '');
       count++;
       label.innerHTML = `${{String(count).padStart(2, '0')}} · ${{entry.label.replace(/</g, '&lt;')}}<small>${{id}}${{turned ? ' · turned 3/4' : ''}}</small>`;
@@ -161,18 +179,25 @@ def main():
         parts[0].parentNode.insertBefore(standHost, parts[0]);
         stand = VGCharacter.createProp(standHost, 'paystand', {{ on: entry.stand.on }}); parts.push(standHost);
       }}
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@cage' ? cage : arg === '@person' ? person : arg)) : step));
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@cage' ? cage : arg === '@carrier' ? carrier : arg === '@person' ? person : arg)) : step));
       // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{{ "with": "@person" }}` (hay "@pet") trong tuỳ chọn của bước.
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => {{ if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = {{ ...arg, with: arg.with === '@pet' ? pet : person }}; }});
       const line = VGCharacter.sequence(rig, steps);
       // Phần "with" của combo (đợt 48): con vật / người phụ làm cùng lúc — y tá giữ con vật, con vật há miệng… Dựng trước khi
       // thêm gì vào `tl`, để một hàng hỏng (catch bên dưới) không để lại gì trong timeline.
       const partners = VGCharacter.partnerLines(line);
+      // đợt 50 C: con vật đi tới bát / bước ra khỏi lồng (như tools/actions.html)
+      if (pet && (entry.feed || entry.petOut)) {{
+        const ratio = Math.hypot(rig.svg.getScreenCTM().a, rig.svg.getScreenCTM().b) / Math.hypot(pet.svg.getScreenCTM().a, pet.svg.getScreenCTM().b), opts = (steps[0] && steps[0][2]) || {{}};
+        petPart = entry.feed ? VGCharacter.sequence(pet, [VGCharacter.RigSVG.bowlReady50c(opts.hold ?? 0.6), ['walk', 2, Math.round((opts.gap ?? 44) * ratio)], [entry.feed === 'water' ? 'drink' : 'eat', 2.4]])
+          : VGCharacter.sequence(pet, [(entry.carrier === 'held' ? VGCharacter.RigSVG.CARRIER_SET50C : 0) + VGCharacter.RigSVG.CARRIER_OPEN50C + 0.85, ['face', 'right'], ['walk', 3, Math.round(entry.petOut * ratio)]]);
+      }}
       if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD} + (entry.personStart || 0));
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};
       // Chỉ hiện trong khung giờ của mình. `visibility` bằng set của timeline: tua tới / tua lui đều đúng.
       tl.set(parts, {{ visibility: 'visible' }}, start).set(parts, {{ visibility: 'hidden' }}, end);
       tl.add(line.paused(false), start + {LEAD});
+      if (petPart) tl.add(petPart.paused(false), start + {LEAD});
       for (const p of partners) tl.add(p.line.paused(false), start + {LEAD} + p.start);
       slots.push([start, end, entry.label]);
       at = end;

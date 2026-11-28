@@ -1,8 +1,10 @@
 """Phase 4 steps: walking up before a turn — the pets that walk on their own (lean, carry a toy, tug of war), and a person who kneels
 to a pet on the floor, steps up to the pay stand / counter / a toy, joins a selfie, steps into reach (or back) of the pet or
 person a hand reaches for, or has a pet turn its tail for the thermometer."""
+from .actions import GROOM_TAIL_50C          # đợt 50 C
 from .actions import (CARE_ACTIONS, CARE_REACH, DESK_PAY, FLOOR_GAP, FLOOR_GAP_KID, HANDS_ON_CARE, HANDS_ON_GAP, HANDS_ON_HEAD, KID_IDS,
     PAIR_GAP, PAIR_PARTNER, PAY_REACH, PICK_GAP, PILL_HEAD, RESTRAIN, RESTRAIN_GAP, TUG_SNOUT, TUG_STAND)
+from . import shop50b          # đợt 50 B
 from .schema import CAT_SPECIES
 from .steps import desk_counter, desk_stand
 from .util import fail, js
@@ -83,7 +85,10 @@ def walk_to_pick_up(emitted, names, turn, turns, who):
         if not (isinstance(step, list) and len(step) > 1 and step[0] == 'pickUp' and isinstance(step[1], str) and step[1][1:] in names and names[step[1][1:]]['_pet']): continue
         pet = names[step[1][1:]]
         px = float(pet['x']) + pet.get('_drop', 0)
-        move = px + (1 if float(who['x']) >= px else -1) * PICK_GAP * who['_host_height'] - float(who['x'])
+        side, gap = 1 if float(who['x']) >= px else -1, PICK_GAP
+        # đợt 50 C: nhặt cái bát đã đặt cho nó — đứng ở phía bát (trước mõm nó), không với qua người nó
+        if any(isinstance(a, dict) and a.get('item') == 'bowl' for a in step[2:]) and '_bowl50c' in pet: side = 1 if pet['_bowl50c'] >= px else -1; px = pet['_bowl50c']; gap = PICK_GAP * 0.75
+        move = px + side * gap * who['_host_height'] - float(who['x'])
         if abs(move) > 0.04 * who['_host_height']:
             turns.append((f'  // {who["name"]} steps up to {step[1][1:]} to "pickUp" the toy by it', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
             emitted[0] += 1
@@ -161,6 +166,7 @@ def walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, tu
         target = names[step[1][1:]]
         # HAI NGƯỜI (đợt 38 C): khoảng cách theo chiều cao trung bình hai người; đập tay theo người THẤP hơn (trẻ con tay ngắn, đứng sát hơn).
         if step[0] in PAIR_GAP and not target['_pet']: wanted = PAIR_GAP[step[0]] * (min(who['_host_height'], target['_host_height']) if step[0] == 'highFive' else (who['_host_height'] + target['_host_height']) / 2)
+        wanted = shop50b.handoff_gap(step, who, target, wanted)          # đợt 50 B: trao món hàng qua quầy — đứng xa hơn, hai mặt không chồng nhau
         # CHO UỐNG THUỐC con chó / thỏ (đợt 36 — Gemini: "chỉ một tay gần mõm, không thấy viên thuốc" ở cảnh corgi): thân dài, ĐẦU
         # nằm ở đầu gần người (nó quay mặt về người) — đứng 0,18 tính từ GIỮA thân là đứng đè lên đầu nó, hai bàn tay chồng lên
         # nhau trước ngực người. Cộng thêm quãng từ giữa thân tới đầu (~0,15 chiều cao host của nó); mèo ngồi thì đầu trên ngực.
@@ -172,6 +178,17 @@ def walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, tu
         # chân trước, cằm, tai, gáy mà không vắt qua thân nó.
         if step[0] in HANDS_ON_CARE and target['_pet'] and not who.get('seated'):
             head = -1 if target.get('faces') in names and float(names[target['faces']]['x']) < float(target['x']) else 1
+            # ĐỢT 50 C — sửa đợt 49 B: sấy / tỉa lông con THỎ DƯỚI SÀN — người quỳ ở phía đầu nó thì hai cánh tay vươn tới lưng vắt ngang qua
+            # cái đầu to (che 42–63 % mặt nó). Quỳ ở phía ĐUÔI: tay tới lưng, gáy từ phía sau, mặt nó để trống.
+            if step[0] in GROOM_TAIL_50C and 'rabbit' in str(target.get('species', '')) and not target.get('on'):
+                head = target.setdefault('_head50c', head)          # nó quay mặt về phía người từ đầu cảnh — người đã sang phía đuôi thì vẫn hướng ấy
+                tail_x = float(target['x']) + target.get('_drop', 0) - head * GROOM_TAIL_50C[step[0]] * target['_host_height']
+                move = tail_x - head * 0.6 * HANDS_ON_GAP[step[0]] * who['_host_height'] - float(who['x'])
+                if abs(move) > 0.03 * who['_host_height']:
+                    turns.append((f'  // {who["name"]} goes to the tail end of {step[1][1:]} for "{step[0]}" (its face stays clear)', f"[{who['name']}, ['walk', 4, {round(move / who['_unit'])}]]"))
+                    emitted[0] += 1
+                    who['x'] = float(who['x']) + move
+                continue
             reach_x = float(target['x']) + target.get('_drop', 0) + head * (0.08 if str(target.get('species', '')) in CAT_SPECIES else HANDS_ON_HEAD) * target['_host_height']
             move = reach_x + head * HANDS_ON_GAP[step[0]] * (1 if target.get('on') else 0.6) * who['_host_height'] - float(who['x'])      # quỳ với con vật dưới sàn: vai thấp, tay ngắn — sát hơn
             if abs(move) > 0.03 * who['_host_height']:

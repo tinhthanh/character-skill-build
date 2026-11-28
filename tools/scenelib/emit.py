@@ -7,6 +7,8 @@ from .steps import step_code, turn_code
 from .util import fail, js, known
 from .views import view_of
 from . import leash49c          # đợt 49 C
+from . import shop50b          # đợt 50 B
+from . import feed50c          # đợt 50 C
 
 
 def emit_together(emitted, entry, st, turns, where):
@@ -105,6 +107,7 @@ def emit_turn(arms, emitted, entry, gear_ops, names, reach_notes, st, stage_set,
         else: part = f"[{js(PAIR_PARTNER[kind])}, {me}]"
         code = '{ together: [' + code + f", [{names[name]['name']}, {part}]] }}"
         emitted[0] += 1
+    code = shop50b.partner_code(code, entry, names, emitted)          # đợt 50 B: ["scanBarcode", "@khach"] một mình — khách đưa món hàng cùng lúc
     # ĐỢT 39 C: `["takeSelfie", hold, { "with": "@người / con vật" }]` một mình: người kia làm phần của mình CÙNG LÚC — người: `joinSelfie`
     # (nghiêng đầu về phía máy, cười, chữ V); con vật: nghiêng đầu tò mò (`tiltHead`).
     selfie = [step for step in entry.get('do', []) if isinstance(step, list) and step and step[0] == 'takeSelfie' and len(step) > 2 and isinstance(step[2], dict) and isinstance(step[2].get('with'), str)]
@@ -181,5 +184,6 @@ def emit_turn(arms, emitted, entry, gear_ops, names, reach_notes, st, stage_set,
         code = '{ together: [' + code + f", [{person['name']}, ['pullToy', {names[entry['who']]['name']}, {js(hold)}]]] }}"
         emitted[0] += 1
     code = leash49c.pet_part(code, entry, names, emitted)          # đợt 49 C: con vật được dắt bước cùng lúc
+    code = feed50c.pet_part(code, entry, names, emitted)          # đợt 50 C: con vật tới bát ăn / bước ra khỏi lồng cùng lúc
     turns.append((None, code))
     emitted[0] += 1

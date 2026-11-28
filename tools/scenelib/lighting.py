@@ -1,5 +1,8 @@
 """moments.json: the moments of a built 3D scene that tools/light_audit.py and tools/acting_check.py check."""
 from .cage import cage_plan          # đợt 49 A
+from .exam50a import micro_plan          # đợt 50 A
+from . import shop50b          # đợt 50 B
+from .feed50c import plan_moments as feed50c_plan          # đợt 50 C
 from .actions import (HANDS_ON_CARE, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ASK, PAIR_ASK, PAIR_TIMES, CAT_RABBIT_ACTS, PET_ACT_ASK, REACH_ACTIONS,
     REACH_TIMES, RESTRAIN, SHOW_SIZE_GAP)
 from .plans import care_plan_tools, care_window, desk_plan
@@ -59,6 +62,23 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             'Is a lamp glowing, with a pool of warm light around it?' if op['on'] else 'Is the lamp off and the room darker around it?']})
     for op in gear_ops:
         pet = pet_of(op['target'])
+        if op['kind'] == 'shop50b':
+            # ĐỢT 50 B — lấy hàng trên kệ / quét mã vạch: tay ở kệ, món hàng trong tay, máy quét chĩa vào món hàng — tools/acting_check.py `shop50b`.
+            step = next((step for n in (op['turn'], op['turn'] - 1, op['turn'] - 2, op['turn'] + 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            plan = shop50b.plan(op, float(step['start']), float(step['duration']))          # lượt trong "together": số lượt đã cộng cả nhóm trước khi viết bước
+            moments.append({'t': plan['times'][1], 'what': f'{op["who"]} {op["name"]}', 'ask': plan['ask'], 'check': plan['check']})
+            continue
+        if op['kind'] in ('feed50c', 'carrier50c'):
+            # ĐỢT 50 C — bát ăn, lồng vận chuyển: tools/acting_check.py `feed50c` / `carrier50c`.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            end = max((float(t[1]) for t in turns), default=1e9)
+            plan = feed50c_plan(op, float(step['start']), float(step['duration']), end)
+            moments.append({'t': plan['times'][min(1, len(plan['times']) - 1)], 'what': f'{op["who"]} {op["name"]} {op["target"]}', 'ask': plan['ask'], 'check': plan['check']})
+            continue
         if op['kind'] == 'cage49a':
             # ĐỢT 49 A — chuồng: lúc mở cửa, lúc con vật đã trong chuồng (cửa đóng) / đã trên tay — tools/acting_check.py `cage49a`.
             step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
@@ -66,6 +86,14 @@ def light_moments(timings, stage_set, power_ops, sky_ops, lamp_ops, gear_ops, na
             if not step: continue
             plan = cage_plan(op, float(step['start']), float(step['duration']))
             moments.append({'t': plan['times'][1], 'what': f'{op["who"]} {op["name"]} {op["target"]}', 'ask': plan['ask'], 'check': plan['check']})
+            continue
+        if op['kind'] == 'micro50a':
+            # ĐỢT 50 A — kính hiển vi: mắt ở thị kính, tay ở núm, rồi đứng thẳng lên — tools/acting_check.py `micro50a`.
+            step = next((step for n in (op['turn'], op['turn'] + 1, op['turn'] - 1) if 0 <= n < len(timings.get('reaches') or [])
+                         for step in timings['reaches'][n] if step['name'] == op['name']), None)
+            if not step: continue
+            plan = micro_plan(op, float(step['start']), float(step['duration']))
+            moments.append({'t': plan['times'][1], 'what': f'{op["who"]} {op["name"]}', 'ask': plan['ask'], 'check': plan['check']})
             continue
         if op['kind'] in REACH_ACTIONS:
             # Lượt có động tác chạm: đo ở 30 / 50 / 70 % lượt — tay tới đích ở ÍT NHẤT một lúc là đạt.

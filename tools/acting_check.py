@@ -527,7 +527,7 @@ def check_seen(folder, checks, keep=None):
     """CON VẬT KHÔNG BỊ CHE (đợt 31): ở lúc được hỏi của mỗi động tác tay chạm con vật (không tính bế: trong vòng tay thì
     tay che là đúng), con vật thấy ≥ 70 % hình và ≥ 60 % đầu."""
     probe_jobs = {(c['times'][len(c['times']) // 2], c['target']) for c in checks if c['kind'] == 'takeTemp'}
-    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39', 'motion42d', 'cage49a') and c.get('to') != 'hands']
+    jobs = [(c['times'][len(c['times']) // 2], c['target'], c['who']) for c in checks if c['kind'] not in ('walk', 'putDown', 'carry', 'gesture', 'reaction', 'weigh', 'look', 'pill', 'worn', 'readChart', 'showXray', 'petAct', 'care38', 'prep', 'pair', 'pairLook', 'talk39', 'motion42d', 'cage49a', 'micro50a', 'feed50c', 'carrier50c') and c.get('to') != 'hands']
     if not jobs: return []
     found = pet_pixels_sharp(folder, jobs, keep)
     if found is None: return [{'scene': folder, 'what': 'pets in view', 'ok': None, 'note': 'needs Pillow (pip install Pillow)'}]
@@ -2982,6 +2982,7 @@ def check_cage49a(folder, c, shots, scales):
         if not pet: row('it is in the arms', None, f'not in the frame at {t:g} s'); continue
         ok = bool(pet.get('carried')) if name == 'takeOutOfCage' else not pet.get('carried') or t < c['times'][0]
         row('it is in the arms' if name == 'takeOutOfCage' else 'it is held before it goes in', bool(pet.get('carried')), f'{"carried" if pet.get("carried") else "not carried"} at {t:g} s')
+    out.extend(check_opaque50c(folder, c, scales, f'{who_n} {name} {pet_n}'))          # đợt 50 C
     return out
 
 
@@ -3049,9 +3050,12 @@ def check_one_scene(folder):
     when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     tool_times = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
-    tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift') for t in c.get(key) or []]      # đợt 49 A
+    tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift', 'opaque') for t in c.get(key) or []]      # đợt 49 A (+ đợt 50 C: 'opaque')
+    tool_times += [t for c in checks if c.get('kind') in FEED50C_KINDS for key in FEED50C_KEYS for t in c.get(key) or []]      # đợt 50 C
     tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
     tool_times += [t for c in checks if c.get('kind') == 'groom49b' for key in ('air', 'ripple', 'before', 'after', 'happy', 'cut', 'shag', 'fall', 'neat') for t in c.get(key) or []]      # đợt 49 B
+    tool_times += [t for c in checks if c.get('kind') in ('exam50a', 'micro50a') for key in ('press', 'flinch', 'after', 'probe', 'gel', 'lying', 'card', 'at') for t in c.get(key) or []]      # đợt 50 A
+    tool_times += [t for c in checks if c.get('kind') == 'shop50b' for key in ('grab', 'read', 'held', 'beam', 'beep', 'taken') for t in c.get(key) or []]      # đợt 50 B
     shots, cuts, log = probe(folder, [t for c in checks for t in when(c)] + tool_times + [m['t'] for m in moments if isinstance(m.get('t'), (int, float))])
     scales = SCALES
     # NẤP (đợt 35): con vật thấy bao nhiêu, đầu bao nhiêu — đo bằng pixel ở lúc được hỏi.
@@ -3090,11 +3094,23 @@ def check_one_scene(folder):
         if c['kind'] == 'cage49a':          # đợt 49 A
             results.extend(check_cage49a(folder, c, shots, scales))
             continue
+        if c['kind'] in FEED50C_KINDS:      # đợt 50 C
+            results.extend(check_feed50c(folder, c, shots, scales))
+            continue
         if c['kind'] == 'care42f':          # đợt 42 F
             results.extend(check_grooming(folder, c, shots, scales))
             continue
+        if c['kind'] == 'shop50b':          # đợt 50 B
+            results.extend(check_shop50b(folder, c, shots, scales))
+            continue
         if c['kind'] == 'groom49b':         # đợt 49 B
             results.extend(check_groom49b(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'exam50a':          # đợt 50 A
+            results.extend(check_exam50a(folder, c, shots, scales))
+            continue
+        if c['kind'] == 'micro50a':         # đợt 50 A
+            results.extend(check_micro50a(folder, c, shots, scales))
             continue
         if c['kind'] == 'walk':
             worst = None
@@ -3270,6 +3286,337 @@ def check_one_scene(folder):
                 results.append({'scene': folder, 'what': f'{name} seated on the seat during {c["kind"]}', 'ok': abs(off) <= FEET,
                                 'note': f'seat line {off * 100:+.1f} % of height ' + ('below' if off > 0 else 'above') + f' the top of the seat at {best[0]:g} s (limit ±{FEET * 100:g} %; above = floating, below = sunk in)'})
     return results
+
+
+# ĐỢT 50 A — phòng khám: sờ nắn, siêu âm, kính hiển vi (số đo từ `set.careProbe()` → `c50a` của người và con vật; mặt con vật ở `c38` / `c42`).
+HANDS_ON_50A = 0.025   # sờ nắn: mỗi bàn tay cách khung thân con vật ≤ 2,5 % chiều cao người …
+BELLY_LOW_50A = 0.25   # … và (bụng) tâm bàn tay ở dưới 25 % trên của khung thân — không trên sống lưng
+PROBE_ON_50A = 0.025   # siêu âm: mặt đầu dò cách khung thân con vật ≤ 2,5 % chiều cao người, ở 60 % dưới của khung thân (bụng)
+GEL_ON_50A = 0.02      # … lớp gel nằm trong khung thân (lấn ≤ 2 %)
+SIDE_LOW_50A = 0.9     # … con vật nằm nghiêng (mức ≥ 0,9) suốt lúc rà
+CARD_OVER_50A = 0.15   # … thẻ ảnh siêu âm che khung đầu con vật / đầu người ≤ 15 %
+EYE_AT_50A = 0.06      # kính hiển vi: giữa hai mắt cách đỉnh thị kính ≤ 6 % chiều cao người …
+KNOB_AT_50A = 0.05     # … lòng bàn tay gần cách núm chỉnh ≤ 5 %
+FACE_COVER_50A = 0.3   # một bàn tay / dụng cụ che ≥ 30 % mặt con vật là "che mặt" — cho phép ở ≤ 25 % các lúc đo
+
+
+def check_exam50a(folder, c, shots, scales):
+    """ĐỢT 50 A: sờ nắn — hai bàn tay trên bụng / sườn ở mọi nhịp ấn, ấn từng nhịp, con vật giật mình khẽ rồi yên; siêu âm — con vật nằm nghiêng, gel
+    trên bụng, mặt đầu dò trên bụng suốt lúc rà, thẻ ảnh hiện mà không che mặt ai, con vật dậy sau đó. Cả hai: không bàn tay / dụng cụ nào che mặt nó lâu."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    person = lambda t: (care(t).get(who_n) or {}).get('c50a') or {}
+    pet = lambda t: (care(t).get(pet_n) or {}).get('c50a') or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    H = lambda t: care(t).get('@H') or frame_size(folder)[1]
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} {pet_n} — {text}', 'ok': ok, 'note': note})
+
+    def body(t):
+        b = pet(t).get('body')
+        return box_of(b) if b else None
+
+    def point_gap(p, b): return (max(0, b['x0'] - p['x'], p['x'] - b['x1']) ** 2 + max(0, b['y0'] - p['y'], p['y'] - b['y1']) ** 2) ** 0.5
+
+    def overlap(a, b): return max(0, min(a['x1'], b['x1']) - max(a['x0'], b['x0'])) * max(0, min(a['y1'], b['y1']) - max(a['y0'], b['y0']))
+
+    def covered(t):
+        # MẶT con vật: hai mắt và miệng, nới ra 35 % khoảng hai mắt (như đợt 49 B); bàn tay: ô vuông 6 % chiều cao người; đầu dò / lọ gel: phần đặc.
+        q = care(t).get(pet_n) or {}
+        eyes = [e for e in ((q.get('c38') or {}).get('eyes') or []) if e]
+        mouth = (q.get('c42') or {}).get('mouth')
+        if not eyes or not mouth or not tall(t): return None
+        pad = max(0.35 * (abs(eyes[0]['x'] - eyes[-1]['x']) if len(eyes) > 1 else 0), 3)
+        xs = [e['x'] for e in eyes] + [mouth['x']]; ys = [e['y'] for e in eyes] + [mouth['y']]
+        fb = {'x0': min(xs) - pad, 'x1': max(xs) + pad, 'y0': min(ys) - pad, 'y1': max(ys) + pad}
+        area = max(1, (fb['x1'] - fb['x0']) * (fb['y1'] - fb['y0']))
+        r = 0.03 * tall(t)
+        boxes = [{'x0': h['x'] - r, 'x1': h['x'] + r, 'y0': h['y'] - r, 'y1': h['y'] + r} for h in (frame(t).get(who_n) or {}).get('hands') or [] if 'x' in h]
+        tool = person(t).get('solid') or person(t).get('tool')
+        if tool: boxes.append(box_of(tool))
+        return max([overlap(b, fb) / area for b in boxes] or [0])
+
+    if name == 'palpate':
+        work, belly = c['press'], c.get('part', 'belly') == 'belly'
+        on = []
+        for t in work:
+            b, hands = body(t), [h for h in (frame(t).get(who_n) or {}).get('hands') or [] if h.get('box')]
+            if not b or not tall(t) or len(hands) < 2: on.append((t, None)); continue
+            gaps = [box_gap(h['box'], b) / tall(t) for h in hands]
+            low = all((h['y'] - b['y0']) / max(1, b['y1'] - b['y0']) >= BELLY_LOW_50A for h in hands) if belly else True
+            on.append((t, max(gaps) if low else 1))
+        seen = [x for x in on if x[1] is not None]
+        good = [x for x in seen if x[1] <= HANDS_ON_50A]
+        worst = max(seen, key=lambda x: x[1], default=None)
+        row(f'both hands on its {"belly" if belly else "flanks"} ({len(on)} moments)', len(on) >= 4 and len(good) >= 0.8 * len(on),
+            f'both hands within {HANDS_ON_50A * 100:g} % of height of its body' + (' (on the lower part)' if belly else '') + f' at {len(good)} of {len(on)} moments' + (f'; worst {worst[1] * 100:.1f} % at {worst[0]:g} s' if worst else ''))
+        press = [person(t).get('press', 0) for t in work]
+        row('it presses in beats (kneading)', max(press) >= 0.6 and min(press) <= 0.35, f'press {min(press):.2f}…{max(press):.2f} over the beats (want ≥ 0.6 and ≤ 0.35)')
+        flinch = [pet(t).get('flinch', 0) for t in c['flinch']]; ears = [pet(t).get('ears', 0) for t in c['flinch']]
+        row('it reacts mildly (a small flinch, ears back), then calms', max(flinch) >= 0.5 and min(ears) < ears[0] - 0.3 and pet(c['after'][0]).get('flinch', 1) == 0,
+            f'flinch up to {max(flinch):.2f}, ears {ears[0]:+.2f} → {min(ears):+.2f}, flinch {pet(c["after"][0]).get("flinch", 0):.2f} after')
+    else:
+        lying = [pet(t).get('side', 0) for t in c['lying'] if pet(t)]
+        low = [pet(t).get('low', 0) for t in c['lying'] if pet(t)]
+        row('it lies on its side', bool(lying) and min(lying[2:] or lying) >= SIDE_LOW_50A and max(low) >= 30, f'lying {min(lying[2:] or lying or [0]):.2f} at least while scanned (want ≥ {SIDE_LOW_50A}); body lowered {max(low or [0]):.0f} frame units')
+        gel = []
+        for t in c['gel']:
+            g, b = pet(t).get('gel'), body(t)
+            gel.append(bool(g and b and tall(t) and box_gap(box_of(g), b) / tall(t) <= GEL_ON_50A and box_of(g)['y0'] >= b['y0'] + 0.3 * (b['y1'] - b['y0'])))
+        row('gel on its belly', all(gel), f'gel on the lower part of its body at {sum(gel)} of {len(gel)} moments')
+        tips = []
+        for t in c['probe']:
+            p, b = person(t), body(t)
+            if not p.get('tip') or p.get('kind') != 46 or not b or not tall(t): tips.append((t, None)); continue
+            inside = (p['tip']['y'] - b['y0']) / max(1, b['y1'] - b['y0']) >= 0.4
+            tips.append((t, point_gap(p['tip'], b) / tall(t) if inside else 1))
+        seen = [x for x in tips if x[1] is not None]
+        good = [x for x in seen if x[1] <= PROBE_ON_50A]
+        worst = max(seen, key=lambda x: x[1], default=None)
+        row(f'the probe on its belly ({len(tips)} moments)', len(tips) >= 4 and len(good) >= 0.85 * len(tips),
+            f'probe face within {PROBE_ON_50A * 100:g} % of height of the lower part of its body at {len(good)} of {len(tips)} moments' + (f'; worst {worst[1] * 100:.1f} % at {worst[0]:g} s' if worst else ''))
+        cards, cover = [], []
+        for t in c['card']:
+            card = person(t).get('card')
+            cards.append(bool(card and person(t).get('scan', 0) > 0.9))
+            if card:
+                cb = box_of(card)
+                heads = [box_of(h) for h in (pet(t).get('head'), (care(t).get(who_n) or {}).get('head')) if h]
+                cover.append(max([overlap(cb, h) / max(1, (h['x1'] - h['x0']) * (h['y1'] - h['y0'])) for h in heads] or [0]))
+        row('a scan picture is shown, off the faces', all(cards) and bool(cover) and max(cover) <= CARD_OVER_50A, f'scan card at {sum(cards)} of {len(cards)} moments, covering at most {max(cover or [0]) * 100:.0f} % of a head (limit {CARD_OVER_50A * 100:g} %)')
+        after = pet(c['after'][-1])
+        row('it gets up after, the gel gone', after.get('side', 1) <= 0.05 and not after.get('gel') and person(c['after'][-1]).get('kind') == 0, f'lying {after.get("side", 0):.2f}, gel ' + ('gone' if not after.get('gel') else 'STILL there') + f', tool {person(c["after"][-1]).get("kind")}')
+        work = c['probe']
+        when = c['times'][1]
+        tool = person(when).get('solid')
+        size = max(tool['w'], tool['h']) / H(when) if tool else 0
+        row('the probe big enough on screen', size >= TOOL_SEEN, f'the probe is {size * 100:.1f} % of the frame height at {when:g} s (least {TOOL_SEEN * 100:g} %)')
+    cov = [x for x in (covered(t) for t in work) if x is not None]
+    row('nothing covers its face for long', bool(cov) and sum(1 for x in cov if x >= FACE_COVER_50A) <= 0.25 * len(cov), f'a hand or the tool covers ≥ {FACE_COVER_50A * 100:g} % of its face at {sum(1 for x in cov if x >= FACE_COVER_50A)} of {len(cov)} moments (at most 25 %; most {max(cov) * 100:.0f} %)' if cov else 'face not measured')
+    return out
+
+
+def check_micro50a(folder, c, shots, scales):
+    """ĐỢT 50 A: soi kính hiển vi — mắt ở thị kính, tay ở núm chỉnh suốt lúc soi, cúi người tới; rồi đứng thẳng lên."""
+    who_n = c['who']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    person = lambda t: (care(t).get(who_n) or {}).get('c50a') or {}
+    tall = lambda t: ({a['name']: a for a in shots.get(float(t), [])}.get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} lookMicroscope — {text}', 'ok': ok, 'note': note})
+
+    eyes, knobs, bent = [], [], []
+    for t in c['at']:
+        p = person(t)
+        bent.append(p.get('micro', 0))
+        if not c.get('prop') or not tall(t): continue
+        if p.get('eyeL') and p.get('eyeR') and p.get('eyepiece'):
+            e = {'x': (p['eyeL']['x'] + p['eyeR']['x']) / 2, 'y': (p['eyeL']['y'] + p['eyeR']['y']) / 2}
+            eyes.append(((e['x'] - p['eyepiece']['x']) ** 2 + (e['y'] - p['eyepiece']['y']) ** 2) ** 0.5 / tall(t))
+        if p.get('palm') and p.get('knobAt'): knobs.append(((p['palm']['x'] - p['knobAt']['x']) ** 2 + (p['palm']['y'] - p['knobAt']['y']) ** 2) ** 0.5 / tall(t))
+    row('bends over to the eyepiece', min(bent or [0]) >= 0.9, f'bent {min(bent or [0]):.2f} at least while looking (want ≥ 0.9)')
+    if c.get('prop'):
+        row(f'an eye at the eyepiece ({len(c["at"])} moments)', len(eyes) == len(c['at']) and max(eyes or [1]) <= EYE_AT_50A, f'eyes {min(eyes or [1]) * 100:.1f}…{max(eyes or [1]) * 100:.1f} % of height from the top of the eyepiece (limit {EYE_AT_50A * 100:g} %)')
+        row('a hand on the focus knob', len(knobs) == len(c['at']) and max(knobs or [1]) <= KNOB_AT_50A, f'palm {min(knobs or [1]) * 100:.1f}…{max(knobs or [1]) * 100:.1f} % of height from the knob (limit {KNOB_AT_50A * 100:g} %)')
+        turns = len({person(t).get('knob') for t in c['at']})
+        row('turns the knob a few notches', turns >= 3, f'{turns} different knob notches while looking (want ≥ 3)')
+    row('straightens up after', person(c['after'][0]).get('micro', 1) <= 0.05, f'bent {person(c["after"][0]).get("micro", 0):.2f} after')
+    return out
+
+
+# ĐỢT 50 B — CỬA HÀNG & QUẦY THU NGÂN (`shop50b`, set3d `careProbe` → `c50b`): lấy hàng trên kệ, quét mã vạch. Mọi độ dài theo chiều cao người trên màn hình.
+SHOP_SHELF = 0.04          # lòng bàn tay cách khung ảnh kệ ≤ chừng ấy lúc nắm lấy món hàng
+SHOP_HOLD = 0.06           # tâm món hàng cách lòng bàn tay cầm nó ≤ chừng ấy (món hàng treo dưới / nằm trên nắm tay)
+SHOP_BEAM = 0.015          # cuối tia đỏ (vạch quét) cách khung món hàng ≤ chừng ấy
+SHOP_BEAM_SHARE = 0.8      # … ở ít nhất chừng ấy phần các lúc đo trong khi tia bật
+SHOP_FACE = 0.15          # quét món hàng của khách: đầu người này che đầu người kia ≤ chừng ấy phần diện tích đầu nhỏ hơn (lượt hai: đầu khách che nửa mặt thu ngân)
+SHOP_AIM = 60              # hướng máy quét (ô kính → cuối tia) lệch hướng ô kính → tâm món hàng ≤ chừng ấy độ (máy sát món hàng to: lệch nhỏ thành góc lớn) — và ô kính NGOÀI món hàng
+
+
+def check_shop50b(folder, c, shots, scales):
+    """ĐỢT 50 B: lấy hàng — lúc nắm, bàn tay ở kệ (có kệ) và món hàng trong tay; lúc đọc — món hàng trước người, mặt nhãn; cuối bước vẫn cầm.
+    Quét mã — món hàng trong tay thu ngân (nhận từ khách), máy quét chĩa vào nó, vạch quét đỏ chạm món hàng, "bíp" và thẻ giá."""
+    name, who_n = c['name'], c['who']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    me = lambda t: (care(t).get(who_n) or {}).get('c50b') or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    tall = lambda t: (frame(t).get(who_n) or {}).get('tall') or 0
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} — {text}', 'ok': ok, 'note': note})
+
+    def bx(b): return {'x0': b['x'] - b['w'] / 2, 'x1': b['x'] + b['w'] / 2, 'y0': b['y'] - b['h'] / 2, 'y1': b['y'] + b['h'] / 2}
+
+    def pgap(p, b): return (max(0, b['x0'] - p['x'], p['x'] - b['x1']) ** 2 + max(0, b['y0'] - p['y'], p['y'] - b['y1']) ** 2) ** 0.5
+
+    def held(t):
+        q = me(t)
+        if not q.get('goods') or not q.get('hand') or not tall(t): return None
+        g = q['goods']
+        return ((g['x'] - q['hand']['x']) ** 2 + (g['y'] - q['hand']['y']) ** 2) ** 0.5 / tall(t) - 0.5 * max(g['w'], g['h']) / tall(t)
+    if name == 'takeFromShelf':
+        for t in c.get('grab') or []:
+            q = me(t)
+            if not tall(t): row('a hand takes the product off the shelf', None, f'not in the frame at {t:g} s'); continue
+            d = held(t)
+            if c.get('target'):
+                shelf = q.get('shelf')
+                gap = pgap(q['hand'], bx(shelf)) / tall(t) if shelf and q.get('hand') else None
+                row('the hand is at the shelf', gap is not None and gap <= SHOP_SHELF, f'palm {gap * 100:.1f} % of height from the shelf at {t:g} s (limit {SHOP_SHELF * 100:g} %)' if gap is not None else f'no hand / shelf measured at {t:g} s')
+            row('the product is in the hand', d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s (limit {SHOP_HOLD * 100:g} %)' if d is not None else f'no product in hand at {t:g} s')
+        for t in c.get('read') or []:
+            q = me(t)
+            row('reads the label (product held up, label side out)', bool(q.get('goods')) and q.get('label') is True, f'product {"in hand" if q.get("goods") else "missing"}, {"label" if q.get("label") else "back"} side at {t:g} s')
+        for t in c.get('held') or []:
+            d = held(t)
+            row('keeps holding the product', d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s' if d is not None else f'no product in hand at {t:g} s')
+        return out
+    for t in c.get('taken') or []:
+        d = held(t)
+        row("the product is in the cashier's hand (taken from the customer)", d is not None and d <= SHOP_HOLD, f'product {d * 100:.1f} % of height from the palm at {t:g} s' if d is not None else f'no product in hand at {t:g} s')
+    hits, aims, notes = 0, [], []
+    for t in c.get('beam') or []:
+        q = me(t)
+        if not q.get('beam') or not q.get('beamEnd') or not q.get('goods') or not q.get('window') or not tall(t): notes.append(f'{t:g} s: no beam / product'); continue
+        g, e, w = bx(q['goods']), q['beamEnd'], q['window']
+        gap = pgap(e, g) / tall(t)
+        hits += gap <= SHOP_BEAM
+        import math
+        a1, a2 = math.atan2(e['y'] - w['y'], e['x'] - w['x']), math.atan2(q['goods']['y'] - w['y'], q['goods']['x'] - w['x'])
+        aims.append(abs((math.degrees(a1 - a2) + 180) % 360 - 180) if pgap(w, g) > 0 else 180.0)          # ô kính trong món hàng: không phải "chĩa vào" 
+        notes.append(f'{t:g} s: {gap * 100:.1f} %')
+    n = len(c.get('beam') or [])
+    row('the red scan line touches the product', n > 0 and hits >= SHOP_BEAM_SHARE * n, f'{hits}/{n} moments with the end of the beam ≤ {SHOP_BEAM * 100:g} % of height from the product ({", ".join(notes[:6])})')
+    row('the scanner is aimed at the product', bool(aims) and max(aims) <= SHOP_AIM, (f'beam off the product centre by at most {max(aims):.0f}°' if aims else 'no beam measured') + f' (limit {SHOP_AIM}°, the scanner outside the product)')
+    if c.get('target'):
+        worst = None
+        for t in (c.get('taken') or []) + (c.get('beam') or []) + (c.get('beep') or []):
+            a, b = (care(t).get(who_n) or {}).get('head'), (care(t).get(c['target']) or {}).get('head')
+            if not a or not b: continue
+            A, B = bx(a), bx(b)
+            share = max(0, min(A['x1'], B['x1']) - max(A['x0'], B['x0'])) * max(0, min(A['y1'], B['y1']) - max(A['y0'], B['y0'])) / max(1, min(a['w'] * a['h'], b['w'] * b['h']))
+            if worst is None or share > worst[1]: worst = (t, share)
+        row(f'both faces stay visible ({who_n} and {c["target"]} do not cover each other)', None if worst is None else worst[1] <= SHOP_FACE,
+            f'the two heads overlap by at most {worst[1] * 100:.0f} % of the smaller head (at {worst[0]:g} s; limit {SHOP_FACE * 100:g} %)' if worst else 'no heads measured')
+    for t in c.get('beep') or []:
+        q = me(t)
+        row('bíp: a green flash and the price card', q.get('beep', 0) > 0.5 and q.get('readout', 0) > 0.5, f'beep {q.get("beep", 0)}, price card {q.get("readout", 0)} at {t:g} s')
+    return out
+
+
+
+
+# ĐỢT 50 C — BÁT ĂN (`serveBowl`) và LỒNG VẬN CHUYỂN (`putInCarrier`, `takeOutOfCarrier`, `pickUpCarrier`, `putDownCarrier`): số đo từ set3d `careProbe`
+# (`f50c` của người — bát, dòng đổ, lồng trên tay; `@carrier50c` — lồng trên sàn) và khung chụp (`shots`). Mọi độ dài theo chiều cao người (`tall`).
+FEED50C_KINDS = ('feed50c', 'carrier50c')
+FEED50C_KEYS = ('down', 'pour', 'full', 'mouth', 'stays', 'opaque', 'open', 'openIn', 'inside', 'closed', 'held', 'carried', 'out')
+BOWL_FRONT50C = 0.4        # bát cách tâm đầu con vật (ngang) ≤ chừng ấy, về phía nó quay mặt
+BOWL_FLOOR50C = 0.05       # đáy bát cách chân con vật (dọc) ≤ chừng ấy — trên sàn
+MOUTH_BOWL50C = 0.06       # nét môi con vật cách vành bát ≤ chừng ấy lúc ăn / uống (ít nhất 2 trong 3 lúc)
+CARRIER_IN50C = 0.03       # thân con vật trong lòng lồng (lấn ≤ chừng ấy mỗi bên)
+CARRIER_HAND50C = 0.05     # bàn tay cách cửa lưới ≤ chừng ấy lúc mở cửa
+
+
+def check_feed50c(folder, c, shots, scales):
+    """ĐỢT 50 C: bát đặt dưới sàn trước mõm, đổ hạt / nước (bát đầy dần), mõm con vật ở bát lúc ăn, bát còn đó; lồng — cửa mở khi con vật vào / ra,
+    con vật trong lồng (sau vỏ, trong lòng lồng), cửa đóng lại, lồng trên tay có con vật trong đó (cả lúc đi), con vật bước ra ngoài lồng."""
+    name, who_n, pet_n = c['name'], c['who'], c['target']
+    care = lambda t: scales.get(('care', float(t))) or {}
+    frame = lambda t: {a['name']: a for a in shots.get(float(t), [])}
+    mine = lambda t: (care(t).get(who_n) or {}).get('f50c') or {}
+    out = []
+
+    def row(text, ok, note): out.append({'scene': folder, 'what': f'{who_n} {name} {pet_n} — {text}'.replace('  ', ' '), 'ok': ok, 'note': note})
+
+    def body(t, n=pet_n):
+        parts = ((frame(t).get(n) or {}).get('parts') or {}).values()
+        return {'x0': min(p['x0'] for p in parts), 'x1': max(p['x1'] for p in parts), 'y0': min(p['y0'] for p in parts), 'y1': max(p['y1'] for p in parts)} if parts else None
+
+    def tall(t): return (frame(t).get(who_n) or {}).get('tall') or 0
+
+    if c['kind'] == 'feed50c':
+        for t in c.get('down') or []:
+            f, b, pet, T = mine(t), body(t), care(t).get(pet_n) or {}, tall(t)
+            bowls = f.get('bowls') or []
+            if not bowls or not b or not T: row('the bowl is on the floor in front of the pet', None, f'not measured at {t:g} s'); continue
+            bw, lips = bowls[-1], pet.get('lips') or {'x': (b['x0'] + b['x1']) / 2, 'y': b['y1']}
+            dx, dy = abs(bw['x'] - lips['x']) / T, abs(bw['y'] + 12 - b['y1']) / T
+            row('the bowl is on the floor in front of the pet', dx <= BOWL_FRONT50C and dy <= BOWL_FLOOR50C + 0.03, f'at {t:g} s: bowl {dx * 100:.1f} % of height from its muzzle (≤ {BOWL_FRONT50C * 100:g} %), rim {dy * 100:.1f} % from its feet line')
+        pours = [(t, mine(t)) for t in c.get('pour') or []]
+        if pours:
+            ok = all((f.get('pour') or 0) > 0.5 and f.get('tool') in (55, 56) for _, f in pours) and len(pours) > 1 and ((pours[-1][1].get('bowls') or [{}])[-1].get('fill', 0) > (pours[0][1].get('bowls') or [{}])[-1].get('fill', 1))
+            row('kibble / water pours from the scoop / jug and the bowl fills', ok, ', '.join(f'{t:g} s: pour {f.get("pour", 0):.2f}, tool {f.get("tool")}, fill {((f.get("bowls") or [{}])[-1]).get("fill", 0):.2f}' for t, f in pours))
+        for t in c.get('full') or []:
+            bowls = mine(t).get('bowls') or []
+            row('the bowl is full', bool(bowls) and bowls[-1].get('fill', 0) >= 0.99, f'fill {(bowls[-1].get("fill", 0) if bowls else 0):.2f} at {t:g} s')
+        hits = []
+        for t in c.get('mouth') or []:
+            bowls, lips, T = mine(t).get('bowls') or [], (care(t).get(pet_n) or {}).get('lips'), tall(t)
+            if not bowls or not lips or not T: continue
+            hits.append((t, ((bowls[-1]['x'] - lips['x']) ** 2 + (bowls[-1]['y'] - lips['y']) ** 2) ** 0.5 / T))
+        row("the pet's mouth is at the bowl (eating / drinking)", sum(1 for _, d in hits if d <= MOUTH_BOWL50C) >= min(2, len(hits)) and bool(hits),
+            ', '.join(f'{d * 100:.1f} %' for _, d in hits) + f' of height from the bowl rim (≤ {MOUTH_BOWL50C * 100:g} % at 2 of 3 moments)' if hits else 'not measured')
+        for t in c.get('stays') or []:
+            bowls = mine(t).get('bowls') or []
+            row('the bowl stays on the floor after', bool(bowls), f'{len(bowls)} bowl(s) on the floor at {t:g} s')
+        return out
+    # LỒNG
+    def carrier(t):
+        ks = [k for k in care(t).get('@carrier50c') or [] if k.get('shown')]
+        who = frame(t).get(who_n) or {}
+        return min(ks, key=lambda k: abs((k['room']['x0'] + k['room']['x1']) / 2 - (who.get('x') or 0)), default=None)
+
+    for t in c.get('open') or []:
+        k, who, f = carrier(t), frame(t).get(who_n), mine(t)
+        if not k or not who or not who.get('tall') or not who.get('hands'): row('the carrier door opens (a hand on it)', None, f'not in the frame at {t:g} s'); continue
+        gap = min(box_gap(h['box'], k['door']) for h in who['hands'] if h.get('box')) / who['tall']
+        row('the carrier door opens (a hand on it)', gap <= CARRIER_HAND50C and (f.get('door') or 0) >= 0.3, f'hand {gap * 100:.1f} % of height from the door, door {(f.get("door") or 0) * 100:.0f} % open at {t:g} s')
+    if c['kind'] == 'carrier50c' and c.get('opaque'): out.extend(check_opaque50c(folder, c, scales, f'{who_n} {name} {pet_n}'))
+    for t in c.get('openIn') or []:
+        f, pet = mine(t), frame(t).get(pet_n) or {}
+        row('the door is open while it goes in', (f.get('door') or 0) >= 0.9, f'door {(f.get("door") or 0) * 100:.0f} % open at {t:g} s, {pet_n} {"in the arms" if pet.get("carried") else "lowered"}')
+    for t in c.get('inside') or []:
+        k, pet, b, T = carrier(t), frame(t).get(pet_n), body(t), tall(t)
+        if not k or not pet or not b or not T: row('it is inside the carrier, behind the shell', None, f'not in the frame at {t:g} s'); continue
+        r, tol = k['room'], CARRIER_IN50C * T
+        within = b['x0'] >= r['x0'] - tol and b['x1'] <= r['x1'] + tol and b['y1'] <= r['y1'] + tol
+        behind = (pet.get('layer') or 0) < k['layer']
+        row('it is inside the carrier, behind the shell', within and behind and not pet.get('carried'), f'at {t:g} s: body {b["x0"]:.0f}–{b["x1"]:.0f} px, inside {r["x0"]:.0f}–{r["x1"]:.0f} (±{tol:.0f}); layer {pet.get("layer")} vs carrier {k["layer"]}' + (' — still carried' if pet.get('carried') else ''))
+    for t in c.get('closed') or []:
+        k = carrier(t)
+        if not k: row('the carrier door is closed again', None, f'no carrier in the frame at {t:g} s'); continue
+        share = (k['door']['x1'] - k['door']['x0']) / max(1, k['open']['x1'] - k['open']['x0'])
+        row('the carrier door is closed again', share >= 0.95, f'the door covers {share * 100:.0f} % of its opening at {t:g} s')
+    for key, label in (('held', 'the carrier is in the hand'), ('carried', 'it rides in the carrier in the hand')):
+        for t in c.get(key) or []:
+            f = mine(t)
+            if key == 'carried' and not pet_n: continue
+            box, head = f.get('carrier'), f.get('petHead')
+            ok = bool(f.get('held')) and bool(box) and (not pet_n or (f.get('petInSlot') and head and head['x0'] >= box['x0'] - 2 and head['x1'] <= box['x1'] + 2 and head['y1'] <= box['y1'] + 2))
+            row(label, ok, f'at {t:g} s: held {bool(f.get("held"))}, hand {f.get("hand")}' + (f', pet in the carrier {bool(f.get("petInSlot"))}' if pet_n else ''))
+    for t in c.get('out') or []:
+        k, b, f = carrier(t), body(t), mine(t)
+        if not k or not b: row('it has walked out of the carrier', None, f'not in the frame at {t:g} s'); continue
+        cx = (b['x0'] + b['x1']) / 2
+        row('it has walked out of the carrier', not (k['room']['x0'] < cx < k['room']['x1']) and not f.get('petInSlot'), f'body centre {cx:.0f} px, carrier {k["room"]["x0"]:.0f}–{k["room"]["x1"]:.0f} at {t:g} s')
+    for t in c.get('down') or []:
+        f, k = mine(t), carrier(t)
+        row('the carrier is set down', not f.get('held') and bool(k), f'held {bool(f.get("held"))}, a carrier on the floor {bool(k)} at {t:g} s')
+    return out
+
+
+
+def check_opaque50c(folder, c, scales, label):
+    """ĐỢT 50 C (duyệt): con vật ĐỤC HẲN (độ đục thật trên trang = 1 — set3d `careProbe` → `op50c`) ở mọi mốc `opaque` (mỗi 0,25 s suốt bước): bế, hạ vào,
+    lấy ra khỏi chuồng / lồng không bao giờ làm nó mờ đi."""
+    vals = [((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('op50c') for t in c.get('opaque') or []]
+    vals = [(t, v) for t, v in zip(c.get('opaque') or [], vals) if v is not None]
+    if not vals: return [{'scene': folder, 'what': f'{label} — the pet stays fully opaque', 'ok': None, 'note': 'not measured'}]
+    worst = min(vals, key=lambda tv: tv[1])
+    return [{'scene': folder, 'what': f'{label} — the pet stays fully opaque', 'ok': worst[1] >= 0.999, 'note': f'least opacity {worst[1]:.3f} at {worst[0]:g} s over {len(vals)} moments (want 1)'}]
 
 
 if __name__ == '__main__':

@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+**Exam room, pet shop, feeding and the pet carrier** (wave 50). Ten new person actions and one pet pose. Each comes
+with script steps, Vietnamese script words, catalog rows, `tools/acting_check.py` measurements and CI cases
+(`tools/ci/w50a.py`, `w50b.py`, `w50c.py`). New hand tools and parts are created on first use, so the markup of every
+other character is unchanged.
+
+- **Exam room** (50 A):
+  - `palpate(pet, { part: 'belly' | 'flank' })`: both hands, fingers spread, press gently; the pet flinches a little,
+    then settles.
+  - `useUltrasound(pet, { screen })`: the pet lies on its side, gel goes on, a probe slides on its belly, and a generic
+    scan picture appears (no numbers). The person glances at an `ultrasound_cart` picture cutout named in the script.
+  - `lookMicroscope(target)`: an eye at the eyepiece of a `microscope` cutout, a hand on the focus knob.
+  - New pet pose `lieOnSide()`.
+  - The pet turns its tail to the person first, so the arms do not cross its face.
+- **Pet shop and till** (50 B):
+  - `takeFromShelf(shelf, { item, level })`: the person turns to the shelf, reaches the high, middle or low row, and
+    reads the label held large in front of the chest.
+  - New items `foodBag`, `treatBox` and `can`, with generic labels and fake prices.
+  - `scanBarcode(item, { put })`: a hand scanner with a red beam, a beep and a price card. It takes the product from
+    the customer, who hands it over automatically.
+  - New combo `shopCheckout`.
+  - Shelves are named set cutouts (`gondola_shelf`, `pet_food_shelf`, `medicine_wall_shelf`).
+  - Faces at the till no longer cover each other; an `acting_check` row measures it.
+- **Feeding and the pet carrier** (50 C):
+  - `serveBowl(pet, { food: 'kibble' | 'water' })`: the person crouches, sets a bowl down and fills it. The pet comes
+    and eats or drinks; the scene tool adds the pet's part. The bowl stays on the floor and can be picked up again.
+  - Pet carrier props `carrierBack` / `carrierFront` and a holdable `carrier`.
+  - New actions `putInCarrier(pet, carrier, { carry })`, `takeOutOfCarrier`, `pickUpCarrier` and `putDownCarrier`.
+  - A pet can start in a carrier the owner is carrying (`"inCarrier"`).
+  - `acting_check` now asserts that a pet stays fully opaque while it is put into or taken out of a carrier or cage.
+- **Fix** (wave 49 B): `blowDry` / `trimFur` on a rabbit on the floor. The kneeling groomer now works from its tail
+  end, so its face is no longer covered (it was 61–68 % covered, now 0 %).
+
 **Boarding, grooming and dog walks** (wave 49). Five new person actions, each with pet reactions, script steps,
 Vietnamese script words, catalog rows, `tools/acting_check.py` measurements and CI cases (`tools/ci/w49a.py`, `w49b.py`,
 `w49c.py`).

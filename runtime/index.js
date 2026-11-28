@@ -21,6 +21,10 @@ import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard
 import { card, stampcard, cash } from './parts.js';
 // đợt 42 E: quả bóng đồ chơi, bát ăn (nhặt dưới sàn lên — `pickUp`)
 import { toy42e, bowl42e } from './parts.js';
+// đợt 50 B: món hàng của cửa hàng thú cưng (túi hạt, hộp bánh thưởng, lon pate — `takeFromShelf`, `scanBarcode`)
+import { foodBag50b, treatBox50b, can50b } from './shop50b-items.js';
+// đợt 50 C
+import { carrier50c } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
@@ -249,6 +253,8 @@ const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
 Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
+Object.assign(ITEMS, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b }); Object.assign(kit.parts, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b });       // đợt 50 B: `items: { R: 'foodBag' }` — món hàng lấy trên kệ, quét mã
+Object.assign(ITEMS, { carrier: carrier50c }); Object.assign(kit.parts, { carrier: carrier50c });       // đợt 50 C: `items: { L: 'carrier' }` — lồng vận chuyển xách ở quai
 
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.
@@ -347,6 +353,7 @@ const PAIR_39A = ['giveChange', 'takeChange', 'stampCard', 'takeCard'];      // 
 const PAIR_SYNC = ['highFive', 'hug', 'patShoulder', 'whisper', 'hearWhisper', 'handOverBag', 'takeBag'];      // đợt 38 C: động tác hai người — cả nhóm `together` bắt đầu cùng lúc
 PAIR_SYNC.push(...PAIR_39A);       // đợt 39 A
 PAIR_SYNC.push('walkOnLeash');       // đợt 49 C: người dắt và con vật bước cùng nhịp — cả nhóm bắt đầu cùng lúc
+PAIR_SYNC.push('scanBarcode');       // đợt 50 B: thu ngân nhận món hàng khách đưa (`handOver` của khách cùng lúc) — cả nhóm bắt đầu cùng lúc
 // Kênh của thế NHÌN THEO (`lookAt`, đợt 36) và các bước KHÔNG thả nó ra.
 const LOOK_KEYS = ['headTurn', 'headPitch', 'headTilt'];
 const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
@@ -356,13 +363,13 @@ const LOOK_KEEP = ['lookAt', 'idle', 'mark', 'mood'];
 // nhân vật nên không chạy nó, nhưng ghi lại ở `timeline.data.steps[i].with` = [[nhân vật, ...bước], …] (đợt 48) để nơi gọi
 // tự dựng — tools/actions.html, tools/reel.py (`partnerLines`). Thuộc tính không đếm được: JSON của các bước không đổi.
 const PARTNERS = new WeakMap();
-const expandCombos = (stepList) => stepList.flatMap((step) => {
+const expandCombos = (stepList, rig = null) => stepList.flatMap((step) => {      // đợt 50 B: `rig` — "$self" của phần "with"
   if (typeof step === 'number') return [step];
   const [name, ...args] = Array.isArray(step) ? step : [step];
   if (!(isCombo(name) && typeof name === 'string')) return [step];
-  return combo(null, name, ...args).flatMap((turn) => {
+  return combo(rig, name, ...args).flatMap((turn) => {
     const [first, partners] = turn.together ? [turn.together[0], turn.together.slice(1)] : [turn, []];
-    const expanded = expandCombos([first[1]]);
+    const expanded = expandCombos([first[1]], rig);
     if (partners.length && expanded.length && typeof expanded[0] !== 'number') {
       if (!Array.isArray(expanded[0])) expanded[0] = [expanded[0]];
       PARTNERS.set(expanded[0], partners);
@@ -388,7 +395,7 @@ export function partnerLines(line) {
 }
 
 export function sequence(rig, stepList, { gap = 0.1, sampleRate = 60, breathe = true } = {}) {
-  stepList = expandCombos(stepList);
+  stepList = expandCombos(stepList, rig);
   const source = gsap.timeline({ paused: true, defaults: { lazy: false } });
   const keys = Object.keys(rig.NGHI);
   // Chỉ chép các khoá trạng thái thật — GSAP gắn thêm `_gsap` vào `rig.s`, chép cả nó là hỏng.
@@ -909,6 +916,8 @@ export function conversation(turnList, { gap = 0.25, waiting = true, stepGap = 0
       steps.forEach((step, n) => { if (Array.isArray(step) && PAIR_39A.includes(step[0]) && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       // ĐỢT 49 C: con vật được dắt (`walkOnLeash(person, …)`) đo chỗ người dắt LÚC NÀY để đi trước họ một quãng.
       steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'walkOnLeash' && typeof rig.follow === 'function' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
+      // ĐỢT 50 B: quét mã món hàng KHÁCH đưa (`scanBarcode(customer)`) — tay nhận vươn tới chỗ khách đứng LÚC NÀY (mỏ neo), như `take`.
+      steps.forEach((step, n) => { if (Array.isArray(step) && step[0] === 'scanBarcode' && step[1] && step[1] !== rig && typeof step[1].centerX === 'function' && step[1].el && !step[1].live) steps[n] = [step[0], anchor(step[1]), ...step.slice(2)]; });
       // Chờ tới giờ bắt đầu lượt: thở cho tới gần lúc đó, rồi một quãng nghỉ số cho khít từng phần trăm giây.
       const first = !mine.used, lead = first ? 0 : stepGap;       // sau mỗi bước `sequence` tự chèn `stepGap`
       let wait = begin - mine.end - lead;

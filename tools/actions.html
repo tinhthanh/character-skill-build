@@ -10,7 +10,7 @@
 <body style="margin:0;background:#1d3a4b;font:12px system-ui;color:#cfe">
 <div id="sheet"></div>
 <script type="module">
-import { RigThu, createCharacter, createPet, createProp, sequence, partnerLines, seed } from '../runtime/index.js';
+import { RigThu, RigSVG, createCharacter, createPet, createProp, sequence, partnerLines, seed } from '../runtime/index.js';
 const query = new URLSearchParams(location.search);
 const id = query.get('nv') || 'vet', isPet = id in RigThu.LOAI, turned = query.get('stance') === 'turned';
 const only = (query.get('only') || '').split(',').map((label) => label.trim()).filter(Boolean);
@@ -58,7 +58,7 @@ for (const entry of entries) {
         const personHost = document.createElement('div');
         personHost.style.cssText = `position:absolute;left:${70 * zoom + gap - tall * 200 / 470}px;top:${floor - tall}px;width:${tall * 400 / 470}px;height:${tall}px`;
         cell.insertBefore(personHost, entry.personFront ? null : host);
-        person = createCharacter(personHost, { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig;
+        person = createCharacter(personHost, { id: entry.person, items: entry.personItems || null, itemsHidden: Array.isArray(entry.personItemsHidden) ? entry.personItemsHidden : !!entry.personItemsHidden }).rig;      // đợt 50 B: ["L"] — chỉ tay ấy đang cất
       }
       if (isPet && entry.person) {
         const tall = 225 * zoom, petTall = tall * 0.43, floor = 10 * zoom + tall * 458 / 470;
@@ -69,7 +69,7 @@ for (const entry of entries) {
         person = createCharacter(personHost, { id: entry.person }).rig;
       }
       const rig = isPet ? createPet(host, { species: id, wear: entry.wear || [] }).rig
-        : createCharacter(host, { id, items: entry.items || null, itemsHidden: !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
+        : createCharacter(host, { id, items: entry.items || null, itemsHidden: Array.isArray(entry.itemsHidden) ? entry.itemsHidden : !!entry.itemsHidden, wear: entry.wearPerson || [] }).rig;
       if (turned && !isPet) rig.state.facing = 0.55;
       // "scale": một cái cân trên sàn, bên trái người (phía không có con vật) — `@scale` trong các bước (đợt 35: `weigh`).
       let scale = null;
@@ -95,16 +95,46 @@ for (const entry of entries) {
         createProp(back, 'cage'); cage = createProp(front, 'cageFront');
         if (pet) { pet.host.style.left = `${(entry.cage === 'in' ? 13 : 140) * zoom}px`; pet.host.style.top = `${(239 - 82 * 292 / 330) * zoom}px`; cell.insertBefore(pet.host, front); pet.apDung(); }
       }
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@cage' ? cage : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
+      // ĐỢT 50 C — "feed": BÁT ĂN — con vật dưới sàn bên trái, quay mặt sang phải; người đứng trước mõm nó (vẽ trước nó). Con vật tự đi tới bát rồi ăn /
+      // uống (`walk` + `eat` / `drink`, bắt đầu lúc người đã lùi — `RigSVG.bowlReady50c`). "carrier": LỒNG VẬN CHUYỂN bên trái người (đầu có cửa phía
+      // người) — "floor": lồng trên sàn, con vật đứng bên phải người; "held": người xách sẵn lồng có con vật (`loadCarrier`), chỗ đặt lồng là đạo cụ đang
+      // ẩn bên trái. `@carrier` trong các bước; con vật tự bước ra khi người mở cửa (`takeOutOfCarrier`).
+      let carrier = null, petPart = null;
+      if (entry.feed && pet) {
+        pet.host.style.left = `${8 * zoom}px`; pet.host.style.top = `${(239 - 82 * 292 / 330) * zoom}px`; pet.state.facing = 1; pet.apDung();
+        host.style.left = `${95 * zoom}px`; cell.appendChild(host);
+      }
+      if (entry.carrier && pet) {
+        const at = (css) => { const d = document.createElement('div'); d.style.cssText = `position:absolute;${css}`; return d; }, box = `left:${-60 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
+        const back = at(box), front = at(box);
+        cell.insertBefore(back, cell.firstChild); cell.appendChild(front); cell.appendChild(host);
+        createProp(back, 'carrierBack'); carrier = createProp(front, 'carrierFront');
+        pet.host.style.top = `${(239 - 82 * 292 / 330) * zoom}px`; pet.state.facing = 1;
+        if (entry.carrier === 'floor') { pet.host.style.left = `${140 * zoom}px`; cell.insertBefore(pet.host, front); }
+        else { pet.host.style.left = `${(40 - 52) * zoom}px`; cell.insertBefore(pet.host, front); }
+        pet.apDung();
+        if (entry.carrier === 'held') { carrier.svg.setAttribute('data-carrier-spot50c', ''); rig.loadCarrier(pet, { hand: 'L' }); }
+      }
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@carrier' ? carrier : arg === '@cage' ? cage : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
       // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{ "with": "@person" }` (hay "@pet") trong tuỳ chọn của bước.
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = { ...arg, with: arg.with === '@pet' ? pet : person }; });
       const line = sequence(rig, steps);
+      if (entry.feed && pet) {
+        // Quãng con vật đi tới bát: `gap` (đơn vị khung người) đổi ra đơn vị khung của nó.
+        const opts = (steps[0] && steps[0][2]) || {}, gap = opts.gap ?? 44, ratio = Math.hypot(rig.svg.getScreenCTM().a, rig.svg.getScreenCTM().b) / Math.hypot(pet.svg.getScreenCTM().a, pet.svg.getScreenCTM().b);
+        petPart = sequence(pet, [RigSVG.bowlReady50c(opts.hold ?? 0.6), ['walk', 2, Math.round(gap * ratio)], [entry.feed === 'water' ? 'drink' : 'eat', 2.4]]);
+      }
+      if (entry.carrier && pet && entry.petOut) {
+        const ratio = Math.hypot(rig.svg.getScreenCTM().a, rig.svg.getScreenCTM().b) / Math.hypot(pet.svg.getScreenCTM().a, pet.svg.getScreenCTM().b);
+        petPart = sequence(pet, [(entry.carrier === 'held' ? RigSVG.CARRIER_SET50C : 0) + RigSVG.CARRIER_OPEN50C + 0.85, ['face', 'right'], ['walk', 3, Math.round(entry.petOut * ratio)]]);
+      }
       const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' || arg === '@self' ? rig : arg)) : step))) : null;
       // Phần "with" của combo (đợt 48): con vật / người phụ làm cùng lúc — y tá giữ con vật, con vật há miệng…
       const partners = partnerLines(line);
       const at = line.duration() * (column + 0.5) / cols;
       line.time(at); rig.render();
       for (const p of partners) { p.line.time(Math.min(Math.max(0, at - p.start), p.line.duration())); p.rig.render(); }
+      if (petPart) { petPart.time(Math.min(at, petPart.duration())); pet.render(); rig.render(); }      // đợt 50 C: con vật đi tới bát / bước ra khỏi lồng
       if (other) { other.time(Math.min(Math.max(0, at - (entry.personStart || 0)), other.duration())); person.render(); }      // personStart: giây bắt đầu personSteps
       const stamp = document.createElement('span'); stamp.style.cssText = 'position:absolute;right:4px;top:2px;color:#8fb3c4';
       stamp.textContent = `${at.toFixed(2)} s`; cell.appendChild(stamp);

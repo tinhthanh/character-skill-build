@@ -2150,6 +2150,20 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c49b = Object.fromEntries(Object.entries(rig.groom49bProbe()).map(([key, v]) => [key, one(v)]));
       }
+      // đợt 50 A: sờ nắn / siêu âm / kính hiển vi (`rig.exam50aProbe()` của người và con vật — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.exam50aProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c50a = Object.fromEntries(Object.entries(rig.exam50aProbe()).map(([key, v]) => [key, one(v)]));
+      }
+      // đợt 50 B: lấy hàng / quét mã vạch (`rig.shop50bProbe()` — phần tử → tâm và cỡ trên màn hình, điểm `px` → px trong `view`).
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.shop50bProbe !== 'function' || !out[name]) continue;
+        const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
+        out[name].c50b = Object.fromEntries(Object.entries(rig.shop50bProbe()).map(([key, v]) => [key, one(v)]));
+      }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
       // ĐỢT 49 A — chuồng: khung trước (`cageFront`) — ô cửa (px trong `view`), cửa đang vẽ (khung hình của nó), lớp vẽ của host khung trước; người: độ mở cửa…
       out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {
@@ -2161,6 +2175,35 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
       for (const actor of actors) {
         const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
         if (rig && typeof rig.cage49aProbe === 'function' && out[name]) out[name].cage49a = rig.cage49aProbe();
+      }
+      // ĐỢT 50 C — lồng vận chuyển trên sàn (`carrierFront`): lòng lồng, ô cửa lưới, cửa đang vẽ (px trong `view`), có đang hiện, lớp vẽ; người: bát đã đặt
+      // (tâm vành bát, bề ngang, độ đầy), dòng đổ, lồng trên tay (khung hình, con vật có trong ngăn của nó không), độ mở cửa.
+      const rect50c = (r) => ({ x0: (r.left - box.left) * sx, y0: (r.top - box.top) * sy, x1: (r.right - box.left) * sx, y1: (r.bottom - box.top) * sy });
+      out['@carrier50c'] = [...view.querySelectorAll('svg[data-prop="carrierFront"]')].map((svg) => {
+        const door = svg.querySelector('[data-carrier-door50c]'), ctm = svg.getScreenCTM(), host = svg.parentNode;
+        if (!door || !ctm || (host && host.style.display === 'none')) return null;
+        const at = (x, y) => { const q = new DOMPoint(x, y).matrixTransform(ctm); return { x: (q.x - box.left) * sx, y: (q.y - box.top) * sy }; }, a = at(+door.dataset.x0, +door.dataset.y0), b = at(+door.dataset.x1, +door.dataset.y1);
+        const w = +door.dataset.w, h = +door.dataset.h, r0 = at(200 - w / 2 + 6, PROP_FRAME.floor - h + 8), r1 = at(200 + w / 2 - 6, PROP_FRAME.floor - 6);
+        return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: rect50c(door.getBoundingClientRect()), room: { x0: r0.x, y0: r0.y, x1: r1.x, y1: r1.y }, shown: svg.style.visibility !== 'hidden', layer: +((host && host.style.zIndex) || 0) };
+      }).filter(Boolean);
+      // … và ĐỘ ĐỤC THẬT của mỗi con vật (tích opacity từ SVG của nó — kể cả khi nó nằm trong tay / trong lồng trên tay một người — tới `view`, nhân
+      // `opacity` của nhóm gốc của nó; ẩn = 0): con vật không bao giờ được mờ đi khi được bế, đặt vào / lấy ra khỏi chuồng, lồng.
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !out[name] || out[name].person || !rig.svg) continue;
+        let op = +(rig.el && rig.el.goc && rig.el.goc.getAttribute('opacity') || 1), node = rig.svg;
+        for (; node && node !== view.parentNode; node = node.parentElement) { const cs = getComputedStyle(node); op *= +cs.opacity; if (cs.visibility === 'hidden' || cs.display === 'none') op = 0; }
+        out[name].op50c = +op.toFixed(3);
+      }
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !out[name] || typeof rig.feed50cProbe !== 'function' || !(rig.bowls50c || rig.carrierLog50c || rig.carrierProps50c)) continue;
+        const f = rig.feed50cProbe(), c = rig.carrier50cProbe(), root = rig.svg.getScreenCTM();
+        const pt = (x, y) => { const q = new DOMPoint(x, y).matrixTransform(root); return { x: (q.x - box.left) * sx, y: (q.y - box.top) * sy }; };
+        const node = c.node && c.node.getBoundingClientRect(), pet = c.pet && c.pet.svg && c.pet.el.dau ? c.pet.el.dau.getBoundingClientRect() : null;
+        out[name].f50c = { bowls: f.bowls.map((b) => ({ ...pt(b.x, b.y - 12 * b.k), w: (pt(b.x + 18 * b.k, b.y).x - pt(b.x - 18 * b.k, b.y).x), food: b.food, fill: b.fill })), pour: f.pour, tool: f.tool,
+                           held: c.held, hand: c.hand, carrier: node && node.width ? rect50c(node) : null, petHead: pet && pet.width ? rect50c(pet) : null,
+                           petInSlot: !!(c.pet && c.pet.svg.parentNode && c.pet.svg.parentNode.hasAttribute && c.pet.svg.parentNode.hasAttribute('data-carrier-slot50c')), door: c.door };
       }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;

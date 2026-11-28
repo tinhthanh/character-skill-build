@@ -9,10 +9,13 @@ THE CAGE. A "cage" cutout is TWO hosts at one x: its inside ("cage" prop, stood 
 barred door ("cageFront", a little nearer). A pet in the cage stands between them (`CAGE_IN` — its depth hops there while it is in
 the arms, `set.depth`), so the bars are drawn over it. People stand just in front of the cage (z within `CAGE_Z`), on the latch side —
 the door is hinged on the side away from the first person who opens it unless the cutout says "door" (the hinge side)."""
+import os
 from .util import fail, js
 
 # Action → (position of the "@prop" item, kinds it accepts, gap: person centre beyond the prop's edge, × the person's host height).
 PROP_STEPS = {'putInCage': (2, ('cage',), 0.15), 'takeOutOfCage': (2, ('cage',), 0.15)}
+# Đợt 50 B: kệ hàng của kho sets (ảnh cutout — loại là tên tệp ảnh, `_kind`); bước tới kệ và chỗ với tay: tools/scenelib/shop50b.py.
+PROP_STEPS['takeFromShelf'] = (1, ('gondola_shelf', 'pet_food_shelf', 'medicine_wall_shelf'), 0.1)
 CAGE_ACTIONS = ('putInCage', 'takeOutOfCage')
 CAGE_SIZE = (170, 140)                 # cỡ ngoài mặc định của chuồng, khung 400 × 470 của nó (runtime/props.js CAGE49A)
 CAGE_BACK, CAGE_IN, CAGE_FRONT = -20, -6, 8      # chiều sâu (so với "z" của cutout): lòng chuồng · con vật trong chuồng · khung trước
@@ -35,7 +38,7 @@ def check_cutouts(stage_set):
     """Các cutout "cage": cỡ (`size`), bản lề (`door`), trên sàn (không `y`); `size` chỉ cho chuồng; tên không trùng."""
     names = [item.get('name') for item in stage_set.get('cutouts', []) if item.get('name')]
     for n, item in enumerate(stage_set.get('cutouts', [])):
-        if 'size' in item and item.get('kind') != 'cage': fail(f'set.cutouts[{n}].size is for a "cage": [width, height] in its 400 × 470 frame')
+        if 'size' in item and item.get('kind') not in ('cage', 'carrier'): fail(f'set.cutouts[{n}].size is for a "cage": [width, height] in its 400 × 470 frame')
         if item.get('kind') != 'cage': continue
         size = item.get('size', list(CAGE_SIZE))
         if not (isinstance(size, list) and len(size) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in size) and 80 <= size[0] <= 380 and 70 <= size[1] <= 400):
@@ -46,13 +49,18 @@ def check_cutouts(stage_set):
         if names.count(name) > 1: fail(f'set.cutouts: two cutouts are named "{name}" — a step names one by "@{name}"')
 
 
+def _kind(c):
+    """Loại của cutout: "kind", không thì tên tệp ảnh (đợt 50 B — ảnh của kho sets: sets-assets/gondola_shelf.svg → gondola_shelf)."""
+    return c.get('kind') or (os.path.splitext(os.path.basename(str(c.get('image') or '')))[0] or None)
+
+
 def prop_target(st, ref, where, action):
     """"@<name>" → (index, cutout) of the set; fails clearly when it is not a cutout of a kind the action takes."""
     names, stage_set = st.take('names', 'stage_set')
     kinds = PROP_STEPS[action][1]
     if stage_set is None: fail(f'{where}: "{action}" names a prop of a 3D set ("@<cutout name>") — add "set" with a set.cutouts item {{ "kind": "{kinds[0]}", "name": … }}')
     cutouts = stage_set.get('cutouts', [])
-    fitting = [c.get('name') for c in cutouts if c.get('kind') in kinds and c.get('name')]
+    fitting = [c.get('name') for c in cutouts if _kind(c) in kinds and c.get('name')]
     if not (isinstance(ref, str) and ref.startswith('@')):
         fail(f'{where}: "{action}" needs the {"/".join(kinds)} as "@<name>" of a set.cutouts item (here: {", ".join("@" + n for n in fitting) or "none"}) — got {js(ref)}')
     name = ref[1:]
@@ -60,8 +68,8 @@ def prop_target(st, ref, where, action):
     if index is None:
         if name in names: fail(f'{where}: "{ref}" is a character — "{action}" needs a {"/".join(kinds)} of the set here (set.cutouts: {", ".join("@" + n for n in fitting) or "none"})')
         fail(f'{where}: "{ref}" — no set.cutouts item has "name": "{name}" (props of a kind "{action}" takes: {", ".join("@" + n for n in fitting) or "none"})')
-    if cutouts[index].get('kind') not in kinds:
-        fail(f'{where}: "{ref}" is a "{cutouts[index].get("kind") or "picture"}" cutout — "{action}" needs a {" or ".join(kinds)}')
+    if _kind(cutouts[index]) not in kinds:
+        fail(f'{where}: "{ref}" is a "{_kind(cutouts[index]) or "picture"}" cutout — "{action}" needs a {" or ".join(kinds)}')
     return index, cutouts[index]
 
 
@@ -75,7 +83,7 @@ def walk_to_prop(emitted, st, turn, turns, who):
     """Trước lượt: bước tới đứng cạnh đồ vật mà bước ấy gọi tên — phía chốt cửa (chuồng), cách mép nó `gap` × chiều cao người."""
     person_default, names = st.take('person_default', 'names')
     for step in turn.get('do', []) if isinstance(turn.get('do'), list) else []:
-        if not (isinstance(step, list) and step and step[0] in PROP_STEPS) or who.get('seated'): continue
+        if not (isinstance(step, list) and step and step[0] in CAGE_ACTIONS) or who.get('seated'): continue          # đợt 50 B: kệ hàng — shop50b.walk_to_shelf
         at, _, gap = PROP_STEPS[step[0]]
         if len(step) <= at: continue
         _, item = prop_target(st, step[at], f'"{who["name"]}" {step[0]}', step[0])
@@ -200,4 +208,5 @@ def cage_plan(op, t0, duration):
         ask = [f'Is {op["who"]} reaching into the open cage with both hands to lift the animal ({op["target"]}) out?',
                f'Is {op["who"]} holding the animal ({op["target"]}) in their arms, with the cage door closed behind?']
         times = [r(TAKE_OPEN), r(TAKE_LIFT), r(TAKE_CLOSED)]
+    check['opaque'] = [r(a / 4) for a in range(1, int(duration * 4))]          # đợt 50 C: con vật đục hẳn suốt bước (acting_check `cage49a`)
     return {'times': times, 'ask': ask, 'check': dict(check, kind='cage49a', name=op['name'], who=op['who'], target=op['target'], cage=op['cage'], times=times)}

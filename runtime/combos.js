@@ -5,7 +5,7 @@
 //   scene.json: { "who": "vet", "do": [["fullCheckup", "@cho"]] }   → mỗi bước một lượt (máy quay, con vật đáp lại…)
 //
 // Mỗi combo: `params` (tên tham số theo thứ tự), `steps` (bước như trong `sequence()`, "$tên" là chỗ của tham số) và
-// `vi` (cách nói trong kịch bản chữ, tools/script.py). Một bước có thể là { "step": [...], "with": { "$pet": [ bước… ] } }:
+// `vi` (cách nói trong kịch bản chữ, tools/script.py). "$self" (đợt 50 B) là chính nhân vật làm combo — để phần "with" của người kia nhắm vào nó. Một bước có thể là { "step": [...], "with": { "$pet": [ bước… ] } }:
 // nhân vật kia diễn CÙNG LÚC (con vật há miệng khi soi răng). `sequence()` chỉ dựng phần của chính nhân vật; `combo()`,
 // tools/scene.py và tools/script.py dựng cả phần kia. Tham số không truyền: bước bỏ nó và các đối số sau nó.
 //
@@ -411,6 +411,17 @@ export const COMBOS = {
       "sợ chạy trốn",
       "sợ nấp sau"
     ]
+  },
+  "shopCheckout": {
+    "params": ["customer"],
+    "about": "ring up a product at the till: take it from the customer (they hand it over at the same time) and scan its barcode — red scan line, bíp, the price shows —, the customer pays by QR, hand the product back, wave (the customer took it off a shelf first — takeFromShelf — and has a phone put away)",
+    "steps": [
+      { "step": ["scanBarcode", "$customer", { "put": "keep" }], "with": { "$customer": [["handOver", "$self"]] } },
+      { "step": ["idle", 2.6], "with": { "$customer": [["payByQR"]] } },
+      { "step": ["handOver", "$customer"], "with": { "$customer": [["take", "$self"]] } },
+      "wave"
+    ],
+    "vi": ["tính tiền món hàng", "quét mã tính tiền", "thanh toán món hàng"]
   }
 };
 // END COMBOS
@@ -464,6 +475,8 @@ export function expandCombo(name, args = []) {
 export function combo(rig, name, ...args) {
   if (!isCombo(name)) throw new Error(`[character] no combo "${name}" (available: ${Object.keys(COMBOS).join(', ')})`);
   const values = bind(name, args);
+  // Đợt 50 B: "$self" trong phần "with" là CHÍNH nhân vật làm combo (khách đưa món hàng cho thu ngân: ["handOver", "$self"]).
+  if (!COMBOS[name].params.includes('self')) values.self = rig;
   return COMBOS[name].steps.map((raw) => {
     if (raw && !Array.isArray(raw) && typeof raw === 'object') {
       const together = [[rig, fill(raw.step, values)]];
