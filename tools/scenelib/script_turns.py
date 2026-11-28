@@ -5,6 +5,7 @@ emit.py (the code of the turn). A step gets what it reads as arguments (the shar
 person of the turn); none returns anything — they add to `turns`, `views`, `gear_ops`… and move people (`x`) in place."""
 from .actions import CONE_BACK, RUN_TO, WHOLE_BODY
 from .cage import walk_to_prop          # đợt 49 A
+from . import shop50b          # đợt 50 B
 from .approach import pets_walk_up, kneel_to_low_pet, walk_to_pay_stand, walk_to_pick_up, join_selfie, walk_into_reach, turn_tail_for_temp
 from .emit import emit_together, emit_turn
 from .entry_cues import collect_shows, collect_popup, collect_lamps, collect_power_and_sky, collect_toasts
@@ -41,6 +42,7 @@ def write_turns(st):
             walk_to_pay_stand(emitted, st, turn, turns, who)
             walk_to_prop(emitted, st, turn, turns, who)          # đợt 49 A: bước tới cạnh đồ vật bước ấy gọi tên (chuồng)
             exam50a.walk_up(emitted, st, turn, turns, who)          # đợt 50 A: bước tới cạnh kính hiển vi
+            shop50b.walk_to_shelf(emitted, st, turn, turns, who)          # đợt 50 B: bước tới cạnh kệ hàng
             walk_to_pick_up(emitted, names, turn, turns, who)
             join_selfie(emitted, names, turn, turns, who)
             walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, turn, turns, where, who)

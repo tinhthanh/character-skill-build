@@ -114,6 +114,10 @@ const NGHI = Object.freeze({
   // ĐỢT 49 A — CHUỒNG LƯU TRÚ (`putInCage`, `takeOutOfCage`): `cageDoor49a` 0 đóng … 1 mở cửa chuồng người này đang mở; `cageMove49a` số lần người này đã
   // dời con vật vào / ra chuồng (lần thứ n đã dời khi `cageMove49a` > n − 0,5 — RigThu.dropX; GIỮ như `picked42e`); `free49aL/R` 1 = tay ấy rời con vật đang bế (mở cửa).
   cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
+  // ĐỢT 50 B — CỬA HÀNG & QUẦY THU NGÂN (runtime/person/shop50b.js): `spin50bL/R` 1 = món hàng trong tay ấy đang quay MẶT SAU (mã vạch), 0 = mặt nhãn;
+  // `beam50bL/R` độ dài tia đỏ của máy quét mã vạch (gadget 50) trong tay ấy (đơn vị khung bàn tay, 0 = tắt), `scanT50b` đồng hồ của tia (rung nhẹ);
+  // `beep50b` 0…1 "bíp" (ô kính loé xanh, hai cung âm thanh); `tiptoe50b` 0…1 kiễng chân (bàn chân xoay, người nhấc lên bằng `lift42d`).
+  spin50bL: 0, spin50bR: 0, beam50bL: 0, beam50bR: 0, scanT50b: 0, beep50b: 0, tiptoe50b: 0,
 });
 
 const MAU_MAC_DINH = {

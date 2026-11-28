@@ -3,6 +3,7 @@ to a pet on the floor, steps up to the pay stand / counter / a toy, joins a self
 person a hand reaches for, or has a pet turn its tail for the thermometer."""
 from .actions import (CARE_ACTIONS, CARE_REACH, DESK_PAY, FLOOR_GAP, FLOOR_GAP_KID, HANDS_ON_CARE, HANDS_ON_GAP, HANDS_ON_HEAD, KID_IDS,
     PAIR_GAP, PAIR_PARTNER, PAY_REACH, PICK_GAP, PILL_HEAD, RESTRAIN, RESTRAIN_GAP, TUG_SNOUT, TUG_STAND)
+from . import shop50b          # đợt 50 B
 from .schema import CAT_SPECIES
 from .steps import desk_counter, desk_stand
 from .util import fail, js
@@ -161,6 +162,7 @@ def walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, tu
         target = names[step[1][1:]]
         # HAI NGƯỜI (đợt 38 C): khoảng cách theo chiều cao trung bình hai người; đập tay theo người THẤP hơn (trẻ con tay ngắn, đứng sát hơn).
         if step[0] in PAIR_GAP and not target['_pet']: wanted = PAIR_GAP[step[0]] * (min(who['_host_height'], target['_host_height']) if step[0] == 'highFive' else (who['_host_height'] + target['_host_height']) / 2)
+        wanted = shop50b.handoff_gap(step, who, target, wanted)          # đợt 50 B: trao món hàng qua quầy — đứng xa hơn, hai mặt không chồng nhau
         # CHO UỐNG THUỐC con chó / thỏ (đợt 36 — Gemini: "chỉ một tay gần mõm, không thấy viên thuốc" ở cảnh corgi): thân dài, ĐẦU
         # nằm ở đầu gần người (nó quay mặt về người) — đứng 0,18 tính từ GIỮA thân là đứng đè lên đầu nó, hai bàn tay chồng lên
         # nhau trước ngực người. Cộng thêm quãng từ giữa thân tới đầu (~0,15 chiều cao host của nó); mèo ngồi thì đầu trên ngực.

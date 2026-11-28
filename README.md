@@ -43,7 +43,7 @@ And what a scene can do with them:
 - **`runtime/`** — the library (ES modules) with an English API. The two rigs keep only their core in
   `rig-svg.js` (people) and `rig-thu.js` (pets): building the SVG, drawing (`apDung`), colours, shape, rest pose and
   the action lists. The actions live in one file per group — `runtime/person/` (`basic`, `gestures`, `counter`,
-  `presenter`, `motion`, `care`, `treatment`, `look-carry`, `pairs`, `floor`, `stance`, `speech`, `cage`, `grooming`) and `runtime/pet/`
+  `presenter`, `motion`, `care`, `treatment`, `look-carry`, `pairs`, `floor`, `stance`, `speech`, `cage`, `grooming`, `shop50b`) and `runtime/pet/`
   (`poses`, `play`, `basic`, `species`, `tricks`, `mood`, `grooming`) — each one `export default (Rig) => mix(Rig, class { … })`,
   installed onto the rig class; module-level constants and helpers are in `person/shared.js` / `pet/shared.js`.
   A new action goes in the group file it belongs to (or a new group file added to the install list at the end of the

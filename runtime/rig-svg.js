@@ -38,6 +38,8 @@ import cage from './person/cage.js';
 import grooming from './person/grooming.js';
 import exam50a from './person/exam50a.js';
 import leash49c from './person/leash49c.js';
+// đợt 50 B: cửa hàng thú cưng, quầy thu ngân
+import shop50b from './person/shop50b.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -1435,6 +1437,7 @@ export class RigSVG {
     this._drawBathTools();                    // đợt 42 F: tia nước vòi sen, bọt trên bàn chải
     this._drawGroomTools49b();                // đợt 49 B: máy sấy (luồng gió), kéo tỉa, tông-đơ — hình dựng lần đầu dùng
     this._drawExam50a();                      // đợt 50 A: đầu dò siêu âm, lọ gel (giọt gel), thẻ ảnh siêu âm — hình dựng lần đầu dùng
+    this._drawShopTools50b(f);                // đợt 50 B: máy quét mã vạch (tia đỏ, bíp), mặt món hàng, kiễng chân — hình dựng lần đầu dùng
     this._drawDeskTools();                     // đợt 39 A: dòng nước rót, mức nước trong cốc, tờ tiền đang đếm, khăn gấp, dấu đỏ trên thẻ, tick "ting"
     this._veGang(e, s);                                       // đợt 38 B: găng trên từng tay, mép găng, đám bọt xà phòng
     const gripping = { L: false, R: false };
@@ -2189,6 +2192,9 @@ export class RigSVG {
   // ĐỢT 49 B — SẤY LÔNG (`blowDry`: vòi máy sấy, gadget 43) và TỈA LÔNG (`trimFur`: kéo 44 / tông-đơ 45) — runtime/person/grooming.js; con vật đọc
   // `petBlow49b`, `petShag49b`, `petCutT49b` (runtime/pet/grooming.js), lông ướt → khô bông qua kênh đợt 42 F.
   static { this.DONG_TAC.push('blowDry', 'trimFur'); }      // đợt 49 B
+  // ĐỢT 50 B — CỬA HÀNG THÚ CƯNG & QUẦY THU NGÂN: lấy hàng trên kệ (`takeFromShelf`: kiễng chân / với / ngồi xổm, xoay món hàng đọc nhãn — kết thúc với
+  // món hàng trong tay) và quét mã vạch (`scanBarcode`: máy quét cầm tay gadget 50, tia đỏ, "bíp", thẻ giá — cần một món hàng) — runtime/person/shop50b.js.
+  static { this.EXCHANGE.push('takeFromShelf', 'scanBarcode'); }      // đợt 50 B
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
 exam50a(RigSVG);       // đợt 50 A
@@ -2196,4 +2202,5 @@ exam50a(RigSVG);       // đợt 50 A
 // (`lookMicroscope`) — runtime/person/exam50a.js; con vật đọc `petSide50a`, `petPress50a`, `petGel50a`… (runtime/pet/exam50a.js).
 RigSVG.DONG_TAC.push('palpate', 'useUltrasound', 'lookMicroscope');      // đợt 50 A
 leash49c(RigSVG);       // đợt 49 C
+shop50b(RigSVG);       // đợt 50 B
 export { veKhuonMat, beRongTaiY, veChanMay };

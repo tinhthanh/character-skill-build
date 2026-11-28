@@ -50,6 +50,9 @@ Một tệp kịch bản:
                                        sờ bụng / sờ nắn / khám bụng, sờ sườn (hai tay ấn nhẹ), siêu âm (con vật nằm nghiêng, gel, đầu dò, ảnh siêu âm;
                                        liếc xe đẩy siêu âm của bối cảnh nếu có — con vật phải ở trên bàn)
     tên: [soi kính hiển vi] [xem kính hiển vi]   cúi vào kính hiển vi của bối cảnh (bước tới cạnh nó), vặn núm, gật · thú: [nằm phơi bụng] (nằm nghiêng)
+                                       quét mã / quét mã vạch (thu ngân nhận món hàng khách đưa rồi quét: tia đỏ, bíp, giá) · combo: tính tiền món hàng
+    tên: [lấy hàng] [lấy túi hạt trên kệ cao] [lấy lon pate kệ dưới] [lấy bánh thưởng]   lấy một món hàng trên kệ (kiễng chân / với / ngồi xổm), xoay đọc nhãn, cầm
+                                       · [quét mã vạch] quét món hàng đang cầm (máy quét cầm tay, tia đỏ, bíp, giá)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên → con vật: dắt đi dạo           dắt chó (hay mèo đeo yếm) đi dạo — tự móc dây, chó kiệu trước, đánh hơi, ngoái lại; "dắt chó đi dạo",
@@ -200,6 +203,16 @@ TARGETED.update({'sờ bụng': ('palpate', None), 'sờ nắn': ('palpate', Non
                  'siêu âm': ('useUltrasound', None), 'siêu âm bụng': ('useUltrasound', None), 'siêu âm cho': ('useUltrasound', None)})
 ACTIONS.update({'soi kính hiển vi': 'lookMicroscope', 'xem kính hiển vi': 'lookMicroscope', 'nhìn kính hiển vi': 'lookMicroscope', 'soi kính': 'lookMicroscope',
                 'nằm phơi bụng': 'lieOnSide', 'nằm nghiêng sang bên': 'lieOnSide', 'nằm nghiêng ra': 'lieOnSide'})
+# ĐỢT 50 B — CỬA HÀNG THÚ CƯNG: "khách: [lấy túi hạt trên kệ cao]" → ["takeFromShelf", { "item", "level" }] (làm điệu bộ cạnh người — kệ có tên của bối cảnh 3D
+# thì viết tay trong scene.json: ["takeFromShelf", "@ke_hang", …]); "thu ngân: [quét mã vạch]" quét món hàng đang cầm; "thu ngân → khách: quét mã" nhận món hàng
+# khách đưa rồi quét (khách đưa cùng lúc). "quét mã" một mình vẫn là trả tiền bằng QR (đợt 39 A).
+GOODS_50B = {'hàng': 'foodBag', 'túi hạt': 'foodBag', 'hạt': 'foodBag', 'thức ăn': 'foodBag', 'bánh thưởng': 'treatBox', 'hộp bánh thưởng': 'treatBox', 'hộp bánh': 'treatBox',
+             'lon pate': 'can', 'pate': 'can', 'lon': 'can'}
+SHELF_LEVELS_50B = {'': 'middle', ' giữa': 'middle', ' tầng giữa': 'middle', ' cao': 'high', ' tầng cao': 'high', ' trên cao': 'high', ' dưới': 'low', ' thấp': 'low', ' tầng dưới': 'low'}
+ACTIONS.update({f'lấy {goods}{place}{level}': ['takeFromShelf', {'item': item, 'level': height}] for goods, item in GOODS_50B.items() for place in ('', ' kệ', ' trên kệ', ' ở kệ', ' trên giá')
+                for level, height in SHELF_LEVELS_50B.items()})
+ACTIONS.update({'quét mã vạch': 'scanBarcode', 'quét mã sản phẩm': 'scanBarcode', 'quét mã hàng': 'scanBarcode', 'quét barcode': 'scanBarcode'})
+TARGETED.update({'quét mã': ('scanBarcode', None), 'quét mã vạch': ('scanBarcode', None), 'quét mã hàng': ('scanBarcode', None), 'quét mã cho': ('scanBarcode', None), 'quét barcode': ('scanBarcode', None)})
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 ACTIONS.update({'ngồi bệt': 'sitOnFloor', 'ngồi xếp bằng': 'sitOnFloor', 'ngồi bệt xuống': 'sitOnFloor', 'nằm xuống': 'lieDown', 'nằm sàn': 'lieDown', 'nằm sofa': ['lieDown', 'sofa'], 'nằm ngủ': ['lieDown', 'floor', {'sleep': True}], 'nhặt': 'pickUp', 'nhặt lên': 'pickUp', 'nhặt đồ chơi': 'pickUp', 'nhặt bóng': 'pickUp'}); TARGETED.update({'nhặt': ('pickUp', None), 'nhặt lên': ('pickUp', None), 'nhặt đồ chơi': ('pickUp', None)})      # ĐỢT 42 E — sát sàn: ngồi bệt, nằm (sàn / sofa), nhặt đồ ("bé → chó: nhặt" — đồ chơi cạnh con chó)
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}

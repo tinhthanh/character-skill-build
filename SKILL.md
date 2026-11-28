@@ -21,6 +21,7 @@ hold a pet still while someone else examines or injects it, wash the hands (soap
 bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water), brush its teeth, towel it dry (the fur turns fluffy),
 blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
 feel its belly or flanks, scan it with ultrasound (it lies on its side, gel, a probe, a generic scan picture), look into a microscope at the lab bench,
+take a product off a shop shelf (on tiptoe, reaching, squatting — then reads its label), scan its barcode at the till (a red scan line, bíp, the price),
 get a notification on the phone (138 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
@@ -197,6 +198,13 @@ clips for every voice file.
    screen — a picture cutout named "cart"; optional; the pet must be on a table), `["lookMicroscope", "@kinh"]` (walks up beside a microscope picture cutout,
    leans in, eye at the eyepiece, turns the knob). The pet turns its tail to the person first. Pet pose `lieOnSide`. Scripts: "sờ bụng", "sờ nắn", "khám bụng",
    "sờ sườn", "siêu âm", "[soi kính hiển vi]", pet "[nằm phơi bụng]".
+   Pet shop / till (đợt 50 B): `["takeFromShelf", "@ke_hang", { "item": "foodBag" | "treatBox" | "can", "level": "high" | "middle" | "low" }]` — the shelf is
+   a sets-repo picture (`gondola_shelf`, `pet_food_shelf`, `medicine_wall_shelf`) with a "name"; the person walks beside it (stand z 10–160 in front),
+   reaches the row, turns the product to read the label and keeps it (no shelf: `["takeFromShelf", { … }]` mimes it). `["scanBarcode", "@khach",
+   { "put": "down" | "keep" | "bag" }]` — the cashier takes the product the customer hands over (added for you), a hand-held scanner, red scan line,
+   bíp and a price card; `["scanBarcode"]` scans the product already in the other hand. Combo `["shopCheckout", "@khach"]` (scan → QR pay → hand it
+   back → wave; the customer needs a put-away phone and a pay stand). Scripts: "[lấy túi hạt trên kệ cao]", "[lấy hàng]", "[quét mã vạch]",
+   "thu ngân → khách: quét mã", "→ khách: tính tiền món hàng". Items `foodBag`, `treatBox`, `can` for `holds` too.
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),
