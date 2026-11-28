@@ -67,6 +67,10 @@ const NGHI = Object.freeze({
   // (0…1), `petRub42f` khăn xô theo nhịp chà (−1…1), `petMood42f` −1 khó chịu (tai cụp) … 1 vui, `petGape42f` miệng hé cho đánh răng, `petLick42f`
   // liếm mép, `petShake42f` pha rũ nước 0 → 1 (con vật tự lắc — đã buông tay). `spray42fL/R` 0…1 tia nước từ vòi sen trong tay ấy (gadget 40), `sprayT42f` pha chảy của tia nước.
   petWet42f: 0, petFoam42f: 0, petDry42f: 0, petTowel42f: 0, petRub42f: 0, petMood42f: 0, petGape42f: 0, petLick42f: 0, petShake42f: 0, spray42fL: 0, spray42fR: 0, sprayT42f: 0,
+  // ĐỢT 49 B — sấy, tỉa lông (runtime/person/grooming.js): `air49bL/R` 0…1 luồng gió từ vòi sấy trong tay ấy (gadget 43), `snip49bL/R` 0…1 kéo mở
+  // (gadget 44), `buzz49bL/R` 0…1 tông-đơ chạy (gadget 45), `groomT49b` đồng hồ của động tác (gió chảy, lông gợn); con vật đọc `petBlow49b` gió vào lông,
+  // `petStand49b` 0…1 con vật đứng dậy (mèo / thỏ đang ngồi), `petShag49b` lông dài chưa tỉa (GIỮ), `petCutT49b` / `petCutDur49b` giây đã tỉa / giây tỉa hết lưng, `petTrimStart49b` / `petTrimEnd49b` chỗ đầu / cuối đường tỉa (GIỮ) — runtime/pet/grooming.js.
+  air49bL: 0, air49bR: 0, snip49bL: 0, snip49bR: 0, buzz49bL: 0, buzz49bR: 0, groomT49b: 0, petStand49b: 0, petBlow49b: 0, petShag49b: 0, petCutT49b: 0, petCutDur49b: 0, petTrimStart49b: 0, petTrimEnd49b: 0,
   petCone: 0,                   // 0…1 LOA chống liếm đã đeo vào cổ con vật (`putCone`, đợt 35) — như `petWrap`
   gadgetTurnL: 0, gadgetTurnR: 0,   // độ xoay thêm của dụng cụ trong tay quanh lòng bàn tay (góc trên màn hình) — vành loa (`putCone`, đợt 35)
   ring: 0, ringX: 0, ringY: 0, ringR: 40, ringFront: 0,

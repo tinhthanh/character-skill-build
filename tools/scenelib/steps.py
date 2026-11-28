@@ -1,7 +1,7 @@
 """The JS code of one step / one turn of the conversation (`step_code`, `turn_code`) and the care / desk helpers they use.
 Each takes the build state `st` first (see state.py); they read the cast, the set and the frame size from it."""
 import os, re
-from .actions import (CARE_REACH, HANDS_ON_CARE, HANDS_ON_HOLD, HANDS_ON_OPTIONS, GROOMING, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ITEM, DESK_NOUN,
+from .actions import (CARE_REACH, HANDS_ON_CARE, HANDS_ON_HOLD, HANDS_ON_OPTIONS, GROOMING, GROOMING_49B, TRIM_TOOLS, CARE_ACTIONS, CHART_ACTIONS, DESK_ACTIONS, DESK_ITEM, DESK_NOUN,
     DESK_PAY, FLOOR_ACTIONS, WHOLE_BODY, PAIR_PARTNER, PAIR_PARTS, PET_MOOD_MARKS, RESTRAIN, RESTRAIN_PAIRS, SHOW_SIZE_GAP, PRESENTER_ACTIONS)
 from .audio import speak_line
 from .floor import floor_step
@@ -44,7 +44,14 @@ def care_code(st, step, where, actor):
         if len(step) > 4 or (len(step) > 2 and not (isinstance(step[2], (int, float)) and 0.5 <= step[2] <= 5)) or (len(step) > 3 and not (isinstance(step[3], dict) and set(step[3]) <= {'reading'} and isinstance(step[3].get('reading', ''), str))):
             fail(f'{where}: "takeTemp" takes ["takeTemp", "@pet", hold (0.5…5 s), {{ "reading": "38.5°C" }}] — got {js(step)}')
     if name == 'givePill' and len(step) > 2: fail(f'{where}: "givePill" takes just the pet: ["givePill", "@pet"] — got {js(step)}')
-    if name in GROOMING:          # đợt 42 F: ["bathPet", "@pet", { "hold": 1.8 }], ["brushTeeth", "@pet", { "hold": 2 }], ["towelDry", "@pet", { "hold": 2.2 }]
+    if name in GROOMING_49B:      # đợt 49 B: ["blowDry", "@pet", { "hold": 2.4 }], ["trimFur", "@pet", { "tool": "clipper", "hold": 2.4 }]
+        options = step[2] if len(step) > 2 else {}
+        lo, hi, d = HANDS_ON_HOLD[name]
+        usage = f'{{ "hold": {d:g} }}' if name == 'blowDry' else f'{{ "tool": "scissors" | "clipper", "hold": {d:g} }}'
+        if len(step) > 3 or not isinstance(options, dict) or set(options) - HANDS_ON_OPTIONS[name]: fail(f'{where}: "{name}" takes ["{name}", "@pet", {usage}] — got {js(step)}')
+        if 'hold' in options and not (isinstance(options['hold'], (int, float)) and not isinstance(options['hold'], bool) and lo <= options['hold'] <= hi): fail(f'{where}: "{name}" hold must be {lo:g}…{hi:g} seconds — got {js(options["hold"])}')
+        if 'tool' in options and options['tool'] not in TRIM_TOOLS: fail(f'{where}: "trimFur" tool must be "scissors" or "clipper" — got {js(options["tool"])}')
+    elif name in GROOMING:          # đợt 42 F: ["bathPet", "@pet", { "hold": 1.8 }], ["brushTeeth", "@pet", { "hold": 2 }], ["towelDry", "@pet", { "hold": 2.2 }]
         options = step[2] if len(step) > 2 else {}
         lo, hi, d = HANDS_ON_HOLD[name]
         if len(step) > 3 or not isinstance(options, dict) or set(options) - {'hold'}: fail(f'{where}: "{name}" takes ["{name}", "@pet", {{ "hold": {d:g} }}] — got {js(step)}')

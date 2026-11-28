@@ -46,6 +46,7 @@ Một tệp kịch bản:
                                        cắt móng, nhỏ mắt, vệ sinh tai / lau tai, quét chip (hay "quét chip 900 123 456 789": mã hiện trên thẻ)
                                        giữ (giữ con vật cho người khác: "cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm")
                                        tắm (con vật tự đứng trong chậu tắm: xối nước, xoa bọt, xả, rũ nước), đánh răng, lau khô (khăn tắm, lông bông)
+                                       sấy lông / sấy khô (vòi máy sấy, lông khô bông), tỉa lông / cắt tỉa (kéo, túm lông rụng), cạo lông / tông đơ (tông-đơ)
     tên: [chạy] [nhảy lên] [nhảy cẫng] [nhảy] [nhảy múa] [quẩy]   chạy tại chỗ, nhảy mừng (hai chân rời sàn), nhảy múa theo nhịp (người;
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
@@ -181,6 +182,11 @@ ACTIONS.update({'run sợ': 'shiverAtVet', 'sợ run': 'shiverAtVet', 'giãy': '
 SWITCHES = {'bật đèn': 'on', 'tắt đèn': 'off'}
 TARGETED.update({'tắm': ('bathPet', None), 'tắm cho': ('bathPet', None), 'tắm rửa': ('bathPet', None), 'đánh răng': ('brushTeeth', None), 'đánh răng cho': ('brushTeeth', None),
                  'chải răng': ('brushTeeth', None), 'lau khô': ('towelDry', None), 'lau khô lông': ('towelDry', None), 'lau khô cho': ('towelDry', None)})      # ĐỢT 42 F — tắm (con vật tự vào chậu tắm), đánh răng, lau khô bằng khăn
+# ĐỢT 49 B — sấy lông (vòi máy sấy, lông khô bông), tỉa lông bằng kéo (mặc định) hay tông-đơ ("cạo lông", "... bằng tông đơ").
+TARGETED.update({'sấy': ('blowDry', None), 'sấy lông': ('blowDry', None), 'sấy khô': ('blowDry', None), 'sấy khô lông': ('blowDry', None), 'sấy cho': ('blowDry', None),
+                 'tỉa lông': ('trimFur', None), 'cắt tỉa': ('trimFur', None), 'cắt tỉa lông': ('trimFur', None), 'cắt lông': ('trimFur', None), 'tỉa lông bằng kéo': ('trimFur', None),
+                 'cạo lông': ('trimFur', {'tool': 'clipper'}), 'tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}),
+                 'cắt lông bằng tông đơ': ('trimFur', {'tool': 'clipper'}), 'tỉa lông bằng tông-đơ': ('trimFur', {'tool': 'clipper'})})
 POWER = {'mất điện': 'off', 'cúp điện': 'off', 'có điện': 'on', 'có điện lại': 'on'}
 ACTIONS.update({'ngồi bệt': 'sitOnFloor', 'ngồi xếp bằng': 'sitOnFloor', 'ngồi bệt xuống': 'sitOnFloor', 'nằm xuống': 'lieDown', 'nằm sàn': 'lieDown', 'nằm sofa': ['lieDown', 'sofa'], 'nằm ngủ': ['lieDown', 'floor', {'sleep': True}], 'nhặt': 'pickUp', 'nhặt lên': 'pickUp', 'nhặt đồ chơi': 'pickUp', 'nhặt bóng': 'pickUp'}); TARGETED.update({'nhặt': ('pickUp', None), 'nhặt lên': ('pickUp', None), 'nhặt đồ chơi': ('pickUp', None)})      # ĐỢT 42 E — sát sàn: ngồi bệt, nằm (sàn / sofa), nhặt đồ ("bé → chó: nhặt" — đồ chơi cạnh con chó)
 SKIES = {'trời tối dần': 'night', 'trời tối': 'night', 'màn đêm': 'night', 'hoàng hôn': 'evening', 'chiều xuống': 'evening', 'trời sáng': 'day', 'bình minh': 'day'}

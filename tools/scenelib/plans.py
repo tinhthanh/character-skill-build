@@ -1,5 +1,5 @@
 """Measurement plans of the care and desk actions: the moments (seconds into the step) moments.json measures."""
-from .actions import BATH_RINSE, BATH_SPRAY, HANDS_ON_HOLD, GROOMING, DESK_PAY, bath_shake_at
+from .actions import BATH_RINSE, BATH_SPRAY, HANDS_ON_HOLD, GROOMING, GROOMING_49B, TRIM_FALL, DESK_PAY, bath_shake_at
 
 
 def care_plan_tools(op, t0):
@@ -8,6 +8,7 @@ def care_plan_tools(op, t0):
     acting_check (`care38`) — kìm khép / mở và chân nhấc, giọt thuốc rơi vào mắt và mắt nhắm, bông ở gốc tai và đầu lắc, máy quét rà trên gáy
     và thẻ mã chip."""
     if op['kind'] in GROOMING: return care_plan_grooming(op, t0)          # đợt 42 F
+    if op['kind'] in GROOMING_49B: return care_plan_49b(op, t0)          # đợt 49 B
     kind, hold = op['kind'], float(op.get('hold') or HANDS_ON_HOLD[op['kind']][2])
     r = lambda a: round(t0 + a, 2)
     every = lambda a, b, d=0.1: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
@@ -73,6 +74,33 @@ def care_plan_grooming(op, t0):
         gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet} (drying)'}]
         ask = [f'Is the animal ({pet}) wrapped in a towel that {who} rubs with both hands?', f'Does the animal\'s fur look fluffy after the towel is taken off?']
     return {'times': times, 'gaze': gaze, 'check': dict(check, kind='care42f', name=kind, who=who, target=pet, times=times, hold=hold), 'ask': ask}
+
+
+def care_plan_49b(op, t0):
+    """ĐỢT 49 B: các lúc đo của sấy lông / tỉa lông, tính từ đầu bước `t0` theo đúng nhịp của runtime/person/grooming.js (`hold`, `tool` của bước) —
+    xem `check_groom49b` của tools/acting_check.py."""
+    kind, hold = op['kind'], float(op.get('hold') or HANDS_ON_HOLD[op['kind']][2])
+    r = lambda a: round(t0 + a, 2)
+    every = lambda a, b, d=0.2: [r(a + d * n) for n in range(int(round((b - a) / d)) + 1)]
+    who, pet = op['who'], op['target']
+    if kind == 'blowDry':
+        W, E1 = 0.6, 0.6 + hold
+        times = [r(W + 0.4), r(W + hold / 2), r(E1 - 0.2)]
+        check = {'air': every(W + 0.35, E1 - 0.1), 'ripple': every(W + 0.4, W + 1.0, 0.1), 'before': [r(W)], 'after': [r(E1 + 0.9), r(E1 + 1.3)], 'happy': [r(E1 + 0.9), r(E1 + 1.4)],
+                 'gadget': 43}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet} (drying)'}]
+        ask = [f'Is {who} blow-drying the animal ({pet}) with a hand-held dryer nozzle aimed at its back, an air stream visible, its fur blown about?',
+               f'Does the animal\'s fur look dry and fluffy afterwards?']
+    else:
+        tool = op.get('tool') or 'scissors'
+        C0, U = 1.0, 1.0 + hold
+        times = [r(C0 + 0.3), r(C0 + hold / 2), r(U - 0.2)]
+        check = {'cut': every(C0 + 0.1, U - 0.1, 0.1), 'shag': [r(C0 - 0.05)], 'fall': every(C0 + 0.3, U + 0.6, 0.1), 'after': [r(U + TRIM_FALL + 0.1), r(U + 1.5)], 'neat': [r(U + 0.35)],
+                 'gadget': 44 if tool == 'scissors' else 45, 'trimTool': tool}
+        gaze = [{'times': times, 'aim': 'pet', 'on': pet, 'what': f'{pet} (trimming)'}]
+        ask = [f'Is {who} trimming the coat of the animal ({pet}) with {"grooming scissors" if tool == "scissors" else "an electric clipper"} along its back, small tufts of fur falling?',
+               'Does the coat look neater (less fluffy, no long tufts) afterwards?']
+    return {'times': times, 'gaze': gaze, 'check': dict(check, kind='groom49b', name=kind, who=who, target=pet, times=times, hold=hold), 'ask': ask}
 
 
 def care_window(kind, length):

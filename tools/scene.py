@@ -152,6 +152,9 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                "putDown" sets it by the feet, away from the cage, or "handOverPet"). A pet can start inside: "inCage": "chuong" on it
                (no x / z). The person must stand just in front of the cage: z 12–60 more than the cage's. Dogs, cats and rabbits; a pet
                too big for the door opening is refused (give a bigger "size").
+               Grooming 2 (wave 49 B): ["blowDry", "@pet", { "hold": 2.4 }] (dryer nozzle aimed at its back, a visible air stream, the
+               fur blown about, ears back, eyes squinting — the fur turns dry and fluffy), ["trimFur", "@pet", { "tool": "scissors" |
+               "clipper", "hold": 2.4 }] (tufts fall as the tool passes along the back; the coat ends neater). A sitting pet stands up.
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).
