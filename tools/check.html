@@ -18,11 +18,18 @@ window.addEventListener('error', (e) => hong('page', e.message));
 const thamSo = new URLSearchParams(location.search);
 const [phanSo, soPhan] = (thamSo.get('shard') || '1/1').split('/').map(Number);
 const chiNhanVat = thamSo.get('characters') ? thamSo.get('characters').split(',') : null;
+// PHẠM VI (đợt 48, tools/scope.py → tools/check.sh --scope): `?only=mẫu,mẫu` chỉ chạy các phần việc có tên khớp một mẫu (`*` thay
+// cho chuỗi bất kỳ) — phần việc không khớp coi như KHÔNG CÓ (không vào ra.tatCa), nên các phần vẫn đối chiếu được với nhau;
+// `?actions=a,b`: phần quét của mỗi nhân vật chỉ thử các động tác ấy, trừ nhân vật trong `?fullCharacters=x,y` (quét đủ).
+const mauChon = thamSo.get('only') ? thamSo.get('only').split(',').filter(Boolean).map((p) => new RegExp('^' + p.replace(/[.+^${}()|[\]\\?]/g, '\\$&').replace(/\*/g, '.*') + '$')) : null;
+const chiDongTac = thamSo.get('actions') ? thamSo.get('actions').split(',').filter(Boolean) : null;
+const quetDu = (thamSo.get('fullCharacters') || '').split(',').filter(Boolean);
 Object.assign(ra, { shard: `${phanSo}/${soPhan}`, tatCa: [], phan: [], thoiGian: {} });
 let viecDangChay = null, batDau = 0;
 const ghiGio = () => { const now = performance.now(); if (viecDangChay) ra.thoiGian[viecDangChay] = Math.round(now - batDau); viecDangChay = null; return now; };
 const chay = (ten) => {
   const now = ghiGio();
+  if (mauChon && !mauChon.some((mau) => mau.test(ten))) { viecDangChay = null; return false; }
   const thuTu = ra.tatCa.push(ten) - 1;
   const cuaToi = chiNhanVat ? chiNhanVat.includes(ten.replace(/^(person|pet):/, '')) && /^(person|pet):/.test(ten) : thuTu % soPhan === phanSo - 1;
   viecDangChay = cuaToi ? ten : null; batDau = now;
@@ -44,6 +51,7 @@ try {
   const xau = (svg) => { let n = 0; svg.querySelectorAll('*').forEach((el) => { for (const a of el.attributes) if (/NaN|undefined|null|Infinity/.test(a.value)) n++; }); return n; };
   const trungId = (svg) => { const m = {}; svg.querySelectorAll('[id]').forEach((e) => { m[e.id] = (m[e.id] || 0) + 1; }); return Object.keys(m).filter((k) => m[k] > 1); };
   const quet = (rig, ten, dsDongTac, duocLech) => {
+    if (chiDongTac && !quetDu.includes(ten)) dsDongTac = dsDongTac.filter((m) => chiDongTac.includes(m));
     const o = ra.nhanVat[ten] = { dongTac: dsDongTac.length };
     const t0 = trungId(rig.svg); if (t0.length) hong(ten, 'duplicate element ids: ' + t0.join(','));
     if (xau(rig.svg)) hong(ten, 'broken SVG attributes (NaN / undefined) at rest');

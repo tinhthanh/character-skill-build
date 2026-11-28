@@ -1,32 +1,61 @@
 name: check
 
+# Một PR chỉ kiểm phần thay đổi chạm tới (tools/scope.py, đợt 48): chạm lõi → kiểm hết; push lên main → luôn kiểm hết.
+# Không chạy trên push của nhánh PR nữa: lượt pull_request đã kiểm đúng mã ấy (trước đây hai lượt chạy song song).
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # Nhánh gốc để so (origin/<nhánh đích của PR>); push lên main thì trống = kiểm hết.
+      SCOPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # tools/scope.py cần merge-base với nhánh gốc
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # .cache/: thời gian (ci-times.json — trường hợp dài chạy trước) và những gì mỗi trường hợp dựng ở lượt qua gần nhất
+      # (ci-uses.json — để --changed / --scope chọn đúng). Lượt nào cũng lưu bản mới; PR đọc được bản của main.
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: check-cache-${{ github.run_id }}
+          restore-keys: check-cache-
       # tools/light_side.py so độ sáng trên ảnh chụp bằng Pillow (đợt 29).
       - name: Install Pillow
         run: python -m pip install --quiet Pillow
+      - name: What the change needs checked
+        if: env.SCOPE_BASE != ''
+        run: python3 tools/scope.py "$SCOPE_BASE"
       # Chrome có sẵn trên runner ubuntu-latest; tools/chrome.sh tự tìm google-chrome.
-      - name: Every character × every action
-        run: sh tools/check.sh
+      - name: Every character × every action (a PR — only what the change touches)
+        run: |
+          if [ -n "$SCOPE_BASE" ]; then sh tools/check.sh --scope "$SCOPE_BASE"; else sh tools/check.sh; fi
       - name: dist/ is committed up to date
         run: git diff --exit-code -- dist
       # Hợp đồng HyperFrames: mỗi ví dụ phải qua `hyperframes lint`. Node có sẵn trên runner.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Examples to lint
+        id: examples
+        run: |
+          if [ -n "$SCOPE_BASE" ]; then eval "$(python3 tools/scope.py "$SCOPE_BASE" --sh)"; else SCOPE_EXAMPLES='*'; fi
+          echo "names=$SCOPE_EXAMPLES" >> "$GITHUB_OUTPUT"
+          echo "examples: ${SCOPE_EXAMPLES:-none}"
       # `hyperframes check` đọc tệp tiếng của ví dụ voiceover bằng ffprobe — runner không có sẵn.
       - name: Install FFmpeg
+        if: steps.examples.outputs.names != ''
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       # lint (tĩnh) + check (nạp từng ví dụ vào trình duyệt, soát runtime / bố cục / chuyển động).
       - name: Examples pass hyperframes lint and check
-        run: sh tools/lint-examples.sh --check
+        if: steps.examples.outputs.names != ''
+        run: |
+          set -f      # "*" là tên, không phải mẫu tệp
+          sh tools/lint-examples.sh --check ${{ steps.examples.outputs.names }}

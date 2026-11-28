@@ -1,6 +1,7 @@
 #!/bin/sh
 # Run `hyperframes lint` on every example composition — the contract this library exists for.
 #   tools/lint-examples.sh             lint only (fast, static)
+#   tools/lint-examples.sh --check a b these examples only (folder names under examples/)
 #   tools/lint-examples.sh --check     also `hyperframes check`: loads each example in a browser and
 #                                      samples it for runtime, layout and motion problems (slower)
 # --check needs FFmpeg (ffprobe) on PATH for examples that have audio.
@@ -16,12 +17,15 @@ VERSION="${HYPERFRAMES_VERSION:-0.9.52}"
 export HYPERFRAMES_NO_TELEMETRY=1 DO_NOT_TRACK=1
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/lint-examples.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
-CHECK=0; [ "${1:-}" = "--check" ] && CHECK=1
+CHECK=0; [ "${1:-}" = "--check" ] && { CHECK=1; shift; }
+# Tên ví dụ sau cờ (đợt 48, tools/scope.py trên CI): chỉ các ví dụ ấy. Không có tên, hay "*": mọi ví dụ.
+ONLY=" $* "; [ "$ONLY" = "  " ] || [ "$ONLY" = " * " ] && ONLY=
 # Cảnh báo của `check` đã biết là báo nhầm với thư viện này (xem references/hyperframes.md).
 KNOWN="rotation_pivot_drift off_pivot_rotation gsap_tween_tail film_silent"
 failed=0
 for example in examples/*/index.html; do
   name="$(basename "$(dirname "$example")")"
+  [ -n "$ONLY" ] && case "$ONLY" in *" $name "*) ;; *) continue ;; esac
   mkdir -p "$WORK/$name"
   cp -R "$(dirname "$example")/." "$WORK/$name/"            # audio, cue scripts and anything else the example loads
   # Cùng một phép thay mà người dùng làm khi chép ví dụ vào project thật.
@@ -52,6 +56,7 @@ done
 # Kịch bản mẫu (examples/*/scene.json): dựng ra composition bằng tools/scene.py rồi soát như các ví dụ khác.
 for scene in examples/*/scene.json; do
   [ -f "$scene" ] || continue
+  [ -n "$ONLY" ] && case "$ONLY" in *" $(basename "$(dirname "$scene")") "*) ;; *) continue ;; esac
   name="$(basename "$(dirname "$scene")")-generated"
   if ! python3 tools/scene.py "$scene" -o "$WORK/$name" > "$WORK/$name.build" 2>&1; then echo "  ✗ $name  scene.py failed:"; sed 's/^/      /' "$WORK/$name.build" | tail -6; failed=1; continue; fi
   if (cd "$WORK/$name" && npx --yes "hyperframes@$VERSION" lint > "$WORK/$name.log" 2>&1) && grep -q "0 errors" "$WORK/$name.log"; then

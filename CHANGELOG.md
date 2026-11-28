@@ -31,6 +31,30 @@ Vietnamese script words, catalog rows, `tools/acting_check.py` measurements and 
     draws the right leash.
 - Every existing action is unchanged: every character × every action, hashed at 9 progress points, is identical to
   `main` for the sources and both bundles, with the new actions skipped (they shift the global id counters).
+**CI checks only what a pull request touches** (wave 48). Every PR used to run the whole check, 35–45 min on the 4-core
+runner: 2 scene cases at a time, and the check page sweeping every character × every action.
+
+- New **`tools/scope.py`** splits the change by folder:
+  - core (rigs, `runtime/index.js`, shared helpers, 3D set, drawing kits, scene builder, check tools, `configs/`,
+    `vendor/`, the workflow, or any unknown file) → everything.
+  - an action method → that action. A private helper or the file's module code → the whole group file.
+  - a combo entry → that combo. A character → it and the characters built on it.
+  - catalog rows → their actions. An example → that example. Docs → nothing.
+- **`sh tools/check.sh --scope [BASE]`** runs only that:
+  - the scene cases `--changed` picks, plus the names as words (new `check_scene.py --words`).
+  - only the check-page units that test them. New page parameters: `?only=` (unit globs; skipped units are not
+    listed, so the shard report still holds), `?actions=` (the sweeps test only these), `?fullCharacters=`.
+- `tools/lint-examples.sh` takes example names.
+- **`.github/workflows/check.yml`**:
+  - A pull request runs `--scope origin/<base>` and lints only the examples it reaches.
+  - A push to `main` runs everything.
+  - Pushes to PR branches no longer start a second, duplicate run.
+  - `.cache/` (case times and `uses`) is kept between runs, so the longest cases start first and `--changed` sees what
+    each case built.
+- Measured locally, one action's method changed (`thumbsDown`):
+  - 60 s instead of about 5 min: 7 of 109 scene cases, and the page sweeps only that action on all 17 people.
+  - A deliberate NaN in that action is caught.
+- New check `scope48`.
 
 **Combo partners run in the review sheet and the reels** (wave 48). A combo's `with` steps are what another character
 does at the same time: the nurse holds the pet during `inject`, the pet opens its mouth, the kid dances along, the

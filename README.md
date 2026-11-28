@@ -95,8 +95,34 @@ python3 tools/check_scene.py --list  # every case with its tags and `uses`
 preset, character id, or a tool: `script`, `acting_check`, `page_eval`, `camera`…) is in its `uses`,
 or when it is tagged `smoke`. It is a fast loop, not a proof: a change to a shared engine
 (`runtime/set3d.js` camera, `runtime/rig-svg.js` skeleton or `runtime/person/shared.js`, `tools/scene.py`) can break scenes that
-never name the changed words. **Run the full `sh tools/check.sh` (no arguments) before merging or
-releasing.**
+never name the changed words.
+
+**`--scope`: what CI runs on a pull request.** `tools/scope.py` splits the change by folder.
+
+- **Core changed → everything.** Core is the two rigs, `runtime/index.js`, the shared helpers, the 3D set, shading, the
+  drawing kits, the scene builder, the check tools themselves, `configs/`, `vendor/` and the workflow. A file the
+  script does not know counts as core.
+- **Otherwise, only what the change reaches:**
+  - an action method in `runtime/person/<group>.js` or `runtime/pet/<group>.js` → that action. A private helper or the
+    file's module code → every action of the file.
+  - a combo entry → that combo.
+  - a character → it and the characters built on it.
+  - catalog rows → their actions.
+  - an example → that example.
+  - docs → nothing.
+- **What then runs:**
+  - The scene cases `--changed` picks, with those names as extra words.
+  - Only the check-page units that test those names: the action sweeps of every character limited to those actions
+    (`?only=` / `?actions=`), the sequence-vs-direct rows, and the page blocks whose code names them.
+  - Only the examples that name them are linted.
+
+```bash
+python3 tools/scope.py             # what a change vs main needs, and why
+sh tools/check.sh --scope          # run just that (one action changed: about 1 min instead of 5)
+```
+
+A push to `main` always runs the whole check, so something a scoped run missed is still caught after the merge.
+**Before a release, or after changing the core, run the full `sh tools/check.sh` (no arguments).**
 
 `tools/check.html` runs at the same time as the scene cases (both only need the fresh `dist/`), split
 into shards — one headless Chrome each, `CHECK_PAGE_SHARDS=n` (default 3, `1` = one unsharded run).
