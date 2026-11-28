@@ -33,3 +33,27 @@ def reel48_case(work, problems, part):
     html = open(os.path.join(work, f'reel-{part}', 'index.html'), encoding='utf-8').read()
     if part == 'dog' and 'scaredPet' not in html:
         problems.append('reel48:dog: the combo scaredPet row is missing from the reel')
+
+
+@case('scope48', uses=('scope',))
+def scope48(work, problems):
+    """tools/scope.py splits a change by folder: one action's method → that action; a private helper → the whole file;
+    a base character → the ones built on it; a combo entry → that combo; core files → everything."""
+    sys.path.insert(0, HERE)
+    import scope
+    lines = open(os.path.join(ROOT, 'runtime', 'person', 'gestures.js'), encoding='utf-8').read().split('\n')
+    at = lambda prefix: next(n + 1 for n, line in enumerate(lines) if line.startswith(prefix))
+    one = scope.touched_actions('runtime/person/gestures.js', [(at('  thumbsDown(') + 1,) * 2])
+    if one != ['thumbsDown']: problems.append(f'scope48: a line inside thumbsDown gives {one}')
+    helper = scope.touched_actions('runtime/person/gestures.js', [(at('  _gestureAt(') + 1,) * 2])
+    if not helper or 'thumbsDown' not in helper or 'laugh' not in helper: problems.append(f'scope48: a private helper does not give the whole file: {helper}')
+    if 'nurse' not in scope.built_on({'nurse'}) or 'receptionist' not in scope.built_on({'nurse'}): problems.append('scope48: characters built on nurse are missing')
+    combos = open(os.path.join(ROOT, 'runtime', 'combos.js'), encoding='utf-8').read().split('\n')
+    line = next(n + 1 for n, text in enumerate(combos) if '"fullCheckup": {' in text) + 2
+    if scope.combo_names([(line, line)]) != ['fullCheckup']: problems.append('scope48: a line of the fullCheckup entry does not give fullCheckup')
+    if scope.combo_names([(len(combos) - 3,) * 2]) is not None: problems.append('scope48: code after the combo table does not ask for everything')
+    for path in ('runtime/rig-svg.js', 'runtime/person/shared.js', 'tools/scene.py', 'tools/check.html', '.github/workflows/check.yml'):
+        if not scope.matches(path, scope.CORE): problems.append(f'scope48: {path} is not core')
+    units, actions = scope.page_units({'actions': {'thumbsDown'}, 'kinds': {'person'}, 'characters': set(), 'combos': set(), 'labels': set()})
+    if 'person:*' not in units or 'pet:*' in units or actions != ['thumbsDown'] or 'seq-vs-direct:*.thumbsDown' not in units:
+        problems.append(f'scope48: page units for thumbsDown: {units} / {actions}')

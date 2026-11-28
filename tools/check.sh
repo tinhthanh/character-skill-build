@@ -3,6 +3,9 @@
 #   tools/check.sh                → everything (required before merge / release); exit 0 on PASS, 1 on FAIL
 #   tools/check.sh --changed [B]  → only the scene cases a change vs B (default main) touches + a smoke set;
 #                                   the check page too, but only when the change touches what it tests (runtime/, configs/, tools/check.html …)
+#   tools/check.sh --scope [B]    → what tools/scope.py says a change vs B (default main) needs: everything when it touches
+#                                   the core, else the scene cases --changed picks (with the touched actions / characters as
+#                                   words) and only the check-page units that test them — what CI runs on a pull request
 #   tools/check.sh --only a,b     → only these scene cases (names, globs, module names such as w44); no check page
 #   tools/check.sh --failed       → only the scene cases that failed last time; no check page
 #   tools/check.sh -j 4           → scene cases 4 at a time (default: CPU count − 2)
@@ -17,21 +20,44 @@ set -e
 cd "$(dirname "$0")/.."
 
 # Tách --page / --no-page (của riêng script này) khỏi các tham số chuyển cho check_scene.py.
-PAGE=auto; SUBSET=; CHANGED=; BASE=main; prev=
+PAGE=auto; SUBSET=; CHANGED=; BASE=main; prev=; SCOPE=
 for a do
   shift
   case $a in
+    --scope) SCOPE=1; prev=$a; continue ;;
+    --scope=*) SCOPE=1; BASE=${a#--scope=}; prev=$a; continue ;;
     --page) PAGE=yes; continue ;;
     --no-page) PAGE=no; continue ;;
     --only|--only=*|--failed|--list) SUBSET=1 ;;
     --changed) CHANGED=1 ;;
     --changed=*) CHANGED=1; BASE=${a#--changed=} ;;
     -*) ;;
-    *) [ "$prev" = --changed ] && BASE=$a ;;
+    *) if [ "$prev" = --scope ]; then BASE=$a; prev=$a; continue; fi
+       [ "$prev" = --changed ] && BASE=$a ;;
   esac
   prev=$a
   set -- "$@" "$a"
 done
+# --scope (đợt 48): tools/scope.py chia thay đổi theo thư mục. Chạm lõi → chạy hết; không thì như --changed (thêm tên các
+# động tác / nhân vật / ví dụ bị chạm làm từ khớp) và trang kiểm tra chỉ chạy các phần việc kiểm chúng (PAGE_QUERY).
+PAGE_QUERY=
+if [ -n "$SCOPE" ]; then
+  eval "$(python3 tools/scope.py "$BASE" --sh)" || { echo "check: tools/scope.py failed"; exit 1; }
+  python3 tools/scope.py "$BASE" | sed 's/^/  /'
+  if [ "$SCOPE_FULL" = 1 ]; then
+    echo "check: the change touches the core — running everything"
+  elif [ "$SCOPE_NONE" = 1 ]; then
+    python3 tools/build.py >/dev/null
+    echo "check: only docs changed — nothing to run"; echo PASS; exit 0
+  else
+    CHANGED=1; set -- "$@" --changed "$BASE" --words "$SCOPE_WORDS"
+    if [ -z "$SCOPE_UNITS" ]; then PAGE=no; echo "check page: skipped (no unit tests what the change touches)"
+    else
+      PAGE=yes
+      PAGE_QUERY="$(python3 -c 'import sys, urllib.parse as u; print(u.urlencode({k: v for k, v in zip(("only", "actions", "fullCharacters"), sys.argv[1:]) if v}))' "$SCOPE_UNITS" "$SCOPE_ACTIONS" "$SCOPE_CHARACTERS")"
+    fi
+  fi
+fi
 if [ "$PAGE" = auto ]; then
   if [ -n "$SUBSET" ]; then PAGE=no
   elif [ -n "$CHANGED" ]; then
@@ -77,6 +103,7 @@ if [ "$PAGE" = yes ]; then
   # Một máy chủ, n trang: mỗi phần một Chrome headless riêng (chrome_run.py tự lấy thư mục hồ sơ và cổng DevTools riêng).
   n=1; while [ $n -le "$SHARDS" ]; do
     QUERY=; [ "$SHARDS" -gt 1 ] && QUERY="?shard=$n/$SHARDS"
+    [ -n "$PAGE_QUERY" ] && QUERY="${QUERY:-?}${QUERY:+&}$PAGE_QUERY"
     # Ghi lại lúc mỗi phần xong: bài kiểm cảnh thường xong sau, nên thời gian chờ ở cuối không cho biết trang mất bao lâu.
     ( CHROME_BIN="$CHROME_BIN" python3 tools/chrome_run.py "http://127.0.0.1:$PORT/tools/check.html$QUERY" --wait PASS,FAIL --size 900x900 --timeout "${CHECK_PAGE_TIMEOUT:-1200}" \
         --dump "$OUT/shard$n.html" >"$OUT/shard$n.log" 2>&1; date +%s >"$OUT/shard$n.end" ) &
