@@ -1,5 +1,6 @@
 """Phases 7 and 8 of a build: host setup code, cards, the conversation lines and the camera code of the timeline."""
 import os, re
+from . import feed50c          # đợt 50 C
 from .actions import CARE_REACH, CARE_ACTIONS, GESTURES, WHOLE_BODY
 from .assets import _svg, copy_asset
 from .schema import CARD_KEYS
@@ -114,6 +115,7 @@ def pose_characters(st):
             setup.append(f"    {who['name']}.state.facing = {toward * 0.55};            // seated: a three-quarter turn into the room, thighs on the seat")
         if who['_late']:
             setup.append(f"    {who['name']}.state.opacity = 0;              // off stage until its turn with \"enter\"")
+    if stage_set is not None: setup.extend(feed50c.setup_lines(st))          # đợt 50 C: người xách sẵn lồng có con vật, con vật ở sẵn trong lồng trên sàn
     # ── THẺ THÔNG BÁO (`"toast"` trên một lượt): một thẻ kiểu thông báo ứng dụng ở góc trên khung — biểu tượng chuông,
     # tiêu đề đậm, một dòng nội dung. Mỗi thẻ là một clip phẳng; giờ hiện điền sau khi đo thời gian (`place_toasts`).
     if toasts:

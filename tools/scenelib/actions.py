@@ -211,3 +211,7 @@ RESTRAIN_TAIL = 0.85          # giây sau lúc giữ: vuốt dỗ + buông (rig:
 
 
 RESTRAIN_PAIRS = {}           # id(bước restrain) → (người làm cùng lúc, động tác của họ) — `step_code` biết đầu con vật quay về đâu
+
+# ĐỢT 50 C — sửa đợt 49 B: sấy / tỉa lông con thỏ dưới sàn — người quỳ ở PHÍA ĐUÔI nó (tools/scenelib/approach.py): đuôi cách giữa thân chừng ấy ×
+# chiều cao host của nó.
+GROOM_TAIL_50C = {'blowDry': 0.2, 'trimFur': 0.2}

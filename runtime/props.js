@@ -339,6 +339,59 @@ DRAW.cageFront = ({ w, height, door = 'left', color, dark }) => {
 };
 DEFAULT_COLOR.cage = '#6fb6d9'; DEFAULT_COLOR.cageFront = '#6fb6d9';      // khung sơn tĩnh điện xanh trời; song cửa inox sáng
 
+// ĐỢT 50 C — LỒNG VẬN CHUYỂN có cửa mở được (`putInCarrier` / `takeOutOfCarrier` / `pickUpCarrier` / `putDownCarrier`), nhìn ngang. Như chuồng đợt 49 A:
+// HAI LỚP cùng cỡ, cùng chỗ — `carrierBack` (lòng lồng tối + nệm, vẽ SAU con vật) và `carrierFront` (vỏ nhựa: nắp trên sáng, khay dưới tối, khe thông
+// gió, cửa sổ hông có song, quai xách, CỬA LƯỚI ở đầu `door` — nhóm `data-carrier-door50c`, vẽ TRƯỚC nó). Con vật đứng giữa hai lớp là "ở trong lồng":
+// vỏ che nó, chỉ thấy qua cửa lưới và cửa sổ hông. Cửa lưới xoay về phía người xem quanh bản lề ở MÉP TRONG (chốt ở mép ngoài, gần đầu lồng) — người
+// đứng phía đầu có cửa. Cùng hình ấy là món đồ cầm tay `carrier` (runtime/parts.js `carrier50c`): xách ở quai, thả thõng bên hông.
+// Cỡ `width` × `height` (khung 400 × 470, mặc định 150 × 112 — vừa một con mèo / chó nhỏ cỡ mặc định của cảnh, cùng đơn vị khung người).
+const CARRIER50C = { w: 150, h: 112, line: '#4a3a30', steel: '#eef3f6', inside: '#3f4752', mat: '#f3c9a0' };
+export function carrierShape50c({ w = CARRIER50C.w, height = CARRIER50C.h, door = 'right' } = {}) {
+  const F = PROP_FRAME.floor, x0 = 200 - w / 2, x1 = 200 + w / 2, top = F - height, d = door === 'left' ? -1 : 1;
+  // Cửa lưới: phần đầu lồng phía `door` (31 % bề dài), chừa viền vỏ 8 đơn vị; bản lề ở mép trong, chốt ở mép ngoài.
+  const dw = Math.round(w * 0.31), ox0 = d > 0 ? x1 - 8 - dw : x0 + 8, open = { x0: ox0, x1: ox0 + dw, y0: top + 13, y1: F - 11 };
+  const hinge = d > 0 ? open.x0 : open.x1, latch = d > 0 ? open.x1 - 6 : open.x0 + 6;
+  // Cửa sổ hông (có song) ở nửa kia: thấy thân con vật trong lồng.
+  const wx0 = d > 0 ? x0 + 12 : x1 - 12 - w * 0.4, side = { x0: wx0, x1: wx0 + w * 0.4, y0: top + 18, y1: top + 18 + height * 0.44 };
+  // Lòng lồng (chỗ con vật đứng / nằm): trong vỏ, trừ viền.
+  const room = { x0: x0 + 6, x1: x1 - 6, y0: top + 8, y1: F - 6 };
+  return { x0, x1, top, floor: F, w, h: height, door, open, hinge, latch, side, room, grip: { x: 200, y: top - 23 }, inside: { x: 200, y: F - 6 } };
+}
+export function carrierBackSvg50c(g, { dark }) {
+  const c = CARRIER50C;
+  return `<path d="M ${g.x0 + 3} ${g.top + 12} Q ${g.x0 + 3} ${g.top + 3} ${g.x0 + 12} ${g.top + 3} H ${g.x1 - 12} Q ${g.x1 - 3} ${g.top + 3} ${g.x1 - 3} ${g.top + 12} V ${g.floor - 4} H ${g.x0 + 3} Z" fill="${c.inside}"/>
+    <rect x="${g.x0 + 9}" y="${g.floor - 19}" width="${g.w - 18}" height="13" rx="6" fill="${c.mat}" stroke="${c.line}" stroke-width="1"/>
+    <rect x="${g.x0 + 3}" y="${g.floor - 5}" width="${g.w - 6}" height="5" rx="2" fill="${dark}"/>`;
+}
+export function carrierFrontSvg50c(g, { color, dark }) {
+  const c = CARRIER50C, o = g.open, sw = g.side, base = g.floor - g.h * 0.36, r = 13;
+  const shell = `M ${g.x0 + r} ${g.top} H ${g.x1 - r} Q ${g.x1} ${g.top} ${g.x1} ${g.top + r} V ${g.floor - 5} Q ${g.x1} ${g.floor} ${g.x1 - 5} ${g.floor} H ${g.x0 + 5} Q ${g.x0} ${g.floor} ${g.x0} ${g.floor - 5} V ${g.top + r} Q ${g.x0} ${g.top} ${g.x0 + r} ${g.top} Z`;
+  const holes = `M ${o.x0} ${o.y0 + 4} Q ${o.x0} ${o.y0} ${o.x0 + 4} ${o.y0} H ${o.x1 - 4} Q ${o.x1} ${o.y0} ${o.x1} ${o.y0 + 4} V ${o.y1} H ${o.x0} Z
+             M ${sw.x0} ${sw.y0 + 6} Q ${sw.x0} ${sw.y0} ${sw.x0 + 6} ${sw.y0} H ${sw.x1 - 6} Q ${sw.x1} ${sw.y0} ${sw.x1} ${sw.y0 + 6} V ${sw.y1 - 6} Q ${sw.x1} ${sw.y1} ${sw.x1 - 6} ${sw.y1} H ${sw.x0 + 6} Q ${sw.x0} ${sw.y1} ${sw.x0} ${sw.y1 - 6} Z`;
+  const n = 4, bars = Array.from({ length: n - 1 }, (_, i) => o.x0 + (o.x1 - o.x0) * (i + 1) / n);
+  const sideBars = [1, 2].map((i) => sw.x0 + (sw.x1 - sw.x0) * i / 3);      // hai song cửa sổ hông
+  const gx = g.grip.x, hw = g.w * 0.17;
+  return `
+    <path d="M ${gx - hw} ${g.top + 1} V ${g.top - 12} Q ${gx - hw} ${g.top - 24} ${gx - hw + 12} ${g.top - 24} H ${gx + hw - 12} Q ${gx + hw} ${g.top - 24} ${gx + hw} ${g.top - 12} V ${g.top + 1}" fill="none" stroke="${c.line}" stroke-width="9" stroke-linecap="round"/>
+    <path d="M ${gx - hw} ${g.top + 1} V ${g.top - 12} Q ${gx - hw} ${g.top - 24} ${gx - hw + 12} ${g.top - 24} H ${gx + hw - 12} Q ${gx + hw} ${g.top - 24} ${gx + hw} ${g.top - 12} V ${g.top + 1}" fill="none" stroke="${dark}" stroke-width="6" stroke-linecap="round"/>
+    <path d="${shell} ${holes}" fill="${color}" fill-rule="evenodd" stroke="${c.line}" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M ${g.x0} ${base} H ${g.x1} V ${g.floor - 5} Q ${g.x1} ${g.floor} ${g.x1 - 5} ${g.floor} H ${g.x0 + 5} Q ${g.x0} ${g.floor} ${g.x0} ${g.floor - 5} Z M ${o.x0} ${base} V ${o.y1} H ${o.x1} V ${base} Z" fill="${dark}" fill-rule="evenodd" stroke="${c.line}" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M ${g.x0 + 2} ${base} H ${g.x1 - 2}" stroke="${c.line}" stroke-width="1.4"/>
+    ${[0.22, 0.78].map((f) => `<rect x="${g.x0 + g.w * f - 4}" y="${base - 4}" width="8" height="9" rx="2" fill="#f4f1ea" stroke="${c.line}" stroke-width="1"/>`).join('')}
+    <path d="${sideBars.map((x) => `M ${x.toFixed(1)} ${sw.y0 + 1} V ${sw.y1 - 1}`).join(' ')}" stroke="${c.line}" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="${sideBars.map((x) => `M ${x.toFixed(1)} ${sw.y0 + 1} V ${sw.y1 - 1}`).join(' ')}" stroke="${c.steel}" stroke-width="1.8" stroke-linecap="round"/>
+    <g data-carrier-door50c="" data-hinge="${g.hinge}" data-door="${g.door}" data-w="${g.w}" data-h="${g.h}" data-color="${color}" data-x0="${o.x0}" data-x1="${o.x1}" data-y0="${o.y0}" data-y1="${o.y1}">
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${o.x1 - o.x0 - 2}" height="${o.y1 - o.y0 - 2}" rx="3" fill="none" stroke="${c.line}" stroke-width="5"/>
+      <rect x="${o.x0 + 1}" y="${o.y0 + 1}" width="${o.x1 - o.x0 - 2}" height="${o.y1 - o.y0 - 2}" rx="3" fill="none" stroke="${c.steel}" stroke-width="2.6"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')}" stroke="${c.line}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="${bars.map((x) => `M ${x.toFixed(1)} ${o.y0 + 2} V ${o.y1 - 2}`).join(' ')}" stroke="${c.steel}" stroke-width="1.6" stroke-linecap="round"/>
+      <rect x="${g.latch - 3}" y="${o.y0 + 6}" width="6" height="13" rx="2.5" fill="${dark}" stroke="${c.line}" stroke-width="1.1"/>
+    </g>`;
+}
+DRAW.carrierBack = ({ w, height, door = 'right', dark }) => carrierBackSvg50c(carrierShape50c({ w, height, door }), { dark });
+DRAW.carrierFront = ({ w, height, door = 'right', color, dark }) => carrierFrontSvg50c(carrierShape50c({ w, height, door }), { color, dark });
+DEFAULT_COLOR.carrierBack = '#5bb5a2'; DEFAULT_COLOR.carrierFront = '#5bb5a2';      // nắp nhựa xanh ngọc, khay dưới tối hơn; cửa lưới inox sáng
+
 export const PROP_KINDS = Object.keys(DRAW);
 
 /**
@@ -357,6 +410,7 @@ export const PROP_KINDS = Object.keys(DRAW);
  *     fill     bát: 'food' (hạt, mặc định) | 'water' | 'empty'
  *     reading  cân: chữ trên màn hình số, vd. '4.2 kg'
  *     door     lồng vận chuyển: phía có cửa lưới, 'right' (mặc định) | 'left'; chuồng (`cage` / `cageFront`, đợt 49 A): phía BẢN LỀ cửa, 'left' (mặc định) | 'right'
+ *     (đợt 50 C) `carrierBack` = lòng lồng vận chuyển (vẽ SAU con vật), `carrierFront` = vỏ + cửa lưới ở đầu `door` ('right' mặc định) — cùng cỡ (150 × 112), cùng host
  *     (đợt 49 A) `cage` = lòng chuồng (vẽ SAU con vật), `cageFront` = khung trước + cửa song (vẽ TRƯỚC nó) — cùng `width` / `height` (cỡ ngoài, 170 × 140), cùng host
  * Trả về { svg, kind, seatY, notify }; xe máy thêm `rideLift(rig)` (nâng người lái bao nhiêu đơn vị khung để ngồi trên yên)
  * và `roll(distance, duration, ease)` (timeline quay bánh khi xe đi `distance` đơn vị khung). Host nên có cùng `bottom` và
@@ -399,6 +453,8 @@ export function createProp(host, kind, options = {}) {
   const prop = { svg, kind, seatY: seat, notify: (message, opts) => notifyOn(svg, kind, message, opts) };
   // ĐỢT 49 A: chuồng — hình học trong khung 400 × 470 (ô cửa, bản lề, chốt, sàn trong chuồng) cho `putInCage` / `takeOutOfCage`.
   if (kind === 'cage' || kind === 'cageFront') prop.cage = cageShape49a({ w: o.w, height: o.height, door: o.door });
+  // ĐỢT 50 C: lồng vận chuyển có cửa mở được — hình học trong khung 400 × 470 (cửa lưới, bản lề, chốt, lòng lồng, quai) cho các động tác lồng.
+  if (kind === 'carrierBack' || kind === 'carrierFront') prop.carrier = carrierShape50c({ w: o.w, height: o.height, door: o.door });
   if (kind === 'xray') {
     // CHỖ CHỈ trên phim, trong khung 400 × 470 (`showXray` của người đứng cạnh, cùng cỡ host): `rig.showXray(prop.spot)`.
     const g = xrayFrame(o.w || XRAY_W), at = o.spot || XRAY_SPOT;

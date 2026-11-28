@@ -23,6 +23,8 @@ import { card, stampcard, cash } from './parts.js';
 import { toy42e, bowl42e } from './parts.js';
 // đợt 50 B: món hàng của cửa hàng thú cưng (túi hạt, hộp bánh thưởng, lon pate — `takeFromShelf`, `scanBarcode`)
 import { foodBag50b, treatBox50b, can50b } from './shop50b-items.js';
+// đợt 50 C
+import { carrier50c } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
@@ -252,6 +254,7 @@ Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
 Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
 Object.assign(ITEMS, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b }); Object.assign(kit.parts, { foodBag: foodBag50b, treatBox: treatBox50b, can: can50b });       // đợt 50 B: `items: { R: 'foodBag' }` — món hàng lấy trên kệ, quét mã
+Object.assign(ITEMS, { carrier: carrier50c }); Object.assign(kit.parts, { carrier: carrier50c });       // đợt 50 C: `items: { L: 'carrier' }` — lồng vận chuyển xách ở quai
 
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.

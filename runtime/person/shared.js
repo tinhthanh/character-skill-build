@@ -118,6 +118,11 @@ const NGHI = Object.freeze({
   // `beam50bL/R` độ dài tia đỏ của máy quét mã vạch (gadget 50) trong tay ấy (đơn vị khung bàn tay, 0 = tắt), `scanT50b` đồng hồ của tia (rung nhẹ);
   // `beep50b` 0…1 "bíp" (ô kính loé xanh, hai cung âm thanh); `tiptoe50b` 0…1 kiễng chân (bàn chân xoay, người nhấc lên bằng `lift42d`).
   spin50bL: 0, spin50bR: 0, beam50bL: 0, beam50bR: 0, scanT50b: 0, beep50b: 0, tiptoe50b: 0,
+  // ĐỢT 50 C — BÁT ĂN (`serveBowl`): `bowl50c` số bát người này đã đặt xuống (GIỮ), `bowlFill50c` 0…1 độ đầy của bát mới nhất (GIỮ), `pour50c` 0…1 dòng
+  // đổ đang chảy, `feedT50c` giây (hạt rơi, nước gợn). LỒNG VẬN CHUYỂN: `carrier50c` số mục nhật ký lồng đã xảy ra (GIỮ — `carrierLog50c`), `carrierDoor50c`
+  // 0 đóng … 1 mở cửa lưới của đạo cụ thứ `carrierDoorN50c` − 1 trong `carrierProps50c`.
+  bowl50c: 0, bowlFill50c: 0, pour50c: 0, feedT50c: 0, carrier50c: 0, carrierDoor50c: 0, carrierDoorN50c: 0,
+  omFront50c: 0,          // 1 = con vật đang bế vẽ trước hai cánh tay (lúc hạ nó vào lồng — `putInCarrier`)
 });
 
 const MAU_MAC_DINH = {

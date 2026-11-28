@@ -40,6 +40,8 @@ import exam50a from './person/exam50a.js';
 import leash49c from './person/leash49c.js';
 // đợt 50 B: cửa hàng thú cưng, quầy thu ngân
 import shop50b from './person/shop50b.js';
+// đợt 50 C
+import feed50c from './person/feed50c.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -739,6 +741,7 @@ export class RigSVG {
     this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
     this._drawScales();
     this._drawCages49a();                   // đợt 49 A: cửa chuồng xoay theo `cageDoor49a`, con vật vừa vào / ra chuồng vẽ lại
+    this._drawFeed50c();                    // đợt 50 C: bát đã đặt (đầy dần, dòng đổ), dụng cụ đổ, lồng vận chuyển (trên tay / đạo cụ, cửa, con vật trong lồng)
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
       el.style.display = on ? '' : 'none';
@@ -2038,6 +2041,7 @@ export class RigSVG {
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
     so.cageMove49a = this.s.cageMove49a;                       // đợt 49 A: con vật đã đưa vào / ra chuồng thì ở chỗ mới
+    so.bowl50c = this.s.bowl50c; so.bowlFill50c = this.s.bowlFill50c; so.carrier50c = this.s.carrier50c;      // đợt 50 C: bát đã đặt thì còn đó (đầy), lồng ở chỗ mới
     so.petShag49b = this.s.petShag49b; so.petCutT49b = this.s.petCutT49b; so.petCutDur49b = this.s.petCutDur49b; so.petTrimStart49b = this.s.petTrimStart49b; so.petTrimEnd49b = this.s.petTrimEnd49b;      // đợt 49 B: lông đã tỉa thì còn gọn
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
@@ -2195,6 +2199,9 @@ export class RigSVG {
   // ĐỢT 50 B — CỬA HÀNG THÚ CƯNG & QUẦY THU NGÂN: lấy hàng trên kệ (`takeFromShelf`: kiễng chân / với / ngồi xổm, xoay món hàng đọc nhãn — kết thúc với
   // món hàng trong tay) và quét mã vạch (`scanBarcode`: máy quét cầm tay gadget 50, tia đỏ, "bíp", thẻ giá — cần một món hàng) — runtime/person/shop50b.js.
   static { this.EXCHANGE.push('takeFromShelf', 'scanBarcode'); }      // đợt 50 B
+  // ĐỢT 50 C — CHO ĂN và LỒNG VẬN CHUYỂN (runtime/person/feed50c.js): đặt bát (`serveBowl`, dụng cụ đổ 55 muỗng hạt / 56 ca nước), cho vào lồng / thả ra,
+  // xách lồng / đặt lồng xuống — cần một con vật hay một lồng (`carrierFront`).
+  static { this.EXCHANGE.push('serveBowl', 'putInCarrier', 'takeOutOfCarrier', 'pickUpCarrier', 'putDownCarrier'); }      // đợt 50 C
 }
 for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage, grooming]) install(RigSVG);
 exam50a(RigSVG);       // đợt 50 A
@@ -2203,4 +2210,5 @@ exam50a(RigSVG);       // đợt 50 A
 RigSVG.DONG_TAC.push('palpate', 'useUltrasound', 'lookMicroscope');      // đợt 50 A
 leash49c(RigSVG);       // đợt 49 C
 shop50b(RigSVG);       // đợt 50 B
+feed50c(RigSVG);        // đợt 50 C
 export { veKhuonMat, beRongTaiY, veChanMay };

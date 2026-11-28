@@ -174,6 +174,16 @@ A 3D SET — a room with depth and a camera that changes angle; the characters s
                its screen), ["lookMicroscope", "@<microscope>", { "hold": 2 }] (walks up beside a microscope picture cutout, eye to the
                eyepiece, turns the knob; without a name: the set's only microscope picture, or mimed). The pet turns its tail to the person
                first (hands never cross its face). Pet pose: "lieOnSide".
+               FEEDING (wave 50 C): ["serveBowl", "@cho", { "food": "kibble" | "water", "hold": 0.6, "gap": 44 }] — walks to the side the
+               pet faces, squats, sets a bowl down in front of its muzzle, pours kibble / water (the bowl fills), steps back; the pet walks to
+               the bowl and eats / drinks (its part is added). The bowl stays; ["pickUp", "@cho", { "item": "bowl" }] picks it up.
+               PET CARRIER (wave 50 C): a set.cutouts { "kind": "carrier", "name": "long", "x", "z", "door": "right", "size": [150, 112] }
+               (two layers; sized to the pet if "size" is left out; the door end faces whoever first reaches it). ["putInCarrier", "@meo",
+               "@long", { "carry": true }] (picks the pet up first if needed; "carry": also takes the carrier by its handle), ["takeOutOfCarrier",
+               "@meo", "@long"] (opens it, the pet walks out — its part is added), ["pickUpCarrier", "@long"], ["putDownCarrier", "@long"].
+               "inCarrier": "chu" on a pet: "chu" carries it in a carrier from the start ("holds": "carrier" is given); "inCarrier": "long":
+               it starts in that carrier. Carrying, the place may be left out: ["putDownCarrier"] / ["takeOutOfCarrier", "@meo"] set the
+               carrier down on the floor just in front. The person stands just in front of the carrier (z 12–60 more), at its door end.
                Teamwork (wave 38): ["restrain", "@pet"] inside "together" with another person's ["inject", "@pet"] (or "examine",
                "listen", "takeTemp"…): the restrainer stands on the other side of the pet, both hands on it, for as long as the other
                works. Preparation: ["washHands", 2] (soap foam, shaken dry), "putOnGloves" … "takeOffGloves" (the gloves stay on between).

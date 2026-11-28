@@ -204,6 +204,12 @@ export default (RigSVG) => mix(RigSVG, class {
     });
   }
 
+  // Đợt 50 C: chỗ cái bát người `served.rig` đã đặt (gốc SVG của họ) → hệ `_aimOf` của người này; phần tử bát để ẩn khi nhặt lên.
+  _servedSpot50c(served) {
+    const s = this.s, q = new DOMPoint(served.bowl.x, served.bowl.y).matrixTransform(served.rig.svg.getScreenCTM()).matrixTransform(this.svg.getScreenCTM().inverse());
+    return { x: q.x - s.x, y: Math.min(428, q.y - s.y - DOI_Y), el: served.el };
+  }
+
   // Hình món đồ NẰM DƯỚI SÀN (hệ cục bộ: đáy ở y = 0).
   static _floorShape(kind) {
     if (kind === 'bowl') return bowlShape42e();
@@ -249,7 +255,9 @@ export default (RigSVG) => mix(RigSVG, class {
     const s = this.s;
     if (s.lie42e > 0.5 || s.floor42e > 0.5 || s.seat > 0.5 || s.ride > 0.5) throw new Error('[character] pickUp: stand up first (standUp / getOff) — the character picks things up from standing');
     if (s.om >= 0.5) throw new Error('[character] pickUp: the character is carrying a pet — putDown() first');
-    const spot = this._pickSpot(target), dir = spot.x >= HONG.x ? 1 : -1, near = dir > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
+    // Đợt 50 C: nhặt cái BÁT đã đặt cho con vật ấy (`serveBowl`) — đích là chính cái bát dưới sàn (nó ẩn đi khi được nhặt lên).
+    const served = item === 'bowl' && target && typeof RigSVG.bowlFor50c === 'function' ? RigSVG.bowlFor50c(target) : null;
+    const spot = served ? this._servedSpot50c(served) : this._pickSpot(target), dir = spot.x >= HONG.x ? 1 : -1, near = dir > 0 ? 'L' : 'R', far = near === 'L' ? 'R' : 'L';
     // Món đồ rig TỰ CHO ở lần dựng trước (`conversation()` / `sequence()` dựng mỗi bước hai lần, rồi trả trạng thái đầu — lúc ấy chưa có món
     // đồ, `item` = 1) mà chưa được nhặt: coi như đang cất.
     const auto = (k) => !!(this.autoItem42e && typeof this.autoItem42e[k] === 'number' && s.picked42e < this.autoItem42e[k] + 0.5);

@@ -4,6 +4,7 @@ TOP_KEYS = ('id', 'width', 'height', 'seed', 'gap', 'background', 'characters', 
 CARD_KEYS = ('title', 'text', 'cta', 'logo', 'dur', 'color')
 CHARACTER_KEYS = ('narrator', 'name', 'id', 'species', 'x', 'height', 'enter', 'seated', 'faces', 'voice', 'holds', 'holdsHidden', 'z', 'on', 'wears', 'side', 'rides')
 CHARACTER_KEYS = CHARACTER_KEYS + ('inTub',)               # đợt 42 F: con vật đứng trong chậu tắm (tự thêm, cỡ vừa nó)
+CHARACTER_KEYS = CHARACTER_KEYS + ('inCarrier',)           # đợt 50 C: con vật ở trong lồng vận chuyển (tên cutout "carrier", hay người đang xách lồng)
 CHARACTER_KEYS = CHARACTER_KEYS + ('inCage',)              # đợt 49 A: con vật ở trong chuồng (tên một cutout "cage") từ đầu cảnh
 NARRATOR_KEYS = ('narrator', 'name', 'voice')            # đợt 42 A: người dẫn không hiện hình chỉ có tên, giọng đọc
 NARRATOR_TURN_KEYS = ('who', 'say', 'audio', 'dur', 'voice', 'view')
@@ -39,6 +40,7 @@ ITEM_KINDS = ('cup', 'clipboard', 'phone', 'syringe', 'pills', 'leash', 'bag')
 # dấu thẻ (đưa cho người kia nếu có đích), rót đồ uống, lau quầy. `giveChange` / `stampCard` với đích là bước HAI NGƯỜI (như đưa túi thuốc): người
 # kia nhận (`takeChange` / `takeCard`) cùng lúc, có sẵn món đồ đang cất.
 ITEM_KINDS = ITEM_KINDS + ('card', 'stampcard', 'cash')
+ITEM_KINDS = ITEM_KINDS + ('carrier',)          # đợt 50 C: lồng vận chuyển xách ở quai
 ITEM_KINDS = ITEM_KINDS + ('toy', 'bowl')            # đợt 42 E: quả bóng đồ chơi, bát ăn — `pickUp` nhặt lên, người kia `take` (holds + holdsHidden)
 ITEM_KINDS = ITEM_KINDS + ('foodBag', 'treatBox', 'can')      # đợt 50 B: món hàng của cửa hàng thú cưng (takeFromShelf, scanBarcode)
 CUTOUT_KINDS = CUTOUT_KINDS + ('paystand',)

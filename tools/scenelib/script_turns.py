@@ -6,6 +6,7 @@ person of the turn); none returns anything — they add to `turns`, `views`, `ge
 from .actions import CONE_BACK, RUN_TO, WHOLE_BODY
 from .cage import walk_to_prop          # đợt 49 A
 from . import shop50b          # đợt 50 B
+from . import feed50c          # đợt 50 C
 from .approach import pets_walk_up, kneel_to_low_pet, walk_to_pay_stand, walk_to_pick_up, join_selfie, walk_into_reach, turn_tail_for_temp
 from .emit import emit_together, emit_turn
 from .entry_cues import collect_shows, collect_popup, collect_lamps, collect_power_and_sky, collect_toasts
@@ -43,6 +44,7 @@ def write_turns(st):
             walk_to_prop(emitted, st, turn, turns, who)          # đợt 49 A: bước tới cạnh đồ vật bước ấy gọi tên (chuồng)
             exam50a.walk_up(emitted, st, turn, turns, who)          # đợt 50 A: bước tới cạnh kính hiển vi
             shop50b.walk_to_shelf(emitted, st, turn, turns, who)          # đợt 50 B: bước tới cạnh kệ hàng
+            feed50c.walk_up(emitted, st, turn, turns, who)          # đợt 50 C: tới trước mõm con vật (bát), tới đầu có cửa của lồng
             walk_to_pick_up(emitted, names, turn, turns, who)
             join_selfie(emitted, names, turn, turns, who)
             walk_into_reach(backs, emitted, entry, names, reach_notes, st, stage_set, turn, turns, where, who)
@@ -124,4 +126,5 @@ def _director_beat(beats, director, emitted, entry, first_turn, names, st):
             beat['size'] = 'full'; beat['floor44b'] = True
             beat.pop('mid', None)
         leash49c.beat(beat, entry, names)          # đợt 49 C: góc toàn người dắt + con vật, đổi góc sớm
+        feed50c.beat(beat, entry, names)          # đợt 50 C: góc toàn người + con vật + bát / lồng
         beats.append(beat)
