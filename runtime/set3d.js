@@ -2134,6 +2134,17 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         out[name].c42 = Object.fromEntries(Object.entries(rig.care42fProbe()).map(([key, v]) => [key, one(v)]));
       }
       out['@tub42f'] = [...view.querySelectorAll('[data-tub-rim42f]')].map(centre).filter(Boolean);
+      // ĐỢT 49 A — chuồng: khung trước (`cageFront`) — ô cửa (px trong `view`), cửa đang vẽ (khung hình của nó), lớp vẽ của host khung trước; người: độ mở cửa…
+      out['@cage49a'] = [...view.querySelectorAll('svg[data-prop="cageFront"]')].map((svg) => {
+        const door = svg.querySelector('[data-cage-door49a]'), ctm = svg.getScreenCTM(), host = svg.parentNode;
+        if (!door || !ctm || (host && host.style.display === 'none')) return null;
+        const at = (x, y) => { const q = new DOMPoint(x, y).matrixTransform(ctm); return { x: (q.x - box.left) * sx, y: (q.y - box.top) * sy }; }, a = at(+door.dataset.x0, +door.dataset.y0), b = at(+door.dataset.x1, +door.dataset.y1), d = door.getBoundingClientRect();
+        return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: { x0: (d.left - box.left) * sx, y0: (d.top - box.top) * sy, x1: (d.right - box.left) * sx, y1: (d.bottom - box.top) * sy }, layer: +((host && host.style.zIndex) || 0) };
+      }).filter(Boolean);
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (rig && typeof rig.cage49aProbe === 'function' && out[name]) out[name].cage49a = rig.cage49aProbe();
+      }
       out['@scales'] = [...view.querySelectorAll('svg[data-prop="scale"] text')].map((text) => text.textContent);
       out['@H'] = view.clientHeight;
       return out;

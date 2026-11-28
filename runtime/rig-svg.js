@@ -34,6 +34,7 @@ import pairs from './person/pairs.js';
 import floor from './person/floor.js';
 import stance from './person/stance.js';
 import speech from './person/speech.js';
+import cage from './person/cage.js';
 
 // Các động tác nằm theo nhóm trong runtime/person/ (mỗi tệp một nhóm); lớp ở đây giữ phần lõi: dựng SVG, vẽ (`apDung`),
 // đổi màu / dáng, tư thế nghỉ, và các bảng tên động tác.
@@ -731,6 +732,7 @@ export class RigSVG {
     this._drawSign();                       // đợt 39 C: tấm bảng giữa hai bàn tay, chớp sáng ở điện thoại
     this._drawFloor(goc42e, under42e);          // đợt 42 E: bóng dài + gối dưới người nằm, món đồ dưới sàn chờ nhặt
     this._drawScales();
+    this._drawCages49a();                   // đợt 49 A: cửa chuồng xoay theo `cageDoor49a`, con vật vừa vào / ra chuồng vẽ lại
     for (const [el, on] of [[e.ring, s.ring >= 0.5 && !(s.ringFront >= 0.5)], [e.ringFront, s.ring >= 0.5 && s.ringFront >= 0.5]]) {
       if (!el) continue;
       el.style.display = on ? '' : 'none';
@@ -1350,8 +1352,9 @@ export class RigSVG {
     // Đang trao (`omGive`): hai tay rời dáng ôm, vươn theo con vật ra điểm giữa hai người (góc do `_offerArms` đặt).
     const cradle = clamp(s.omRise, 0, 1) * (1 - clamp(s.omGive || 0, 0, 1));
     if (cradle) for (const [side, sign] of [['L', 1], ['R', -1]]) {
-      rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * cradle;
-      rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * cradle;
+      const hug = cradle * (1 - clamp(s['free49a' + side] || 0, 0, 1));          // đợt 49 A: tay ấy rời con vật (mở cửa chuồng), tay kia vẫn ôm
+      rotation['bat' + side] += (sign * CRADLE[0] - rotation['bat' + side]) * hug;
+      rotation['cang' + side] += (sign * CRADLE[1] - rotation['cang' + side]) * hug;
     }
     // đợt 40 C — con vật trong tay VÙNG VẪY (`struggle` của rig thú ghi `vung` −1…1): hai cánh tay giữ chặt mà lắc theo từng cú giật —
     // cùng quét sang một phía (`swing`) và siết vào mỗi lần giật (`squeeze`). Đọc từ trạng thái con vật mỗi lần vẽ, nên gọi thẳng hay qua `sequence()` như nhau.
@@ -2019,6 +2022,7 @@ export class RigSVG {
     so.petWrap = this.s.petWrap; so.petCone = this.s.petCone;  // băng đã quấn, loa đã đeo cho con vật thì vẫn còn trên nó (đợt 35)
     so.gloveL = this.s.gloveL; so.gloveR = this.s.gloveR;      // găng đã đeo thì vẫn đeo (đợt 38 B)
     so.petWet42f = this.s.petWet42f; so.petDry42f = this.s.petDry42f;      // đợt 42 F: con vật đã tắm thì còn ướt, đã lau thì còn khô bông
+    so.cageMove49a = this.s.cageMove49a;                       // đợt 49 A: con vật đã đưa vào / ra chuồng thì ở chỗ mới
     // Tay ĐÃ CẤT ĐỒ thì buông lỏng: tư thế nghỉ của nhân vật cầm đồ là cánh tay gập giữ cái cốc — cất cốc rồi
     // mà tay vẫn gập nắm như thế là bàn tay nắm vào không khí.
     const target = { ...so, ...giu }, hands = { tayL: this.NGHI.tayL, tayR: this.NGHI.tayR };
@@ -2165,6 +2169,8 @@ export class RigSVG {
   // `petLick42f`) — con vật đọc lại khi vẽ (RigThu._veBath): gọi thẳng hay qua `sequence()` đều đúng nhịp. Con vật trong chậu tắm: đạo cụ `tub`
   // + `pet.inTub42f(rim)` (tools/scene.py: `"inTub": true`).
   static { this.DONG_TAC.push('bathPet', 'brushTeeth', 'towelDry'); }      // đợt 42 F
+  // ĐỢT 49 A — CHUỒNG LƯU TRÚ: đặt con vật vào chuồng / bế ra (runtime/person/cage.js) — cần một con vật và một chuồng (`cageFront`).
+  static { this.EXCHANGE.push('putInCage', 'takeOutOfCage'); }      // đợt 49 A
 }
-for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech]) install(RigSVG);
+for (const install of [basic, counter, presenter, motion, gestures, care, treatment, lookCarry, pairs, floor, stance, speech, cage]) install(RigSVG);
 export { veKhuonMat, beRongTaiY, veChanMay };

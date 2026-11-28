@@ -84,7 +84,18 @@ for (const entry of entries) {
         const standHost = document.createElement('div'); standHost.style.cssText = `position:absolute;left:${(5 + entry.stand.dx * 0.5) * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
         cell.insertBefore(standHost, cell.firstChild); stand = createProp(standHost, 'paystand', { on: entry.stand.on });
       }
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
+      // ĐỢT 49 A — "cage": chuồng trên sàn bên trái người (lòng chuồng sau con vật, khung trước có cửa trước nó; người đứng phía chốt, vẽ trước cả hai) —
+      // `@cage` trong các bước. "cage": "in" — con vật ở trong chuồng từ đầu (giữa chuồng); true — nó đứng dưới sàn bên phải người, cùng sàn với chuồng.
+      let cage = null;
+      if (entry.cage) {
+        host.style.left = `${40 * zoom}px`; cell.appendChild(host);
+        const at = (css) => { const d = document.createElement('div'); d.style.cssText = `position:absolute;${css}`; return d; }, box = `left:${-37 * zoom}px;top:${10 * zoom}px;width:${200 * zoom}px;height:${235 * zoom}px`;
+        const back = at(box), front = at(box);
+        cell.insertBefore(back, cell.firstChild); cell.insertBefore(front, host);
+        createProp(back, 'cage'); cage = createProp(front, 'cageFront');
+        if (pet) { pet.host.style.left = `${(entry.cage === 'in' ? 13 : 140) * zoom}px`; pet.host.style.top = `${(239 - 82 * 292 / 330) * zoom}px`; cell.insertBefore(pet.host, front); pet.apDung(); }
+      }
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@cage' ? cage : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg)) : step));
       // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{ "with": "@person" }` (hay "@pet") trong tuỳ chọn của bước.
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = { ...arg, with: arg.with === '@pet' ? pet : person }; });
       const line = sequence(rig, steps);

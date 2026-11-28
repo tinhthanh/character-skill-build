@@ -8,6 +8,7 @@ from .floor import floor_step
 from .schema import MARKS, MOODS, PET_MOODS, TURN_KEYS
 from .sets import ROOM_DEFAULTS
 from .util import fail, js, known, slug
+from . import cage as cage49a          # đợt 49 A
 
 
 # ĐỢT 35 — CÂN, ĐO NHIỆT ĐỘ, CHO UỐNG THUỐC: kiểm tra đối số, rồi viết bước. Cân: tên một cutout "scale" (có "name") — trong
@@ -295,6 +296,7 @@ def step_code(st, step, where, actor=None):
     if isinstance(step, str): return js(step)
     if not isinstance(step, list) or not step or not isinstance(step[0], str): fail(f'{where}: a step is "name", ["name", args…] or a number — got {js(step)}')
     if step[0] in CARE_REACH: return care_code(st, step, where, actor)
+    if step[0] in cage49a.CAGE_ACTIONS: return cage49a.step_code(st, step, where, actor)          # đợt 49 A: bước gọi tên một đạo cụ của bối cảnh ("@chuong")
     parts = []
     for item in step:
         if isinstance(item, str) and item.startswith('@'):

@@ -182,6 +182,10 @@ clips for every voice file.
    Grooming (đợt 42 F): `["bathPet", "@pet"]` on a pet with `"inTub": true` (it stands in a bath tub sized to it — 3D sets), `["towelDry", "@pet"]`,
    `["brushTeeth", "@pet"]` — the pet's wet / foamy / fluffy fur, open mouth, shake-off and lip-lick follow the person by themselves.
    Scripts: "tắm" (the tub comes by itself), "lau khô" / "lau khô lông", "đánh răng"; cast option "trong chậu".
+   Props by name (đợt 49 A): a step may name a set cutout as `"@<name>"`. Boarding: a cutout `{ "kind": "cage", "name": "chuong", "x", "z", "size": [170, 140] }`
+   (two layers — inside behind the pet, barred front with a door in front), `["putInCage", "@meo", "@chuong"]` (picks the pet up if needed, walks beside
+   the cage, opens the door one-handed, sets it in, closes), `["takeOutOfCage", "@meo", "@chuong"]` (ends holding it); `"inCage": "chuong"` starts a pet
+   inside. The person stands just in front of the cage (z 12–60 more). Rig: `putInCage(pet, cageFrontProp | { at, scale, door })`, props `cage` + `cageFront`.
    Two people together: `["highFive", "@boy"]`, `["hug", "@owner"]`, `["patShoulder", "@owner"]` (comfort), `["whisper", "@nurse"]`,
    `["handOverBag", "@owner"]` (with `"holds": "bag"` — a medicine bag held out in both hands; the owner gets a put-away bag to take it).
    Cashier / café (đợt 39 A): `["payByQR"]` / `["payByCard"]` (phone / bank card to a pay stand on the counter — added for you on the `reception` / `pharmacy` presets),

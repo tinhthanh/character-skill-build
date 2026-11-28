@@ -2,6 +2,7 @@
 import json, os, re
 from .camera import check_camera
 from .expand import expand_combos, narrator_split, pair_restrain
+from . import cage as cage49a          # đợt 49 A
 from .schema import (BACKGROUND_KEYS, BOX_KEYS, CAMERA_KEYS, CUTOUT_KEYS, CUTOUT_KINDS, DRIVE_KEYS, LAMP_KEYS, LIGHT_MOODS, NARRATOR_KEYS,
     NARRATOR_RIG, PANEL_KEYS, ROOM_KEYS, SCREEN_KINDS, SET_KEYS, TOP_KEYS)
 from .sets import SET_PRESETS
@@ -97,7 +98,7 @@ def load_scene(st):
             if item.get('screen') and not os.path.isfile(os.path.join(folder, item['screen'])): fail(f'set.cutouts[{n}].screen not found: {item["screen"]} (looked in {folder})')
             if 'fill' in item and (item.get('kind') != 'bowl' or item['fill'] not in ('food', 'water', 'empty')): fail(f'set.cutouts[{n}].fill must be "food", "water" or "empty" (bowl only)')
             if 'on' in item and (item.get('kind') not in ('lamp', 'floorlamp') or item['on'] not in (True, False)): fail(f'set.cutouts[{n}].on is for a "lamp": true (lit) or false (off until a turn switches it on with "lamp")')
-            if 'door' in item and (item.get('kind') != 'carrier' or item['door'] not in ('left', 'right')): fail(f'set.cutouts[{n}].door must be "left" or "right" (carrier only)')
+            if 'door' in item and (item.get('kind') not in ('carrier', 'cage') or item['door'] not in ('left', 'right')): fail(f'set.cutouts[{n}].door must be "left" or "right" (carrier, cage only)')      # đợt 49 A: chuồng — phía bản lề
             if 'reading' in item and (item.get('kind') != 'scale' or not isinstance(item['reading'], str)): fail(f'set.cutouts[{n}].reading is the text on a scale\'s display, such as "4.2 kg" (scale only)')
         # ÁNH SÁNG: "light" (giờ trong ngày), "lamps" (đèn), panel "window": true (cửa sổ hắt nắng).
         if stage_set.get('light', 'day') not in LIGHT_MOODS: fail(f'set.light must be one of {", ".join(LIGHT_MOODS)} — got {js(stage_set.get("light"))}')
@@ -119,4 +120,8 @@ def load_scene(st):
         for key, why in (('props', 'use set.boxes'), ('background', 'use set.sky and set.room'), ('camera', 'put "view" on the turns instead')):
             if scene.get(key) and not (key == 'camera' and scene[key] == 'auto'): fail(f'"{key}" cannot be combined with "set" — {why}' + (' — or "camera": "auto" to let the camera choose every shot' if key == 'camera' else ''))
         if scene.get('layout', 'stage') != 'stage': fail('"layout": "presenter" cannot be combined with "set"')
+    # ĐỢT 49 A — CHUỒNG: kiểm tra cutout "cage", con vật "inCage" (ở trong chuồng từ đầu), chèn lượt bế trước khi đặt vào chuồng (tools/scenelib/cage.py).
+    if stage_set is not None: cage49a.check_cutouts(stage_set)
+    cage49a.place_in_cage(scene, stage_set)
+    cage49a.split_turns(scene)
     st.keep(narrators=narrators, preset_note=preset_note, scene=scene, stage_set=stage_set)

@@ -100,7 +100,7 @@ def main():
       const before = stage.children.length;
       try {{
       const parts = [];
-      let rig, pet = null, scale = null, person = null;
+      let rig, pet = null, scale = null, person = null, cage = null;
       if (isPet && entry.person) {{
         // A pet beside a person (`hide`, `lick`, combo `scaredPet`): both at their real size (pet host = 0.43 × person host),
         // on one floor, the person drawn in front at `personAt` — as in tools/actions.html (a 230 px cell, person 225 px tall).
@@ -139,6 +139,15 @@ def main():
           host.parentNode.insertBefore(scaleHost, host);
           scale = VGCharacter.createProp(scaleHost, 'scale', {{ reading: entry.scale === true ? '4.2 kg' : String(entry.scale) }}); parts.push(scaleHost);
         }}
+        // ĐỢT 49 A — "cage": chuồng trên sàn bên trái người (lòng chuồng sau con vật, khung trước có cửa trước nó, người trước cả hai), con vật dưới sàn
+        // bên phải người hay trong chuồng ("in") — như tools/actions.html (chuồng lệch −0,385 bề ngang host người, con vật +0,5 / −0,135). `@cage` trong các bước.
+        if (entry.cage && pet) {{
+          const box = `left:${{personX - personW * 0.385}}px;top:${{personY}}px;width:${{personW}}px;height:${{personH}}px`, back = add('host', box), front = add('host', box), petHost = pet.host;
+          petHost.parentNode.insertBefore(back, petHost); host.parentNode.insertBefore(front, host);
+          VGCharacter.createProp(back, 'cage'); cage = VGCharacter.createProp(front, 'cageFront'); parts.push(back, front);
+          const table = parts.find((el) => el.className === 'table'); if (table) table.style.display = 'none';
+          petHost.style.left = `${{personX + personW * (entry.cage === 'in' ? -0.135 : 0.5)}}px`; petHost.style.top = `${{personY + personH * 458 / 470 - petHost.offsetHeight * 292 / 330}}px`; pet.apDung();
+        }}
       }}
       const label = add('label', '');
       count++;
@@ -152,7 +161,7 @@ def main():
         parts[0].parentNode.insertBefore(standHost, parts[0]);
         stand = VGCharacter.createProp(standHost, 'paystand', {{ on: entry.stand.on }}); parts.push(standHost);
       }}
-      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? person : arg)) : step));
+      const steps = entry.steps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@qr' && stand ? {{ x: stand.qr.x + entry.stand.dx, y: stand.qr.y }} : arg === '@reader' && stand ? {{ x: stand.reader.x + entry.stand.dx, y: stand.reader.y }} : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@cage' ? cage : arg === '@person' ? person : arg)) : step));
       // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{{ "with": "@person" }}` (hay "@pet") trong tuỳ chọn của bước.
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => {{ if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = {{ ...arg, with: arg.with === '@pet' ? pet : person }}; }});
       const line = VGCharacter.sequence(rig, steps);

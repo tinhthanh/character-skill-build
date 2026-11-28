@@ -1724,8 +1724,17 @@ try {
           ? L.createCharacter(spot(`left:${left + 100 + (entry.personGap || 84) - tall * 200 / 470}px;top:${235 - tall}px;width:${tall * 400 / 470}px;height:${tall}px`), { id: entry.person, items: entry.personItems || null, itemsHidden: !!entry.personItemsHidden }).rig : null;
         // ĐỢT 39 A — đế thanh toán (`entry.stand`: lệch `dx` đơn vị khung, mặt quầy cao `on`): `@qr` / `@reader` là mã QR / máy quẹt thẻ của nó, như tools/actions.html.
         const stand = entry.stand ? L.createProp(spot(`left:${left + entry.stand.dx * 0.5}px;top:0;width:200px;height:235px`), 'paystand', { on: entry.stand.on }) : null;
+        // ĐỢT 49 A — "cage": chuồng trên sàn bên trái người (người đứng phía chốt), con vật dưới sàn bên phải / trong chuồng ("in") — `@cage`, như tools/actions.html.
+        let cage = null;
+        if (entry.cage) {
+          host.style.left = `${left + 40}px`;
+          const back = spot(`left:${left - 37}px;top:10px;width:200px;height:235px`), front = spot(`left:${left - 37}px;top:10px;width:200px;height:235px`);
+          L.createProp(back, 'cage'); cage = L.createProp(front, 'cageFront'); host.style.top = '10px';
+          if (pet) { pet.host.style.left = `${left + (entry.cage === 'in' ? 13 : 140)}px`; pet.host.style.top = `${239 - 82 * 292 / 330}px`; stage.insertBefore(pet.host, back.nextSibling); pet.apDung(); }
+          stage.appendChild(host);
+        }
         const step = entry.steps[0], [name, ...args] = Array.isArray(step) ? step : [step];
-        const mapped = args.map((arg) => (arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg));
+        const mapped = args.map((arg) => (arg === '@cage' ? cage : arg === '@qr' && stand ? { x: stand.qr.x + entry.stand.dx, y: stand.qr.y } : arg === '@reader' && stand ? { x: stand.reader.x + entry.stand.dx, y: stand.reader.y } : arg === '@pet' ? pet : arg === '@scale' ? scale : arg === '@person' ? partner : arg));
         // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{ "with": "@person" }` trong tuỳ chọn của bước.
         mapped.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) mapped[n] = { ...arg, with: arg.with === '@pet' ? pet : partner }; });
         return { rig, name, args: mapped };      // '@person' (đợt 35): con vật — không đặt người (nấp tại chỗ, liếm không đích); người (đợt 38 C): người kia
