@@ -2982,6 +2982,7 @@ def check_cage49a(folder, c, shots, scales):
         if not pet: row('it is in the arms', None, f'not in the frame at {t:g} s'); continue
         ok = bool(pet.get('carried')) if name == 'takeOutOfCage' else not pet.get('carried') or t < c['times'][0]
         row('it is in the arms' if name == 'takeOutOfCage' else 'it is held before it goes in', bool(pet.get('carried')), f'{"carried" if pet.get("carried") else "not carried"} at {t:g} s')
+    out.extend(check_opaque50c(folder, c, scales, f'{who_n} {name} {pet_n}'))          # đợt 50 C
     return out
 
 
@@ -3049,7 +3050,7 @@ def check_one_scene(folder):
     when = lambda c: [t for key in ('times', 'frames', 'empty', 'track', 'appear', 'after', 'reading', 'raised', 'nods', 'samples', 'chew',
                                     'closed', 'open', 'lifted', 'down', 'hanging', 'falling', 'blink', 'chin', 'wipe', 'shake', 'free', 'scan', 'card') if isinstance(c.get(key), list) for t in c[key] if isinstance(t, (int, float))]
     tool_times = [t for c in checks if c.get('kind') == 'care38' and isinstance(c.get('hit'), (int, float)) for t in (c['hit'] + 0.05,)]      # đợt 38 A: ngay sau lúc giọt thuốc rơi vào mắt
-    tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift') for t in c.get(key) or []]      # đợt 49 A
+    tool_times += [t for c in checks if c.get('kind') == 'cage49a' for key in ('open', 'inside', 'closed', 'carried', 'lift', 'opaque') for t in c.get(key) or []]      # đợt 49 A (+ đợt 50 C: 'opaque')
     tool_times += [t for c in checks if c.get('kind') in FEED50C_KINDS for key in FEED50C_KEYS for t in c.get(key) or []]      # đợt 50 C
     tool_times += [t for c in checks if c.get('kind') == 'care42f' for key in ('spray', 'lather', 'wet', 'rinsed', 'foamUp', 'rimAt', 'brush', 'lick', 'carry', 'rub', 'happy') for t in c.get(key) or []]      # đợt 42 F
     tool_times += [t for c in checks if c.get('kind') == 'groom49b' for key in ('air', 'ripple', 'before', 'after', 'happy', 'cut', 'shag', 'fall', 'neat') for t in c.get(key) or []]      # đợt 49 B
@@ -3279,7 +3280,7 @@ def check_one_scene(folder):
 # ĐỢT 50 C — BÁT ĂN (`serveBowl`) và LỒNG VẬN CHUYỂN (`putInCarrier`, `takeOutOfCarrier`, `pickUpCarrier`, `putDownCarrier`): số đo từ set3d `careProbe`
 # (`f50c` của người — bát, dòng đổ, lồng trên tay; `@carrier50c` — lồng trên sàn) và khung chụp (`shots`). Mọi độ dài theo chiều cao người (`tall`).
 FEED50C_KINDS = ('feed50c', 'carrier50c')
-FEED50C_KEYS = ('down', 'pour', 'full', 'mouth', 'stays', 'open', 'openIn', 'inside', 'closed', 'held', 'carried', 'out')
+FEED50C_KEYS = ('down', 'pour', 'full', 'mouth', 'stays', 'opaque', 'open', 'openIn', 'inside', 'closed', 'held', 'carried', 'out')
 BOWL_FRONT50C = 0.4        # bát cách tâm đầu con vật (ngang) ≤ chừng ấy, về phía nó quay mặt
 BOWL_FLOOR50C = 0.05       # đáy bát cách chân con vật (dọc) ≤ chừng ấy — trên sàn
 MOUTH_BOWL50C = 0.06       # nét môi con vật cách vành bát ≤ chừng ấy lúc ăn / uống (ít nhất 2 trong 3 lúc)
@@ -3341,6 +3342,7 @@ def check_feed50c(folder, c, shots, scales):
         if not k or not who or not who.get('tall') or not who.get('hands'): row('the carrier door opens (a hand on it)', None, f'not in the frame at {t:g} s'); continue
         gap = min(box_gap(h['box'], k['door']) for h in who['hands'] if h.get('box')) / who['tall']
         row('the carrier door opens (a hand on it)', gap <= CARRIER_HAND50C and (f.get('door') or 0) >= 0.3, f'hand {gap * 100:.1f} % of height from the door, door {(f.get("door") or 0) * 100:.0f} % open at {t:g} s')
+    if c['kind'] == 'carrier50c' and c.get('opaque'): out.extend(check_opaque50c(folder, c, scales, f'{who_n} {name} {pet_n}'))
     for t in c.get('openIn') or []:
         f, pet = mine(t), frame(t).get(pet_n) or {}
         row('the door is open while it goes in', (f.get('door') or 0) >= 0.9, f'door {(f.get("door") or 0) * 100:.0f} % open at {t:g} s, {pet_n} {"in the arms" if pet.get("carried") else "lowered"}')
@@ -3372,6 +3374,17 @@ def check_feed50c(folder, c, shots, scales):
         f, k = mine(t), carrier(t)
         row('the carrier is set down', not f.get('held') and bool(k), f'held {bool(f.get("held"))}, a carrier on the floor {bool(k)} at {t:g} s')
     return out
+
+
+
+def check_opaque50c(folder, c, scales, label):
+    """ĐỢT 50 C (duyệt): con vật ĐỤC HẲN (độ đục thật trên trang = 1 — set3d `careProbe` → `op50c`) ở mọi mốc `opaque` (mỗi 0,25 s suốt bước): bế, hạ vào,
+    lấy ra khỏi chuồng / lồng không bao giờ làm nó mờ đi."""
+    vals = [((scales.get(('care', float(t))) or {}).get(c['target']) or {}).get('op50c') for t in c.get('opaque') or []]
+    vals = [(t, v) for t, v in zip(c.get('opaque') or [], vals) if v is not None]
+    if not vals: return [{'scene': folder, 'what': f'{label} — the pet stays fully opaque', 'ok': None, 'note': 'not measured'}]
+    worst = min(vals, key=lambda tv: tv[1])
+    return [{'scene': folder, 'what': f'{label} — the pet stays fully opaque', 'ok': worst[1] >= 0.999, 'note': f'least opacity {worst[1]:.3f} at {worst[0]:g} s over {len(vals)} moments (want 1)'}]
 
 
 if __name__ == '__main__':

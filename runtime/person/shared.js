@@ -114,6 +114,7 @@ const NGHI = Object.freeze({
   // đổ đang chảy, `feedT50c` giây (hạt rơi, nước gợn). LỒNG VẬN CHUYỂN: `carrier50c` số mục nhật ký lồng đã xảy ra (GIỮ — `carrierLog50c`), `carrierDoor50c`
   // 0 đóng … 1 mở cửa lưới của đạo cụ thứ `carrierDoorN50c` − 1 trong `carrierProps50c`.
   bowl50c: 0, bowlFill50c: 0, pour50c: 0, feedT50c: 0, carrier50c: 0, carrierDoor50c: 0, carrierDoorN50c: 0,
+  omFront50c: 0,          // 1 = con vật đang bế vẽ trước hai cánh tay (lúc hạ nó vào lồng — `putInCarrier`)
 });
 
 const MAU_MAC_DINH = {

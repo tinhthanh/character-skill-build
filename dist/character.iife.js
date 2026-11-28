@@ -1194,6 +1194,7 @@ const NGHI = Object.freeze({
   // đổ đang chảy, `feedT50c` giây (hạt rơi, nước gợn). LỒNG VẬN CHUYỂN: `carrier50c` số mục nhật ký lồng đã xảy ra (GIỮ — `carrierLog50c`), `carrierDoor50c`
   // 0 đóng … 1 mở cửa lưới của đạo cụ thứ `carrierDoorN50c` − 1 trong `carrierProps50c`.
   bowl50c: 0, bowlFill50c: 0, pour50c: 0, feedT50c: 0, carrier50c: 0, carrierDoor50c: 0, carrierDoorN50c: 0,
+  omFront50c: 0,          // 1 = con vật đang bế vẽ trước hai cánh tay (lúc hạ nó vào lồng — `putInCarrier`)
 });
 
 const MAU_MAC_DINH = {
@@ -9516,6 +9517,11 @@ const __default = (RigSVG) => mix(RigSVG, class {
 
   // VẼ (gọi trong `apDung`): bát, dụng cụ đổ, lồng — chỉ khi người này đã từng dùng chúng.
   _drawFeed50c() {
+    // Con vật đang bế vẽ trước hai cánh tay (`omFront50c`, lúc hạ nó vào lồng): ngăn bế dời ra sau tay gần, trong cùng nhóm cha (cùng hệ toạ độ);
+    // về chỗ cũ (ngay trước tay gần) khi kênh về 0 — nhân vật không dùng thì markup không đổi.
+    const om = this.el.om, front = (this.s.omFront50c || 0) >= 0.5;
+    if (om && front && !this._omHome50c) { this._omHome50c = { parent: om.parentNode, next: om.nextSibling }; om.parentNode.appendChild(om); }
+    else if (om && !front && this._omHome50c) { const home = this._omHome50c; this._omHome50c = null; home.parent.insertBefore(om, home.next && home.next.parentNode === home.parent ? home.next : null); }
     if (this.bowls50c) this._drawBowls50c();
     this._drawFeedTools50c();
     if (this.carrierProps50c || this.carrierLog50c) this._drawCarriers50c();
@@ -9650,10 +9656,15 @@ const __default = (RigSVG) => mix(RigSVG, class {
     // 3. Hạ con vật vào lồng (chỗ nhà của nó đã là giữa lồng).
     const L0 = opened + 0.45;
     t.to(s, { cageMove49a: n + 1, carrier50c: e + 1, duration: 0.02 }, L0 - 0.05);
-    t.to(s, { ...this._twoHands49a(body, home.width, k), duration: 0.02 }, L0);
+    // Hai tay đỡ dưới BỤNG nó (không giữa thân như chuồng): tay gần — vẽ trên con vật — không vắt ngang mặt / lưng nó lúc hạ xuống (đợt 50 C, duyệt).
+    t.to(s, { ...this._twoHands49a({ x: body.x, y: body.y + home.height * 0.3 }, home.width, k), duration: 0.02 }, L0);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, L0 + 0.02);
     t.to(s, { ...inside.look, than: N.than - inside.lean, dau: N.dau + inside.lean * 0.8, dauY: 7, duration: 0.6, ease: 'power2.inOut' }, L0);
     t.to(s, { omRise: 0, duration: 0.7, ease: 'sine.inOut' }, L0);
+    // Duyệt đợt 50 C: lúc hai tay hạ nó xuống, con vật vẽ TRƯỚC hai cánh tay (`omFront50c`) — tay áo cùng màu áo vắt qua nó thì trên khung nhỏ nó
+    // trông như mờ đi (hai bàn tay đỡ dưới bụng, sau nó).
+    t.to(s, { omFront50c: 1, duration: 0.02 }, L0);
+    t.to(s, { omFront50c: 0, duration: 0.02 }, L0 + 0.72);
     t.set(s, { om: 0 }, L0 + 0.72);
     // 4. Rút tay ra, đóng cửa, gài chốt.
     const R0 = L0 + 0.75;
@@ -19059,6 +19070,15 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const w = +door.dataset.w, h = +door.dataset.h, r0 = at(200 - w / 2 + 6, PROP_FRAME.floor - h + 8), r1 = at(200 + w / 2 - 6, PROP_FRAME.floor - 6);
         return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: rect50c(door.getBoundingClientRect()), room: { x0: r0.x, y0: r0.y, x1: r1.x, y1: r1.y }, shown: svg.style.visibility !== 'hidden', layer: +((host && host.style.zIndex) || 0) };
       }).filter(Boolean);
+      // … và ĐỘ ĐỤC THẬT của mỗi con vật (tích opacity từ SVG của nó — kể cả khi nó nằm trong tay / trong lồng trên tay một người — tới `view`, nhân
+      // `opacity` của nhóm gốc của nó; ẩn = 0): con vật không bao giờ được mờ đi khi được bế, đặt vào / lấy ra khỏi chuồng, lồng.
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !out[name] || out[name].person || !rig.svg) continue;
+        let op = +(rig.el && rig.el.goc && rig.el.goc.getAttribute('opacity') || 1), node = rig.svg;
+        for (; node && node !== view.parentNode; node = node.parentElement) { const cs = getComputedStyle(node); op *= +cs.opacity; if (cs.visibility === 'hidden' || cs.display === 'none') op = 0; }
+        out[name].op50c = +op.toFixed(3);
+      }
       for (const actor of actors) {
         const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
         if (!rig || !out[name] || typeof rig.feed50cProbe !== 'function' || !(rig.bowls50c || rig.carrierLog50c || rig.carrierProps50c)) continue;

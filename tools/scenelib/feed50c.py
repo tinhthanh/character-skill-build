@@ -430,6 +430,7 @@ def plan_moments(op, start, duration, end_of_scene):
             check = {'held': [round(min(start + duration - 0.05, end_of_scene - 0.05), 2)]}
         else:
             check = {'down': [round(min(start + duration - 0.05, end_of_scene - 0.05), 2)], 'carried': [t for t in (round(start - 0.6, 2), r(0.15)) if t > 0.2]}
+        if name in ('putInCarrier', 'takeOutOfCarrier'): check['opaque'] = [r(a / 4) for a in range(1, int(duration * 4))]      # con vật đục hẳn suốt bước (duyệt đợt 50 C)
         ask = [f'Is {op["who"]} {"opening" if name in ("putInCarrier", "takeOutOfCarrier") else "carrying" if name == "pickUpCarrier" else "setting down"} a pet carrier?']
         times = [t for key in ('open', 'inside', 'held', 'down', 'out') for t in check.get(key, [])][:3] or [r(1.0)]
     return {'times': times, 'ask': ask, 'check': dict(check, kind=op['kind'], name=op['name'], who=op['who'], target=op['target'], carrier=op.get('carrier'), times=times)}

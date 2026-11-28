@@ -2172,6 +2172,15 @@ export function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const w = +door.dataset.w, h = +door.dataset.h, r0 = at(200 - w / 2 + 6, PROP_FRAME.floor - h + 8), r1 = at(200 + w / 2 - 6, PROP_FRAME.floor - 6);
         return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: rect50c(door.getBoundingClientRect()), room: { x0: r0.x, y0: r0.y, x1: r1.x, y1: r1.y }, shown: svg.style.visibility !== 'hidden', layer: +((host && host.style.zIndex) || 0) };
       }).filter(Boolean);
+      // … và ĐỘ ĐỤC THẬT của mỗi con vật (tích opacity từ SVG của nó — kể cả khi nó nằm trong tay / trong lồng trên tay một người — tới `view`, nhân
+      // `opacity` của nhóm gốc của nó; ẩn = 0): con vật không bao giờ được mờ đi khi được bế, đặt vào / lấy ra khỏi chuồng, lồng.
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !out[name] || out[name].person || !rig.svg) continue;
+        let op = +(rig.el && rig.el.goc && rig.el.goc.getAttribute('opacity') || 1), node = rig.svg;
+        for (; node && node !== view.parentNode; node = node.parentElement) { const cs = getComputedStyle(node); op *= +cs.opacity; if (cs.visibility === 'hidden' || cs.display === 'none') op = 0; }
+        out[name].op50c = +op.toFixed(3);
+      }
       for (const actor of actors) {
         const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
         if (!rig || !out[name] || typeof rig.feed50cProbe !== 'function' || !(rig.bowls50c || rig.carrierLog50c || rig.carrierProps50c)) continue;

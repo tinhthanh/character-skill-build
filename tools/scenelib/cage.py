@@ -200,4 +200,5 @@ def cage_plan(op, t0, duration):
         ask = [f'Is {op["who"]} reaching into the open cage with both hands to lift the animal ({op["target"]}) out?',
                f'Is {op["who"]} holding the animal ({op["target"]}) in their arms, with the cage door closed behind?']
         times = [r(TAKE_OPEN), r(TAKE_LIFT), r(TAKE_CLOSED)]
+    check['opaque'] = [r(a / 4) for a in range(1, int(duration * 4))]          # đợt 50 C: con vật đục hẳn suốt bước (acting_check `cage49a`)
     return {'times': times, 'ask': ask, 'check': dict(check, kind='cage49a', name=op['name'], who=op['who'], target=op['target'], cage=op['cage'], times=times)}

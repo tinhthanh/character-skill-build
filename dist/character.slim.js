@@ -851,6 +851,7 @@ const NGHI = Object.freeze({
   pairFront: 0, pairSlot: 0,    // `pairSlot`: người kia là mục nào của `rig.pairList` (như `omSlot`) — mỗi khung đúng người của lần ấy
   cageDoor49a: 0, cageMove49a: 0, free49aL: 0, free49aR: 0,
   bowl50c: 0, bowlFill50c: 0, pour50c: 0, feedT50c: 0, carrier50c: 0, carrierDoor50c: 0, carrierDoorN50c: 0,
+  omFront50c: 0,          // 1 = con vật đang bế vẽ trước hai cánh tay (lúc hạ nó vào lồng — `putInCarrier`)
 });
 const MAU_MAC_DINH = {
   da: '#f1c3a0', daToi: '#d9a583', toc: '#2c2a33', ao: '#4a8ed6', aoToi: '#3a74b3',
@@ -6626,6 +6627,9 @@ const __default = (RigSVG) => mix(RigSVG, class {
     }
   }
   _drawFeed50c() {
+    const om = this.el.om, front = (this.s.omFront50c || 0) >= 0.5;
+    if (om && front && !this._omHome50c) { this._omHome50c = { parent: om.parentNode, next: om.nextSibling }; om.parentNode.appendChild(om); }
+    else if (om && !front && this._omHome50c) { const home = this._omHome50c; this._omHome50c = null; home.parent.insertBefore(om, home.next && home.next.parentNode === home.parent ? home.next : null); }
     if (this.bowls50c) this._drawBowls50c();
     this._drawFeedTools50c();
     if (this.carrierProps50c || this.carrierLog50c) this._drawCarriers50c();
@@ -6731,10 +6735,12 @@ const __default = (RigSVG) => mix(RigSVG, class {
     t.to(s, { ['free49a' + k]: 0, ['aim' + k]: 0, duration: 0.35, ease: 'power2.inOut' }, opened + 0.05);
     const L0 = opened + 0.45;
     t.to(s, { cageMove49a: n + 1, carrier50c: e + 1, duration: 0.02 }, L0 - 0.05);
-    t.to(s, { ...this._twoHands49a(body, home.width, k), duration: 0.02 }, L0);
+    t.to(s, { ...this._twoHands49a({ x: body.x, y: body.y + home.height * 0.3 }, home.width, k), duration: 0.02 }, L0);
     t.set(s, { tayL: 'xoe', tayR: 'xoe' }, L0 + 0.02);
     t.to(s, { ...inside.look, than: N.than - inside.lean, dau: N.dau + inside.lean * 0.8, dauY: 7, duration: 0.6, ease: 'power2.inOut' }, L0);
     t.to(s, { omRise: 0, duration: 0.7, ease: 'sine.inOut' }, L0);
+    t.to(s, { omFront50c: 1, duration: 0.02 }, L0);
+    t.to(s, { omFront50c: 0, duration: 0.02 }, L0 + 0.72);
     t.set(s, { om: 0 }, L0 + 0.72);
     const R0 = L0 + 0.75;
     t.to(s, { ['bat' + other]: N['bat' + other], ['cang' + other]: N['cang' + other], ['aim' + other]: 0, ...down, duration: 0.45, ease: 'power2.inOut' }, R0);
@@ -13403,6 +13409,13 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         const w = +door.dataset.w, h = +door.dataset.h, r0 = at(200 - w / 2 + 6, PROP_FRAME.floor - h + 8), r1 = at(200 + w / 2 - 6, PROP_FRAME.floor - 6);
         return { open: { x0: a.x, y0: a.y, x1: b.x, y1: b.y }, door: rect50c(door.getBoundingClientRect()), room: { x0: r0.x, y0: r0.y, x1: r1.x, y1: r1.y }, shown: svg.style.visibility !== 'hidden', layer: +((host && host.style.zIndex) || 0) };
       }).filter(Boolean);
+      for (const actor of actors) {
+        const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
+        if (!rig || !out[name] || out[name].person || !rig.svg) continue;
+        let op = +(rig.el && rig.el.goc && rig.el.goc.getAttribute('opacity') || 1), node = rig.svg;
+        for (; node && node !== view.parentNode; node = node.parentElement) { const cs = getComputedStyle(node); op *= +cs.opacity; if (cs.visibility === 'hidden' || cs.display === 'none') op = 0; }
+        out[name].op50c = +op.toFixed(3);
+      }
       for (const actor of actors) {
         const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
         if (!rig || !out[name] || typeof rig.feed50cProbe !== 'function' || !(rig.bowls50c || rig.carrierLog50c || rig.carrierProps50c)) continue;
