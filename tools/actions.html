@@ -10,7 +10,7 @@
 <body style="margin:0;background:#1d3a4b;font:12px system-ui;color:#cfe">
 <div id="sheet"></div>
 <script type="module">
-import { RigThu, createCharacter, createPet, createProp, sequence, seed } from '../runtime/index.js';
+import { RigThu, createCharacter, createPet, createProp, sequence, partnerLines, seed } from '../runtime/index.js';
 const query = new URLSearchParams(location.search);
 const id = query.get('nv') || 'vet', isPet = id in RigThu.LOAI, turned = query.get('stance') === 'turned';
 const only = (query.get('only') || '').split(',').map((label) => label.trim()).filter(Boolean);
@@ -89,9 +89,12 @@ for (const entry of entries) {
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => { if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = { ...arg, with: arg.with === '@pet' ? pet : person }; });
       const line = sequence(rig, steps);
       const other = person && entry.personSteps ? sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@pet' || arg === '@self' ? rig : arg)) : step))) : null;
+      // Phần "with" của combo (đợt 48): con vật / người phụ làm cùng lúc — y tá giữ con vật, con vật há miệng…
+      const partners = partnerLines(line);
       const at = line.duration() * (column + 0.5) / cols;
       line.time(at); rig.render();
-      if (other) { other.time(Math.min(at, other.duration())); person.render(); }
+      for (const p of partners) { p.line.time(Math.min(Math.max(0, at - p.start), p.line.duration())); p.rig.render(); }
+      if (other) { other.time(Math.min(Math.max(0, at - (entry.personStart || 0)), other.duration())); person.render(); }      // personStart: giây bắt đầu personSteps
       const stamp = document.createElement('span'); stamp.style.cssText = 'position:absolute;right:4px;top:2px;color:#8fb3c4';
       stamp.textContent = `${at.toFixed(2)} s`; cell.appendChild(stamp);
     } catch (error) {

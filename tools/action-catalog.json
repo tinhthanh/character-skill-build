@@ -1,5 +1,5 @@
 {
-  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species), person (pets: a person of that id standing beside the pet, \"@person\" in the steps; personSteps: what the person does at the same time, \"@pet\" is the pet; personAt: the person's centre in px of the cell, default 150). People rows may have a second person too (wave 38 C — two people together): person, personSteps (\"@self\" is the row's character), personGap (centre to centre in px of a 235 px tall cell, default 84), personScale (0.75 for a child), personItems / personItemsHidden (what the second person holds). Points are in the 400 × 470 frame.",
+  "_about": "Every action as a ready demo, shared by tools/actions.sh (review sheet) and tools/reel.py (video reel / clips). Each entry: label, steps (as in sequence(); \"@pet\" is the demo pet), optional items (createCharacter items), itemsHidden, pet (species placed in reach, on a table), wear (pet accessories: cone, bandage), species (pets: only for that species), person (pets: a person of that id standing beside the pet, \"@person\" in the steps; personSteps: what the person does at the same time, \"@pet\" is the pet; personAt: the person's centre in px of the cell, default 150). People rows may have a second person too (wave 38 C — two people together): person, personSteps (\"@self\" is the row's character), personGap (centre to centre in px of a 235 px tall cell, default 84), personScale (0.75 for a child), personItems / personItemsHidden (what the second person holds), personStart (seconds into the row at which personSteps begin, default 0). A combo's own `with` steps (a pet opening its mouth, a nurse holding the pet) run on their own through partnerLines(); personSteps must not overlap them. Points are in the 400 × 470 frame.",
   "people": [
     { "label": "idle", "steps": [["idle", 1.6]] },
     { "label": "wave", "steps": ["wave"] },
@@ -177,7 +177,7 @@
     { "label": "combo napWithPet (pet)", "steps": [["napWithPet", "@pet"]], "pet": "dog", "petOnFloor": true },
     { "label": "combo welcomeHome (pet)", "steps": [["welcomeHome", "@pet"]], "pet": "dog", "petOnFloor": true },
     { "label": "combo playFetch (pet)", "steps": [["playFetch", "@pet"]], "pet": "dog", "petOnFloor": true },
-    { "label": "combo danceWithKid (child)", "steps": [["danceWithKid", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["face", "front"], ["dance", "happy", 2], ["idle", 0.6], ["highFive", "@self"]], "personGap": 78 },
+    { "label": "combo danceWithKid (child)", "steps": [["danceWithKid", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["highFive", "@self"]], "personStart": 6.3, "personGap": 78 },
     { "label": "combo tidyToys", "steps": ["tidyToys"] },
     { "label": "combo celebrateWithKid (child)", "steps": [["celebrateWithKid", "@person"]], "person": "boy", "personScale": 0.75, "personSteps": [["highFive", "@self"]], "personGap": 78 },
     { "label": "combo farewellOwner (person)", "steps": [["farewellOwner", "@person"]], "items": { "R": "bag" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["takeBag", "@self"]], "personGap": 94 },
@@ -192,7 +192,7 @@
     { "label": "combo dispenseMedicine (person)", "steps": [["dispenseMedicine", "@person"]], "items": { "R": "bag", "L": "clipboard" }, "person": "granny", "personItems": { "L": "bag" }, "personItemsHidden": true, "personSteps": [["idle", 10.9], ["takeBag", "@self"]], "personGap": 94 },
     { "label": "combo newPatientCheckIn (pet)", "steps": [["newPatientCheckIn", "@pet"]], "pet": "dog", "items": { "R": "clipboard" }, "itemsHidden": true },
     { "label": "combo dentalCare (pet)", "steps": [["dentalCare", "@pet"]], "pet": "dog" },
-    { "label": "combo comfortOwner (person)", "steps": [["comfortOwner", "@person"]], "person": "granny", "personSteps": [["idle", 2.3], ["lookAt", "@self", { "hold": 2.6 }], ["hug", "@self"]], "personGap": 75 },
+    { "label": "combo comfortOwner (person)", "steps": [["comfortOwner", "@person"]], "person": "granny", "personSteps": [["hug", "@self"]], "personStart": 6.02, "personGap": 75 },
     { "label": "combo fullSpa (pet in a tub)", "steps": [["fullSpa", "@pet"]], "pet": "dog", "tub": true },
     { "label": "combo postSurgeryCheck (pet)", "steps": [["postSurgeryCheck", "@pet"]], "pet": "cat", "wear": ["cone"], "items": { "R": "clipboard" }, "itemsHidden": true },
     { "label": "combo dischargePet (pet → person)", "steps": [["dischargePet", "@pet", "@person"]], "pet": "dog", "person": "owner_woman", "personSteps": [["idle", 1.65], ["takePet", "@self"]], "personGap": 120 },

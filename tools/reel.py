@@ -156,11 +156,15 @@ def main():
       // ĐỢT 39 C: chụp ảnh tự sướng cùng ai — `{{ "with": "@person" }}` (hay "@pet") trong tuỳ chọn của bước.
       for (const step of steps) if (Array.isArray(step)) step.forEach((arg, n) => {{ if (arg && typeof arg === 'object' && !arg.svg && (arg.with === '@person' || arg.with === '@pet')) step[n] = {{ ...arg, with: arg.with === '@pet' ? pet : person }}; }});
       const line = VGCharacter.sequence(rig, steps);
-      if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD});
+      // Phần "with" của combo (đợt 48): con vật / người phụ làm cùng lúc — y tá giữ con vật, con vật há miệng… Dựng trước khi
+      // thêm gì vào `tl`, để một hàng hỏng (catch bên dưới) không để lại gì trong timeline.
+      const partners = VGCharacter.partnerLines(line);
+      if (person && entry.personSteps) tl.add(VGCharacter.sequence(person, entry.personSteps.map((step) => (Array.isArray(step) ? step.map((arg) => (arg === '@self' || arg === '@pet' ? rig : arg)) : step))).paused(false), at + {LEAD} + (entry.personStart || 0));
       const start = at, end = at + {LEAD} + line.duration() + {TAIL};
       // Chỉ hiện trong khung giờ của mình. `visibility` bằng set của timeline: tua tới / tua lui đều đúng.
       tl.set(parts, {{ visibility: 'visible' }}, start).set(parts, {{ visibility: 'hidden' }}, end);
       tl.add(line.paused(false), start + {LEAD});
+      for (const p of partners) tl.add(p.line.paused(false), start + {LEAD} + p.start);
       slots.push([start, end, entry.label]);
       at = end;
       }} catch (error) {{
