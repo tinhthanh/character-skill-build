@@ -3,6 +3,7 @@ import json, os, re
 from .camera import check_camera
 from .expand import expand_combos, narrator_split, pair_restrain
 from . import cage as cage49a          # đợt 49 A
+from . import feed50c          # đợt 50 C
 from .schema import (BACKGROUND_KEYS, BOX_KEYS, CAMERA_KEYS, CUTOUT_KEYS, CUTOUT_KINDS, DRIVE_KEYS, LAMP_KEYS, LIGHT_MOODS, NARRATOR_KEYS,
     NARRATOR_RIG, PANEL_KEYS, ROOM_KEYS, SCREEN_KINDS, SET_KEYS, TOP_KEYS)
 from .sets import SET_PRESETS
@@ -124,4 +125,5 @@ def load_scene(st):
     if stage_set is not None: cage49a.check_cutouts(stage_set)
     cage49a.place_in_cage(scene, stage_set)
     cage49a.split_turns(scene)
+    feed50c.prepare(scene, stage_set); feed50c.note_start(scene, stage_set)          # đợt 50 C: lồng vận chuyển hai lớp, con vật "inCarrier", lượt bế trước khi cho vào lồng
     st.keep(narrators=narrators, preset_note=preset_note, scene=scene, stage_set=stage_set)

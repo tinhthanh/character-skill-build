@@ -21,6 +21,8 @@ import { roundGlasses, shortBeard, moustache, wrinkles, apronBib, cup, clipboard
 import { card, stampcard, cash } from './parts.js';
 // đợt 42 E: quả bóng đồ chơi, bát ăn (nhặt dưới sàn lên — `pickUp`)
 import { toy42e, bowl42e } from './parts.js';
+// đợt 50 C
+import { carrier50c } from './parts.js';
 import { COLOR_KEYS, PERSON_STATE_KEYS, PET_STATE_KEYS, HAND_SHAPES, CONFIG_GROUPS, PET_SHAPE_KEYS,
          definitionToInternal, definitionToPublic, configToInternal, stateToInternal, DRAWING_SLOTS, DEFINITION_KEYS } from './schema.js';
 import { createSet, OVERVIEW, CAMERA_LIMITS } from './set3d.js';
@@ -249,6 +251,7 @@ const ITEMS = { cup, clipboard, phone, syringe, pills, leash, bag };
 Object.assign(ITEMS, { card, stampcard, cash });       // đợt 39 A
 Object.assign(kit.parts, { card, stampcard, cash });       // đợt 39 A: thẻ ngân hàng, thẻ tích điểm, xấp tiền (cũng là `kit.parts`)
 Object.assign(ITEMS, { toy: toy42e, bowl: bowl42e }); Object.assign(kit.parts, { toy: toy42e, bowl: bowl42e });       // đợt 42 E: `items: { R: 'toy' }` — đồ `pickUp` nhặt lên, `take` nhận
+Object.assign(ITEMS, { carrier: carrier50c }); Object.assign(kit.parts, { carrier: carrier50c });       // đợt 50 C: `items: { L: 'carrier' }` — lồng vận chuyển xách ở quai
 
 /**
  * Dựng một nhân vật NGƯỜI vào `host`.

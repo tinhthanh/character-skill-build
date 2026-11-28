@@ -187,6 +187,13 @@ clips for every voice file.
    (two layers — inside behind the pet, barred front with a door in front), `["putInCage", "@meo", "@chuong"]` (picks the pet up if needed, walks beside
    the cage, opens the door one-handed, sets it in, closes), `["takeOutOfCage", "@meo", "@chuong"]` (ends holding it); `"inCage": "chuong"` starts a pet
    inside. The person stands just in front of the cage (z 12–60 more). Rig: `putInCage(pet, cageFrontProp | { at, scale, door })`, props `cage` + `cageFront`.
+   Feeding (đợt 50 C): `["serveBowl", "@cho", { "food": "kibble" | "water", "hold": 0.6 }]` — walks to the side the pet faces, squats, sets a bowl down in
+   front of its muzzle, pours kibble / water from a scoop / jug (the bowl fills), steps back; the pet walks to the bowl and eats / drinks by itself. The
+   bowl stays (`["pickUp", "@cho", { "item": "bowl" }]` picks it up). Pet carrier: a cutout `{ "kind": "carrier", "name": "long", "x", "z" }` (two layers,
+   door end `"door"`, sized to the pet), `["putInCarrier", "@meo", "@long", { "carry": true }]`, `["takeOutOfCarrier", "@meo", "@long"]` (the pet walks out),
+   `["pickUpCarrier", "@long"]`, `["putDownCarrier"]`; `"inCarrier": "chu"` on a pet = the person carries it in a carrier from the start (enters with it,
+   then `["takeOutOfCarrier", "@meo"]` sets it down in front and opens it), `"inCarrier": "long"` = it starts in that carrier. Dogs, cats, rabbits.
+   Scripts: "cho ăn", "đặt bát", "cho uống nước", "cho vào lồng" (… "rồi xách"), "thả ra khỏi lồng", "[xách lồng]", "[đặt lồng xuống]".
    Grooming 2 (đợt 49 B): `["blowDry", "@pet", { "hold": 2.4 }]` (dryer nozzle aimed down at its back, air stream, the other hand fluffs the fur —
    fur ripples, ears back, eyes squint; wet → dry and fluffy, so it follows `bathPet` / `towelDry`), `["trimFur", "@pet", { "tool": "clipper" }]`
    (`"scissors"` by default — long tufts trimmed along the back fall to the floor / table, the other hand steadies it, the coat ends neater).

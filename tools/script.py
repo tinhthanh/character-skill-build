@@ -51,6 +51,11 @@ Một tệp kịch bản:
                                        "[nhảy]" của thú vẫn là nhảy chồm) · tên → tên khác: chạy tới (chạy lại đứng cạnh người / con vật ấy)
     tên → con vật: dắt đi dạo           dắt chó (hay mèo đeo yếm) đi dạo — tự móc dây, chó kiệu trước, đánh hơi, ngoái lại; "dắt chó đi dạo",
                                        "dắt đi", "dắt đi dạo sang trái", "dắt đi dạo 200" (quãng, đơn vị khung); dây vẫn móc ("tháo dây" sau)
+    tên → con vật: đặt bát / cho ăn / cho uống nước   đặt bát xuống trước mõm, đổ hạt (hay nước — "cho uống", "đặt bát nước"), lùi lại; con vật
+                                       tự tới ăn / uống, bát ở lại dưới sàn ("bé → chó: nhặt bát" nhặt nó lên)
+    tên → con vật: cho vào lồng / bỏ vào lồng   cho vào lồng vận chuyển (tự đặt một cái lồng cạnh người ấy): mở cửa lưới, đặt vào, đóng; "cho vào lồng
+                                       rồi xách" — xách lồng lên luôn · thả ra khỏi lồng / cho ra khỏi lồng — mở cửa, con vật tự bước ra (đang xách thì đặt
+                                       lồng xuống trước) · tên: [xách lồng] [đặt lồng xuống]
     tên: [rửa tay] [đeo găng] [tháo găng]   rửa tay (bọt xà phòng, vẩy khô), đeo / tháo găng tay y tế (găng còn đeo tới khi tháo)
     tên: [đọc bệnh án]                 cầm bìa hồ sơ (tự giao), đọc, lật trang, ngẩng lên gật
     tên: [chỉ phim]                    quay sang đèn đọc phim X-quang (tự đặt cạnh người ấy), chỉ vào chỗ rạn, quay lại
@@ -170,6 +175,16 @@ from scene import COMBOS, expand_combos       # noqa: E402
 # ĐỢT 38 B — phối hợp và chuẩn bị ở phòng khám: giữ con vật cho người khác làm ("cùng lúc: y tá → chó: giữ | bác sĩ → chó: tiêm"),
 # rửa tay, đeo / tháo găng tay ("bác sĩ: [rửa tay, đeo găng]").
 TARGETED.update({'giữ': ('restrain', None), 'giữ con vật': ('restrain', None), 'giữ chặt': ('restrain', None)})
+# ĐỢT 50 C — CHO ĂN và LỒNG VẬN CHUYỂN: "bé → chó: cho ăn" / "đặt bát" / "cho uống nước"; "y tá → mèo: cho vào lồng" (… "rồi xách"), "thả ra khỏi lồng";
+# "chủ: [xách lồng]", "[đặt lồng xuống]". Lồng tự thêm vào bối cảnh (`CARRIER_NAME`, cạnh người đầu tiên dùng, phía không có con vật).
+TARGETED.update({'đặt bát': ('serveBowl', None), 'đặt bát ăn': ('serveBowl', None), 'cho ăn': ('serveBowl', None), 'đổ hạt': ('serveBowl', None), 'đổ thức ăn': ('serveBowl', None),
+                 'cho uống': ('serveBowl', {'food': 'water'}), 'cho uống nước': ('serveBowl', {'food': 'water'}), 'đặt bát nước': ('serveBowl', {'food': 'water'}), 'rót nước': ('serveBowl', {'food': 'water'}),
+                 'nhặt bát': ('pickUp', {'item': 'bowl'}), 'dọn bát': ('pickUp', {'item': 'bowl'}),
+                 'cho vào lồng': ('putInCarrier', None), 'bỏ vào lồng': ('putInCarrier', None), 'đặt vào lồng': ('putInCarrier', None),
+                 'cho vào lồng rồi xách': ('putInCarrier', {'carry': True}), 'bỏ vào lồng rồi xách': ('putInCarrier', {'carry': True}), 'cho vào lồng xách đi': ('putInCarrier', {'carry': True}),
+                 'thả ra khỏi lồng': ('takeOutOfCarrier', None), 'cho ra khỏi lồng': ('takeOutOfCarrier', None), 'thả ra': ('takeOutOfCarrier', None), 'mở lồng': ('takeOutOfCarrier', None)})
+ACTIONS.update({'xách lồng': 'pickUpCarrier', 'xách lồng lên': 'pickUpCarrier', 'nhấc lồng': 'pickUpCarrier', 'đặt lồng xuống': 'putDownCarrier', 'đặt lồng': 'putDownCarrier', 'để lồng xuống': 'putDownCarrier'})
+CARRIER_NAME = 'long'                                    # tên cái lồng vận chuyển tự thêm vào bối cảnh khi có lượt dùng lồng
 ACTIONS.update({'tháo dây': 'unleash', 'tháo dây dắt': 'unleash', 'tháo xích': 'unleash'})          # đợt 49 C — sau "dắt đi dạo" (dây vẫn móc)
 ACTIONS.update({'rửa tay': 'washHands', 'đeo găng': 'putOnGloves', 'đeo găng tay': 'putOnGloves', 'tháo găng': 'takeOffGloves', 'tháo găng tay': 'takeOffGloves'})
 COMBO_WORDS = {word: name for name, combo in COMBOS.items() for word in combo.get('vi', [])}
@@ -531,6 +546,34 @@ def build_parsed(head, cast, lines, base, soft_boxes=False):
         pet = next((c for c in characters if c['name'] == weighs[0][1]), None)
         side = -1 if not pet or float(pet.get('x', 0)) >= float(doer.get('x', 0)) else 1
         scene['set'].setdefault('cutouts', []).append({'kind': 'scale', 'name': SCALE_NAME, 'x': round(float(doer.get('x', 0)) + side * 160), 'z': doer.get('z', -560)})
+    # ĐỢT 50 C — LỒNG VẬN CHUYỂN: một cái lồng trên sàn cạnh người dùng lồng đầu tiên (phía không có con vật, lùi sau người một chút); các bước lồng
+    # chưa gọi tên lồng thì gọi nó — trừ lúc người đang xách lồng (đặt xuống ngay trước mặt). Thả ra mà chưa cho vào: con vật ở trong lồng từ đầu.
+    flat50c = [t for entry in script for t in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry]) if isinstance(t, dict)]
+    for t in flat50c:
+        if isinstance(t.get('do'), list): t['do'] = [[step] if step in ('pickUpCarrier', 'putDownCarrier') else step for step in t['do']]
+    uses50c = [(t, step) for t in flat50c for step in t.get('do', []) if (step if isinstance(step, str) else step[0] if isinstance(step, list) and step else None) in ('putInCarrier', 'takeOutOfCarrier', 'pickUpCarrier', 'putDownCarrier')]
+    if uses50c and not any(item.get('name') == CARRIER_NAME for item in scene['set'].get('cutouts', [])):
+        doer = next(c for c in characters if c['name'] == uses50c[0][0]['who'])
+        pet = next((c for c in characters if isinstance(uses50c[0][1], list) and len(uses50c[0][1]) > 1 and c['name'] == str(uses50c[0][1][1])[1:]), None)
+        side = -1 if not pet or float(pet.get('x', 0)) >= float(doer.get('x', 0)) else 1
+        scene['set'].setdefault('cutouts', []).append({'kind': 'carrier', 'name': CARRIER_NAME, 'x': round(float(doer.get('x', 0)) + side * 230), 'z': doer.get('z', -560) - 30})
+        holding50c, inside50c = set(), set()
+        for t, step in uses50c:
+            name, who = step[0], t['who']
+            if name == 'putInCarrier':
+                step.insert(2, '@' + CARRIER_NAME)
+                if isinstance(step[-1], dict) and step[-1].get('carry'): holding50c.add(who)
+                else: inside50c.add(step[1][1:])
+            elif name == 'pickUpCarrier': step.insert(1, '@' + CARRIER_NAME); holding50c.add(who); inside50c.clear()
+            elif name == 'putDownCarrier': holding50c.discard(who)
+            elif name == 'takeOutOfCarrier':
+                if who in holding50c: holding50c.discard(who)
+                else:
+                    step.insert(2, '@' + CARRIER_NAME)
+                    if step[1][1:] not in inside50c:
+                        c = next((c for c in characters if c['name'] == step[1][1:]), None)
+                        if c is not None and not c.get('inCarrier'): c['inCarrier'] = CARRIER_NAME; c.pop('x', None); c.pop('z', None)
+                inside50c.discard(step[1][1:])
     # ĐỢT 42 F — TẮM: con vật được tắm đứng trong chậu tắm (tools/scene.py tự thêm chậu vừa cỡ nó) từ đầu cảnh.
     bathed = {step[1][1:] for entry in script for turn in (entry.get('together', []) if isinstance(entry, dict) and 'together' in entry else [entry]) if isinstance(turn, dict)
               for step in turn.get('do', []) if isinstance(step, list) and len(step) > 1 and step[0] == 'bathPet' and isinstance(step[1], str)}

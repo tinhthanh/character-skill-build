@@ -35,7 +35,7 @@ def check_cutouts(stage_set):
     """Các cutout "cage": cỡ (`size`), bản lề (`door`), trên sàn (không `y`); `size` chỉ cho chuồng; tên không trùng."""
     names = [item.get('name') for item in stage_set.get('cutouts', []) if item.get('name')]
     for n, item in enumerate(stage_set.get('cutouts', [])):
-        if 'size' in item and item.get('kind') != 'cage': fail(f'set.cutouts[{n}].size is for a "cage": [width, height] in its 400 × 470 frame')
+        if 'size' in item and item.get('kind') not in ('cage', 'carrier'): fail(f'set.cutouts[{n}].size is for a "cage": [width, height] in its 400 × 470 frame')
         if item.get('kind') != 'cage': continue
         size = item.get('size', list(CAGE_SIZE))
         if not (isinstance(size, list) and len(size) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in size) and 80 <= size[0] <= 380 and 70 <= size[1] <= 400):
