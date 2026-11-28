@@ -22,7 +22,7 @@ bath a pet standing in a tub (shower spray, foam, rinse — it shakes off water)
 blow-dry it (a dryer nozzle with a visible air stream, the fur blown about, then fluffy), trim its coat with scissors or a clipper (tufts fall, the coat ends neater),
 feel its belly or flanks, scan it with ultrasound (it lies on its side, gel, a probe, a generic scan picture), look into a microscope at the lab bench,
 take a product off a shop shelf (on tiptoe, reaching, squatting — then reads its label), scan its barcode at the till (a red scan line, bíp, the price),
-get a notification on the phone (138 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
+get a notification on the phone (148 person actions in all — `VGCharacter.list().personActions`) and hold a stance (sit down, face someone, look at something — `lookAt` turns the head, put an item
 away, keep the phone at the cheek, carry a pet, hold a leash). Pets can also lie down, sleep, look unwell, scratch an
 itch, limp, tremble with fear, eat and drink from a bowl, cough, sneeze, pant, yawn, shake off water, open the
 mouth for an exam, rub against a leg, fetch a ball, greet their owner, play, go into a carrier, roll over belly up, chase

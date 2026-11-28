@@ -14188,6 +14188,7 @@ function createSet(view, { origin = null, camera: initial = {} } = {}) {
         if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.exam50aProbe !== 'function' || !out[name]) continue;
         const one = (v) => (v && v.getBoundingClientRect ? (v.style && v.style.display === 'none' ? null : centre(v)) : v && v.px ? { x: (v.x - box.left) * sx, y: (v.y - box.top) * sy } : v);
         out[name].c50a = Object.fromEntries(Object.entries(rig.exam50aProbe()).map(([key, v]) => [key, one(v)]));
+      }
       for (const actor of actors) {
         const rig = actor.rig, name = actor.host.dataset.name || actor.host.id || '';
         if (!rig || !rig.el || actor.host.style.display === 'none' || typeof rig.shop50bProbe !== 'function' || !out[name]) continue;
